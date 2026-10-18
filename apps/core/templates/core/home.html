@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block content %}
+<h1 class="h4">خوش آمدید</h1>
+<p>امروز: {{ now|jformat:"%Y/%m/%d" }}</p>
+{% endblock %}
