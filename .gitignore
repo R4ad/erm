@@ -7,3 +7,4 @@ media/
 .venv/
 .pytest_cache/
 .ruff_cache/
+settings.json
