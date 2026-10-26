@@ -15,3 +15,13 @@ def role_required(*roles):
         return wrapper
 
     return decorator
+
+class RoleRequiredMixin:
+
+    roles = ()
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_system_admin or user.has_role(*self.roles):
+            return super().dispatch(request, *args, **kwargs)
+        raise PermissionDenied

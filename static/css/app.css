@@ -8,3 +8,7 @@
 body {
   font-family: "Vazirmatn", sans-serif;
 }
+
+[aria-invalid="true"] {
+  border-color: var(--bs-form-invalid-border-color);
+}

@@ -34,3 +34,9 @@ class OrgUnit(TimeStampedModel):
             if node.pk == self.pk:
                 raise ValidationError({"parent": "یک واحد نمی‌تواند زیرمجموعه‌ی خودش باشد."})
             node = node.parent
+
+        if self.is_active and self.parent and not self.parent.is_active:
+            raise ValidationError({"parent": "واحد بالادست غیرفعال است٫ واحد فعال نمی تواند زیر آن باشد."})
+
+        if self.pk and not self.is_active and self.children.filter(is_active=True).exists():
+            raise ValidationError({"is_active": "این واحد زیرمجموعه فعال دارد٫ اول آن ها را غیرفعال کنید."})
