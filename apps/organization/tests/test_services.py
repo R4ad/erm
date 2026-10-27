@@ -23,7 +23,7 @@ def test_unit_tree_puts_each_unit_right_after_its_parent():
 
     tree = unit_tree(OrgUnit.objects.all())
 
-    assert tree == [root, child, grandchild, tech]
-    assert [unit.depth for unit in tree] == [0, 1, 2, 0]
+    assert tree == [tech, root, child, grandchild]
+    assert [unit.depth for unit in tree] == [0, 0, 1, 2]
     # اگر بالادست در فهرست نباشد، واحد ریشه حساب می‌شود و گم نمی‌شود.
     assert unit_tree([child, grandchild]) == [child, grandchild]

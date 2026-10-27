@@ -7,7 +7,14 @@ from apps.core.models import TimeStampedModel
 
 class OrgUnit(TimeStampedModel):
     name = models.CharField("نام", max_length=200)
-    code = models.CharField("کد", max_length=20, unique=True)
+    code = models.CharField(
+        "کد",
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="کد رسمی واحد، اگر دارد.",
+    )
     parent = models.ForeignKey(
         "self",
         verbose_name="واحد بالادست",
@@ -23,7 +30,15 @@ class OrgUnit(TimeStampedModel):
     class Meta:
         verbose_name = "واحد سازمانی"
         verbose_name_plural = "واحدهای سازمانی"
-        ordering = ["code"]
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent", "name"],
+                nulls_distinct=False,
+                name="unique_unit_name_per_parent",
+                violation_error_message="زیر این واحد بالادست، واحدی با همین نام هست.",
+            ),
+        ]
 
     def __str__(self):
         return self.name

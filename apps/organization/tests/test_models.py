@@ -23,3 +23,10 @@ def test_active_unit_cannot_sit_under_inactive_parent():
     with pytest.raises(ValidationError) as error:
         unit.full_clean()
     assert "parent" in error.value.message_dict
+
+@pytest.mark.django_db
+def test_two_units_under_one_parent_cannot_share_a_name():
+    OrgUnit.objects.create(name="مالی")  # بدون بالادست
+
+    with pytest.raises(ValidationError):
+        OrgUnit(name="مالی").full_clean()

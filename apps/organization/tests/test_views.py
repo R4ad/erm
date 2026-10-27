@@ -50,3 +50,15 @@ def test_parent_choices_exclude_the_unit_and_its_subtree(client, system_admin):
     response = client.get(reverse("organization:unit_update", args=[root.pk]))
 
     assert list(response.context["form"].fields["parent"].queryset) == [tech]
+
+@pytest.mark.django_db
+def test_parent_choices_are_listed_as_a_tree(client, system_admin):
+    ceo = OrgUnit.objects.create(name="مدیر عامل")
+    OrgUnit.objects.create(name="مالی", parent=ceo)
+    OrgUnit.objects.create(name="الف")
+    client.force_login(system_admin)
+
+    response = client.get(reverse("organization:unit_create"))
+
+    labels = [label for value, label in response.context["form"].fields["parent"].choices]
+    assert labels == ["بدون بالادست (واحد ریشه)", "الف", "مدیر عامل", "— مالی"]

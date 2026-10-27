@@ -10,6 +10,7 @@ django-environ = "*"
 django-simple-history = "*"
 django-jalali = "*"
 gunicorn = "*"
+openpyxl = "*"
 
 [dev-packages]
 pytest = "*"

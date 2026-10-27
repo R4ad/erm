@@ -14,6 +14,7 @@ class User(AbstractUser):
         blank=True,
         validators=[RegexValidator(r"^\d+$", "کد پرسنلی فقط باید رقم باشد.")],
     )
+    job_title = models.CharField("عنوان شغلی", max_length=200, blank=True)
     org_unit = models.ForeignKey(
         "organization.OrgUnit",
         verbose_name="واحد سازمانی",

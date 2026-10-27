@@ -1,15 +1,29 @@
 from django import forms
+from django.forms.models import ModelChoiceIterator
 
 from apps.core.forms import BootstrapFormMixin
 
 from .models import OrgUnit
-from .services import get_subtree_ids
+from .services import get_subtree_ids, unit_tree
+
+
+class UnitChoiceIterator(ModelChoiceIterator):
+    """گزینه‌ها را به ترتیب درخت می‌دهد: هر واحد و پشت سرش زیرمجموعه‌هایش."""
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield ("", self.field.empty_label)
+        for unit in unit_tree(self.queryset):
+            yield self.choice(unit)
 
 
 class UnitChoiceField(forms.ModelChoiceField):
+    """فهرست کشویی واحدها به شکل درخت، تا واحدهای هم‌نام با جایشان در درخت از هم جدا شوند."""
+
+    iterator = UnitChoiceIterator
 
     def label_from_instance(self, unit):
-        label = f"{unit.name} ({unit.code})"
+        label = "— " * unit.depth + unit.name
         if not unit.is_active:
             label += " - غیرفعال"
         return label
@@ -17,7 +31,7 @@ class UnitChoiceField(forms.ModelChoiceField):
 class OrgUnitForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = OrgUnit
-        fields = ["code", "name", "parent", "is_active"]
+        fields = ["name", "parent", "code", "is_active"]
         field_classes = {"parent": UnitChoiceField}
 
     def __init__(self, *args, **kwargs):

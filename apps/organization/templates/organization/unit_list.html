@@ -24,7 +24,7 @@
     {% for unit in units %}
       <tr>
         <td style="padding-inline-start: calc({{ unit.depth }} * 1.5rem + 0.5rem)">{{ unit.name }}</td>
-        <td class="text-nowrap">{{ unit.code }}</td>
+        <td class="text-nowrap">{{ unit.code|default:"" }}</td>
         <td>
           {% for manager in unit.managers.all %}
             {{ manager.get_full_name|default:manager.username }}{% if not forloop.last %}، {% endif %}
