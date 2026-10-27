@@ -55,7 +55,6 @@ def clean_text(value):
 
 
 def clean_code(value):
-    """کد پرسنلی را رشته‌ای از رقم‌های لاتین می‌کند. Excel گاهی آن را عدد می‌دهد، مثلاً 81597.0."""
     if isinstance(value, float) and value.is_integer():
         value = int(value)
     return clean_text(value).translate(LATIN_DIGITS)

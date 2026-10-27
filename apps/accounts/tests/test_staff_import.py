@@ -33,15 +33,15 @@ def make_file(tmp_path, *rows, header=HEADER):
 
 def test_position_becomes_a_path_from_the_root_and_text_is_cleaned(tmp_path):
     arabic_yeh = chr(0x064A)  # ي عربی؛ با کیبورد فارسی تایپ نمی‌شود
-    path = make_file(tmp_path, person(81597, f"فر{arabic_yeh}با", " عسکر  حلوائی", "پشتیبانی فنی*مدیریت پرداخت * توسعه محصول"))
+    path = make_file(tmp_path, person(12345, f"مر{arabic_yeh}م", " صادقی  نژاد", "پشتیبانی فنی*مدیریت پرداخت * توسعه محصول"))
 
     rows, errors = read_staff_file(path)
 
     assert errors == []
     row = rows[0]
-    assert row.personnel_code == "81597"
-    assert row.first_name == "فریبا"  # ي عربی شد ی فارسی
-    assert row.last_name == "عسکر حلوائی"
+    assert row.personnel_code == "12345"
+    assert row.first_name == "مریم"  # ي عربی شد ی فارسی
+    assert row.last_name == "صادقی نژاد"
     assert row.unit_path == ["توسعه محصول", "مدیریت پرداخت", "پشتیبانی فنی"]
 
 
