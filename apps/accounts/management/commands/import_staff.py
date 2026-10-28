@@ -5,6 +5,10 @@ from apps.accounts.models import User
 from apps.accounts.staff_import import StaffFileError, import_staff, read_staff_file
 
 
+def full_names(users):
+    return "، ".join(sorted(user.get_full_name() for user in users))
+
+
 class Command(BaseCommand):
     help = "کارکنان و واحدهای سازمانی را از فایل Excel منابع انسانی وارد می‌کند."
 
@@ -52,6 +56,31 @@ class Command(BaseCommand):
         write(f"کاربرانی که در فایل نیستند و {action}: {len(report.missing_users)}")
         for user in report.missing_users:
             write(f"  {user.personnel_code} {user.get_full_name()}")
+
+
+        write(f"واحدهایی که مدیرشان تعیین یا عوض شد: {len(report.manager_changes)}")
+        for path, new, removed in sorted(report.manager_changes, key=lambda change: change[0]):
+            line = f"  {path}: {full_names(new)}"
+            if removed:
+                line += f" (به جای {full_names(removed)})"
+            write(line)
+        write(f"واحدهایی که مدیرشان همان ماند: {report.unchanged_managed_units}")
+        write(f"نقش «مدیر واحد» داده شد به: {len(report.new_unit_managers)}")
+        for user in report.new_unit_managers:
+            write(f"  {user.username} {user.get_full_name()}")
+
+        if report.idle_unit_managers:
+            count = len(report.idle_unit_managers)
+            write(self.style.WARNING(f"نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند: {count}"))
+            for user in report.idle_unit_managers:
+                write(f"  {user.username} {user.get_full_name()}")
+
+                
+        if report.manager_problems:
+            write(self.style.WARNING(f"مدیرهایی که معلوم نشدند: {len(report.manager_problems)}"))
+            for problem in report.manager_problems:
+                write(f"  {problem}")
+
 
         if errors:
             write(self.style.ERROR(f"ردیف‌هایی که وارد نشدند: {len(errors)}"))

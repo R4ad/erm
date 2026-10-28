@@ -1,13 +1,15 @@
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
+from django.contrib.auth.models import Group
 from django.db import transaction
 from openpyxl import load_workbook
 
 from apps.organization.models import OrgUnit
 
 from .models import User
+from .roles import Role
 
 COLUMNS = {
     "کد پرسنلی": "personnel_code",
@@ -15,6 +17,8 @@ COLUMNS = {
     "نام خانوادگی": "last_name",
     "جایگاه سازمانی": "position",
     "عنوان شغلی": "job_title",
+    "نام مدیر": "manager_name",
+    "مدیر مافوق": "superior_name",
 }
 REQUIRED_COLUMNS = ["کد پرسنلی", "نام", "نام خانوادگی", "جایگاه سازمانی"]
 
@@ -43,6 +47,8 @@ class StaffRow:
     last_name: str
     job_title: str
     unit_path: list
+    manager_name: str
+    superior_name: str
 
 
 def clean_text(value):
@@ -63,6 +69,10 @@ def clean_code(value):
 def header_key(value):
     """سرستون بدون فاصله و نیم‌فاصله، تا «کدپرسنلی» و «کد پرسنلی» یکی حساب شوند."""
     return clean_text(value).replace(" ", "").replace(ZWNJ, "")
+
+def name_key(name):
+    """نام برای مقایسه، با همان یکدست‌سازی سرستون‌ها: «علی پور» و «علی‌پور» یک نفرند."""
+    return header_key(name)
 
 
 def read_staff_file(file):
@@ -104,7 +114,11 @@ def read_staff_file(file):
             errors.append(f"ردیف {line}: جایگاه سازمانی خالی است.")
         else:
             job_title = clean_text(cell.get("job_title"))
-            rows.append(StaffRow(line, code, first_name, last_name, job_title, unit_path))
+            manager_name = clean_text(cell.get("manager_name"))
+            superior_name = clean_text(cell.get("superior_name"))
+            rows.append(StaffRow(
+                line, code, first_name, last_name, job_title, unit_path, manager_name, superior_name
+            ))
 
     counts = Counter(row.personnel_code for row in rows)
     for row in rows:
@@ -124,6 +138,11 @@ class ImportReport:
     unchanged_users: int = 0
     missing_users: list = field(default_factory=list)  # کاربرانی که در فایل نیستند
     errors: list = field(default_factory=list)  # ردیف‌هایی که هنگام نوشتن کنار گذاشته شدند
+    manager_changes: list = field(default_factory=list)  # (مسیر واحد، مدیرهای تازه، مدیرهایی که کنار رفتند)
+    unchanged_managed_units: int = 0
+    new_unit_managers: list = field(default_factory=list)  # کسانی که نقش «مدیر واحد» گرفتند
+    idle_unit_managers: list = field(default_factory=list)  # نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند
+    manager_problems: list = field(default_factory=list)  # «نام مدیر»هایی که معلوم نشد چه کسی‌اند
 
 
 @transaction.atomic
@@ -134,7 +153,7 @@ def import_staff(rows, deactivate_missing=False):
     # نام واحدهایی که دستی ساخته شده‌اند هم یکدست می‌شود تا «مالي» و «مالی» یک واحد حساب شوند.
     units = {(unit.parent_id, clean_text(unit.name)): unit for unit in OrgUnit.objects.all()}
     users = {user.personnel_code: user for user in User.objects.exclude(personnel_code=None)}
-
+    imported = []
     for row in rows:
         unit = None
         for depth, name in enumerate(row.unit_path):
@@ -166,6 +185,7 @@ def import_staff(rows, deactivate_missing=False):
             user.set_unusable_password()
             user.save()
             report.new_users.append(user)
+            imported.append((row, user))
             continue
 
         changed = [name for name, value in values.items() if getattr(user, name) != value]
@@ -177,6 +197,9 @@ def import_staff(rows, deactivate_missing=False):
         else:
             report.unchanged_users += 1
 
+        imported.append((row, user))
+    assign_managers(imported, report)
+
     # مدیر کل (superuser) هیچ‌وقت غیرفعال نمی‌شود تا کسی از سامانه بیرون نماند.
     missing = (
         User.objects.filter(is_active=True, is_superuser=False)
@@ -187,3 +210,58 @@ def import_staff(rows, deactivate_missing=False):
     if deactivate_missing:
         missing.update(is_active=False)
     return report
+
+
+def assign_managers(imported, report):
+    """هر کس که در «نام مدیر» آمده، مدیر واحد خودش می‌شود و نقش «مدیر واحد» را می‌گیرد."""
+    by_name = defaultdict(list)  # نام ← (ردیف، کاربر) همه‌ی کسانی که این نام را دارند
+    for row, user in imported:
+        by_name[name_key(row.first_name + row.last_name)].append((row, user))
+
+    managers = defaultdict(set)  # شناسه‌ی واحد ← مدیرهایش طبق فایل
+    paths = {}  # شناسه‌ی واحد ← مسیرش، برای گزارش
+    problems = defaultdict(list)  # پیام ← شماره‌ی ردیف‌هایی که این مشکل را دارند
+    for row, _ in imported:
+        if not row.manager_name:
+            continue
+        found = by_name.get(name_key(row.manager_name), [])
+        if not found:
+            problems[f"«{row.manager_name}» در ردیف‌های واردشده نیست."].append(row.line)
+            continue
+        if len(found) > 1:
+            # هم‌نام‌ها: مدیر درست کسی است که مدیر خودش همان «مدیر مافوق» این ردیف است.
+            superior = name_key(row.superior_name)
+            found = [
+                (candidate_row, candidate)
+                for candidate_row, candidate in found
+                if superior and name_key(candidate_row.manager_name) == superior
+            ]
+        if len(found) != 1:
+            problems[f"چند نفر «{row.manager_name}» نام دارند و «مدیر مافوق» معلومشان نکرد."].append(row.line)
+            continue
+        manager_row, manager = found[0]
+        managers[manager.org_unit_id].add(manager)
+        paths[manager.org_unit_id] = " / ".join(manager_row.unit_path)
+
+    report.manager_problems = [
+        f"{message} ردیف: {'، '.join(str(line) for line in lines)}" for message, lines in problems.items()
+    ]
+
+    # فقط واحدهایی که فایل برایشان مدیر نشان می‌دهد عوض می‌شوند؛ بقیه دست نمی‌خورند.
+    units = OrgUnit.objects.prefetch_related("managers").in_bulk(list(managers))
+    for unit_id, new in managers.items():
+        old = set(units[unit_id].managers.all())
+        if new == old:
+            report.unchanged_managed_units += 1
+        else:
+            units[unit_id].managers.set(new)
+            report.manager_changes.append((paths[unit_id], new, old - new))
+
+    # نقش داده می‌شود ولی پس گرفته نمی‌شود؛ کسی که دیگر مدیر نیست فقط گزارش می‌شود.
+    group = Group.objects.get(name=Role.UNIT_MANAGER)
+    holders = set(group.user_set.all())
+    report.new_unit_managers = sorted(set().union(*managers.values()) - holders, key=lambda user: user.username)
+    group.user_set.add(*report.new_unit_managers)
+    report.idle_unit_managers = list(
+        group.user_set.filter(is_active=True, managed_units__isnull=True).order_by("username")
+    )

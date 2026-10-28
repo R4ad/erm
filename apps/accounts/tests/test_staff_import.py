@@ -1,10 +1,12 @@
 from io import StringIO
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core.management import call_command
 from openpyxl import Workbook
 
 from apps.accounts.models import User
+from apps.accounts.roles import Role
 from apps.accounts.staff_import import StaffFileError, import_staff, read_staff_file
 from apps.organization.models import OrgUnit
 
@@ -14,9 +16,9 @@ HEADER = [
 ]
 
 
-def person(code, first_name, last_name, position, job_title=""):
+def person(code, first_name, last_name, position, job_title="", manager="", superior=""):
     """یک ردیف فایل با همان ترتیب ستون‌های فایل منابع انسانی."""
-    return [code, first_name, last_name, "", position, "", "", job_title, "", ""]
+    return [code, first_name, last_name, "", position, manager, superior, job_title, "", ""]
 
 
 def make_file(tmp_path, *rows, header=HEADER):
@@ -29,6 +31,12 @@ def make_file(tmp_path, *rows, header=HEADER):
     path = tmp_path / "staff.xlsx"
     workbook.save(path)
     return path
+
+
+def import_file(tmp_path, *rows):
+    """فایل ساختگی را می‌سازد، می‌خواند و وارد می‌کند."""
+    rows, _ = read_staff_file(make_file(tmp_path, *rows))
+    return import_staff(rows)
 
 
 def test_position_becomes_a_path_from_the_root_and_text_is_cleaned(tmp_path):
@@ -135,3 +143,91 @@ def test_dry_run_saves_nothing(tmp_path):
     assert not User.objects.filter(personnel_code="1").exists()
     assert not OrgUnit.objects.exists()
     assert "کاربران تازه: 1" in out.getvalue()
+
+
+@pytest.mark.django_db
+def test_each_manager_becomes_manager_of_their_own_unit(tmp_path):
+    zwnj = chr(0x200C)  # نیم‌فاصله
+    rows = [
+        person(1, "نادر", "شریفی", "مدیر عامل", manager="نادر شریفی"),
+        person(2, "مهدی", f"علی{zwnj}پور", "مالی*مدیر عامل", manager="نادر شریفی"),
+        person(3, "سارا", "احمدی", "خزانه*مالی*مدیر عامل", manager="مهدی علی پور"),  # با فاصله
+    ]
+
+    report = import_file(tmp_path, *rows)
+
+    mahdi = User.objects.get(personnel_code="2")
+    assert [unit.name for unit in mahdi.managed_units.all()] == ["مالی"]
+    assert mahdi.has_role(Role.UNIT_MANAGER)
+    assert not OrgUnit.objects.get(name="خزانه").managers.exists()
+    assert sorted(path for path, new, removed in report.manager_changes) == ["مدیر عامل", "مدیر عامل / مالی"]
+    assert report.manager_problems == []
+
+    again = import_file(tmp_path, *rows)
+    assert (again.manager_changes, again.unchanged_managed_units, again.new_unit_managers) == ([], 2, [])
+
+
+@pytest.mark.django_db
+def test_same_name_managers_are_told_apart_by_the_superior(tmp_path):
+    import_file(
+        tmp_path,
+        person(1, "علی", "رضایی", "مالی", manager="مینا کریمی"),
+        person(2, "علی", "رضایی", "فنی", manager="رضا نوری"),
+        person(3, "سارا", "احمدی", "فنی", manager="علی رضایی", superior="رضا نوری"),
+    )
+
+    assert not User.objects.get(personnel_code="1").managed_units.exists()
+    assert [unit.name for unit in User.objects.get(personnel_code="2").managed_units.all()] == ["فنی"]
+
+
+@pytest.mark.django_db
+def test_unknown_and_ambiguous_managers_are_reported(tmp_path):
+    report = import_file(
+        tmp_path,
+        person(1, "علی", "رضایی", "مالی", manager="مینا کریمی"),
+        person(2, "علی", "رضایی", "فنی"),
+        person(3, "سارا", "احمدی", "فنی", manager="علی رضایی"),
+        person(4, "رضا", "نوری", "فنی", manager="مینا کریمی"),
+    )
+
+    assert report.manager_problems == [
+        "«مینا کریمی» در ردیف‌های واردشده نیست. ردیف: 2، 5",
+        "چند نفر «علی رضایی» نام دارند و «مدیر مافوق» معلومشان نکرد. ردیف: 4",
+    ]
+    assert not OrgUnit.objects.filter(managers__isnull=False).exists()
+
+
+@pytest.mark.django_db
+def test_only_units_named_in_the_file_get_new_managers(tmp_path):
+    finance = OrgUnit.objects.create(name="مالی")
+    archive = OrgUnit.objects.create(name="بایگانی")
+    old = User.objects.create_user("old")
+    old.managed_units.set([finance, archive])
+
+    report = import_file(tmp_path, person(1, "سارا", "احمدی", "مالی", manager="سارا احمدی"))
+
+    sara = User.objects.get(personnel_code="1")
+    assert list(finance.managers.all()) == [sara]
+    assert list(archive.managers.all()) == [old]
+    assert report.manager_changes == [("مالی", {sara}, {old})]
+
+
+@pytest.mark.django_db
+def test_the_role_is_never_taken_away_only_reported(tmp_path):
+    idle = User.objects.create_user("idle")
+    idle.groups.add(Group.objects.get(name=Role.UNIT_MANAGER))
+
+    report = import_file(tmp_path, person(1, "سارا", "احمدی", "مالی"))
+
+    assert report.idle_unit_managers == [idle]
+    assert idle.has_role(Role.UNIT_MANAGER)
+
+
+@pytest.mark.django_db
+def test_report_shows_each_unit_with_its_manager(tmp_path):
+    path = make_file(tmp_path, person(1, "سارا", "احمدی", "خزانه*مالی", manager="سارا احمدی"))
+    out = StringIO()
+
+    call_command("import_staff", str(path), "--dry-run", stdout=out)
+
+    assert "مالی / خزانه: سارا احمدی" in out.getvalue()
