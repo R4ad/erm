@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from apps.core.views import FilteredListView
 
-from .forms import StaffFileForm, StaffImportConfirmForm
+from .forms import StaffFileForm, StaffImportConfirmForm, UserFilterForm
 from .models import User
 from .permissions import RoleRequiredMixin, role_required
 from .roles import Role
