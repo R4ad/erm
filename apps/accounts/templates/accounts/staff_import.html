@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}ورود کارکنان{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">ورود کارکنان از فایل منابع انسانی</h1>
+
+{% if report %}
+  {% if confirm_form %}
+    <div class="alert alert-warning">اجرای آزمایشی: هنوز چیزی ذخیره نشده است. گزارش را بخوانید و اگر درست بود، تأیید کنید.</div>
+  {% endif %}
+
+  {% for section in report.sections %}
+    {% if section.lines %}
+      <details class="mb-2{% if section.level %} text-{{ section.level }}{% endif %}"{% if section.level %} open{% endif %}>
+        <summary>{{ section.title }}: {{ section.count }}</summary>
+        <ul class="small mt-2">
+          {% for line in section.lines %}<li>{{ line }}</li>{% endfor %}
+        </ul>
+      </details>
+    {% else %}
+      <p class="mb-2">{{ section.title }}: {{ section.count }}</p>
+    {% endif %}
+  {% endfor %}
+
+  {% if confirm_form %}
+    <form method="post" action="{% url 'accounts:staff_import_confirm' %}" class="mt-4">
+      {% csrf_token %}
+      {% for field in confirm_form %}{{ field }}{% endfor %}
+      <button type="submit" name="confirm" class="btn btn-primary">تأیید و ذخیره</button>
+      <button type="submit" name="cancel" class="btn btn-outline-secondary">انصراف</button>
+    </form>
+  {% else %}
+    <a href="{% url 'accounts:staff_import' %}" class="btn btn-outline-secondary mt-4">بارگذاری فایل دیگر</a>
+  {% endif %}
+{% else %}
+  <div class="row">
+    <div class="col-lg-6">
+      <p>اول گزارش آزمایشی نشان داده می‌شود و تا آن را تأیید نکنید، چیزی ذخیره نمی‌شود.</p>
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% include "includes/form_fields.html" %}
+        <button type="submit" class="btn btn-primary">بارگذاری و گزارش آزمایشی</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

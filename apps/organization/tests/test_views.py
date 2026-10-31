@@ -1,17 +1,8 @@
 import pytest
-from django.contrib.auth.models import Group
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.accounts.roles import Role
 from apps.organization.models import OrgUnit
-
-
-@pytest.fixture
-def system_admin(db):
-    user = User.objects.create_user("admin")
-    user.groups.add(Group.objects.get(name=Role.SYSTEM_ADMIN))
-    return user
 
 
 @pytest.mark.django_db

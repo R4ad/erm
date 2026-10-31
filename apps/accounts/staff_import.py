@@ -130,8 +130,23 @@ def read_staff_file(file):
         raise StaffFileError("فایل هیچ ردیفی ندارد.")
     return rows, errors
 
+
+@dataclass
+class ReportSection:
+    """یک بخش گزارش: عنوان و تعداد، و اگر لازم است سطرهای جزئیات."""
+    title: str
+    count: int
+    lines: list = field(default_factory=list)
+    level: str = ""  # warning یا danger برای بخش‌هایی که کار دستی لازم دارند
+
+
+def full_names(users):
+    return "، ".join(sorted(user.get_full_name() for user in users))
+
+
 @dataclass
 class ImportReport:
+    deactivate_missing: bool = False
     new_units: list = field(default_factory=list)  # مسیر کامل هر واحد تازه
     new_users: list = field(default_factory=list)
     updated_users: list = field(default_factory=list)  # (کاربر، فیلدهایی که عوض شد)
@@ -144,11 +159,58 @@ class ImportReport:
     idle_unit_managers: list = field(default_factory=list)  # نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند
     manager_problems: list = field(default_factory=list)  # «نام مدیر»هایی که معلوم نشد چه کسی‌اند
 
+    def sections(self):
+        """گزارش به شکل فهرست بخش‌ها؛ دستور import_staff و صفحه‌ی ورود کارکنان هر دو همین را نشان می‌دهند."""
+        updated = []
+        for user, changed in self.updated_users:
+            labels = "، ".join(str(User._meta.get_field(name).verbose_name) for name in changed)
+            updated.append(f"{user.personnel_code} {user.get_full_name()}: {labels}")
+        changes = []
+        for path, new, removed in sorted(self.manager_changes, key=lambda change: change[0]):
+            line = f"{path}: {full_names(new)}"
+            if removed:
+                line += f" (به جای {full_names(removed)})"
+            changes.append(line)
+        action = "غیرفعال شدند" if self.deactivate_missing else "فعال ماندند"
+
+        sections = [
+            ReportSection("واحدهای تازه", len(self.new_units), sorted(self.new_units)),
+            ReportSection("کاربران تازه", len(self.new_users)),
+            ReportSection("کاربران به‌روزشده", len(updated), updated),
+            ReportSection("کاربران بدون تغییر", self.unchanged_users),
+            ReportSection(
+                f"کاربرانی که در فایل نیستند و {action}",
+                len(self.missing_users),
+                [f"{user.personnel_code} {user.get_full_name()}" for user in self.missing_users],
+            ),
+            ReportSection("واحدهایی که مدیرشان تعیین یا عوض شد", len(changes), changes),
+            ReportSection("واحدهایی که مدیرشان همان ماند", self.unchanged_managed_units),
+            ReportSection(
+                "نقش «مدیر واحد» داده شد به",
+                len(self.new_unit_managers),
+                [f"{user.username} {user.get_full_name()}" for user in self.new_unit_managers],
+            ),
+        ]
+        if self.idle_unit_managers:
+            sections.append(ReportSection(
+                "نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند",
+                len(self.idle_unit_managers),
+                [f"{user.username} {user.get_full_name()}" for user in self.idle_unit_managers],
+                "warning",
+            ))
+        if self.manager_problems:
+            sections.append(ReportSection(
+                "مدیرهایی که معلوم نشدند", len(self.manager_problems), self.manager_problems, "warning"
+            ))
+        if self.errors:
+            sections.append(ReportSection("ردیف‌هایی که وارد نشدند", len(self.errors), self.errors, "danger"))
+        return sections
+
 
 @transaction.atomic
 def import_staff(rows, deactivate_missing=False):
     """ردیف‌ها را در پایگاه داده می‌نویسد. اجرای دوباره با همان فایل چیزی را عوض نمی‌کند."""
-    report = ImportReport()
+    report = ImportReport(deactivate_missing=deactivate_missing)
     # همه‌ی واحدها و کاربران را یک بار می‌خوانیم تا برای هر ردیف پرس‌وجوی جدا نزنیم.
     # نام واحدهایی که دستی ساخته شده‌اند هم یکدست می‌شود تا «مالي» و «مالی» یک واحد حساب شوند.
     units = {(unit.parent_id, clean_text(unit.name)): unit for unit in OrgUnit.objects.all()}
@@ -265,3 +327,20 @@ def assign_managers(imported, report):
     report.idle_unit_managers = list(
         group.user_set.filter(is_active=True, managed_units__isnull=True).order_by("username")
     )
+
+
+def run_import(file, deactivate_missing=False, dry_run=False):
+    """فایل را می‌خواند و وارد می‌کند و گزارش را برمی‌گرداند. با dry_run همه‌چیز انجام و در آخر پس گرفته می‌شود."""
+    rows, errors = read_staff_file(file)
+    if errors and deactivate_missing:
+        # کسی که ردیفش خطا دارد در فایل هست ولی وارد نشده؛ نباید به‌اشتباه غیرفعال شود.
+        raise StaffFileError(
+            "فایل ردیف نادرست دارد و تا درست نشود کسی غیرفعال نمی‌شود. "
+            "بدون غیرفعال کردن اجرا کنید تا ردیف‌های نادرست را در گزارش ببینید."
+        )
+    with transaction.atomic():
+        report = import_staff(rows, deactivate_missing=deactivate_missing)
+        if dry_run:
+            transaction.set_rollback(True)
+    report.errors = errors + report.errors
+    return report
