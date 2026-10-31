@@ -19,6 +19,7 @@
                 <li class="nav-item"><a class="nav-link" href="#">اقدامات</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">گزارش‌ها</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'organization:unit_list' %}">ساختار سازمانی</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'accounts:user_list' %}">کاربران</a></li>
                 {% if user.is_system_admin %}
                 <li class="nav-item"><a class="nav-link" href="{% url 'accounts:staff_import' %}">ورود کارکنان</a></li>
                 {% endif %}

@@ -6,8 +6,11 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.core.views import FilteredListView
+
 from .forms import StaffFileForm, StaffImportConfirmForm
-from .permissions import role_required
+from .models import User
+from .permissions import RoleRequiredMixin, role_required
 from .roles import Role
 from .staff_import import StaffFileError, run_import
 
@@ -66,3 +69,11 @@ def staff_import_confirm(request):
         path.unlink()  # بعد از تأیید، فایل در هر حال پاک می‌شود
     messages.success(request, "کارکنان وارد شدند. گزارش آن‌چه انجام شد:")
     return render(request, "accounts/staff_import.html", {"report": report})
+
+
+class UserListView(RoleRequiredMixin, FilteredListView):
+    roles = [Role.SYSTEM_ADMIN]
+    queryset = User.objects.select_related("org_unit").prefetch_related("groups").order_by("last_name", "first_name")
+    filter_form_class = UserFilterForm
+    template_name = "accounts/user_list.html"
+    context_object_name = "users"

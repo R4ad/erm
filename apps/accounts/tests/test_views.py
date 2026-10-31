@@ -1,9 +1,11 @@
 import re
 
 import pytest
+from django.contrib.auth.models import Group
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.accounts.roles import Role
 from apps.organization.models import OrgUnit
 
 from .test_staff_import import make_file, person
@@ -33,7 +35,7 @@ def imported_users():
 
 @pytest.mark.django_db
 def test_only_system_admin_can_use_the_pages_and_see_their_menu_links(client, system_admin):
-    pages = [reverse("accounts:staff_import")]
+    pages = [reverse("accounts:user_list"), reverse("accounts:staff_import")]
     client.force_login(User.objects.create_user("sara"))
     home = client.get(reverse("core:home")).text
     for page in pages:
@@ -121,3 +123,64 @@ def test_nobody_is_deactivated_while_the_file_has_bad_rows(client, system_admin,
 
     assert "تا درست نشود کسی غیرفعال نمی‌شود" in response.context["form"].errors["file"][0]
     assert not imported_users().exists()
+
+
+def listed(client, **params):
+    """نام کاربری کسانی که فهرست کاربران با این جست‌وجو و فیلترها نشان می‌دهد."""
+    response = client.get(reverse("accounts:user_list"), params)
+    return sorted(person.username for person in response.context["users"])
+
+
+@pytest.fixture
+def staff(system_admin):
+    finance = OrgUnit.objects.create(name="مالی")
+    treasury = OrgUnit.objects.create(name="خزانه", parent=finance)
+    it = OrgUnit.objects.create(name="فناوری")
+    zwnj = chr(0x200C)
+    User.objects.create_user("sara", personnel_code="1001", first_name="سارا", last_name="احمدی نژاد", org_unit=treasury)
+    mahdi = User.objects.create_user(
+        "1002", personnel_code="1002", first_name="مهدی", last_name=f"علی{zwnj}پور", org_unit=finance
+    )
+    mahdi.groups.add(Group.objects.get(name=Role.UNIT_MANAGER))
+    User.objects.create_user("2001", personnel_code="2001", first_name="رضا", last_name="نوری", org_unit=it)
+    User.objects.create_user("2002", personnel_code="2002", first_name="مینا", last_name="کریمی", is_active=False)
+    return {"finance": finance, "it": it}
+
+
+@pytest.mark.django_db
+def test_search_finds_every_word_in_names_and_codes(client, system_admin, staff):
+    client.force_login(system_admin)
+    zwnj, arabic_yeh = chr(0x200C), chr(0x064A)
+
+    assert listed(client, q="سارا احمدی") == ["sara"]
+    assert listed(client, q="علی پور") == ["1002"]  # نام با نیم‌فاصله ثبت شده
+    assert listed(client, q=f"احمدی{zwnj}نژاد") == ["sara"]  # نام با فاصله ثبت شده
+    assert listed(client, q=f"عل{arabic_yeh}") == ["1002"]
+    assert listed(client, q="۱۰۰") == ["1002", "sara"]  # رقم فارسی در کد پرسنلی
+    assert listed(client, q="sara") == ["sara"]
+    assert listed(client, q="سارا نوری") == []
+
+
+@pytest.mark.django_db
+def test_filters_by_unit_with_its_sub_units_role_and_status(client, system_admin, staff):
+    client.force_login(system_admin)
+
+    assert listed(client, unit=staff["finance"].pk) == ["1002", "sara"]
+    assert listed(client, unit=staff["it"].pk) == ["2001"]
+    assert listed(client, role=Role.UNIT_MANAGER) == ["1002"]
+    assert listed(client, status="inactive") == ["2002"]
+    assert listed(client, status="active", q="20") == ["2001"]
+    assert listed(client, role="نقش ناموجود") == []
+
+
+@pytest.mark.django_db
+def test_page_links_keep_the_search(client, system_admin):
+    for number in range(30):
+        User.objects.create_user(f"77{number:02}", personnel_code=f"77{number:02}")
+    client.force_login(system_admin)
+
+    response = client.get(reverse("accounts:user_list"), {"q": "77"})
+
+    assert response.context["paginator"].count == 30
+    assert len(response.context["users"]) == 25
+    assert "?q=77&amp;page=2" in response.text
