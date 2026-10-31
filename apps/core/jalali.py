@@ -29,6 +29,7 @@ def jalali_year_range(year):
     """روز اول سال شمسی و روز اول سال بعدش، هر دو میلادی."""
     return jdatetime.date(year, 1, 1).togregorian(), jdatetime.date(year + 1, 1, 1).togregorian()
 
+
 def to_jalali_datetime(moment):
     """زمان (aware) را به وقت تهران و متن شمسی مثل 1405/08/09 14:30 تبدیل می‌کند."""
     return jdatetime.datetime.fromgregorian(datetime=timezone.localtime(moment)).strftime("%Y/%m/%d %H:%M")
