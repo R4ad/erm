@@ -245,6 +245,7 @@ def import_staff(rows, deactivate_missing=False):
             # نام کاربری فعلاً همان کد پرسنلی است. کاربر رمز ندارد تا مدیر سامانه برایش رمز بگذارد (بعداً AD).
             user = User(username=row.personnel_code, personnel_code=row.personnel_code, **values)
             user.set_unusable_password()
+            user._change_reason = CHANGE_REASON
             user.save()
             report.new_users.append(user)
             imported.append((row, user))
@@ -254,6 +255,7 @@ def import_staff(rows, deactivate_missing=False):
         if changed:
             for name in changed:
                 setattr(user, name, values[name])
+            user._change_reason = CHANGE_REASON
             user.save(update_fields=changed)
             report.updated_users.append((user, changed))
         else:
@@ -270,7 +272,11 @@ def import_staff(rows, deactivate_missing=False):
     )
     report.missing_users = list(missing)
     if deactivate_missing:
-        missing.update(is_active=False)
+        # با save و نه update()، تا غیرفعال شدن هر نفر در تاریخچه‌ی کاربر (Audit Log) بماند.
+        for user in report.missing_users:
+            user.is_active = False
+            user._change_reason = CHANGE_REASON
+            user.save(update_fields=["is_active"])
     return report
 
 

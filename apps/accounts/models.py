@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator
+from simple_history.models import HistoricalRecords
 
 from apps.organization.services import get_subtree_ids
 from .roles import Role
@@ -30,6 +31,10 @@ class User(AbstractUser):
         related_name="managers",
     )
 
+    # رمز در تاریخچه نمی‌آید. last_login هم نمی‌آید چون ورودها در Audit Log ثبت می‌شوند.
+    # تغییر نقش‌ها و واحدهای تحت مدیریت (چندبه‌چند) را apps/audit/signals.py ثبت می‌کند.
+    history = HistoricalRecords(excluded_fields=["password", "last_login"])
+
     def has_role(self, *roles):
         return self.groups.filter(name__in=roles).exists()
 
@@ -40,6 +45,10 @@ class User(AbstractUser):
     @property
     def is_system_admin(self):
         return self.is_superuser or self.has_role(Role.SYSTEM_ADMIN)
+
+    @property
+    def can_view_audit_log(self):
+        return self.is_system_admin or self.has_role(Role.VIEWER)
 
     def managed_unit_ids(self):
         ids = set()

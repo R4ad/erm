@@ -23,5 +23,9 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     path("units/", include("apps.organization.urls")),
     path("holidays/", include("apps.workcalendar.urls")),
+    path("audit/", include("apps.audit.urls")),
     path("", include("apps.core.urls")),
 ]
+
+# هر PermissionDenied از این view می‌گذرد تا در Audit Log ثبت شود.
+handler403 = "apps.audit.views.permission_denied"

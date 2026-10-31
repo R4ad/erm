@@ -1,0 +1,11 @@
+<h1 class="h4 mb-3">سوابق ممیزی</h1>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link{% if request.resolver_match.url_name == 'event_list' %} active{% endif %}"
+       href="{% url 'audit:event_list' %}">ورود و رویدادها</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if request.resolver_match.url_name == 'change_list' %} active{% endif %}"
+       href="{% url 'audit:change_list' %}">تغییرات داده</a>
+  </li>
+</ul>
