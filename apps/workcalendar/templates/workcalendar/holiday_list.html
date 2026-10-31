@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}تعطیلات{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">تعطیلات</h1>
+  <a href="{% url 'workcalendar:holiday_create' %}" class="btn btn-primary btn-sm">تعطیلی جدید</a>
+</div>
+<p class="text-body-secondary small">پنجشنبه و جمعه همیشه تعطیل‌اند و لازم نیست این‌جا ثبت شوند. تعطیلات رسمی هر سال را از تقویم رسمی وارد کنید.</p>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>تاریخ</th>
+          <th>روز</th>
+          <th>مناسبت</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for holiday in holidays %}
+          <tr>
+            <td>{{ holiday.date|jformat:"%Y/%m/%d" }}</td>
+            <td>{{ holiday.weekday_name }}</td>
+            <td>{{ holiday.title }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{% url 'workcalendar:holiday_update' holiday.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+              <form method="post" action="{% url 'workcalendar:holiday_delete' holiday.pk %}" class="d-inline"
+                    onsubmit="return confirm('این تعطیلی حذف شود؟')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-body-secondary py-4">تعطیلی‌ای ثبت نشده است.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

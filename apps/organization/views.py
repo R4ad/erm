@@ -3,6 +3,7 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
+from apps.core.views import FormPageMixin
 
 from .forms import OrgUnitForm
 from .models import OrgUnit
@@ -22,17 +23,15 @@ class OrgUnitListView(ListView):
         return context
 
 
-class OrgUnitCreateView(RoleRequiredMixin, SuccessMessageMixin, CreateView):
+class OrgUnitCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, CreateView):
     model = OrgUnit
     form_class = OrgUnitForm
-    template_name = "organization/unit_form.html"
     success_url = reverse_lazy("organization:unit_list")
     success_message = "واحد «%(name)s» اضافه شد."
 
 
-class OrgUnitUpdateView(RoleRequiredMixin, SuccessMessageMixin, UpdateView):
+class OrgUnitUpdateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, UpdateView):
     model = OrgUnit
     form_class = OrgUnitForm
-    template_name = "organization/unit_form.html"
     success_url = reverse_lazy("organization:unit_list")
     success_message = "تغییرات واحد «%(name)s» ذخیره شد."
