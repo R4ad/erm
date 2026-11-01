@@ -22,6 +22,12 @@ urlpatterns = [
         views.ServiceCustomerUpdateView.as_view(),
         name="service_customer_update",
     ),
+    path(
+        "services/<int:service_pk>/dependencies/new/<str:kind>/",
+        views.DependencyCreateView.as_view(),
+        name="dependency_create",
+    ),
+    path("services/dependencies/<int:pk>/edit/", views.DependencyUpdateView.as_view(), name="dependency_update"),
     path("commitments/", views.CommitmentListView.as_view(), name="commitment_list"),
     path("commitments/new/", views.CommitmentCreateView.as_view(), name="commitment_create"),
     path("commitments/<int:pk>/edit/", views.CommitmentUpdateView.as_view(), name="commitment_update"),

@@ -1,5 +1,6 @@
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Prefetch
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.utils.functional import cached_property
@@ -15,14 +16,22 @@ from .forms import (
     CommitmentForm,
     CustomerFilterForm,
     CustomerForm,
+    DependencyForm,
     ServiceCustomerForm,
     ServiceFilterForm,
     ServiceForm,
     SupplierFilterForm,
     SupplierForm,
 )
-from .models import Asset, Commitment, Customer, Service, ServiceCustomer, Supplier
-from .permissions import EDIT_ROLES, can_edit_catalog, visible_assets, visible_commitments, visible_services
+from .models import Asset, Commitment, Customer, Dependency, Service, ServiceCustomer, Supplier
+from .permissions import (
+    EDIT_ROLES,
+    can_edit_catalog,
+    visible_assets,
+    visible_commitments,
+    visible_dependents,
+    visible_services,
+)
 
 
 class BackToRecordMixin:
@@ -88,10 +97,22 @@ class ServiceDetailView(DetailView):
         return visible_services(self.request.user).select_related("org_unit", "owner")
 
     def get_context_data(self, **kwargs):
+        user = self.request.user
+        dependencies = list(self.object.dependencies.select_related("upstream_service", "supplier", "asset"))
+        # نام خدمت بالادستی همیشه دیده می‌شود، ولی پیوند به صفحه‌اش فقط اگر کاربر اجازه‌ی دیدنش را دارد.
+        # تأمین‌کننده را همه می‌بینند، و دارایی‌ای را که خدمتی قابل‌دیدن به آن وابسته است هم.
+        visible_upstream = set(
+            visible_services(user).filter(dependents__service=self.object).values_list("pk", flat=True)
+        )
+        for dependency in dependencies:
+            hidden = dependency.upstream_service_id and dependency.upstream_service_id not in visible_upstream
+            dependency.target_url = None if hidden else dependency.target.get_absolute_url()
         return super().get_context_data(
-            can_edit=can_edit_catalog(self.request.user),
+            can_edit=can_edit_catalog(user),
             customer_links=self.object.customer_links.select_related("customer"),
             commitments=self.object.commitments.select_related("customer", "owner"),
+            dependencies=dependencies,
+            dependents=visible_dependents(self.object, user),
             **kwargs,
         )
 
@@ -165,7 +186,10 @@ class SupplierDetailView(DetailView):
     context_object_name = "supplier"
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(can_edit=can_edit_catalog(self.request.user), **kwargs)
+        user = self.request.user
+        return super().get_context_data(
+            can_edit=can_edit_catalog(user), dependents=visible_dependents(self.object, user), **kwargs
+        )
 
 
 class SupplierCreateView(RoleRequiredMixin, SuccessMessageMixin, BackToRecordMixin, FormPageMixin, CreateView):
@@ -204,7 +228,10 @@ class AssetDetailView(DetailView):
         return visible_assets(self.request.user).select_related("org_unit", "owner")
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(can_edit=can_edit_catalog(self.request.user), **kwargs)
+        user = self.request.user
+        return super().get_context_data(
+            can_edit=can_edit_catalog(user), dependents=visible_dependents(self.object, user), **kwargs
+        )
 
 
 class AssetCreateView(RoleRequiredMixin, SuccessMessageMixin, BackToRecordMixin, FormPageMixin, CreateView):
@@ -273,3 +300,50 @@ class CommitmentCreateView(CommitmentFormMixin, CreateView):
 
 class CommitmentUpdateView(CommitmentFormMixin, UpdateView):
     success_message = "تغییرات تعهد «%(title)s» ذخیره شد."
+
+
+class DependencyFormMixin(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin):
+    """مشترک افزودن و ویرایش وابستگی. بعد از ذخیره یا انصراف به صفحه‌ی همان خدمت برمی‌گردد."""
+
+    roles = EDIT_ROLES
+    model = Dependency
+    form_class = DependencyForm
+
+    def get_success_url(self):
+        return self.object.service.get_absolute_url()
+
+    def get_success_message(self, cleaned_data):
+        return f"وابستگی خدمت «{self.object.service.name}» به «{self.object.target}» ذخیره شد."
+
+
+class DependencyCreateView(DependencyFormMixin, CreateView):
+    # نوع وابستگی در نشانی صفحه می‌آید و به فیلد همان نوع در مدل می‌رسد.
+    TARGETS = {"service": "upstream_service", "supplier": "supplier", "asset": "asset"}
+
+    def dispatch(self, request, *args, **kwargs):
+        self.service = get_object_or_404(Service, pk=kwargs["service_pk"])
+        if kwargs["kind"] not in self.TARGETS:
+            raise Http404
+        self.target = self.TARGETS[kwargs["kind"]]
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        return super().get_form_kwargs() | {"instance": Dependency(service=self.service), "target": self.target}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        kind = Dependency._meta.get_field(self.target).verbose_name
+        context["title"] = f"وابستگی خدمت {self.service} به {kind}"
+        context["cancel_url"] = self.service.get_absolute_url()
+        return context
+
+
+class DependencyUpdateView(DependencyFormMixin, UpdateView):
+    def get_form_kwargs(self):
+        return super().get_form_kwargs() | {"target": self.object.target_field}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = f"ویرایش وابستگی خدمت {self.object.service} به «{self.object.target}»"
+        context["cancel_url"] = self.object.service.get_absolute_url()
+        return context

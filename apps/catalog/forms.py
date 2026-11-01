@@ -7,7 +7,7 @@ from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Asset, Commitment, Customer, DataClass, Service, ServiceCustomer, Supplier
+from .models import Asset, Commitment, Customer, DataClass, Dependency, Service, ServiceCustomer, Supplier
 
 STATUS_CHOICES = [("", "همه"), ("active", "فعال"), ("inactive", "غیرفعال")]
 CRITICAL_CHOICES = [("", "همه"), ("yes", "حیاتی"), ("no", "غیرحیاتی")]
@@ -243,3 +243,47 @@ class CommitmentFilterForm(BootstrapFormMixin, forms.Form):
         if data["kind"]:
             commitments = commitments.filter(kind=data["kind"])
         return commitments
+
+
+class DependencyForm(BootstrapFormMixin, forms.ModelForm):
+    """وابستگی به یکی از سه نوع: خدمت دیگر، تأمین‌کننده یا دارایی. view نوع را با target می‌دهد
+    (نام یکی از Dependency.TARGET_FIELDS) و فرم فقط فیلد همان نوع را نشان می‌دهد."""
+
+    class Meta:
+        model = Dependency
+        fields = [
+            *Dependency.TARGET_FIELDS,
+            "description",
+            "alternative",
+            "is_shared_point",
+            "infra_owner",
+            "control_operator",
+            "evidence_provider",
+            "change_authority",
+            "incident_contact",
+            "valid_from",
+            "valid_until",
+        ]
+        field_classes = {"valid_from": JalaliDateField, "valid_until": JalaliDateField}
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 2}),
+            "alternative": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, target, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in Dependency.TARGET_FIELDS:
+            if name != target:
+                del self.fields[name]
+        field = self.fields[target]
+        field.required = True
+        # گزینه‌های فعالی که هنوز برای این خدمت ثبت نشده‌اند، به‌اضافه‌ی هدف فعلی همین وابستگی. چون «خدمت»
+        # در فرم نیست، Django قاعده‌های یکتایی را در فرم چک نمی‌کند؛ این فهرست جلوی وابستگی تکراری را می‌گیرد.
+        # isnull=False لازم است: اگر در فهرست زیرپرس‌وجو NULL باشد، NOT IN هیچ گزینه‌ای را باقی نمی‌گذارد.
+        taken = Dependency.objects.filter(service=self.instance.service, **{f"{target}__isnull": False})
+        taken = taken.exclude(pk=self.instance.pk).values(target)
+        choices = active_or_current(field.queryset.model.objects.all(), getattr(self.instance, f"{target}_id"))
+        choices = choices.exclude(pk__in=taken)
+        if target == "upstream_service":
+            choices = choices.exclude(pk=self.instance.service_id)  # خدمت به خودش وابسته نمی‌شود
+        field.queryset = choices

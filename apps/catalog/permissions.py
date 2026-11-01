@@ -37,10 +37,15 @@ def visible_services(user):
 
 
 def visible_assets(user):
-    """دارایی‌هایی که این کاربر می‌بیند، با همان قاعده‌ی خدمت."""
+    """دارایی‌هایی که این کاربر می‌بیند: با همان قاعده‌ی خدمت، به‌اضافه‌ی دارایی‌هایی که خدمت‌های
+    قابل‌دیدنش به آن‌ها وابسته‌اند."""
     condition = visibility_condition(user)
     assets = Asset.objects.all()
-    return assets if condition is None else assets.filter(condition)
+    if condition is None:
+        return assets
+    services = Service.objects.filter(condition)
+    # distinct: دارایی‌ای که دو خدمت قابل‌دیدن به آن وابسته‌اند، بدون آن دو بار می‌آمد.
+    return assets.filter(condition | Q(dependents__service__in=services)).distinct()
 
 
 def visible_commitments(user):
@@ -52,3 +57,10 @@ def visible_commitments(user):
         return commitments
     # distinct: تعهدی که به دو خدمت قابل‌دیدن وصل است، بدون آن دو بار می‌آمد.
     return commitments.filter(services__in=Service.objects.filter(condition)).distinct()
+
+
+def visible_dependents(record, user):
+    """وابستگی‌هایی به این خدمت، تأمین‌کننده یا دارایی که کاربر خدمت وابسته‌شان را می‌بیند."""
+    return record.dependents.filter(service__in=visible_services(user)).select_related("service").order_by(
+        "service__code"
+    )

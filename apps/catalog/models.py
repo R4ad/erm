@@ -328,3 +328,116 @@ class Commitment(ValidityPeriod, TimeStampedModel):
 
     def __str__(self):
         return self.title
+
+
+class Responsibility(models.TextChoices):
+    """طرف مسئول در مرز مسئولیت یک وابستگی (بخش ۶ سند v5)."""
+
+    DATIN = "datin", "داتین"
+    BANK = "bank", "بانک"
+    SUPPLIER = "supplier", "تأمین‌کننده"
+
+
+class Dependency(ValidityPeriod, TimeStampedModel):
+    """وابستگی یک خدمت به خدمت دیگر، تأمین‌کننده یا دارایی، با مرز مسئولیت داتین، بانک و تأمین‌کننده
+    (بخش ۶ سند v5). از سه ستون «به چه» دقیقاً یکی پر می‌شود."""
+
+    TARGET_FIELDS = ["upstream_service", "supplier", "asset"]
+    BOUNDARY_FIELDS = ["infra_owner", "control_operator", "evidence_provider", "change_authority", "incident_contact"]
+
+    service = models.ForeignKey(
+        Service, verbose_name="خدمت", on_delete=models.CASCADE, related_name="dependencies"
+    )
+    upstream_service = models.ForeignKey(
+        Service,
+        verbose_name="خدمت بالادستی",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="dependents",
+    )
+    supplier = models.ForeignKey(
+        Supplier, verbose_name="تأمین‌کننده", on_delete=models.PROTECT, null=True, blank=True, related_name="dependents"
+    )
+    asset = models.ForeignKey(
+        Asset, verbose_name="دارایی", on_delete=models.PROTECT, null=True, blank=True, related_name="dependents"
+    )
+    description = models.TextField("شرح", blank=True, help_text="خدمت برای چه کاری به آن وابسته است.")
+    alternative = models.TextField("جایگزین", blank=True, help_text="اگر از کار بیفتد، مسیر جایگزین چیست.")
+    is_shared_point = models.BooleanField(
+        "نقطه‌ی شکست مشترک", default=False, help_text="از کار افتادنش چند خدمت را با هم مختل می‌کند."
+    )
+    # مرز مسئولیت: چه کسی هر کار را برای این وابستگی انجام می‌دهد. همه اختیاری‌اند تا بعداً کامل شوند.
+    infra_owner = models.CharField("مالک زیرساخت", max_length=20, choices=Responsibility.choices, blank=True)
+    control_operator = models.CharField(
+        "اجراکننده‌ی کنترل", max_length=20, choices=Responsibility.choices, blank=True
+    )
+    evidence_provider = models.CharField(
+        "ارائه‌دهنده‌ی شاهد", max_length=20, choices=Responsibility.choices, blank=True
+    )
+    change_authority = models.CharField("تصمیم‌گیر تغییر", max_length=20, choices=Responsibility.choices, blank=True)
+    incident_contact = models.CharField(
+        "مخاطب اعلام رخداد", max_length=200, blank=True, help_text="نام یا نقش؛ ممکن است بیرون از داتین باشد."
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "وابستگی"
+        verbose_name_plural = "وابستگی‌ها"
+        ordering = ["upstream_service__code", "supplier__name", "asset__code"]
+        constraints = [
+            *ValidityPeriod.Meta.constraints,
+            models.CheckConstraint(
+                condition=Q(upstream_service__isnull=False, supplier__isnull=True, asset__isnull=True)
+                | Q(upstream_service__isnull=True, supplier__isnull=False, asset__isnull=True)
+                | Q(upstream_service__isnull=True, supplier__isnull=True, asset__isnull=False),
+                name="dependency_has_exactly_one_target",
+                violation_error_message="وابستگی باید دقیقاً به یکی از این‌ها باشد: خدمت دیگر، تأمین‌کننده یا دارایی.",
+            ),
+            models.CheckConstraint(
+                condition=~Q(upstream_service=F("service")),
+                name="dependency_not_on_itself",
+                violation_error_message="خدمت نمی‌تواند به خودش وابسته باشد.",
+            ),
+            # ستون خالی (NULL) در قاعده‌ی یکتایی با هیچ ردیفی برابر نیست؛ پس این سه قاعده فقط جفت‌های پر را
+            # یکتا می‌کنند و خدمت می‌تواند به چند تأمین‌کننده و چند دارایی وابسته باشد.
+            models.UniqueConstraint(
+                fields=["service", "upstream_service"],
+                name="unique_upstream_service_per_service",
+                violation_error_message="وابستگی به این خدمت پیش‌تر ثبت شده است.",
+            ),
+            models.UniqueConstraint(
+                fields=["service", "supplier"],
+                name="unique_supplier_per_service",
+                violation_error_message="وابستگی به این تأمین‌کننده پیش‌تر ثبت شده است.",
+            ),
+            models.UniqueConstraint(
+                fields=["service", "asset"],
+                name="unique_asset_per_service",
+                violation_error_message="وابستگی به این دارایی پیش‌تر ثبت شده است.",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.service.code} وابسته به {self.target}"
+
+    @property
+    def target_field(self):
+        """نام ستونی از سه ستون «به چه» که پر است، مثل supplier."""
+        return next((name for name in self.TARGET_FIELDS if getattr(self, f"{name}_id")), None)
+
+    @property
+    def target(self):
+        """خدمت، تأمین‌کننده یا دارایی‌ای که این خدمت به آن وابسته است."""
+        return getattr(self, self.target_field) if self.target_field else None
+
+    @property
+    def target_kind(self):
+        """نوع هدف برای نمایش: «خدمت بالادستی»، «تأمین‌کننده» یا «دارایی»."""
+        return self._meta.get_field(self.target_field).verbose_name if self.target_field else ""
+
+    @property
+    def has_boundary(self):
+        """دست‌کم یکی از پنج پرسش مرز مسئولیت جواب دارد."""
+        return any(getattr(self, name) for name in self.BOUNDARY_FIELDS)

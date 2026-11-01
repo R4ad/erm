@@ -90,6 +90,80 @@
 </div>
 
 <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+  <h2 class="h5 mb-0">وابستگی‌ها</h2>
+  {% if can_edit %}
+    <div class="dropdown">
+      <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        افزودن وابستگی
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'catalog:dependency_create' service.pk 'service' %}">به خدمت دیگر</a></li>
+        <li><a class="dropdown-item" href="{% url 'catalog:dependency_create' service.pk 'supplier' %}">به تأمین‌کننده</a></li>
+        <li><a class="dropdown-item" href="{% url 'catalog:dependency_create' service.pk 'asset' %}">به دارایی</a></li>
+      </ul>
+    </div>
+  {% endif %}
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>به چه</th>
+        <th>شرح و جایگزین</th>
+        <th>مرز مسئولیت</th>
+        <th>اعتبار</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for dependency in dependencies %}
+        <tr>
+          <td>
+            <div class="small text-body-secondary">{{ dependency.target_kind }}</div>
+            {% if dependency.target_url %}
+              <a href="{{ dependency.target_url }}">{{ dependency.target }}</a>
+            {% else %}
+              {{ dependency.target }}
+            {% endif %}
+            {% if dependency.is_shared_point %}<span class="badge text-bg-warning ms-1">نقطه‌ی شکست مشترک</span>{% endif %}
+          </td>
+          <td class="small">
+            {{ dependency.description|linebreaksbr|default:"-" }}
+            {% if dependency.alternative %}
+              <div class="text-body-secondary">جایگزین: {{ dependency.alternative|linebreaksbr }}</div>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if dependency.has_boundary %}
+              <div>مالک زیرساخت: {{ dependency.get_infra_owner_display|default:"-" }}</div>
+              <div>اجراکننده‌ی کنترل: {{ dependency.get_control_operator_display|default:"-" }}</div>
+              <div>ارائه‌دهنده‌ی شاهد: {{ dependency.get_evidence_provider_display|default:"-" }}</div>
+              <div>تصمیم‌گیر تغییر: {{ dependency.get_change_authority_display|default:"-" }}</div>
+              <div>مخاطب اعلام رخداد: {{ dependency.incident_contact|default:"-" }}</div>
+            {% else %}
+              <span class="text-body-secondary">ثبت نشده</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">{% include "catalog/includes/validity.html" with record=dependency %}</td>
+          {% if can_edit %}
+            <td class="text-end">
+              <a href="{% url 'catalog:dependency_update' dependency.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-body-secondary py-4">هنوز وابستگی‌ای برای این خدمت ثبت نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "catalog/includes/dependents_table.html" %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-2">
   <h2 class="h5 mb-0">بانک‌ها و زمان‌های بازیابی</h2>
   {% if can_edit %}
     <a href="{% url 'catalog:service_customer_create' service.pk %}" class="btn btn-primary btn-sm">افزودن بانک</a>
