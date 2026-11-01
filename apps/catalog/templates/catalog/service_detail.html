@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ service }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ service }}
+    {% if service.is_critical %}<span class="badge text-bg-danger ms-1">حیاتی</span>{% endif %}
+    {% if not service.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'catalog:service_update' service.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'catalog:service_list' %}" class="btn btn-outline-secondary btn-sm">فهرست خدمات</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">نوع</dt>
+  <dd class="col-sm-9">{{ service.get_kind_display }}</dd>
+
+  <dt class="col-sm-3">مأموریت و خروجی</dt>
+  <dd class="col-sm-9">{{ service.description|default:"-"|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">واحد مالک</dt>
+  <dd class="col-sm-9">{{ service.org_unit }}</dd>
+
+  <dt class="col-sm-3">مالک خدمت</dt>
+  <dd class="col-sm-9">{{ service.owner.get_full_name|default:service.owner.username }}</dd>
+
+  <dt class="col-sm-3">مرحله‌ی چرخه‌ی عمر</dt>
+  <dd class="col-sm-9">{{ service.get_lifecycle_stage_display }}</dd>
+
+  <dt class="col-sm-3">محیط اجرا</dt>
+  <dd class="col-sm-9">{{ service.get_environment_display }}</dd>
+</dl>
+{% endblock %}
