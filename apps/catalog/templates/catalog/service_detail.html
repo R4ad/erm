@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load formatting jformat %}
+
+{% block title %}{{ service }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ service }}
+    {% if service.is_critical %}<span class="badge text-bg-danger ms-1">حیاتی</span>{% endif %}
+    {% if not service.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'catalog:service_update' service.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'catalog:service_list' %}" class="btn btn-outline-secondary btn-sm">فهرست خدمات</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">نوع</dt>
+  <dd class="col-sm-9">{{ service.get_kind_display }}</dd>
+
+  <dt class="col-sm-3">مأموریت و خروجی</dt>
+  <dd class="col-sm-9">{{ service.description|default:"-"|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">واحد مالک</dt>
+  <dd class="col-sm-9">{{ service.org_unit }}</dd>
+
+  <dt class="col-sm-3">مالک خدمت</dt>
+  <dd class="col-sm-9">{{ service.owner.get_full_name|default:service.owner.username }}</dd>
+
+  <dt class="col-sm-3">مرحله‌ی چرخه‌ی عمر</dt>
+  <dd class="col-sm-9">{{ service.get_lifecycle_stage_display }}</dd>
+
+  <dt class="col-sm-3">محیط اجرا</dt>
+  <dd class="col-sm-9">{{ service.get_environment_display }}</dd>
+</dl>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+  <h2 class="h5 mb-0">بانک‌ها و زمان‌های بازیابی</h2>
+  {% if can_edit %}
+    <a href="{% url 'catalog:service_customer_create' service.pk %}" class="btn btn-primary btn-sm">افزودن بانک</a>
+  {% endif %}
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>بانک</th>
+        <th>RTO</th>
+        <th>MTPD</th>
+        <th>RPO</th>
+        <th>مرجع BIA</th>
+        <th>اعتبار</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for link in customer_links %}
+        <tr>
+          <td>
+            {{ link.customer }}
+            {% if link.customer.is_key %}<span class="badge text-bg-warning ms-1">کلیدی</span>{% endif %}
+            {% if link.tolerance_notes %}<div class="small text-body-secondary">{{ link.tolerance_notes|linebreaksbr }}</div>{% endif %}
+          </td>
+          <td>{{ link.rto_minutes|minutes|default:"-" }}</td>
+          <td>{{ link.mtpd_minutes|minutes|default:"-" }}</td>
+          <td>{{ link.rpo_minutes|minutes|default:"-" }}</td>
+          <td>{{ link.bia_reference|default:"-" }}</td>
+          <td class="text-nowrap">
+            {% if link.valid_from %}از {{ link.valid_from|jformat:"%Y/%m/%d" }}{% endif %}
+            {% if link.valid_until %}تا {{ link.valid_until|jformat:"%Y/%m/%d" }}{% endif %}
+            {% if link.is_expired %}<span class="badge text-bg-secondary ms-1">منقضی</span>{% endif %}
+          </td>
+          {% if can_edit %}
+            <td class="text-end">
+              <a href="{% url 'catalog:service_customer_update' link.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-body-secondary py-4">هنوز بانکی برای این خدمت ثبت نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

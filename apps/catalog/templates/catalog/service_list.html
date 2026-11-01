@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}خدمات{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">خدمات و فرایندها</h1>
+  {% if can_edit %}
+    <a href="{% url 'catalog:service_create' %}" class="btn btn-primary btn-sm">خدمت جدید</a>
+  {% endif %}
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>کد</th>
+          <th>نام</th>
+          <th>نوع</th>
+          <th>واحد مالک</th>
+          <th>مالک</th>
+          <th>مرحله</th>
+          <th>وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in services %}
+          <tr>
+            <td class="text-nowrap"><a href="{{ service.get_absolute_url }}">{{ service.code }}</a></td>
+            <td>
+              {{ service.name }}
+              {% if service.is_critical %}<span class="badge text-bg-danger ms-1">حیاتی</span>{% endif %}
+            </td>
+            <td>{{ service.get_kind_display }}</td>
+            <td>{{ service.org_unit }}</td>
+            <td>{{ service.owner.get_full_name|default:service.owner.username }}</td>
+            <td>{{ service.get_lifecycle_stage_display }}</td>
+            <td>
+              {% if service.is_active %}
+                <span class="badge text-bg-success">فعال</span>
+              {% else %}
+                <span class="badge text-bg-secondary">غیرفعال</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-body-secondary py-4">خدمتی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

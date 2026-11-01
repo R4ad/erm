@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load formatting %}
+
+{% block title %}بانک‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">بانک‌ها</h1>
+  {% if can_edit %}
+    <a href="{% url 'catalog:customer_create' %}" class="btn btn-primary btn-sm">بانک جدید</a>
+  {% endif %}
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>نام</th>
+          <th>مشتری کلیدی</th>
+          <th>مبنای مالی (ریال)</th>
+          <th>وضعیت</th>
+          {% if can_edit %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+          <tr>
+            <td>{{ customer.name }}</td>
+            <td>{% if customer.is_key %}<span class="badge text-bg-warning">کلیدی</span>{% endif %}</td>
+            <td>{{ customer.financial_basis|thousands }}</td>
+            <td>
+              {% if customer.is_active %}
+                <span class="badge text-bg-success">فعال</span>
+              {% else %}
+                <span class="badge text-bg-secondary">غیرفعال</span>
+              {% endif %}
+            </td>
+            {% if can_edit %}
+              <td class="text-end">
+                <a href="{% url 'catalog:customer_update' customer.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-body-secondary py-4">بانکی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}
