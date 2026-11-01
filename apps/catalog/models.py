@@ -10,6 +10,26 @@ from simple_history.models import HistoricalRecords
 from apps.core.models import TimeStampedModel
 
 
+def check_active_unit_and_owner(record, noun):
+    """خدمت یا دارایی فعال باید واحد و مالک فعال داشته باشد؛ رکورد غیرفعال فقط سابقه است و مهم نیست.
+    noun اسم رکورد در پیام خطاست، مثل «خدمت»."""
+    errors = {}
+    if record.is_active and record.org_unit_id and not record.org_unit.is_active:
+        errors["org_unit"] = f"این واحد غیرفعال است؛ {noun} فعال باید مال یک واحد فعال باشد."
+    if record.is_active and record.owner_id and not record.owner.is_active:
+        errors["owner"] = f"این کاربر غیرفعال است؛ برای {noun} فعال مالک دیگری انتخاب کنید."
+    if errors:
+        raise ValidationError(errors)
+
+
+class DataClass(models.TextChoices):
+    """طبقه‌ی اطلاعات داتین. ریسک (قدم ۱۱) و پیامد داده (قدم ۱۶) هم همین را به کار می‌برند."""
+
+    PUBLIC = "public", "عمومی"
+    INTERNAL = "internal", "درون‌سازمانی"
+    CONFIDENTIAL = "confidential", "محرمانه"
+
+
 class Customer(TimeStampedModel):
     """بانک یا مشتری دیگر داتین. دیدن داده‌ها بر اساس بانک محدود نمی‌شود؛ بانک برای زمان‌های بازیابی هر خدمت
     و بعدها پیامد ریسک برای هر بانک ثبت می‌شود."""
@@ -99,14 +119,7 @@ class Service(TimeStampedModel):
         return reverse("catalog:service_detail", args=[self.pk])
 
     def clean(self):
-        # خدمت فعال باید واحد و مالک فعال داشته باشد؛ خدمت غیرفعال فقط سابقه است و مهم نیست.
-        errors = {}
-        if self.is_active and self.org_unit_id and not self.org_unit.is_active:
-            errors["org_unit"] = "این واحد غیرفعال است؛ خدمت فعال باید مال یک واحد فعال باشد."
-        if self.is_active and self.owner_id and not self.owner.is_active:
-            errors["owner"] = "این کاربر غیرفعال است؛ برای خدمت فعال مالک دیگری انتخاب کنید."
-        if errors:
-            raise ValidationError(errors)
+        check_active_unit_and_owner(self, "خدمت")
 
 
 class ServiceCustomer(TimeStampedModel):
@@ -183,3 +196,100 @@ class ServiceCustomer(TimeStampedModel):
     @property
     def is_expired(self):
         return self.valid_until is not None and self.valid_until < timezone.localdate()
+
+
+class Supplier(TimeStampedModel):
+    """تأمین‌کننده یا پیمانکار بیرونی. خدمت‌ها از راه وابستگی به آن وصل می‌شوند."""
+
+    name = models.CharField(
+        "نام", max_length=200, unique=True, error_messages={"unique": "تأمین‌کننده‌ای با همین نام ثبت شده است."}
+    )
+    description = models.TextField("خدمت یا کالا", blank=True, help_text="چه چیزی به داتین می‌دهد.")
+    is_critical = models.BooleanField("حیاتی", default=False)
+    contract_owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مسئول قرارداد",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="supplier_contracts",
+        help_text="کارمند داتین که قرارداد را پیگیری می‌کند.",
+    )
+    is_active = models.BooleanField("فعال", default=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "تأمین‌کننده"
+        verbose_name_plural = "تأمین‌کنندگان"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse("catalog:supplier_detail", args=[self.pk])
+
+    def clean(self):
+        if self.is_active and self.contract_owner_id and not self.contract_owner.is_active:
+            raise ValidationError(
+                {"contract_owner": "این کاربر غیرفعال است؛ برای تأمین‌کننده‌ی فعال مسئول دیگری انتخاب کنید."}
+            )
+
+
+class Asset(TimeStampedModel):
+    """دارایی: سامانه، سخت‌افزار، اطلاعات، مکان یا نیروی انسانی. در v5 دارایی شرط ثبت ریسک نیست؛
+    خدمت‌ها از راه وابستگی به آن وصل می‌شوند."""
+
+    class Kind(models.TextChoices):
+        SYSTEM = "system", "سامانه و نرم‌افزار"
+        HARDWARE = "hardware", "سخت‌افزار و شبکه"
+        INFORMATION = "information", "اطلاعات"
+        SITE = "site", "مکان"
+        PEOPLE = "people", "نیروی انسانی"
+
+    code = models.CharField(
+        "کد", max_length=20, unique=True, error_messages={"unique": "دارایی‌ای با همین کد ثبت شده است."}
+    )
+    name = models.CharField("نام", max_length=200)
+    kind = models.CharField("نوع", max_length=20, choices=Kind.choices)
+    org_unit = models.ForeignKey(
+        "organization.OrgUnit",
+        verbose_name="واحد مالک",
+        on_delete=models.PROTECT,
+        related_name="assets",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مالک دارایی",
+        on_delete=models.PROTECT,
+        related_name="owned_assets",
+    )
+    data_class = models.CharField("طبقه‌ی اطلاعات", max_length=20, choices=DataClass.choices, blank=True)
+    # برچسب‌های CIA طبق بخش ۸ سند v5: کدام ویژگی امنیت اطلاعات برای این دارایی مهم است. امتیاز نیستند.
+    cia_c = models.BooleanField("محرمانگی (C)", default=False)
+    cia_i = models.BooleanField("صحت (I)", default=False)
+    cia_a = models.BooleanField("دسترس‌پذیری (A)", default=False)
+    is_active = models.BooleanField("فعال", default=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "دارایی"
+        verbose_name_plural = "دارایی‌ها"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    def get_absolute_url(self):
+        return reverse("catalog:asset_detail", args=[self.pk])
+
+    def clean(self):
+        check_active_unit_and_owner(self, "دارایی")
+
+    @property
+    def cia_labels(self):
+        """برچسب‌های تیک‌خورده، مثل «C، A»."""
+        labels = [("C", self.cia_c), ("I", self.cia_i), ("A", self.cia_a)]
+        return "، ".join(letter for letter, checked in labels if checked)

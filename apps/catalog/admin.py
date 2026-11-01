@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Customer, Service, ServiceCustomer
+from .models import Asset, Customer, Service, ServiceCustomer, Supplier
 
 
 @admin.register(Customer)
@@ -22,5 +22,21 @@ class ServiceAdmin(SimpleHistoryAdmin):
     inlines = [ServiceCustomerInline]
     list_display = ("code", "name", "kind", "org_unit", "owner", "is_critical", "is_active")
     list_filter = ("kind", "is_critical", "lifecycle_stage", "environment", "is_active")
+    search_fields = ("code", "name")
+    raw_id_fields = ("owner",)
+
+
+@admin.register(Supplier)
+class SupplierAdmin(SimpleHistoryAdmin):
+    list_display = ("name", "is_critical", "contract_owner", "is_active")
+    list_filter = ("is_critical", "is_active")
+    search_fields = ("name", "description")
+    raw_id_fields = ("contract_owner",)
+
+
+@admin.register(Asset)
+class AssetAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "name", "kind", "org_unit", "owner", "data_class", "is_active")
+    list_filter = ("kind", "data_class", "is_active")
     search_fields = ("code", "name")
     raw_id_fields = ("owner",)

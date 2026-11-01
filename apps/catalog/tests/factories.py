@@ -1,7 +1,7 @@
 from django.contrib.auth.models import Group
 
 from apps.accounts.models import User
-from apps.catalog.models import Service
+from apps.catalog.models import Asset, Service
 from apps.organization.models import OrgUnit
 
 
@@ -24,3 +24,11 @@ def make_service(code, org_unit=None, owner=None, **fields):
         **fields,
     }
     return Service.objects.create(code=code, org_unit=org_unit, owner=owner, **values)
+
+
+def make_asset(code, org_unit=None, owner=None, **fields):
+    """دارایی آزمایشی، مثل make_service."""
+    org_unit = org_unit or OrgUnit.objects.create(name=f"واحد {code}")
+    owner = owner or make_user(f"owner-{code}")
+    values = {"name": f"دارایی {code}", "kind": Asset.Kind.SYSTEM, **fields}
+    return Asset.objects.create(code=code, org_unit=org_unit, owner=owner, **values)

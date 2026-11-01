@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ supplier }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ supplier }}
+    {% if supplier.is_critical %}<span class="badge text-bg-danger ms-1">حیاتی</span>{% endif %}
+    {% if not supplier.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'catalog:supplier_update' supplier.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'catalog:supplier_list' %}" class="btn btn-outline-secondary btn-sm">فهرست تأمین‌کنندگان</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">خدمت یا کالا</dt>
+  <dd class="col-sm-9">{{ supplier.description|default:"-"|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">مسئول قرارداد</dt>
+  <dd class="col-sm-9">
+    {% if supplier.contract_owner %}
+      {{ supplier.contract_owner.get_full_name|default:supplier.contract_owner.username }}
+    {% else %}-{% endif %}
+  </dd>
+</dl>
+{% endblock %}

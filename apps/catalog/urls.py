@@ -22,4 +22,12 @@ urlpatterns = [
         views.ServiceCustomerUpdateView.as_view(),
         name="service_customer_update",
     ),
+    path("suppliers/", views.SupplierListView.as_view(), name="supplier_list"),
+    path("suppliers/new/", views.SupplierCreateView.as_view(), name="supplier_create"),
+    path("suppliers/<int:pk>/", views.SupplierDetailView.as_view(), name="supplier_detail"),
+    path("suppliers/<int:pk>/edit/", views.SupplierUpdateView.as_view(), name="supplier_update"),
+    path("assets/", views.AssetListView.as_view(), name="asset_list"),
+    path("assets/new/", views.AssetCreateView.as_view(), name="asset_create"),
+    path("assets/<int:pk>/", views.AssetDetailView.as_view(), name="asset_detail"),
+    path("assets/<int:pk>/edit/", views.AssetUpdateView.as_view(), name="asset_update"),
 ]

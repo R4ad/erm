@@ -7,9 +7,22 @@ from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Customer, Service, ServiceCustomer
+from .models import Asset, Customer, DataClass, Service, ServiceCustomer, Supplier
 
 STATUS_CHOICES = [("", "همه"), ("active", "فعال"), ("inactive", "غیرفعال")]
+CRITICAL_CHOICES = [("", "همه"), ("yes", "حیاتی"), ("no", "غیرحیاتی")]
+
+
+def active_or_current(queryset, current_id):
+    """فقط رکوردهای فعال، به‌اضافه‌ی مقدار فعلی همین فرم (حتی اگر بعداً غیرفعال شده باشد)
+    تا فرم ویرایش رکورد قدیمی بدون انتخاب دوباره باز شود."""
+    return queryset.filter(Q(is_active=True) | Q(pk=current_id))
+
+
+def user_choices(current_id):
+    """گزینه‌های فیلد کاربر: کاربرهای فعال و کاربر فعلی، به ترتیب نام، با واحدشان برای برچسب."""
+    users = User.objects.select_related("org_unit").order_by("last_name", "first_name", "username")
+    return active_or_current(users, current_id)
 
 
 class CustomerForm(BootstrapFormMixin, forms.ModelForm):
@@ -64,15 +77,8 @@ class ServiceForm(BootstrapFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # فقط واحدها و کاربرهای فعال، به‌اضافه‌ی مقدار فعلی همین خدمت (حتی اگر بعداً غیرفعال شده باشد)
-        # تا فرم ویرایش خدمت قدیمی بدون انتخاب دوباره باز شود.
-        unit, owner = self.fields["org_unit"], self.fields["owner"]
-        unit.queryset = OrgUnit.objects.filter(Q(is_active=True) | Q(pk=self.instance.org_unit_id))
-        owner.queryset = (
-            User.objects.filter(Q(is_active=True) | Q(pk=self.instance.owner_id))
-            .select_related("org_unit")
-            .order_by("last_name", "first_name", "username")
-        )
+        self.fields["org_unit"].queryset = active_or_current(OrgUnit.objects.all(), self.instance.org_unit_id)
+        self.fields["owner"].queryset = user_choices(self.instance.owner_id)
 
 
 class ServiceFilterForm(BootstrapFormMixin, forms.Form):
@@ -81,9 +87,7 @@ class ServiceFilterForm(BootstrapFormMixin, forms.Form):
     )
     unit = UnitChoiceField(OrgUnit.objects.all(), label="واحد مالک", required=False, empty_label="همه‌ی واحدها")
     kind = forms.ChoiceField(label="نوع", required=False, choices=[("", "همه")] + Service.Kind.choices)
-    is_critical = forms.ChoiceField(
-        label="حیاتی", required=False, choices=[("", "همه"), ("yes", "حیاتی"), ("no", "غیرحیاتی")]
-    )
+    is_critical = forms.ChoiceField(label="حیاتی", required=False, choices=CRITICAL_CHOICES)
     status = forms.ChoiceField(label="وضعیت", required=False, choices=STATUS_CHOICES)
 
     def filter(self, services):
@@ -123,6 +127,74 @@ class ServiceCustomerForm(BootstrapFormMixin, forms.ModelForm):
         # چون «خدمت» در فرم نیست، Django قاعده‌ی یکتایی (خدمت، بانک) را در فرم چک نمی‌کند؛
         # این فهرست جلوی انتخاب بانک تکراری را می‌گیرد.
         taken = ServiceCustomer.objects.filter(service=self.instance.service).exclude(pk=self.instance.pk)
-        self.fields["customer"].queryset = Customer.objects.filter(
-            Q(is_active=True) | Q(pk=self.instance.customer_id)
-        ).exclude(pk__in=taken.values("customer"))
+        customers = active_or_current(Customer.objects.all(), self.instance.customer_id)
+        self.fields["customer"].queryset = customers.exclude(pk__in=taken.values("customer"))
+
+
+class SupplierForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Supplier
+        fields = ["name", "description", "is_critical", "contract_owner", "is_active"]
+        field_classes = {"contract_owner": OwnerChoiceField}
+        widgets = {"description": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["contract_owner"].queryset = user_choices(self.instance.contract_owner_id)
+
+
+class SupplierFilterForm(BootstrapFormMixin, forms.Form):
+    q = forms.CharField(
+        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "نام یا خدمت و کالا"})
+    )
+    is_critical = forms.ChoiceField(label="حیاتی", required=False, choices=CRITICAL_CHOICES)
+    status = forms.ChoiceField(label="وضعیت", required=False, choices=STATUS_CHOICES)
+
+    def filter(self, suppliers):
+        data = self.cleaned_data
+        for word in data["q"].split():
+            suppliers = suppliers.filter(Q(name__icontains=word) | Q(description__icontains=word))
+        if data["is_critical"]:
+            suppliers = suppliers.filter(is_critical=data["is_critical"] == "yes")
+        if data["status"]:
+            suppliers = suppliers.filter(is_active=data["status"] == "active")
+        return suppliers
+
+
+class AssetForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Asset
+        fields = ["code", "name", "kind", "org_unit", "owner", "data_class", "cia_c", "cia_i", "cia_a", "is_active"]
+        field_classes = {"org_unit": UnitChoiceField, "owner": OwnerChoiceField}
+        help_texts = {"cia_a": "برچسب‌های CIA نشان می‌دهند کدام ویژگی امنیت اطلاعات برای این دارایی مهم است."}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["org_unit"].queryset = active_or_current(OrgUnit.objects.all(), self.instance.org_unit_id)
+        self.fields["owner"].queryset = user_choices(self.instance.owner_id)
+
+
+class AssetFilterForm(BootstrapFormMixin, forms.Form):
+    q = forms.CharField(
+        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا نام دارایی"})
+    )
+    unit = UnitChoiceField(OrgUnit.objects.all(), label="واحد مالک", required=False, empty_label="همه‌ی واحدها")
+    kind = forms.ChoiceField(label="نوع", required=False, choices=[("", "همه")] + Asset.Kind.choices)
+    data_class = forms.ChoiceField(
+        label="طبقه‌ی اطلاعات", required=False, choices=[("", "همه")] + DataClass.choices
+    )
+    status = forms.ChoiceField(label="وضعیت", required=False, choices=STATUS_CHOICES)
+
+    def filter(self, assets):
+        data = self.cleaned_data
+        for word in data["q"].split():
+            assets = assets.filter(Q(code__icontains=word) | Q(name__icontains=word))
+        if data["unit"]:
+            assets = assets.filter(org_unit__in=get_subtree_ids(data["unit"]))
+        if data["kind"]:
+            assets = assets.filter(kind=data["kind"])
+        if data["data_class"]:
+            assets = assets.filter(data_class=data["data_class"])
+        if data["status"]:
+            assets = assets.filter(is_active=data["status"] == "active")
+        return assets

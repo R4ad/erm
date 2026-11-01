@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ asset }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ asset }}
+    {% if not asset.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'catalog:asset_update' asset.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'catalog:asset_list' %}" class="btn btn-outline-secondary btn-sm">فهرست دارایی‌ها</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">نوع</dt>
+  <dd class="col-sm-9">{{ asset.get_kind_display }}</dd>
+
+  <dt class="col-sm-3">واحد مالک</dt>
+  <dd class="col-sm-9">{{ asset.org_unit }}</dd>
+
+  <dt class="col-sm-3">مالک دارایی</dt>
+  <dd class="col-sm-9">{{ asset.owner.get_full_name|default:asset.owner.username }}</dd>
+
+  <dt class="col-sm-3">طبقه‌ی اطلاعات</dt>
+  <dd class="col-sm-9">{{ asset.get_data_class_display|default:"-" }}</dd>
+
+  <dt class="col-sm-3">برچسب CIA</dt>
+  <dd class="col-sm-9">{{ asset.cia_labels|default:"-" }}</dd>
+</dl>
+{% endblock %}

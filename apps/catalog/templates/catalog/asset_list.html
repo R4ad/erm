@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}دارایی‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">دارایی‌ها</h1>
+  {% if can_edit %}
+    <a href="{% url 'catalog:asset_create' %}" class="btn btn-primary btn-sm">دارایی جدید</a>
+  {% endif %}
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>کد</th>
+          <th>نام</th>
+          <th>نوع</th>
+          <th>واحد مالک</th>
+          <th>مالک</th>
+          <th>طبقه‌ی اطلاعات</th>
+          <th>CIA</th>
+          <th>وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in assets %}
+          <tr>
+            <td class="text-nowrap"><a href="{{ asset.get_absolute_url }}">{{ asset.code }}</a></td>
+            <td>{{ asset.name }}</td>
+            <td>{{ asset.get_kind_display }}</td>
+            <td>{{ asset.org_unit }}</td>
+            <td>{{ asset.owner.get_full_name|default:asset.owner.username }}</td>
+            <td>{{ asset.get_data_class_display|default:"-" }}</td>
+            <td class="text-nowrap">{{ asset.cia_labels|default:"-" }}</td>
+            <td>
+              {% if asset.is_active %}
+                <span class="badge text-bg-success">فعال</span>
+              {% else %}
+                <span class="badge text-bg-secondary">غیرفعال</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-body-secondary py-4">دارایی‌ای با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

@@ -25,8 +25,17 @@
           <li class="nav-item"><a class="nav-link" href="#">ریسک‌ها</a></li>
           <li class="nav-item"><a class="nav-link" href="#">اقدامات</a></li>
           <li class="nav-item"><a class="nav-link" href="#">گزارش‌ها</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'catalog:service_list' %}">خدمات</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'catalog:customer_list' %}">بانک‌ها</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              خدمات و دارایی‌ها
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'catalog:service_list' %}">خدمات</a></li>
+              <li><a class="dropdown-item" href="{% url 'catalog:asset_list' %}">دارایی‌ها</a></li>
+              <li><a class="dropdown-item" href="{% url 'catalog:supplier_list' %}">تأمین‌کنندگان</a></li>
+              <li><a class="dropdown-item" href="{% url 'catalog:customer_list' %}">بانک‌ها</a></li>
+            </ul>
+          </li>
           <li class="nav-item"><a class="nav-link" href="{% url 'organization:unit_list' %}">ساختار سازمانی</a></li>
           {% if user.is_system_admin %}
           <li class="nav-item"><a class="nav-link" href="{% url 'accounts:user_list' %}">کاربران</a></li>
