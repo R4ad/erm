@@ -1,6 +1,8 @@
 from django.contrib.messages.views import SuccessMessageMixin
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
+from django.utils.functional import cached_property
 from django.views.generic import CreateView, DetailView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
@@ -9,6 +11,8 @@ from apps.core.views import FilteredListView, FormPageMixin
 from .forms import (
     AssetFilterForm,
     AssetForm,
+    CommitmentFilterForm,
+    CommitmentForm,
     CustomerFilterForm,
     CustomerForm,
     ServiceCustomerForm,
@@ -17,8 +21,8 @@ from .forms import (
     SupplierFilterForm,
     SupplierForm,
 )
-from .models import Asset, Customer, Service, ServiceCustomer, Supplier
-from .permissions import EDIT_ROLES, can_edit_catalog, visible_assets, visible_services
+from .models import Asset, Commitment, Customer, Service, ServiceCustomer, Supplier
+from .permissions import EDIT_ROLES, can_edit_catalog, visible_assets, visible_commitments, visible_services
 
 
 class BackToRecordMixin:
@@ -87,6 +91,7 @@ class ServiceDetailView(DetailView):
         return super().get_context_data(
             can_edit=can_edit_catalog(self.request.user),
             customer_links=self.object.customer_links.select_related("customer"),
+            commitments=self.object.commitments.select_related("customer", "owner"),
             **kwargs,
         )
 
@@ -215,3 +220,56 @@ class AssetUpdateView(RoleRequiredMixin, SuccessMessageMixin, BackToRecordMixin,
     model = Asset
     form_class = AssetForm
     success_message = "تغییرات دارایی «%(name)s» ذخیره شد."
+
+
+class CommitmentListView(FilteredListView):
+    filter_form_class = CommitmentFilterForm
+    template_name = "catalog/commitment_list.html"
+    context_object_name = "commitments"
+
+    def get_queryset(self):
+        # کنار هر تعهد فقط خدمت‌هایی نشان داده می‌شوند که کاربر اجازه‌ی دیدنشان را دارد.
+        services = Prefetch("services", queryset=visible_services(self.request.user))
+        commitments = visible_commitments(self.request.user).select_related("customer", "owner")
+        self.queryset = commitments.prefetch_related(services)
+        return super().get_queryset()
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(can_edit=can_edit_catalog(self.request.user), **kwargs)
+
+
+class CommitmentFormMixin(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin):
+    """مشترک ساختن و ویرایش تعهد. اگر از صفحه‌ی یک خدمت آمده باشیم (?service=شناسه در نشانی)،
+    بعد از ذخیره یا انصراف به صفحه‌ی همان خدمت برمی‌گردیم؛ وگرنه به فهرست تعهدها."""
+
+    roles = EDIT_ROLES
+    model = Commitment
+    form_class = CommitmentForm
+    success_url = reverse_lazy("catalog:commitment_list")
+
+    @cached_property
+    def from_service(self):
+        service_id = self.request.GET.get("service", "")
+        if not service_id.isdecimal():
+            return None
+        return visible_services(self.request.user).filter(pk=service_id).first()
+
+    def get_success_url(self):
+        return self.from_service.get_absolute_url() if self.from_service else self.success_url
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+
+class CommitmentCreateView(CommitmentFormMixin, CreateView):
+    success_message = "تعهد «%(title)s» ثبت شد."
+
+    def get_initial(self):
+        # دکمه‌ی «افزودن تعهد» در صفحه‌ی خدمت، همان خدمت را از پیش انتخاب می‌کند.
+        return {"services": [self.from_service]} if self.from_service else {}
+
+
+class CommitmentUpdateView(CommitmentFormMixin, UpdateView):
+    success_message = "تغییرات تعهد «%(title)s» ذخیره شد."

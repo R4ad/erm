@@ -7,7 +7,7 @@ from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Asset, Customer, DataClass, Service, ServiceCustomer, Supplier
+from .models import Asset, Commitment, Customer, DataClass, Service, ServiceCustomer, Supplier
 
 STATUS_CHOICES = [("", "همه"), ("active", "فعال"), ("inactive", "غیرفعال")]
 CRITICAL_CHOICES = [("", "همه"), ("yes", "حیاتی"), ("no", "غیرحیاتی")]
@@ -198,3 +198,48 @@ class AssetFilterForm(BootstrapFormMixin, forms.Form):
         if data["status"]:
             assets = assets.filter(is_active=data["status"] == "active")
         return assets
+
+
+class CommitmentForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Commitment
+        fields = [
+            "title",
+            "kind",
+            "clause_ref",
+            "description",
+            "services",
+            "customer",
+            "owner",
+            "valid_from",
+            "valid_until",
+        ]
+        field_classes = {"owner": OwnerChoiceField, "valid_from": JalaliDateField, "valid_until": JalaliDateField}
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "services": forms.SelectMultiple(attrs={"size": 8}),
+        }
+        help_texts = {"services": "برای انتخاب چند خدمت، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید."}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # خدمت‌های فعال، به‌اضافه‌ی خدمت‌هایی که همین حالا روی تعهدند، حتی اگر بعداً غیرفعال شده باشند.
+        current = self.instance.services.all() if self.instance.pk else Service.objects.none()
+        self.fields["services"].queryset = Service.objects.filter(Q(is_active=True) | Q(pk__in=current))
+        self.fields["customer"].queryset = active_or_current(Customer.objects.all(), self.instance.customer_id)
+        self.fields["owner"].queryset = user_choices(self.instance.owner_id)
+
+
+class CommitmentFilterForm(BootstrapFormMixin, forms.Form):
+    q = forms.CharField(
+        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "عنوان یا مرجع بند"})
+    )
+    kind = forms.ChoiceField(label="نوع", required=False, choices=[("", "همه")] + Commitment.Kind.choices)
+
+    def filter(self, commitments):
+        data = self.cleaned_data
+        for word in data["q"].split():
+            commitments = commitments.filter(Q(title__icontains=word) | Q(clause_ref__icontains=word))
+        if data["kind"]:
+            commitments = commitments.filter(kind=data["kind"])
+        return commitments

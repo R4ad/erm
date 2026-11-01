@@ -4,10 +4,9 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 from django.urls import reverse
-from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
-from apps.core.models import TimeStampedModel
+from apps.core.models import TimeStampedModel, ValidityPeriod
 
 
 def check_active_unit_and_owner(record, noun):
@@ -122,7 +121,7 @@ class Service(TimeStampedModel):
         check_active_unit_and_owner(self, "خدمت")
 
 
-class ServiceCustomer(TimeStampedModel):
+class ServiceCustomer(ValidityPeriod, TimeStampedModel):
     """جدول واسط خدمت و بانک: این خدمت به این بانک ارائه می‌شود، با زمان‌های بازیابی همین جفت.
     RTO و MTPD روی خدمت نیستند، چون یک خدمت برای هر بانک می‌تواند زمان متفاوتی داشته باشد.
     زمان‌ها همه به دقیقه‌اند تا بعداً با مدت اختلال در سنجش پیامد ساده مقایسه شوند."""
@@ -157,8 +156,6 @@ class ServiceCustomer(TimeStampedModel):
     tolerance_notes = models.TextField(
         "حد تحمل خاص بانک", blank=True, help_text="محدودیت یا دستور سخت‌گیرانه‌تری که خود بانک داده است."
     )
-    valid_from = models.DateField("اعتبار از", null=True, blank=True)
-    valid_until = models.DateField("اعتبار تا", null=True, blank=True)
 
     history = HistoricalRecords()
 
@@ -167,12 +164,13 @@ class ServiceCustomer(TimeStampedModel):
         verbose_name_plural = "بانک‌های خدمت‌ها"
         ordering = ["customer__name"]
         constraints = [
+            *ValidityPeriod.Meta.constraints,
             models.UniqueConstraint(
                 fields=["service", "customer"],
                 name="unique_customer_per_service",
                 violation_error_message="این بانک پیش‌تر برای این خدمت ثبت شده است.",
             ),
-            # این دو قاعده در خود پایگاه داده هم چک می‌شوند. فرم هم پیش از ذخیره همین‌ها را چک می‌کند
+            # این قاعده در خود پایگاه داده هم چک می‌شود. فرم هم پیش از ذخیره همین را چک می‌کند
             # و پیام فارسی را نشان می‌دهد. اگر یکی از دو مقدار خالی باشد، قاعده چیزی را رد نمی‌کند.
             models.CheckConstraint(
                 condition=Q(rto_minutes__lt=F("mtpd_minutes"))
@@ -181,21 +179,10 @@ class ServiceCustomer(TimeStampedModel):
                 name="rto_less_than_mtpd",
                 violation_error_message="RTO باید کمتر از MTPD باشد.",
             ),
-            models.CheckConstraint(
-                condition=Q(valid_from__lte=F("valid_until"))
-                | Q(valid_from__isnull=True)
-                | Q(valid_until__isnull=True),
-                name="valid_from_not_after_valid_until",
-                violation_error_message="«اعتبار تا» نباید پیش از «اعتبار از» باشد.",
-            ),
         ]
 
     def __str__(self):
         return f"{self.service.code} - {self.customer}"
-
-    @property
-    def is_expired(self):
-        return self.valid_until is not None and self.valid_until < timezone.localdate()
 
 
 class Supplier(TimeStampedModel):
@@ -293,3 +280,51 @@ class Asset(TimeStampedModel):
         """برچسب‌های تیک‌خورده، مثل «C، A»."""
         labels = [("C", self.cia_c), ("I", self.cia_i), ("A", self.cia_a)]
         return "، ".join(letter for letter, checked in labels if checked)
+
+
+class Commitment(ValidityPeriod, TimeStampedModel):
+    """بند SLA، قرارداد یا الزام ابلاغی (بخش ۵ سند v5). یک تعهد می‌تواند چند خدمت را بپوشاند.
+    جز عنوان همه‌ی فیلدها اختیاری‌اند تا تعهد با اطلاعات ناقص هم ثبت و بعداً کامل شود."""
+
+    class Kind(models.TextChoices):
+        SLA = "sla", "SLA"
+        CONTRACT = "contract", "قرارداد"
+        REGULATORY = "regulatory", "الزام قانونی یا نظارتی"
+        INTERNAL = "internal", "الزام داخلی"
+
+    title = models.CharField("عنوان", max_length=200)
+    kind = models.CharField("نوع", max_length=20, choices=Kind.choices, blank=True)
+    clause_ref = models.CharField(
+        "مرجع بند", max_length=200, blank=True, help_text="شماره‌ی بند قرارداد یا SLA، یا شماره‌ی ابلاغیه."
+    )
+    description = models.TextField("شرح", blank=True, help_text="مهلت، صحت خروجی یا حد تحمل.")
+    services = models.ManyToManyField(Service, verbose_name="خدمت‌ها", related_name="commitments", blank=True)
+    customer = models.ForeignKey(
+        Customer,
+        verbose_name="بانک",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commitments",
+        help_text="خالی یعنی تعهد مال همه‌ی بانک‌های این خدمت‌هاست.",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مسئول اجرا",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="owned_commitments",
+    )
+
+    # m2m_fields: افزودن و برداشتن خدمت‌ها هم در تاریخچه ثبت می‌شود، نه فقط فیلدهای خود تعهد.
+    history = HistoricalRecords(m2m_fields=[services])
+
+    class Meta:
+        verbose_name = "تعهد"
+        verbose_name_plural = "تعهدها"
+        ordering = ["title", "pk"]
+        constraints = ValidityPeriod.Meta.constraints
+
+    def __str__(self):
+        return self.title

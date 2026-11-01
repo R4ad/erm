@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}تعهدها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">تعهدها</h1>
+  {% if can_edit %}
+    <a href="{% url 'catalog:commitment_create' %}" class="btn btn-primary btn-sm">تعهد جدید</a>
+  {% endif %}
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>عنوان</th>
+          <th>نوع</th>
+          <th>مرجع بند</th>
+          <th>خدمت‌ها</th>
+          <th>بانک</th>
+          <th>مسئول اجرا</th>
+          <th>اعتبار</th>
+          {% if can_edit %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for commitment in commitments %}
+          <tr>
+            <td>
+              {{ commitment.title }}
+              {% if commitment.description %}
+                <div class="small text-body-secondary">{{ commitment.description|truncatewords:15 }}</div>
+              {% endif %}
+            </td>
+            <td>{{ commitment.get_kind_display|default:"-" }}</td>
+            <td>{{ commitment.clause_ref|default:"-" }}</td>
+            <td>
+              {% for service in commitment.services.all %}
+                <a href="{{ service.get_absolute_url }}" class="text-nowrap">{{ service.code }}</a>{% if not forloop.last %}، {% endif %}
+              {% empty %}-{% endfor %}
+            </td>
+            <td>{{ commitment.customer|default:"همه" }}</td>
+            <td>
+              {% if commitment.owner %}
+                {{ commitment.owner.get_full_name|default:commitment.owner.username }}
+              {% else %}-{% endif %}
+            </td>
+            <td class="text-nowrap">{% include "catalog/includes/validity.html" with record=commitment %}</td>
+            {% if can_edit %}
+              <td class="text-end">
+                <a href="{% url 'catalog:commitment_update' commitment.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-body-secondary py-4">تعهدی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

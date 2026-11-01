@@ -9,6 +9,8 @@ from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.audit.models import AuditEvent, AuditLogIsReadOnly
 from apps.audit.services import client_ip, describe_changes, tracked_models
+from apps.catalog.models import Commitment
+from apps.catalog.tests.factories import make_service
 from apps.organization.models import OrgUnit
 from apps.workcalendar.models import Holiday
 
@@ -184,3 +186,16 @@ def test_dates_in_history_are_shown_in_jalali():
     holiday.date = datetime.date(2027, 2, 12)
     holiday.save()
     assert describe_changes(holiday.history.first()) == [("تاریخ", "1405/11/22", "1405/11/23")]
+
+@pytest.mark.django_db
+def test_many_to_many_changes_are_shown_by_name():
+    commitment = Commitment.objects.create(title="SLA پرداخت")
+    payment, card = make_service("SRV-1", name="پرداخت"), make_service("SRV-2", name="کارت")
+
+    commitment.services.add(payment, card)
+    commitment.services.remove(payment)
+
+    removed, added, created = commitment.history.all()
+    assert describe_changes(added) == [("خدمت‌ها", "—", "SRV-1 - پرداخت، SRV-2 - کارت")]
+    assert describe_changes(removed) == [("خدمت‌ها", "SRV-1 - پرداخت، SRV-2 - کارت", "SRV-2 - کارت")]
+    assert created.history_type == "+"

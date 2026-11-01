@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Asset, Customer, Service, ServiceCustomer, Supplier
+from .models import Asset, Commitment, Customer, Service, ServiceCustomer, Supplier
 
 
 @admin.register(Customer)
@@ -39,4 +39,13 @@ class AssetAdmin(SimpleHistoryAdmin):
     list_display = ("code", "name", "kind", "org_unit", "owner", "data_class", "is_active")
     list_filter = ("kind", "data_class", "is_active")
     search_fields = ("code", "name")
+    raw_id_fields = ("owner",)
+
+
+@admin.register(Commitment)
+class CommitmentAdmin(SimpleHistoryAdmin):
+    list_display = ("title", "kind", "clause_ref", "customer", "owner", "valid_until")
+    list_filter = ("kind",)
+    search_fields = ("title", "clause_ref")
+    filter_horizontal = ("services",)
     raw_id_fields = ("owner",)

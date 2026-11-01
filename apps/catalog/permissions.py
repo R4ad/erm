@@ -2,7 +2,7 @@ from django.db.models import Q
 
 from apps.accounts.roles import Role
 
-from .models import Asset, Service
+from .models import Asset, Commitment, Service
 
 # این نقش‌ها همه‌ی خدمت‌ها و دارایی‌ها را می‌بینند. مدیر سامانه همیشه همه را می‌بیند.
 SEE_ALL_ROLES = [Role.GRC_MEMBER, Role.SECURITY_WORKGROUP, Role.SECURITY_COMMITTEE]
@@ -41,3 +41,14 @@ def visible_assets(user):
     condition = visibility_condition(user)
     assets = Asset.objects.all()
     return assets if condition is None else assets.filter(condition)
+
+
+def visible_commitments(user):
+    """تعهدهایی که این کاربر می‌بیند: تعهدهای خدمت‌هایی که می‌بیند. کسی که همه‌ی خدمت‌ها را می‌بیند،
+    تعهدی را هم که هنوز به خدمتی وصل نشده می‌بیند."""
+    condition = visibility_condition(user)
+    commitments = Commitment.objects.all()
+    if condition is None:
+        return commitments
+    # distinct: تعهدی که به دو خدمت قابل‌دیدن وصل است، بدون آن دو بار می‌آمد.
+    return commitments.filter(services__in=Service.objects.filter(condition)).distinct()
