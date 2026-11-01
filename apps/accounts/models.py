@@ -4,6 +4,7 @@ from django.core.validators import RegexValidator
 
 from apps.organization.services import get_subtree_ids
 from .roles import Role
+from simple_history.models import HistoricalRecords
 
 class User(AbstractUser):
     personnel_code = models.CharField(
@@ -29,6 +30,7 @@ class User(AbstractUser):
         blank=True,
         related_name="managers",
     )
+    history = HistoricalRecords(excluded_fields=["password", "last_login"])
 
     def has_role(self, *roles):
         return self.groups.filter(name__in=roles).exists()
@@ -40,6 +42,10 @@ class User(AbstractUser):
     @property
     def is_system_admin(self):
         return self.is_superuser or self.has_role(Role.SYSTEM_ADMIN)
+
+    @property
+    def can_view_audit_log(self):
+        return self.is_system_admin or self.has_role(Role.VIEWER)
 
     def managed_unit_ids(self):
         ids = set()

@@ -31,6 +31,9 @@
           <li class="nav-item"><a class="nav-link" href="{% url 'accounts:staff_import' %}">ورود کارکنان</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'workcalendar:holiday_list' %}">تعطیلات</a></li>
           {% endif %}
+          {% if user.can_view_audit_log %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'audit:event_list' %}">سوابق ممیزی</a></li>
+          {% endif %}
         </ul>
 
         <div class="d-flex flex-wrap align-items-center gap-3 ms-lg-auto py-2 py-lg-0">

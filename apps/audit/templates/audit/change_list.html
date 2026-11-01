@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}تغییرات داده{% endblock %}
+
+{% block content %}
+{% include "audit/tabs.html" %}
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>زمان</th>
+          <th>کاربر</th>
+          <th>تغییر</th>
+          <th>رکورد</th>
+          <th>چه چیزی عوض شد</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td class="text-nowrap" dir="ltr">{{ row.record.history_date|jformat:"%Y/%m/%d %H:%M" }}</td>
+            <td>
+              {% if row.record.history_user %}
+                {{ row.record.history_user.get_full_name|default:row.record.history_user.username }}
+              {% else %}
+                <span class="text-body-secondary small">خط فرمان</span>
+              {% endif %}
+            </td>
+            <td><span class="badge text-bg-secondary">{{ row.type }}</span></td>
+            <td>
+              {{ row.record.instance }}
+              {% if row.record.history_change_reason %}
+                <div class="text-body-secondary small">{{ row.record.history_change_reason }}</div>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% for label, old, new in row.changes %}
+                <div>
+                  {{ label }}: <del class="text-body-secondary">{{ old }}</del> ← {{ new }}
+                </div>
+              {% empty %}
+                {% if row.record.history_type == "~" %}<span class="text-body-secondary">فیلدی که این‌جا نشان داده شود عوض نشد (مثلاً رمز یا نقش)</span>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-body-secondary py-4">تغییری با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

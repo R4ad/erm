@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}سوابق ممیزی{% endblock %}
+
+{% block content %}
+{% include "audit/tabs.html" %}
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="mb-2">
+    {# همان فیلترهای صفحه به خروجی می‌رود #}
+    <a href="{% url 'audit:event_export' %}?{{ request.GET.urlencode }}" class="btn btn-outline-success btn-sm">خروجی Excel</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>زمان</th>
+          <th>کاربر</th>
+          <th>رویداد</th>
+          <th>شرح</th>
+          <th>نشانی IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td class="text-nowrap" dir="ltr">{{ event.at|jformat:"%Y/%m/%d %H:%M" }}</td>
+            <td>
+              {% if event.user %}{{ event.user.get_full_name|default:event.username }}{% endif %}
+              <span class="text-body-secondary small">{{ event.username|default:"خط فرمان" }}</span>
+            </td>
+            <td>
+              <span class="badge {% if event.event == 'login_failed' or event.event == 'permission_denied' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
+                {{ event.get_event_display }}
+              </span>
+            </td>
+            <td class="small">{{ event.summary }}</td>
+            <td class="small" dir="ltr">{{ event.ip_address|default:"" }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-body-secondary py-4">رویدادی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

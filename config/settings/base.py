@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.workflow",
     "apps.reports",
     "apps.workcalendar",
+    "apps.audit",
     "django_jalali",
     "simple_history",
 ]
