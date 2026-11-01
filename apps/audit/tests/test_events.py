@@ -103,6 +103,17 @@ def test_managed_unit_changes_are_logged():
 
 
 @pytest.mark.django_db
+def test_viewer_scope_changes_are_logged():
+    viewer = User.objects.create_user("sara", first_name="سارا", last_name="کریمی")
+    unit = OrgUnit.objects.create(name="مالی")
+
+    viewer.scope_units.add(unit)
+
+    event = events(AuditEvent.Event.SCOPE_UNITS_CHANGED).get()
+    assert event.summary == "سارا کریمی (sara): مالی افزوده شد"
+
+
+@pytest.mark.django_db
 def test_events_cannot_be_changed_or_deleted():
     event = AuditEvent.objects.create(event=AuditEvent.Event.LOGIN, username="sara")
 

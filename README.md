@@ -75,7 +75,7 @@ pipenv run pytest
 ## ساختار پروژه
 
 - `config/` تنظیمات و آدرس‌های اصلی
-- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `risks`، `actions`، `workflow`، `reports`
+- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `workcalendar`، `audit`، `catalog`، `risks`، `actions`، `workflow`، `reports`
 - `templates/` و `static/` قالب پایه، فونت وزیرمتن، Bootstrap راست‌چین و htmx
 - `docker/nginx/` تنظیمات nginx
 - `docs/` قواعد کسب‌وکار

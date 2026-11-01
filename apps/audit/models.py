@@ -25,6 +25,7 @@ class AuditEvent(models.Model):
         PERMISSION_DENIED = "permission_denied", "دسترسی ردشده"
         ROLES_CHANGED = "roles_changed", "تغییر نقش"
         MANAGED_UNITS_CHANGED = "managed_units_changed", "تغییر واحدهای تحت مدیریت"
+        SCOPE_UNITS_CHANGED = "scope_units_changed", "تغییر دامنه‌ی مشاهده"
         EXPORT = "export", "خروجی گرفتن"
 
     # کاربری که رویداد را انجام داده. PROTECT: کاربری که سابقه دارد حذف نمی‌شود، فقط غیرفعال می‌شود.
@@ -67,7 +68,11 @@ class AuditEvent(models.Model):
         details = self.details
         if self.event == self.Event.PERMISSION_DENIED:
             return details.get("path", "")
-        if self.event in (self.Event.ROLES_CHANGED, self.Event.MANAGED_UNITS_CHANGED):
+        if self.event in (
+            self.Event.ROLES_CHANGED,
+            self.Event.MANAGED_UNITS_CHANGED,
+            self.Event.SCOPE_UNITS_CHANGED,
+        ):
             verb = "افزوده شد" if details.get("action") == "added" else "برداشته شد"
             return f"{details.get('target', '')}: {'، '.join(details.get('items', []))} {verb}"
         if self.event == self.Event.EXPORT:

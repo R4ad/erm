@@ -10,3 +10,15 @@ def thousands(value):
     if value is None or value == "":
         return ""
     return f"{value:,}"
+
+
+@register.filter
+def minutes(value):
+    """مدت به دقیقه را خوانا می‌کند: 90 → «1 ساعت و 30 دقیقه»، 1500 → «1 روز و 1 ساعت».
+    روز این‌جا ۲۴ ساعت است، نه روز کاری."""
+    if value is None or value == "":
+        return ""
+    days, rest = divmod(int(value), 24 * 60)
+    hours, mins = divmod(rest, 60)
+    parts = [f"{count} {unit}" for count, unit in [(days, "روز"), (hours, "ساعت"), (mins, "دقیقه")] if count]
+    return " و ".join(parts) or "0 دقیقه"

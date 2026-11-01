@@ -30,6 +30,14 @@ class User(AbstractUser):
         blank=True,
         related_name="managers",
     )
+    scope_units = models.ManyToManyField(
+        "organization.OrgUnit",
+        verbose_name="دامنه‌ی مشاهده",
+        blank=True,
+        related_name="scoped_viewers",
+        help_text="فقط برای نقش «فقط مشاهده». اگر واحدی انتخاب شود، فقط سوابق همین واحدها و زیرمجموعه‌هایشان "
+        "دیده می‌شود. خالی یعنی همه‌ی سوابق.",
+    )
     history = HistoricalRecords(excluded_fields=["password", "last_login"])
 
     def has_role(self, *roles):
@@ -50,5 +58,15 @@ class User(AbstractUser):
     def managed_unit_ids(self):
         ids = set()
         for unit in self.managed_units.all():
+            ids |= get_subtree_ids(unit)
+        return ids
+
+    def scope_unit_ids(self):
+        """واحدهایی که ممیز می‌بیند، با زیرمجموعه‌هایشان. None یعنی دامنه‌ای تعیین نشده و همه را می‌بیند."""
+        units = list(self.scope_units.all())
+        if not units:
+            return None
+        ids = set()
+        for unit in units:
             ids |= get_subtree_ids(unit)
         return ids

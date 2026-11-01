@@ -1,4 +1,4 @@
-"""گیرنده‌های سیگنال: ورود، خروج، ورود ناموفق و تغییر نقش‌ها و واحدهای تحت مدیریت کاربران."""
+"""گیرنده‌های سیگنال: ورود، خروج، ورود ناموفق و تغییر نقش‌ها، واحدهای تحت مدیریت و دامنه‌ی مشاهده‌ی کاربران."""
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import (
@@ -72,3 +72,4 @@ def track_relation(field_name, event):
 
 track_relation("groups", AuditEvent.Event.ROLES_CHANGED)
 track_relation("managed_units", AuditEvent.Event.MANAGED_UNITS_CHANGED)
+track_relation("scope_units", AuditEvent.Event.SCOPE_UNITS_CHANGED)

@@ -1,12 +1,19 @@
 from django.contrib.messages.views import SuccessMessageMixin
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.core.views import FilteredListView, FormPageMixin
 
-from .forms import CustomerFilterForm, CustomerForm, ServiceFilterForm, ServiceForm
-from .models import Customer, Service
+from .forms import (
+    CustomerFilterForm,
+    CustomerForm,
+    ServiceCustomerForm,
+    ServiceFilterForm,
+    ServiceForm,
+)
+from .models import Customer, Service, ServiceCustomer
 from .permissions import EDIT_ROLES, can_edit_catalog, visible_services
 
 
@@ -59,7 +66,11 @@ class ServiceDetailView(DetailView):
         return visible_services(self.request.user).select_related("org_unit", "owner")
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(can_edit=can_edit_catalog(self.request.user), **kwargs)
+        return super().get_context_data(
+            can_edit=can_edit_catalog(self.request.user),
+            customer_links=self.object.customer_links.select_related("customer"),
+            **kwargs,
+        )
 
 
 class ServiceCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, CreateView):
@@ -82,4 +93,42 @@ class ServiceUpdateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, U
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cancel_url"] = self.object.get_absolute_url()
+        return context
+
+
+class ServiceCustomerFormMixin(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin):
+    """مشترک افزودن و ویرایش بانک یک خدمت. بعد از ذخیره یا انصراف به صفحه‌ی همان خدمت برمی‌گردد."""
+
+    roles = EDIT_ROLES
+    model = ServiceCustomer
+    form_class = ServiceCustomerForm
+
+    def get_success_url(self):
+        return self.object.service.get_absolute_url()
+
+    def get_success_message(self, cleaned_data):
+        return f"بانک «{self.object.customer}» برای خدمت «{self.object.service.name}» ذخیره شد."
+
+
+class ServiceCustomerCreateView(ServiceCustomerFormMixin, CreateView):
+    def dispatch(self, request, *args, **kwargs):
+        self.service = get_object_or_404(Service, pk=kwargs["service_pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        # فرم از همان اول می‌داند ردیف مال کدام خدمت است؛ خدمت از نشانی صفحه می‌آید، نه از فرم.
+        return super().get_form_kwargs() | {"instance": ServiceCustomer(service=self.service)}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = f"افزودن بانک به خدمت {self.service}"
+        context["cancel_url"] = self.service.get_absolute_url()
+        return context
+
+
+class ServiceCustomerUpdateView(ServiceCustomerFormMixin, UpdateView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = f"ویرایش بانک «{self.object.customer}» در خدمت {self.object.service}"
+        context["cancel_url"] = self.object.service.get_absolute_url()
         return context

@@ -2,12 +2,12 @@ from django import forms
 from django.db.models import Q
 
 from apps.accounts.models import User
-from apps.core.forms import BootstrapFormMixin
+from apps.core.forms import BootstrapFormMixin, JalaliDateField
 from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Customer, Service
+from .models import Customer, Service, ServiceCustomer
 
 STATUS_CHOICES = [("", "همه"), ("active", "فعال"), ("inactive", "غیرفعال")]
 
@@ -99,3 +99,30 @@ class ServiceFilterForm(BootstrapFormMixin, forms.Form):
         if data["status"]:
             services = services.filter(is_active=data["status"] == "active")
         return services
+
+
+class ServiceCustomerForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = ServiceCustomer
+        fields = [
+            "customer",
+            "rto_minutes",
+            "mtpd_minutes",
+            "rpo_minutes",
+            "bia_reference",
+            "tolerance_notes",
+            "valid_from",
+            "valid_until",
+        ]
+        field_classes = {"valid_from": JalaliDateField, "valid_until": JalaliDateField}
+        widgets = {"tolerance_notes": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # فقط بانک‌های فعالی که هنوز برای این خدمت ثبت نشده‌اند، به‌اضافه‌ی بانک فعلی همین ردیف.
+        # چون «خدمت» در فرم نیست، Django قاعده‌ی یکتایی (خدمت، بانک) را در فرم چک نمی‌کند؛
+        # این فهرست جلوی انتخاب بانک تکراری را می‌گیرد.
+        taken = ServiceCustomer.objects.filter(service=self.instance.service).exclude(pk=self.instance.pk)
+        self.fields["customer"].queryset = Customer.objects.filter(
+            Q(is_active=True) | Q(pk=self.instance.customer_id)
+        ).exclude(pk__in=taken.values("customer"))

@@ -20,9 +20,7 @@ def services(db):
     }
 
 
-@pytest.mark.parametrize(
-    "role", [Role.SYSTEM_ADMIN, Role.GRC_MEMBER, Role.SECURITY_WORKGROUP, Role.SECURITY_COMMITTEE, Role.VIEWER]
-)
+@pytest.mark.parametrize("role", [Role.SYSTEM_ADMIN, Role.GRC_MEMBER, Role.SECURITY_WORKGROUP, Role.SECURITY_COMMITTEE])
 def test_these_roles_see_every_service(services, role):
     user = make_user("someone", role)
 
@@ -41,6 +39,34 @@ def test_managed_units_without_the_unit_manager_role_show_nothing(services):
     user.managed_units.add(services["finance"].org_unit)
 
     assert list(visible_services(user)) == []
+
+
+def test_viewer_without_a_scope_sees_every_service(services):
+    viewer = make_user("auditor", Role.VIEWER)
+
+    assert set(visible_services(viewer)) == set(services.values())
+
+
+def test_viewer_with_a_scope_sees_only_those_units_and_their_subunits(services):
+    viewer = make_user("auditor", Role.VIEWER)
+    viewer.scope_units.add(services["finance"].org_unit)
+
+    assert set(visible_services(viewer)) == {services["finance"], services["payroll"]}
+
+
+def test_scope_without_the_viewer_role_shows_nothing(services):
+    user = make_user("someone")
+    user.scope_units.add(services["finance"].org_unit)
+
+    assert list(visible_services(user)) == []
+
+
+def test_viewer_who_is_also_a_unit_manager_sees_both(services):
+    user = make_user("both", Role.VIEWER, Role.UNIT_MANAGER)
+    user.scope_units.add(services["payroll"].org_unit)
+    user.managed_units.add(services["tech"].org_unit)
+
+    assert set(visible_services(user)) == {services["payroll"], services["tech"]}
 
 
 def test_owner_sees_own_service_even_without_a_role(services):
