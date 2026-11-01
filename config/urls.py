@@ -25,3 +25,5 @@ urlpatterns = [
     path("holidays/", include("apps.workcalendar.urls")),
     path("", include("apps.core.urls")),
 ]
+
+handler403 = "apps.audit.views.permission_denied"
