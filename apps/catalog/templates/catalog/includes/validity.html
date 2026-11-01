@@ -1,0 +1,4 @@
+{% load jformat %}{% if record.valid_from %}از {{ record.valid_from|jformat:"%Y/%m/%d" }}{% endif %}
+{% if record.valid_until %}تا {{ record.valid_until|jformat:"%Y/%m/%d" }}{% endif %}
+{% if not record.valid_from and not record.valid_until %}-{% endif %}
+{% if record.is_expired %}<span class="badge text-bg-secondary ms-1">منقضی</span>{% endif %}

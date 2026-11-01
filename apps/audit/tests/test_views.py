@@ -14,6 +14,8 @@ from apps.accounts.tests.test_staff_import import person
 # pending_dir فیکسچر autouse است و با import در این فایل هم فایل‌های بارگذاری را به پوشه‌ی موقت می‌برد.
 from apps.accounts.tests.test_views import confirm, pending_dir, upload  # noqa: F401
 from apps.audit.models import AuditEvent
+from apps.catalog.models import Commitment
+from apps.catalog.tests.factories import make_service
 from apps.workcalendar.models import Holiday
 
 PAGES = ["audit:event_list", "audit:change_list", "audit:event_export"]
@@ -119,6 +121,18 @@ def test_change_list_shows_who_changed_what(client, system_admin, viewer):
         "rows"
     ][0]["type"] == "ایجاد"
     assert client.get(reverse("audit:change_list"), {"model": "no.such"}).context["rows"] == []
+
+
+@pytest.mark.django_db
+def test_change_list_shows_which_services_were_added_to_a_commitment(client, viewer):
+    commitment = Commitment.objects.create(title="SLA پرداخت")
+    commitment.services.add(make_service("SRV-1", name="پرداخت"))
+    client.force_login(viewer)
+
+    response = client.get(reverse("audit:change_list"), {"model": "catalog.commitment"})
+
+    assert response.context["rows"][0]["changes"] == [("خدمت‌ها", "—", "SRV-1 - پرداخت")]
+    assert "SLA پرداخت" in response.text
 
 
 @pytest.mark.django_db

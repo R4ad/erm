@@ -1,10 +1,10 @@
 import pytest
 
 from apps.accounts.roles import Role
-from apps.catalog.permissions import can_edit_catalog, visible_services
+from apps.catalog.permissions import can_edit_catalog, visible_assets, visible_services
 from apps.organization.models import OrgUnit
 
-from .factories import make_service, make_user
+from .factories import make_asset, make_service, make_user
 
 
 @pytest.fixture
@@ -80,3 +80,34 @@ def test_only_grc_and_system_admin_edit(db):
     assert can_edit_catalog(make_user("admin", Role.SYSTEM_ADMIN))
     assert not can_edit_catalog(make_user("manager", Role.UNIT_MANAGER))
     assert not can_edit_catalog(make_user("viewer", Role.VIEWER))
+
+
+@pytest.fixture
+def assets(db):
+    """همان درخت واحدهای fixture خدمت‌ها، با یک دارایی در هر واحد."""
+    finance = OrgUnit.objects.create(name="مالی")
+    payroll = OrgUnit.objects.create(name="حقوق", parent=finance)
+    tech = OrgUnit.objects.create(name="فنی")
+    return {
+        "finance": make_asset("AST-1", org_unit=finance),
+        "payroll": make_asset("AST-2", org_unit=payroll),
+        "tech": make_asset("AST-3", org_unit=tech),
+    }
+
+
+@pytest.mark.parametrize("role", [Role.SYSTEM_ADMIN, Role.GRC_MEMBER, Role.SECURITY_WORKGROUP, Role.SECURITY_COMMITTEE])
+def test_these_roles_see_every_asset(assets, role):
+    assert set(visible_assets(make_user("someone", role))) == set(assets.values())
+
+
+def test_assets_follow_the_unit_rules_of_services(assets):
+    manager = make_user("manager", Role.UNIT_MANAGER)
+    manager.managed_units.add(assets["finance"].org_unit)
+    scoped_viewer = make_user("auditor", Role.VIEWER)
+    scoped_viewer.scope_units.add(assets["payroll"].org_unit)
+
+    assert set(visible_assets(manager)) == {assets["finance"], assets["payroll"]}
+    assert set(visible_assets(scoped_viewer)) == {assets["payroll"]}
+    assert set(visible_assets(make_user("viewer", Role.VIEWER))) == set(assets.values())
+    assert list(visible_assets(assets["tech"].owner)) == [assets["tech"]]
+    assert list(visible_assets(make_user("nobody"))) == []

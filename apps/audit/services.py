@@ -72,6 +72,13 @@ def show_value(field, value):
     return str(value)  # برای ForeignKey، diff_against خود شیء را می‌دهد و str نامش است
 
 
+def show_related(field, rows):
+    """مقدار فیلد چندبه‌چند، مثل خدمت‌های یک تعهد. diff_against برای هر ردیف جدول واسط یک dict می‌دهد،
+    مثل {"commitment": تعهد، "service": خدمت}؛ از هر ردیف طرف دیگر رابطه را برمی‌داریم."""
+    target = field.m2m_reverse_field_name()  # برای خدمت‌های تعهد: service
+    return "، ".join(sorted(show_value(field, row[target]) for row in rows)) or "—"
+
+
 def describe_changes(record):
     """فهرست (نام فیلد، مقدار قبلی، مقدار تازه) برای یک ردیف «ویرایش» تاریخچه، در مقایسه با ردیف قبلی."""
     if record.history_type != "~":
@@ -82,8 +89,10 @@ def describe_changes(record):
     delta = record.diff_against(previous, foreign_keys_are_objs=True)
     rows = []
     for change in delta.changes:
-        field = record._meta.get_field(change.field)
-        old, new = show_value(field, change.old), show_value(field, change.new)
+        # فیلد را از خود مدل می‌گیریم، نه از مدل تاریخچه، چون فیلد چندبه‌چند در مدل تاریخچه فیلد نیست.
+        field = record.instance_type._meta.get_field(change.field)
+        show = show_related if field.many_to_many else show_value
+        old, new = show(field, change.old), show(field, change.new)
         if old != new:  # مثلاً فرم ادمین کسر ثانیه‌ی زمان را می‌اندازد؛ تغییری که دیده نمی‌شود نشان داده نمی‌شود
             rows.append((field.verbose_name, old, new))
     return rows
