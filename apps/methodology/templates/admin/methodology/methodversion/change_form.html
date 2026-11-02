@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+{% load admin_urls %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  <li><a href="{% url opts|admin_urlname:'copy' original.pk %}">کپی به پیش‌نویس تازه</a></li>
+  {% if original.can_record_approval %}
+    <li><a href="{% url opts|admin_urlname:'approve' original.pk %}">ثبت تصویب</a></li>
+  {% endif %}
+  {% if original.status == "approved" %}
+    <li><a href="{% url opts|admin_urlname:'activate' original.pk %}">فعال کردن</a></li>
+  {% endif %}
+{% endblock %}
