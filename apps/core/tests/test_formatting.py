@@ -1,4 +1,14 @@
-from apps.core.templatetags.formatting import minutes, thousands
+from apps.core.templatetags.formatting import minutes, paragraphs, thousands
+
+
+def test_paragraphs_splits_on_blank_lines_and_escapes_html():
+    html = paragraphs("## عنوان\n\nبند اول\nخط دوم\n\n<script>alert(1)</script>")
+
+    assert html == (
+        '<h4 class="h6 mt-3">عنوان</h4><p>بند اول<br>خط دوم</p><p>&lt;script&gt;alert(1)&lt;/script&gt;</p>'
+    )
+    assert paragraphs("") == ""
+    assert paragraphs(None) == ""
 
 
 def test_thousands_groups_digits_and_leaves_empty_values_empty():
