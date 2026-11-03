@@ -163,21 +163,20 @@ class RiskScenario(TimeStampedModel):
 
 class Risk(TimeStampedModel):
     """نمونه‌ی ریسک (بخش ۱ و ۶ سند v5): کاربرد یک سناریو در یک خدمت، بانک و دامنه‌ی مشخص، با یک مالک. تعریف عامل
-    آغازگر هم اینجاست، چون بخش ۱۳ می‌گوید در همه‌ی ارزیابی‌های یک ریسک ثابت می‌ماند. ریسک حذف نمی‌شود؛ بازنشسته
-    یا ادغام می‌شود (قدم ۱۴)."""
+    آغازگر هم اینجاست، چون بخش ۱۳ می‌گوید در همه‌ی ارزیابی‌های یک ریسک ثابت می‌ماند. ریسک حذف نمی‌شود؛ رد،
+    بسته یا ادغام می‌شود (قدم ۱۴)."""
 
     class Status(models.TextChoices):
-        # ده وضعیت بخش ۲۳. تا قدم ۱۴ که انتقال‌ها ساخته می‌شوند، هر ریسک تازه «پیش‌نویس» است.
-        DRAFT = "draft", "پیش‌نویس"
-        IDENTIFIED = "identified", "شناسایی‌شده"
-        ASSESSING = "assessing", "در ارزیابی"
-        QUALITY_CHECK = "quality_check", "در کنترل کیفیت"
-        DECISION = "decision", "در تصمیم"
-        TREATING = "treating", "در مواجهه"
-        ACCEPTED = "accepted", "پذیرفته‌شده"
-        REASSESSING = "reassessing", "در بازسنجی"
-        RETIRED = "retired", "بازنشسته"
-        MERGED = "merged", "ادغام‌شده"
+        # چرخه‌ی عمر ریسک، به ترتیب جدول جواب س۱۵. انتقال‌ها و انجام‌دهنده‌ی هر کدام در قدم ۱۴ ساخته می‌شود.
+        # ریسک با «ثبت‌شده در رجیستر» به دنیا می‌آید؛ «در پاسخ به پرسش‌ها» وقتی است که برای ارزیابی پرسش تازه‌ای لازم شود.
+        QUESTIONS = "questions", "در پاسخ به پرسش‌ها"
+        REGISTERED = "registered", "ثبت‌شده در رجیستر"
+        ASSESSMENT = "assessment", "در ارزیابی"
+        REJECTED = "rejected", "ردشده"
+        TREATMENT_PLAN = "treatment_plan", "برنامه‌ی درمان"
+        TREATMENT = "treatment", "در اجرای درمان"
+        REVIEW = "review", "در بازبینی"
+        CLOSED = "closed", "بسته‌شده"
 
     class Channel(models.TextChoices):
         INTERVIEW = "interview", "مصاحبه"
@@ -186,10 +185,9 @@ class Risk(TimeStampedModel):
         CHANGE = "change", "تغییر"
         SCAN = "scan", "اسکن"
         AUDIT = "audit", "ممیزی"
-        V4_MIGRATION = "v4_migration", "مهاجرت v4"
 
-    # ریسک بازنشسته یا ادغام‌شده فقط سابقه است.
-    CLOSED_STATUSES = [Status.RETIRED, Status.MERGED]
+    # ریسک ردشده یا بسته‌شده فقط سابقه است.
+    CLOSED_STATUSES = [Status.REJECTED, Status.CLOSED]
 
     code = models.CharField("کد", max_length=20, unique=True, editable=False)
     scenario = models.ForeignKey(
@@ -229,7 +227,7 @@ class Risk(TimeStampedModel):
         null=True,
         blank=True,
         related_name="owned_risks",
-        help_text="یک شخص حقیقی؛ پیش از «شناسایی‌شده» باید تعیین شود.",
+        help_text="یک شخص حقیقی؛ پیش از ارسال برای ارزیابی باید تعیین شود.",
     )
     org_unit = models.ForeignKey(
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, related_name="risks"
@@ -250,7 +248,7 @@ class Risk(TimeStampedModel):
     count_exclusions = models.TextField("موارد خارج از شمارش", blank=True)
     channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
     status = models.CharField(
-        "وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT, editable=False
+        "وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False
     )
     needs_completion = models.BooleanField(
         "نیازمند تکمیل",
