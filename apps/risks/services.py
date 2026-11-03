@@ -83,7 +83,7 @@ def save_coverage(cell, user, status, reason):
 
 
 def active_risks(risks):
-    """ریسک‌هایی که بازنشسته یا ادغام نشده‌اند."""
+    """ریسک‌هایی که رد یا بسته نشده‌اند."""
     return risks.exclude(status__in=Risk.CLOSED_STATUSES)
 
 
