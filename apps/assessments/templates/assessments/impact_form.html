@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}پروفایل پیامد {{ assessment.code }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">پروفایل پیامد ارزیابی {{ assessment.get_kind_display }} {{ assessment.code }}</h1>
+  <a href="{{ assessment.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">بازگشت به ارزیابی</a>
+</div>
+
+<div class="alert alert-light border small">
+  برای داتین و هر بانک متأثر، سطح هر بُعد را با دلیل و شاهد ثبت کنید. صفر یعنی «اثر ندارد» و دلیل می‌خواهد؛ اگر داده نیست «نامعلوم» را با دلیل انتخاب کنید و صفر نگذارید.
+  اگر داده کافی نیست، سطح را بازه بگیرید (مثلاً ۳ تا ۴). با مدت اختلال و مبلغ زیان، سامانه سطح S و F را پیشنهاد می‌دهد؛ سطح دیگر دلیل می‌خواهد.
+  خانه‌ای که «ثبت‌نشده» بماند ذخیره نمی‌شود.
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% for group in groups %}
+    <div class="card mb-4">
+      <div class="card-header d-flex flex-wrap gap-3 align-items-center">
+        <strong>{% if group.customer %}{{ group.customer.name }}{% else %}داتین{% endif %}</strong>
+        <span class="small text-body-secondary">
+          {% if group.facts.critical %}خدمت حیاتی{% else %}خدمت غیرحیاتی یا بدون خدمت{% endif %}
+          {% if group.customer %}
+            · RTO: {{ group.facts.rto|default:"ثبت‌نشده" }}{% if group.facts.rto %} دقیقه{% endif %}
+            · MTPD: {{ group.facts.mtpd|default:"ثبت‌نشده" }}{% if group.facts.mtpd %} دقیقه{% endif %}
+            · مبنای مالی: {% if group.facts.basis %}{{ group.facts.basis }} ریال{% else %}ثبت‌نشده{% endif %}
+          {% else %}
+            · مبنای مالی داتین درآمد عملیاتی تأییدشده‌ی ۱۲ ماه اخیر است و در ردیف F نوشته می‌شود.
+          {% endif %}
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-top mb-0">
+          <thead class="small">
+            <tr>
+              <th style="min-width: 9rem">بُعد</th>
+              <th style="min-width: 14rem">سطح</th>
+              <th style="min-width: 5rem">تا</th>
+              <th style="min-width: 10rem">مقدار واقعی</th>
+              <th style="min-width: 7rem">اطمینان</th>
+              <th style="min-width: 14rem">دلیل</th>
+              <th style="min-width: 12rem">شواهد</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in group.forms %}
+              <tr>
+                <td>
+                  <strong>{{ form.scale.code }}</strong> {{ form.scale.name }}
+                  {% if form.suggestion %}
+                    <div class="small mt-2 {% if form.suggestion.level is None %}text-warning-emphasis{% else %}text-success-emphasis{% endif %}">
+                      {% if form.suggestion.level is not None %}پیشنهاد سامانه: سطح {{ form.suggestion.level }}. {% endif %}{{ form.suggestion.note }}
+                    </div>
+                  {% endif %}
+                  {% if form.scale.code == "S" and group.facts.critical and group.customer and not group.facts.mtpd %}
+                    <div class="small mt-1 text-body-secondary">بدون RTO یا MTPD مصوب، سطح موقت کمتر از {{ provisional_level|floatformat:0 }} ثبت نشود مگر با دلیل و تأیید متولی روش.</div>
+                  {% endif %}
+                </td>
+                <td>{{ form.level }}{% for error in form.level.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}{% for error in form.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
+                <td>{{ form.level_high }}{% for error in form.level_high.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
+                <td>
+                  {{ form.actual_value }}{% for error in form.actual_value.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                  {% if form.unit %}<div class="mt-1">{{ form.unit }}</div>{% endif %}
+                  {% if form.basis %}
+                    <label class="form-label small mt-2 mb-0" for="{{ form.basis.id_for_label }}">{{ form.basis.label }}</label>
+                    {{ form.basis }}{% for error in form.basis.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                  {% endif %}
+                </td>
+                <td>{{ form.confidence }}{% for error in form.confidence.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
+                <td>{{ form.rationale }}{% for error in form.rationale.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
+                <td>{{ form.evidence }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">ذخیره</button>
+  <a href="{{ assessment.get_absolute_url }}" class="btn btn-outline-secondary">انصراف</a>
+</form>
+{% endblock %}

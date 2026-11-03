@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ assessment }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    ارزیابی {{ assessment.get_kind_display }} {{ assessment.code }}
+    <span class="badge text-bg-light border ms-1">{{ assessment.get_status_display }}</span>
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'assessments:impact_profile' assessment.pk %}" class="btn btn-primary btn-sm">پروفایل پیامد</a>
+      <a href="{% url 'assessments:assessment_update' assessment.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{{ assessment.risk.get_absolute_url }}#assessments" class="btn btn-outline-secondary btn-sm">ریسک</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">ریسک</dt>
+  <dd class="col-sm-9"><a href="{{ assessment.risk.get_absolute_url }}">{{ assessment.risk }}</a></dd>
+
+  <dt class="col-sm-3">نسخه‌ی روش</dt>
+  <dd class="col-sm-9"><a href="{{ assessment.method_version.get_absolute_url }}">{{ assessment.method_version }}</a></dd>
+
+  <dt class="col-sm-3">افق</dt>
+  <dd class="col-sm-9">{{ assessment.horizon_months }} ماه</dd>
+
+  <dt class="col-sm-3">تاریخ جلسه‌ی کارگروه</dt>
+  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}هنوز ثبت نشده{% endif %}</dd>
+
+  <dt class="col-sm-3">فرض‌ها</dt>
+  <dd class="col-sm-9">{{ assessment.assumptions|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">ثبت‌کننده</dt>
+  <dd class="col-sm-9">{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}، {{ assessment.created_at|jformat:"%Y/%m/%d" }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3">پروفایل پیامد</h2>
+<div class="mb-3">
+  {% if summary.impact %}
+    <span class="fs-5">پیامد (I): {{ summary.impact }}</span>
+    <span class="small text-body-secondary ms-2">بیشترین سطح معتبر بین ابعاد و ذی‌نفعان.</span>
+  {% else %}
+    <span class="fs-5">پیامد (I): هنوز معلوم نیست</span>
+  {% endif %}
+</div>
+{% for problem in summary.problems %}<div class="alert alert-danger py-2">{{ problem }}</div>{% endfor %}
+{% if summary.incomplete %}
+  <div class="alert alert-warning py-2">
+    پیامد هنوز کران بالای قابل دفاعی ندارد، چون خانه‌های نامعلوم یا ثبت‌نشده می‌توانند آن را بالاتر ببرند.
+    {% if summary.unknown %}<div class="small mt-1">نامعلوم: {{ summary.unknown|join:"، " }}</div>{% endif %}
+    {% if summary.missing %}<div class="small mt-1">ثبت‌نشده: {{ summary.missing|join:"، " }}</div>{% endif %}
+  </div>
+{% elif summary.missing %}
+  <div class="alert alert-light border py-2 small">ثبت‌نشده: {{ summary.missing|join:"، " }}</div>
+{% endif %}
+
+<div class="table-responsive">
+  <table class="table table-bordered align-middle text-center">
+    <thead>
+      <tr>
+        <th class="text-start">بُعد</th>
+        {% for customer in summary.stakeholders %}
+          <th>{% if customer %}{{ customer.name }}{% else %}داتین{% endif %}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for scale, cells in summary.rows %}
+        <tr>
+          <th class="text-start fw-normal">{{ scale.code }} - {{ scale.name }}</th>
+          {% for detail in cells %}
+            <td{% if detail.rationale %} title="{{ detail.rationale }}"{% endif %}>
+              {% if detail %}
+                <span class="{% if detail.is_unknown %}text-warning-emphasis{% else %}fw-bold{% endif %}">{{ detail.level_display }}</span>
+                {% if detail.actual_value is not None %}<div class="small text-body-secondary">{{ detail.actual_value.normalize }} {{ detail.unit }}</div>{% endif %}
+                {% if detail.confidence %}<div class="small text-body-secondary">اطمینان {{ detail.get_confidence_display }}</div>{% endif %}
+              {% else %}
+                <span class="text-body-secondary">-</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="small text-body-secondary">
+  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود. احتمال (A و مسیرها) در قدم بعد به ارزیابی اضافه می‌شود.
+</p>
+{% endblock %}
