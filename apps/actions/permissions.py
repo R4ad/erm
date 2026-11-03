@@ -1,6 +1,7 @@
 from django.db.models import Q
 
 from apps.accounts.roles import Role
+from apps.assessments.services import decision_assessment
 from apps.risks.models import Risk
 from apps.risks.permissions import visible_risks
 
@@ -35,7 +36,14 @@ def can_edit_plan(user, plan):
         and not plan.is_owner_approved
         and plan.risk.is_active
         and plan.risk.status == Risk.Status.TREATMENT_PLAN
+        and is_current_plan(plan)
     )
+
+
+def is_current_plan(plan):
+    """طرح ارزیابی تصمیم همین دور. طرح دور قبل، بازسنجی‌شده یا نه، اقدام تازه نمی‌گیرد."""
+    base = decision_assessment(plan.risk)
+    return base is not None and base.pk == plan.assessment_id
 
 
 def can_add_action(user, plan):
@@ -44,6 +52,7 @@ def can_add_action(user, plan):
         can_edit_plans(user)
         and plan.risk.is_active
         and plan.risk.status in [Risk.Status.TREATMENT_PLAN, *EXECUTION_STATUSES]
+        and is_current_plan(plan)
     )
 
 

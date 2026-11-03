@@ -6,6 +6,7 @@ from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
 
+from apps.assessments.comparison import compare
 from apps.assessments.services import decision_assessment
 from apps.core.records import record_extras
 from apps.core.views import FilteredListView
@@ -13,6 +14,7 @@ from apps.risks.models import Risk
 from apps.risks.permissions import visible_evidence, visible_risks
 
 from . import acceptance as acc
+from . import reassessment as reassess
 from .forms import (
     AcceptanceFilterForm,
     AcceptanceForm,
@@ -20,6 +22,7 @@ from .forms import (
     ActionForm,
     MoveForm,
     PlanForm,
+    ReassessmentForm,
     RevokeForm,
     SignForm,
 )
@@ -32,6 +35,7 @@ from .permissions import (
     can_edit_plan,
     can_edit_acceptance,
     can_edit_plans,
+    is_current_plan,
     visible_acceptances,
     visible_actions,
     visible_plans,
@@ -149,10 +153,20 @@ class PlanDetailView(DetailView):
             can_add_action=can_add_action(user, plan),
             can_approve=approvable,
             acceptances=plan.acceptances.select_related("assessment__decision_level", "follow_up_by"),
-            can_add_acceptance=can_edit_plans(user) and not acc.creation_problems(plan.risk),
+            **plan_reassessment_context(plan, user),
+            can_add_acceptance=can_edit_plans(user) and is_current_plan(plan) and not acc.creation_problems(plan.risk),
             **record_extras(plan, user),
             **kwargs,
         )
+
+
+def plan_reassessment_context(plan, user):
+    reassessment = getattr(plan, "reassessment", None)
+    pending = reassessment is None and not reassess.reassessment_problems(plan)
+    context = {"reassessment": reassessment, "can_reassess": pending and can_edit_plans(user)}
+    if reassessment or pending:
+        context["comparison"] = compare(reassess.comparison_assessments(plan, reassessment))
+    return context
 
 
 class PlanApproveView(View):
@@ -522,3 +536,50 @@ class AcceptanceListView(FilteredListView):
             "risk", "assessment__decision_level", "follow_up_by"
         )
         return super().get_queryset()
+
+
+class ReassessmentCreateView(CreateView):
+    form_class = ReassessmentForm
+    template_name = "actions/reassessment_form.html"
+
+    @cached_property
+    def plan(self):
+        return get_object_or_404(
+            visible_plans(self.request.user).select_related("risk", "assessment", "target_assessment"),
+            pk=self.kwargs["plan_pk"],
+        )
+
+    def dispatch(self, request, *args, **kwargs):
+        if not can_edit_plans(request.user):
+            raise PermissionDenied
+        problems = reassess.reassessment_problems(self.plan)
+        if problems:
+            for problem in problems:
+                messages.error(request, problem)
+            return redirect(self.plan.get_absolute_url() + "#reassessment")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        return {"responsible": self.request.user.pk}
+
+    def form_valid(self, form):
+        try:
+            reassess.record_reassessment(self.plan, form.instance, self.request.user)
+        except PlanError as error:
+            for problem in error.problems:
+                form.add_error(None, problem)
+            return self.form_invalid(form)
+        messages.success(self.request, "بازسنجی ثبت شد و طرح بسته شد.")
+        return redirect(self.plan.get_absolute_url() + "#reassessment")
+
+    def get_context_data(self, **kwargs):
+        plan = self.plan
+        return super().get_context_data(
+            plan=plan,
+            risk=plan.risk,
+            title=f"بازسنجی {plan}",
+            cancel_url=plan.get_absolute_url(),
+            open_actions=plan.actions.exclude(status=TreatmentAction.Status.VERIFIED),
+            **compare(reassess.comparison_assessments(plan)),
+            **kwargs,
+        )

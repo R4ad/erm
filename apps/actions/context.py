@@ -5,7 +5,7 @@ from apps.risks.models import Risk
 
 from .acceptance import creation_problems as acceptance_creation_problems
 from .permissions import can_edit_plans
-from .services import containment_due, current_plan, decision_due, plan_creation_problems
+from .services import containment_due, current_plan, decision_due, pending_reassessment, plan_creation_problems
 
 
 def risk_treatment(risk, user):
@@ -24,6 +24,7 @@ def risk_treatment(risk, user):
     }
     base = decision_assessment(risk)
     context["out_of_authority"] = bool(base and base.binding_prohibition)
+    context["pending_reassessment"] = pending_reassessment(risk) if plan is None else None
     if risk.status == Risk.Status.TREATMENT_PLAN and base and plan is None:
         level = base.decision_level
         context["plan_level"] = level

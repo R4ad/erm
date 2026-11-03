@@ -15,10 +15,13 @@
     <span class="small text-body-secondary">از ارزیابی جاری <a href="{{ current_assessment.get_absolute_url }}">{{ current_assessment.code }}</a>، تأییدشده در {{ current_assessment.approved_at|jformat:"%Y/%m/%d" }}</span>
   </p>
 {% endif %}
+{% with compare=assessments|length %}
+<form method="get" action="{% url 'assessments:compare' %}">
 <div class="table-responsive">
   <table class="table table-hover align-middle">
     <thead>
       <tr>
+        {% if compare > 1 %}<th class="text-nowrap"><span class="visually-hidden">انتخاب برای مقایسه</span></th>{% endif %}
         <th>کد</th>
         <th>نوع</th>
         <th>نسخه‌ی روش</th>
@@ -32,6 +35,7 @@
     <tbody>
       {% for assessment in assessments %}
         <tr>
+          {% if compare > 1 %}<td><input class="form-check-input" type="checkbox" name="id" value="{{ assessment.pk }}" aria-label="مقایسه‌ی {{ assessment.code }}"></td>{% endif %}
           <td class="text-nowrap"><a href="{{ assessment.get_absolute_url }}">{{ assessment.code }}</a></td>
           <td>{{ assessment.get_kind_display }}</td>
           <td>{{ assessment.method_version.number }}</td>
@@ -49,3 +53,9 @@
     </tbody>
   </table>
 </div>
+{% if compare > 1 %}
+  <button type="submit" class="btn btn-outline-secondary btn-sm">مقایسه‌ی انتخاب‌شده‌ها</button>
+  <span class="small text-body-secondary ms-2">دو تا چهار ارزیابی؛ قدیمی‌ترین ستون اول است</span>
+{% endif %}
+</form>
+{% endwith %}

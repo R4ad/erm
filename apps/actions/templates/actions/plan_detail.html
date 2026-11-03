@@ -7,7 +7,7 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h1 class="h4 mb-0">
     طرح مواجهه: {{ plan.get_option_display }}
-    {% if plan.is_owner_approved %}<span class="badge text-bg-success">تأییدشده‌ی مالک</span>{% else %}<span class="badge text-bg-light border">منتظر تأیید مالک</span>{% endif %}
+    {% if reassessment %}<span class="badge text-bg-secondary">بازسنجی‌شده و بسته</span>{% elif plan.is_owner_approved %}<span class="badge text-bg-success">تأییدشده‌ی مالک</span>{% else %}<span class="badge text-bg-light border">منتظر تأیید مالک</span>{% endif %}
   </h1>
   <div>
     {% if can_edit %}<a href="{% url 'actions:plan_update' plan.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>{% endif %}
@@ -70,6 +70,30 @@
   {% if can_add_action %}<a href="{% url 'actions:action_create' plan.pk %}" class="btn btn-primary btn-sm">اقدام تازه</a>{% endif %}
 </div>
 {% include "actions/includes/action_table.html" with action_list=actions empty_text="هنوز اقدامی ثبت نشده است." %}
+
+{% if reassessment or can_reassess %}
+  <div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="reassessment">
+    <h2 class="h5 mb-0">بازسنجی</h2>
+    {% if can_reassess %}<a href="{% url 'actions:reassessment_create' plan.pk %}" class="btn btn-primary btn-sm">ثبت بازسنجی</a>{% endif %}
+  </div>
+  {% if reassessment %}
+    <dl class="row">
+      <dt class="col-sm-3">تاریخ و مسئول</dt>
+      <dd class="col-sm-9">{{ reassessment.performed_on|jformat:"%Y/%m/%d" }}، {{ reassessment.responsible.get_full_name|default:reassessment.responsible.username }}</dd>
+      <dt class="col-sm-3">ارزیابی تازه</dt>
+      <dd class="col-sm-9"><a href="{{ reassessment.assessment.get_absolute_url }}">{{ reassessment.assessment.code }}</a></dd>
+      <dt class="col-sm-3">مقایسه با هدف</dt>
+      <dd class="col-sm-9">{% if reassessment.target_met is None %}طرح ارزیابی هدف تأییدشده نداشت.{% elif reassessment.target_met %}<span class="badge text-bg-success">هدف محقق شد</span>{% else %}<span class="badge text-bg-warning">هدف هنوز محقق نشده است</span>{% endif %}
+        {% if reassessment.method_changed %}<div class="small text-warning-emphasis">روش ارزیابی عوض شده و بخشی از تغییر ممکن است از روش باشد.</div>{% endif %}
+      </dd>
+      <dt class="col-sm-3">تصمیم</dt>
+      <dd class="col-sm-9"><span class="fw-semibold">{{ reassessment.get_decision_display }}</span><div>{{ reassessment.note|linebreaksbr }}</div></dd>
+    </dl>
+  {% else %}
+    <p class="small text-body-secondary">ارزیابی جاری تازه‌ای بعد از این طرح تأیید شده است. پیش از طرح دور تازه، نتیجه را با هدف مقایسه و تصمیم پذیرش یا ادامه‌ی اصلاح را ثبت کنید.</p>
+  {% endif %}
+  {% include "assessments/includes/comparison_table.html" with profiles=comparison.profiles rows=comparison.rows method_changed=comparison.method_changed %}
+{% endif %}
 
 <div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="acceptances">
   <h2 class="h5 mb-0">پذیرش</h2>

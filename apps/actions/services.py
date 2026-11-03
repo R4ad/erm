@@ -12,7 +12,7 @@ from apps.methodology.models import PeriodUnit, RiskLevel
 from apps.risks.models import Risk
 from apps.workcalendar.workdays import add_period
 
-from .models import ActionUpdate, RiskAcceptance, TreatmentAction, TreatmentPlan
+from .models import ActionUpdate, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_approve_plan, is_action_worker
 
 ST = TreatmentAction.Status
@@ -61,6 +61,43 @@ def current_plan(risk):
     return TreatmentPlan.objects.filter(assessment=base).first()
 
 
+def previous_plan(risk):
+    """آخرین طرح دورهای قبل: طرحی که بر ارزیابی تصمیم فعلی نیست."""
+    base = decision_assessment(risk)
+    plans = risk.treatment_plans.select_related("assessment")
+    if base is not None:
+        plans = plans.exclude(assessment=base)
+    return plans.order_by("-created_at", "-pk").first()
+
+
+def pending_reassessment(risk):
+    """طرح دور قبل که ارزیابی جاری تازه‌ای بعد از آن تأیید شده ولی بازسنجی‌اش هنوز ثبت نشده است (بخش ۲۰)."""
+    base = decision_assessment(risk)
+    plan = previous_plan(risk)
+    if base is None or plan is None or Reassessment.objects.filter(plan=plan).exists():
+        return None
+    if plan.assessment.approved_at and base.approved_at and plan.assessment.approved_at >= base.approved_at:
+        return None
+    return plan
+
+
+def last_reassessment(risk):
+    plan = previous_plan(risk)
+    return Reassessment.objects.filter(plan=plan).first() if plan else None
+
+
+def reassessment_option_problem(risk, option):
+    """گزینه‌ی طرح دور تازه از تصمیم بازسنجی طرح قبلی پیروی می‌کند: پذیرش یا ادامه‌ی اصلاح."""
+    reassessment = last_reassessment(risk)
+    if reassessment is None or not option:
+        return None
+    if reassessment.decision == Reassessment.Decision.ACCEPT and option != OPTION.ACCEPT:
+        return "تصمیم بازسنجی طرح قبلی «پذیرش ریسک باقیمانده» بود، پس گزینه‌ی این طرح پذیرش است."
+    if reassessment.decision == Reassessment.Decision.CONTINUE and option == OPTION.ACCEPT:
+        return "تصمیم بازسنجی طرح قبلی «ادامه‌ی اصلاح» بود، پس گزینه‌ی این طرح پذیرش نیست."
+    return None
+
+
 def plan_creation_problems(risk):
     problems = []
     if risk.status != Risk.Status.TREATMENT_PLAN:
@@ -70,6 +107,12 @@ def plan_creation_problems(risk):
         problems.append("ارزیابی جاری تأییدشده‌ای با سطح تصمیم برای این دور ارزیابی ریسک نیست.")
     elif TreatmentPlan.objects.filter(assessment=base).exists():
         problems.append(f"برای ارزیابی {base.code} طرح مواجهه ثبت شده است.")
+    pending = pending_reassessment(risk)
+    if pending is not None:
+        problems.append(
+            f"طرح قبلی ({pending.get_option_display()}، بر اساس {pending.assessment.code}) هنوز بازسنجی نشده است؛ اول "
+            "ارزیابی تازه را با هدف مقایسه و تصمیم پذیرش یا ادامه‌ی اصلاح را ثبت کنید."
+        )
     return problems
 
 
@@ -77,6 +120,9 @@ def plan_creation_problems(risk):
 def create_plan(plan, risk, user):
     """plan از فرم می‌آید و هنوز ذخیره نشده است. ارزیابی مبنا و مهلت طرح را سامانه تعیین می‌کند."""
     problems = plan_creation_problems(risk)
+    option_problem = reassessment_option_problem(risk, plan.option)
+    if option_problem:
+        problems.append(option_problem)
     if problems:
         raise PlanError(problems)
     base = decision_assessment(risk)
