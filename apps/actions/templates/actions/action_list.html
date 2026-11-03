@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}اقدام‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">اقدام‌ها</h1>
+  <a href="{% url 'actions:my_work' %}" class="btn btn-outline-secondary btn-sm">کارهای من</a>
+</div>
+<p class="text-body-secondary small">اقدام‌های طرح‌های مواجهه. «عقب‌افتاده» یعنی سررسید گذشته و نتیجه هنوز تأیید نشده است.</p>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  {% include "actions/includes/action_table.html" with action_list=actions show_risk=True empty_text="اقدامی با این مشخصات پیدا نشد." %}
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

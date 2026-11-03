@@ -1,0 +1,34 @@
+{% load jformat %}
+{% comment %}
+  جدول اقدام‌ها. show_risk ستون ریسک را نشان می‌دهد.
+{% endcomment %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>عنوان</th>
+        {% if show_risk %}<th>ریسک</th>{% endif %}
+        <th>سازوکار</th>
+        <th>مالک و مجری</th>
+        <th>سررسید</th>
+        <th>وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for action in action_list %}
+        <tr>
+          <td class="text-nowrap"><a href="{{ action.get_absolute_url }}">{{ action.code }}</a></td>
+          <td>{{ action.title }}</td>
+          {% if show_risk %}<td class="text-nowrap">{{ action.plan.risk.code }}</td>{% endif %}
+          <td class="small">{{ action.get_mechanism_display }}{% if action.dimension %} ({{ action.dimension.code }}){% endif %}</td>
+          <td class="small">{{ action.owner.get_full_name|default:action.owner.username }}<div class="text-body-secondary">{{ action.assignee.get_full_name|default:action.assignee.username }}</div></td>
+          <td class="text-nowrap">{{ action.due_date|jformat:"%Y/%m/%d" }}</td>
+          <td>{% include "actions/includes/action_status.html" %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="{% if show_risk %}7{% else %}6{% endif %}" class="text-center text-body-secondary py-4">{{ empty_text }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

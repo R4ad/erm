@@ -5,13 +5,15 @@
 که با «طرح پرسش‌های جدید» (ردیف ۴) به پاسخ به پرسش‌ها برگشته است.
 
 شرط‌هایی که به ماژول‌های بعدی بسته‌اند، وقتی همان ماژول ساخته شود اضافه می‌شوند: ارزیابی جاری تأییدشده برای ردیف
-۶ از قدم ۱۸ آمده است؛ طرح درمان برای ردیف ۷ (قدم ۱۹) و موعد بازبینی برای ردیف ۸ (قدم ۲۳) می‌آیند.
+۶ از قدم ۱۸ و طرح مواجهه‌ی تأییدشده برای ردیف ۷ از قدم ۱۹ آمده است؛ پذیرش برای ردیف ۷ (قدم ۲۰) و موعد بازبینی
+برای ردیف ۸ (قدم ۲۳) می‌آیند.
 """
 
 from dataclasses import dataclass, field
 
 from apps.accounts.roles import Role
-from apps.assessments.models import Assessment
+from apps.actions.services import current_plan, pending_actions
+from apps.assessments.services import round_current_assessments
 from apps.risks.models import Risk
 
 S = Risk.Status
@@ -70,14 +72,25 @@ def approved_current_assessment(risk, data):
     آخرین ورود ریسک به «در ارزیابی» تأیید شده باشد، تا ریسکی که از بازبینی برگشته (ردیف ۹) با نتیجه‌ی تازه تصمیم
     بگیرد، و سطح تصمیم داشته باشد، چون برنامه‌ی درمان از روی همین سطح طراحی می‌شود. ارزیابی ناقصی که کران قابل
     دفاعی ندارد سطح تصمیم ندارد، مگر یک قاعده‌ی تقدم سطح را بالا برده باشد."""
-    approved = Assessment.objects.filter(risk=risk, kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED)
-    entered = risk.transitions.filter(to_status=S.ASSESSMENT).values_list("created_at", flat=True).first()
-    if entered:
-        approved = approved.filter(approved_at__gte=entered)
+    approved = round_current_assessments(risk)
     if not approved.exists():
         return ["هنوز ارزیابی جاری تأییدشده‌ای برای این دور ارزیابی ریسک نیست."]
     if not approved.filter(decision_level__isnull=False).exists():
         return ["ارزیابی جاری تأییدشده ناقص است و سطح تصمیم ندارد؛ جزء نامعلوم را روشن کنید و دوباره ارزیابی کنید."]
+    return []
+
+
+def approved_treatment_plan(risk, data):
+    """ردیف ۷: اجرا وقتی شروع می‌شود که مالک ریسک طرح مواجهه‌ی ارزیابی فعلی و همه‌ی اقدام‌هایش را تأیید کرده باشد
+    (بخش ۲۰ و ۲۳)."""
+    plan = current_plan(risk)
+    if plan is None:
+        return ["طرح مواجهه‌ای برای ارزیابی جاری تأییدشده‌ی این ریسک ثبت نشده است."]
+    if not plan.is_owner_approved:
+        return ["مالک ریسک هنوز طرح مواجهه را تأیید نکرده است."]
+    pending = list(pending_actions(plan).values_list("code", flat=True))
+    if pending:
+        return [f"این اقدام‌ها هنوز تأیید مالک ریسک را ندارند: {'، '.join(pending)}."]
     return []
 
 
@@ -142,8 +155,9 @@ TRANSITIONS = [
         source=S.TREATMENT_PLAN,
         target=S.TREATMENT,
         label="شروع اجرای درمان",
-        description="برنامه‌ی درمان آماده است و اجرایش شروع می‌شود.",
+        description="طرح مواجهه تأیید شده است و اجرایش شروع می‌شود.",
         roles=GRC,
+        checks=(approved_treatment_plan,),
     ),
     Transition(
         name="start_review",

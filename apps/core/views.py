@@ -18,7 +18,10 @@ from .models import Attachment, Comment
 
 
 def home(request):
-    return render(request, "core/home.html", {"now": timezone.now()})
+    """صفحه‌ی اول همان «کارهای من» است، تا هر کس با کارهای منتظر خودش شروع کند."""
+    from apps.actions.mywork import my_work  # اپ اقدام‌ها به core وابسته است، نه برعکس
+
+    return render(request, "core/home.html", {"now": timezone.now(), **my_work(request.user)})
 
 
 class FilteredListView(ListView):

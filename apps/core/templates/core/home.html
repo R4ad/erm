@@ -2,6 +2,7 @@
 {% load jformat %}
 
 {% block content %}
-<h1 class="h4">خوش آمدید</h1>
-<p>امروز: {{ now|jformat:"%Y/%m/%d" }}</p>
+<h1 class="h4">کارهای من</h1>
+<p class="text-body-secondary">امروز: {{ now|jformat:"%Y/%m/%d" }}</p>
+{% include "actions/includes/my_work_sections.html" %}
 {% endblock %}
