@@ -1,0 +1,46 @@
+{% comment %}
+  بالای صفحه‌ی ریسک: انتقال‌هایی که این کاربر انجام می‌دهد، پیشنهاد ادغام و تفکیک، و پیوندهای ادغام و تفکیک.
+  context از apps.workflow.context.risk_workflow می‌آید.
+{% endcomment %}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="fw-semibold">گردش کار</span>
+      {% for transition in transitions %}
+        <a href="{% url 'workflow:transition' risk.pk transition.name %}" class="btn btn-primary btn-sm" title="{{ transition.description }}">{{ transition.label }}</a>
+      {% empty %}
+        <span class="text-body-secondary small">{% if risk.is_active %}از وضعیت فعلی کاری با نقش شما نیست.{% else %}این ریسک فقط سابقه است.{% endif %}</span>
+      {% endfor %}
+      {% if can_propose_change %}
+        <span class="ms-auto"></span>
+        <a href="{% url 'workflow:change_request_create' risk.pk 'merge' %}" class="btn btn-outline-secondary btn-sm">پیشنهاد ادغام</a>
+        <a href="{% url 'workflow:change_request_create' risk.pk 'split' %}" class="btn btn-outline-secondary btn-sm">پیشنهاد تفکیک</a>
+      {% endif %}
+    </div>
+
+    {% if pending_change %}
+      <div class="alert alert-info mt-3 mb-0">
+        پیشنهاد {{ pending_change.get_kind_display }}{% if pending_change.merge_into %} در {{ pending_change.merge_into.code }}{% endif %}
+        منتظر تأیید مالک ریسک است.
+        <a href="{{ pending_change.get_absolute_url }}" class="alert-link">{% if can_decide_change %}بررسی و تأیید یا رد{% else %}جزئیات{% endif %}</a>
+      </div>
+    {% endif %}
+
+    {% if risk.merged_into or risk.split_from or merged_risks or split_parts %}
+      <ul class="list-unstyled small mt-3 mb-0">
+        {% if risk.merged_into %}
+          <li>این ریسک در {% if merged_into_visible %}<a href="{{ risk.merged_into.get_absolute_url }}">{{ risk.merged_into.code }}</a>{% else %}{{ risk.merged_into.code }}{% endif %} ادغام شده است.</li>
+        {% endif %}
+        {% if risk.split_from %}
+          <li>از ریسک {% if split_from_visible %}<a href="{{ risk.split_from.get_absolute_url }}">{{ risk.split_from.code }}</a>{% else %}{{ risk.split_from.code }}{% endif %} تفکیک شده است.</li>
+        {% endif %}
+        {% if merged_risks %}
+          <li>ریسک‌های ادغام‌شده در این ریسک: {% for item in merged_risks %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</li>
+        {% endif %}
+        {% if split_parts %}
+          <li>ریسک‌های تفکیک‌شده از این ریسک: {% for item in split_parts %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</li>
+        {% endif %}
+      </ul>
+    {% endif %}
+  </div>
+</div>

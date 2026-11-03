@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ transition.label }} {{ risk.code }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-7">
+    <h1 class="h4 mb-1">{{ transition.label }}</h1>
+    <p class="text-body-secondary mb-3">
+      <a href="{{ risk.get_absolute_url }}">{{ risk }}</a>
+      · {{ risk.get_status_display }} ← {{ transition.target_label }}
+    </p>
+    <p>{{ transition.description }}</p>
+
+    {% if problems %}
+      <div class="alert alert-warning">
+        <div class="fw-semibold mb-1">این شرط‌ها هنوز برقرار نیست:</div>
+        <ul class="mb-0">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "includes/form_fields.html" %}
+      <button type="submit" class="btn btn-primary">{{ transition.label }}</button>
+      <a href="{{ risk.get_absolute_url }}" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

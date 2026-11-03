@@ -12,6 +12,7 @@ from apps.catalog.permissions import visible_services
 from apps.catalog.views import BackToRecordMixin
 from apps.core.records import record_extras
 from apps.core.views import FilteredListView, FormPageMixin
+from apps.workflow.context import risk_workflow
 
 from .forms import (
     CoverageFilterForm,
@@ -232,12 +233,20 @@ class RiskDetailView(DetailView):
             links=risk.links.all(),
             # نام خدمت همیشه دیده می‌شود، ولی پیوند به صفحه‌اش فقط اگر کاربر اجازه‌ی دیدنش را دارد.
             service_url=risk.service.get_absolute_url() if service_visible else None,
-            can_edit=can_edit_register(user),
+            # ریسک ردشده یا بسته‌شده فقط سابقه است و ویرایش نمی‌شود (بخش ۲۳).
+            can_edit=risk.is_active and can_edit_register(user),
             evidence=visible_evidence(user).filter(risks=risk),
-            can_add_evidence=risk.is_active and can_add_evidence(user, risk),
+            can_add_evidence=can_add_evidence(user, risk),
             **record_extras(risk, user),
+            **risk_workflow(risk, user),
             **kwargs,
         )
+
+
+class ClosedRisk(Exception):
+    def __init__(self, risk):
+        super().__init__(risk.code)
+        self.risk = risk
 
 
 class RiskFormMixin(RoleRequiredMixin, BackToRecordMixin, FormPageMixin):
@@ -283,6 +292,21 @@ class RiskUpdateView(RiskFormMixin, UpdateView):
     def get_queryset(self):
         return visible_risks(self.request.user)
 
+    def get_object(self, queryset=None):
+        risk = super().get_object(queryset)
+        if not risk.is_active:
+            raise ClosedRisk(risk)
+        return risk
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except ClosedRisk as closed:
+            messages.error(
+                request, f"ریسک {closed.risk.code} «{closed.risk.get_status_display()}» است و ویرایش نمی‌شود."
+            )
+            return redirect(closed.risk.get_absolute_url())
+
     def success_text(self):
         return f"تغییرات ریسک «{self.object}» ذخیره شد."
 
@@ -311,7 +335,8 @@ class ExternalLinkFormMixin(RoleRequiredMixin, SuccessMessageMixin, FormPageMixi
 class ExternalLinkCreateView(ExternalLinkFormMixin, CreateView):
     @cached_property
     def risk(self):
-        return get_object_or_404(visible_risks(self.request.user), pk=self.kwargs["risk_pk"])
+        # پیوند فقط به ریسک فعال اضافه می‌شود؛ ریسک ردشده یا بسته‌شده فقط سابقه است.
+        return get_object_or_404(active_risks(visible_risks(self.request.user)), pk=self.kwargs["risk_pk"])
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -321,7 +346,8 @@ class ExternalLinkCreateView(ExternalLinkFormMixin, CreateView):
 
 class ExternalLinkUpdateView(ExternalLinkFormMixin, UpdateView):
     def get_queryset(self):
-        return ExternalLink.objects.filter(risk__in=visible_risks(self.request.user)).select_related("risk")
+        risks = active_risks(visible_risks(self.request.user))
+        return ExternalLink.objects.filter(risk__in=risks).select_related("risk")
 
 
 class EvidenceListView(FilteredListView):
