@@ -123,6 +123,18 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
+# پیوست‌ها (قدم ۱۳). فایل‌ها نشانی عمومی ندارند (MEDIA_URL تعریف نمی‌شود) و فقط از view دانلود سرو می‌شوند
+# که اول دسترسی به رکورد اصلی را چک می‌کند.
+MEDIA_ROOT = env.path("MEDIA_ROOT", default=BASE_DIR / "media")
+# سقف حجم و پسوندهای مجاز هر پیوست (س۲۴): PDF، تصویر، فایل‌های Office و متن.
+ATTACHMENT_MAX_SIZE = 20 * 1024 * 1024
+ATTACHMENT_EXTENSIONS = [
+    "pdf", "png", "jpg", "jpeg", "gif", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv",
+]  # fmt: skip
+# روی سرور، فرستادن فایل با nginx است: Django فقط سرآیند X-Accel-Redirect را با این پیشوند می‌فرستد و nginx
+# فایل را از مسیر internal همان پیشوند برمی‌دارد. در اجرای محلی خود Django فایل را می‌فرستد.
+ATTACHMENT_X_ACCEL_PREFIX = env("ATTACHMENT_X_ACCEL_PREFIX", default="")
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 

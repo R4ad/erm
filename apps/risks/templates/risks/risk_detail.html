@@ -113,4 +113,15 @@
     </tbody>
   </table>
 </div>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="evidence">
+  <h2 class="h5 mb-0">شواهد</h2>
+  {% if can_add_evidence %}
+    <a href="{% url 'risks:evidence_create' %}?risk={{ risk.pk }}" class="btn btn-primary btn-sm">افزودن شاهد</a>
+  {% endif %}
+</div>
+{% include "risks/includes/evidence_table.html" with evidence_list=evidence empty_text="شاهدی که شما ببینید به این ریسک وصل نیست. نبود شاهد دلیل رد ریسک نیست؛ ریسک با عدم قطعیت بیشتر ارزیابی می‌شود." %}
+
+{% include "core/includes/attachments.html" with record=risk %}
+{% include "core/includes/comments.html" with record=risk %}
 {% endblock %}

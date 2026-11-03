@@ -1,0 +1,24 @@
+{% load jformat %}
+{% comment %}
+  بخش نظرهای یک رکورد. هر کس رکورد را می‌بیند نظر می‌نویسد و نویسنده نظرش را ویرایش می‌کند.
+{% endcomment %}
+<h2 class="h5 mt-4 mb-3" id="comments">نظرها</h2>
+{% for comment in comments %}
+  <div class="border rounded p-3 mb-2">
+    <div class="d-flex justify-content-between small text-body-secondary mb-1">
+      <span>
+        {{ comment.created_by.get_full_name|default:comment.created_by.username }}، {{ comment.created_at|jformat:"%Y/%m/%d %H:%M" }}
+        {% if comment.was_edited %}<span title="ویرایش {{ comment.updated_at|jformat:'%Y/%m/%d %H:%M' }}">(ویرایش‌شده)</span>{% endif %}
+      </span>
+      {% if comment.created_by_id == user.pk %}<a href="{% url 'core:comment_update' comment.pk %}">ویرایش</a>{% endif %}
+    </div>
+    <div>{{ comment.text|linebreaksbr }}</div>
+  </div>
+{% empty %}
+  <p class="text-body-secondary">هنوز نظری نیست.</p>
+{% endfor %}
+<form method="post" action="{% url 'core:comment_create' record_content_type record.pk %}" class="mt-3 mb-5">
+  {% csrf_token %}
+  {{ comment_form.text }}
+  <button type="submit" class="btn btn-outline-primary btn-sm mt-2">ثبت نظر</button>
+</form>

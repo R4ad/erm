@@ -1,6 +1,14 @@
+import os
+import uuid
+
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import F, Q
+from django.urls import reverse
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 class TimeStampedModel(models.Model):
@@ -50,3 +58,66 @@ class CodeCounter(models.Model):
 
     def __str__(self):
         return f"{self.prefix}: {self.last}"
+
+
+def attachment_path(attachment, filename):
+    """نام تصادفی روی دیسک، با پسوند اصلی؛ نام اصلی فقط در پایگاه داده می‌ماند و در دانلود برمی‌گردد."""
+    extension = os.path.splitext(filename)[1].lower()
+    return f"attachments/{timezone.now():%Y/%m}/{uuid.uuid4().hex}{extension}"
+
+
+class Attachment(TimeStampedModel):
+    """فایل پیوست هر رکوردی که پیوست می‌پذیرد (شاهد، ریسک و بعدها اقدام و پذیرش). با GenericForeignKey به رکورد
+    وصل می‌شود. پیوست حذف یا عوض نمی‌شود؛ فایل تازه پیوست تازه است."""
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    file = models.FileField("فایل", upload_to=attachment_path)
+    original_name = models.CharField("نام فایل", max_length=255)
+    size = models.PositiveIntegerField("اندازه (بایت)")
+    description = models.CharField("شرح", max_length=300, blank=True, help_text="مثلاً «گزارش تست نفوذ».")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="بارگذاری‌کننده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "پیوست"
+        verbose_name_plural = "پیوست‌ها"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self):
+        return self.original_name
+
+    def get_absolute_url(self):
+        return reverse("core:attachment_download", args=[self.pk])
+
+
+class Comment(TimeStampedModel):
+    """نظر روی هر رکوردی که نظر می‌پذیرد. نظر حذف نمی‌شود و ویرایشش در تاریخچه می‌ماند."""
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    text = models.TextField("متن")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="نویسنده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "نظر"
+        verbose_name_plural = "نظرها"
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self):
+        return self.text[:60]
+
+    @property
+    def was_edited(self):
+        return (self.updated_at - self.created_at).total_seconds() > 1

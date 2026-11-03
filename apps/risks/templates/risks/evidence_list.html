@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}شواهد{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">شواهد</h1>
+  {% if can_create %}
+    <a href="{% url 'risks:evidence_create' %}" class="btn btn-primary btn-sm">شاهد جدید</a>
+  {% endif %}
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  {% include "risks/includes/evidence_table.html" with empty_text="شاهدی با این مشخصات پیدا نشد." %}
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

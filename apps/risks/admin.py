@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Coverage, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
+from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
 
 
 @admin.register(RiskCategory)
@@ -60,3 +60,15 @@ class RiskAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # ریسک بازنشسته یا ادغام می‌شود، نه حذف (قدم ۱۴)
+
+
+@admin.register(Evidence)
+class EvidenceAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "title", "kind", "observed_on", "reliability", "access_class", "owner")
+    list_filter = ("kind", "reliability", "access_class")
+    search_fields = ("code", "title", "source")
+    raw_id_fields = ("owner", "customer")
+    filter_horizontal = ("risks",)
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # شاهد حذف نمی‌شود

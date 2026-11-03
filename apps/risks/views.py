@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.functional import cached_property
@@ -9,11 +10,14 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.catalog.permissions import visible_services
 from apps.catalog.views import BackToRecordMixin
+from apps.core.records import record_extras
 from apps.core.views import FilteredListView, FormPageMixin
 
 from .forms import (
     CoverageFilterForm,
     CoverageForm,
+    EvidenceFilterForm,
+    EvidenceForm,
     ExternalLinkForm,
     RiskCategoryForm,
     RiskFilterForm,
@@ -21,12 +25,15 @@ from .forms import (
     RiskScenarioForm,
     ScenarioFilterForm,
 )
-from .models import Coverage, ExternalLink, Risk, RiskCategory, RiskScenario
+from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario
 from .permissions import (
     REGISTER_EDIT_ROLES,
     UNIVERSE_EDIT_ROLES,
+    can_add_evidence,
+    can_edit_evidence,
     can_edit_register,
     can_edit_universe,
+    visible_evidence,
     visible_risks,
 )
 from .services import (
@@ -138,7 +145,6 @@ class RiskCategoryUpdateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMix
     success_message = "تغییرات دسته‌ی «%(code)s %(name)s» ذخیره شد."
 
 
-
 class ScenarioListView(FilteredListView):
     """کتابخانه‌ی سناریوهای مرجع. همه‌ی کاربران آن را می‌بینند، چون سناریو به خدمت یا واحد خاصی بسته نیست."""
 
@@ -212,9 +218,7 @@ class RiskDetailView(DetailView):
 
     def get_queryset(self):
         # ریسکی که کاربر اجازه‌ی دیدنش را ندارد اصلاً پیدا نمی‌شود (۴۰۴).
-        return visible_risks(self.request.user).select_related(
-            "scenario", "service", "category", "org_unit", "owner"
-        )
+        return visible_risks(self.request.user).select_related("scenario", "service", "category", "org_unit", "owner")
 
     def get_context_data(self, **kwargs):
         risk = self.object
@@ -227,6 +231,9 @@ class RiskDetailView(DetailView):
             # نام خدمت همیشه دیده می‌شود، ولی پیوند به صفحه‌اش فقط اگر کاربر اجازه‌ی دیدنش را دارد.
             service_url=risk.service.get_absolute_url() if service_visible else None,
             can_edit=can_edit_register(user),
+            evidence=visible_evidence(user).filter(risks=risk),
+            can_add_evidence=risk.is_active and can_add_evidence(user, risk),
+            **record_extras(risk, user),
             **kwargs,
         )
 
@@ -313,3 +320,88 @@ class ExternalLinkCreateView(ExternalLinkFormMixin, CreateView):
 class ExternalLinkUpdateView(ExternalLinkFormMixin, UpdateView):
     def get_queryset(self):
         return ExternalLink.objects.filter(risk__in=visible_risks(self.request.user)).select_related("risk")
+
+
+class EvidenceListView(FilteredListView):
+    """شواهدی که کاربر می‌بیند، تازه‌ترین شاهد اول."""
+
+    filter_form_class = EvidenceFilterForm
+    template_name = "risks/evidence_list.html"
+    context_object_name = "evidence_list"
+
+    def get_queryset(self):
+        self.queryset = visible_evidence(self.request.user).select_related("owner")
+        return super().get_queryset()
+
+    def get_context_data(self, **kwargs):
+        user = self.request.user
+        can_create = can_edit_register(user) or active_risks(Risk.objects.filter(owner=user)).exists()
+        return super().get_context_data(can_create=can_create, **kwargs)
+
+
+class EvidenceDetailView(DetailView):
+    template_name = "risks/evidence_detail.html"
+    context_object_name = "evidence"
+
+    def get_queryset(self):
+        return visible_evidence(self.request.user).select_related("owner", "customer")
+
+    def get_context_data(self, **kwargs):
+        evidence = self.object
+        user = self.request.user
+        return super().get_context_data(
+            # از ریسک‌های مرتبط فقط آن‌هایی که کاربر می‌بیند.
+            risks=visible_risks(user).filter(evidence=evidence).select_related("service", "category", "owner"),
+            can_edit=can_edit_evidence(user, evidence),
+            **record_extras(evidence, user),
+            **kwargs,
+        )
+
+
+class EvidenceFormMixin(BackToRecordMixin, FormPageMixin):
+    model = Evidence
+    form_class = EvidenceForm
+    success_url = reverse_lazy("risks:evidence_list")
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "user": self.request.user}
+
+
+class EvidenceCreateView(EvidenceFormMixin, CreateView):
+    """شاهد تازه، از صفحه‌ی یک ریسک (?risk=شناسه) یا از فهرست شواهد. عضو GRC و مدیر سامانه برای همه‌ی ریسک‌ها،
+    مالک ریسک برای ریسک‌های خودش."""
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if not (can_edit_register(user) or active_risks(Risk.objects.filter(owner=user)).exists()):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        risk_id = self.request.GET.get("risk", "")
+        if risk_id.isdecimal():
+            risk = active_risks(visible_risks(self.request.user)).filter(pk=risk_id).first()
+            if risk and can_add_evidence(self.request.user, risk):
+                return {"risks": [risk]}
+        return {}
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"شاهد «{self.object}» ثبت شد. اگر فایلی دارد، حالا پیوستش کنید.")
+        return response
+
+
+class EvidenceUpdateView(EvidenceFormMixin, UpdateView):
+    def get_queryset(self):
+        return visible_evidence(self.request.user)
+
+    def get_object(self, queryset=None):
+        evidence = super().get_object(queryset)
+        if not can_edit_evidence(self.request.user, evidence):
+            raise PermissionDenied
+        return evidence
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"تغییرات شاهد «{self.object}» ذخیره شد.")
+        return response
