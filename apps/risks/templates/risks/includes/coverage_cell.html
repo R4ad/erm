@@ -1,0 +1,10 @@
+{% comment %}
+  یک خانه‌ی جدول پوشش. توضیح زیر نشان (title) دسته، دلیل، بررسی‌کننده و تاریخ را نشان می‌دهد.
+  ویرایشگر با کلیک روی نشان به صفحه‌ی ثبت وضعیت همان خانه می‌رود و بعد به همین صفحه برمی‌گردد.
+{% endcomment %}
+{% if can_edit %}
+  <a href="{% url 'risks:coverage_update' cell.service_id cell.category_id %}?next={{ request.get_full_path|urlencode }}"
+     class="text-decoration-none" title="{{ cell.summary }}">{% include "risks/includes/coverage_badge.html" %}</a>
+{% else %}
+  <span title="{{ cell.summary }}">{% include "risks/includes/coverage_badge.html" %}</span>
+{% endif %}

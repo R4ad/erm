@@ -22,7 +22,15 @@
 
       <div class="collapse navbar-collapse" id="main-menu">
         <ul class="navbar-nav">
-          <li class="nav-item"><a class="nav-link" href="#">ریسک‌ها</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              ریسک‌ها
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'risks:coverage' %}">جهان ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'risks:category_list' %}">دسته‌های ریسک</a></li>
+            </ul>
+          </li>
           <li class="nav-item"><a class="nav-link" href="#">اقدامات</a></li>
           <li class="nav-item"><a class="nav-link" href="#">گزارش‌ها</a></li>
           <li class="nav-item dropdown">
