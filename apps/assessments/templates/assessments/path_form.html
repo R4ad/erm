@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">{{ title }}</h1>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "includes/form_fields.html" %}
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+      <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">B0: قابلیت پایه‌ی مسیر (بخش ۱۵)</div>
+      <ul class="list-group list-group-flush small">
+        {% for level in b0_scale.levels.all %}
+          <li class="list-group-item"><span class="fw-bold">{{ level.value }} {{ level.name }}:</span> {{ level.criteria }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">Bc از E کنترل‌های مسیر</div>
+      <ul class="list-group list-group-flush small">
+        {% for rule in bc_rules %}
+          <li class="list-group-item">{{ rule }}</li>
+        {% endfor %}
+        <li class="list-group-item">در غیر این صورت Bc برابر ۵ است. کنترل معلق یا با شاهد کهنه E1 حساب می‌شود. B مسیر کمترِ B0 و Bc است.</li>
+        <li class="list-group-item">فقط کنترل پیشگیرانه‌ای که به همین ریسک وصل است و ارزیابی اثربخشی دارد انتخاب می‌شود. راه دورزدن یا حساب استثنایی که از همه‌ی موانع عبور می‌کند، مسیر جداست.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

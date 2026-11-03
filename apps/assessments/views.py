@@ -1,8 +1,10 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.functional import cached_property
+from django.views import View
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
@@ -10,7 +12,8 @@ from apps.methodology.models import MethodParameter
 from apps.risks.models import Evidence
 from apps.risks.permissions import visible_risks
 
-from .forms import AssessmentForm, ImpactDetailForm
+from .forms import AssessmentForm, ImpactDetailForm, InitiatorForm, PathForm
+from .models import Path
 from .permissions import ASSESSMENT_EDIT_ROLES, can_edit_assessment, visible_assessments
 from .services import (
     AssessmentError,
@@ -19,6 +22,8 @@ from .services import (
     default_horizon,
     impact_scales,
     impact_summary,
+    initiator_scale,
+    likelihood_summary,
     parameter,
     stakeholder_facts,
     stakeholders,
@@ -87,6 +92,7 @@ class AssessmentDetailView(DetailView):
         assessment = self.object
         return super().get_context_data(
             summary=impact_summary(assessment),
+            likelihood=likelihood_summary(assessment),
             can_edit=can_edit_assessment(self.request.user, assessment),
             **kwargs,
         )
@@ -95,9 +101,10 @@ class AssessmentDetailView(DetailView):
 class EditableAssessmentMixin:
     """ارزیابی‌ای که کاربر می‌بیند و اجازه‌ی ویرایشش را دارد؛ وگرنه ۴۰۴ یا ۴۰۳."""
 
-    def get_assessment(self):
+    def get_assessment(self, pk=None):
         assessment = get_object_or_404(
-            visible_assessments(self.request.user).select_related("risk", "method_version"), pk=self.kwargs["pk"]
+            visible_assessments(self.request.user).select_related("risk", "method_version"),
+            pk=self.kwargs["pk"] if pk is None else pk,
         )
         if not can_edit_assessment(self.request.user, assessment):
             raise PermissionDenied
@@ -184,3 +191,98 @@ class ImpactProfileView(EditableAssessmentMixin, TemplateView):
                 form.save(self.assessment)
         messages.success(request, f"پروفایل پیامد ارزیابی {self.assessment.code} ذخیره شد.")
         return redirect(self.assessment.get_absolute_url())
+
+
+def evidence_choices(risk, current=()):
+    """شواهد این ریسک، به‌اضافه‌ی شاهدی که قبلاً انتخاب شده و بعداً از ریسک جدا شده، تا بی‌صدا حذف نشود."""
+    return Evidence.objects.filter(Q(risks=risk) | Q(pk__in=[item.pk for item in current])).distinct().order_by("code")
+
+
+class InitiatorView(EditableAssessmentMixin, UpdateView):
+    """عامل آغازگر (بخش ۱۴): تعریف آغازگر و واحد شمارش از ریسک، و مسیر و داده و سطح A در همین ارزیابی."""
+
+    form_class = InitiatorForm
+    template_name = "assessments/initiator_form.html"
+
+    def get_object(self, queryset=None):
+        return self.get_assessment()
+
+    def get_form_kwargs(self):
+        current = list(self.object.a_evidence.all()) if self.object.pk else []
+        return {**super().get_form_kwargs(), "evidence": evidence_choices(self.object.risk, current)}
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, f"عامل آغازگر ارزیابی {self.object.code} ذخیره شد.")
+        return redirect(f"{self.object.get_absolute_url()}#likelihood")
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            assessment=self.object, risk=self.object.risk, scale=initiator_scale(self.object.method_version), **kwargs
+        )
+
+
+class PathFormMixin(EditableAssessmentMixin):
+    form_class = PathForm
+    template_name = "assessments/path_form.html"
+
+    def get_form_kwargs(self):
+        current = list(self.object.evidence.all()) if self.object else []
+        return {
+            **super().get_form_kwargs(),
+            "assessment": self.assessment,
+            "evidence": evidence_choices(self.assessment.risk, current),
+        }
+
+    def form_valid(self, form):
+        path = form.save()
+        messages.success(self.request, f"مسیر «{path.name}» ذخیره شد.")
+        return redirect(path.get_absolute_url())
+
+    def get_context_data(self, **kwargs):
+        version = self.assessment.method_version
+        return super().get_context_data(
+            assessment=self.assessment,
+            b0_scale=version.scales.prefetch_related("levels").get(code="B0"),
+            bc_rules=version.bc_rules.all(),
+            cancel_url=f"{self.assessment.get_absolute_url()}#likelihood",
+            **kwargs,
+        )
+
+
+class PathCreateView(PathFormMixin, CreateView):
+    @cached_property
+    def assessment(self):
+        return self.get_assessment()
+
+    def dispatch(self, request, *args, **kwargs):
+        self.assessment  # دسترسی پیش از هر کاری بررسی می‌شود
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(title=f"مسیر تازه برای {self.assessment}", **kwargs)
+
+
+class EditablePathMixin(PathFormMixin):
+    """مسیری که ارزیابی‌اش را کاربر می‌بیند و ویرایش می‌کند."""
+
+    def get_object(self, queryset=None):
+        path = get_object_or_404(Path, pk=self.kwargs["pk"])
+        self.assessment = self.get_assessment(path.assessment_id)
+        return path
+
+
+class PathUpdateView(EditablePathMixin, UpdateView):
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(title=f"ویرایش مسیر «{self.object.name}»", **kwargs)
+
+
+class PathDeleteView(EditablePathMixin, View):
+    """مسیر پیش‌نویس حذف می‌شود و حذفش در تاریخچه می‌ماند."""
+
+    def post(self, request, *args, **kwargs):
+        path = self.get_object()
+        name = path.name
+        path.delete()
+        messages.success(request, f"مسیر «{name}» حذف شد.")
+        return redirect(f"{self.assessment.get_absolute_url()}#likelihood")

@@ -141,30 +141,13 @@ def max_band(bands, unknown, top):
 def calculate(tables, inputs):
     """محاسبه‌ی کامل یک ارزیابی با جدول‌های یک نسخه‌ی روش. ورودی نامعتبر InvalidInput می‌دهد."""
     problems = []
-    a = as_band(inputs.a, "A", tables.scale_values["A"], problems)
-    path_bands = [check_path(tables, path, number, problems) for number, path in enumerate(inputs.paths, 1)]
+    checked = check_likelihood(tables, inputs.a, inputs.paths, problems)
     impact_bands = check_impacts(tables, inputs.impacts, problems)
-    if not inputs.paths:
-        problems.append("دست‌کم یک مسیر تحقق لازم است (بخش ۱۵).")
     if problems:
         raise InvalidInput(problems)
 
     incomplete = []
-    if a is None:
-        incomplete.append("A نامعلوم است و کران قابل دفاعی ندارد.")
-
-    paths = tuple(path_result(tables, path, b0, e_bands) for path, (b0, e_bands) in zip(inputs.paths, path_bands))
-    # B سناریو بزرگ‌ترین B مسیرهاست؛ کنترل خوب یک مسیر، باز بودن مسیر دیگر را جبران نمی‌کند (بخش ۱۵).
-    unknown_paths = [path.name or f"مسیر {number}" for number, path in enumerate(paths, 1) if path.b is None]
-    b = max_band([path.b for path in paths if path.b], unknown=bool(unknown_paths), top=max(tables.scale_values["B0"]))
-    if b is None:
-        incomplete.append(f"B0 {'، '.join(unknown_paths)} نامعلوم است؛ نبود اطلاعات مسیر مجوز B0 برابر ۱ نیست.")
-
-    likelihood = None
-    if a and b:
-        # جدول A × B با بالا رفتن A یا B پایین نمی‌آید (check_version)، پس دو سر بازه از دو گوشه می‌آیند.
-        likelihood = Band(tables.likelihood(a.low, b.low), tables.likelihood(a.high, b.high))
-
+    paths, b, likelihood = likelihood_result(tables, inputs.paths, checked, incomplete)
     impact = impact_band(tables, impact_bands, incomplete)
     score = base_level = decision_level = None
     escalations = []
@@ -207,6 +190,50 @@ def calculate(tables, inputs):
         out_of_acceptance_authority=inputs.binding_prohibition,
         acceptance_restricted=inputs.customer_tolerance_exceeded or inputs.binding_prohibition,
     )
+
+
+@dataclass(frozen=True)
+class CheckedLikelihood:
+    """ورودی‌های احتمال بعد از بررسی: A و برای هر مسیر B0 و E کنترل‌هایش، همه به صورت Band یا None."""
+
+    a: Band | None
+    path_bands: tuple
+
+
+NO_PATH = "دست‌کم یک مسیر تحقق لازم است (بخش ۱۵)."
+A_UNKNOWN = "A نامعلوم است و کران قابل دفاعی ندارد."
+
+
+def check_likelihood(tables, a, paths, problems):
+    """A و مسیرها را بررسی می‌کند. ایرادها به problems می‌رود و نتیجه فقط وقتی معنا دارد که problems خالی باشد."""
+    a_band = as_band(a, "A", tables.scale_values["A"], problems)
+    path_bands = tuple(check_path(tables, path, number, problems) for number, path in enumerate(paths, 1))
+    if not paths:
+        problems.append(NO_PATH)
+    return CheckedLikelihood(a_band, path_bands)
+
+
+def likelihood_result(tables, paths, checked, incomplete):
+    """B هر مسیر، B سناریو و L از ورودی‌های بررسی‌شده. جزء نامعلوم دلیلش را به incomplete اضافه می‌کند. پیش‌نویس
+    ارزیابی هم همین را نشان می‌دهد، حتی وقتی پروفایل پیامدش هنوز کامل نیست."""
+    a = checked.a
+    if a is None:
+        incomplete.append(A_UNKNOWN)
+
+    results = tuple(path_result(tables, path, b0, e_bands) for path, (b0, e_bands) in zip(paths, checked.path_bands))
+    # B سناریو بزرگ‌ترین B مسیرهاست؛ کنترل خوب یک مسیر، باز بودن مسیر دیگر را جبران نمی‌کند (بخش ۱۵).
+    unknown_paths = [path.name or f"مسیر {number}" for number, path in enumerate(results, 1) if path.b is None]
+    b = max_band(
+        [path.b for path in results if path.b], unknown=bool(unknown_paths), top=max(tables.scale_values["B0"])
+    )
+    if b is None and results:
+        incomplete.append(f"B0 {'، '.join(unknown_paths)} نامعلوم است؛ نبود اطلاعات مسیر مجوز B0 برابر ۱ نیست.")
+
+    likelihood = None
+    if a and b:
+        # جدول A × B با بالا رفتن A یا B پایین نمی‌آید (check_version)، پس دو سر بازه از دو گوشه می‌آیند.
+        likelihood = Band(tables.likelihood(a.low, b.low), tables.likelihood(a.high, b.high))
+    return results, b, likelihood
 
 
 def check_path(tables, path, number, problems):

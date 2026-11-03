@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}عامل آغازگر {{ assessment.code }}{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">عامل آغازگر (A) در ارزیابی {{ assessment.get_kind_display }} {{ assessment.code }}</h1>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">مرز آغازگر از ریسک {{ risk.code }}</div>
+      <div class="card-body small">
+        {% if risk.needs_completion %}
+          <div class="alert alert-warning py-2">تعریف آغازگر، واحد شمارش یا دامنه‌ی ریسک کامل نیست؛ A ذخیره می‌شود ولی نهایی تأیید نمی‌شود (بخش ۱۳). <a href="{% url 'risks:risk_update' risk.pk %}">تکمیل ریسک</a></div>
+        {% endif %}
+        <dl class="row mb-0">
+          <dt class="col-sm-4">عامل آغازگر</dt><dd class="col-sm-8">{{ risk.initiator|linebreaksbr|default:"-" }}</dd>
+          <dt class="col-sm-4">واحد شمارش</dt><dd class="col-sm-8">{{ risk.count_unit|default:"-" }}</dd>
+          <dt class="col-sm-4">دامنه</dt><dd class="col-sm-8">{{ risk.scope|linebreaksbr|default:"-" }}</dd>
+          <dt class="col-sm-4">خارج از شمارش</dt><dd class="col-sm-8">{{ risk.count_exclusions|linebreaksbr|default:"-" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.rate %}
+        <div class="alert {% if form.rate.insufficient %}alert-warning{% else %}alert-info{% endif %} py-2">
+          {% if form.rate.suggestion.level %}سامانه از روی نرخ سطح {{ form.rate.suggestion.level }} را پیشنهاد می‌دهد: {% endif %}{{ form.rate.suggestion.note }}
+          {% for reason in form.rate.insufficient %}<div class="small">{{ reason }}</div>{% endfor %}
+        </div>
+      {% endif %}
+      {% include "includes/form_fields.html" %}
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+      <a href="{{ assessment.get_absolute_url }}#likelihood" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">جدول A (بخش ۱۴)</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 small align-middle">
+          <thead><tr><th>A</th><th>نرخ سالانه</th><th>شاهد آینده‌نگر</th></tr></thead>
+          <tbody>
+            {% for level in scale.levels.all %}
+              <tr><td class="fw-bold">{{ level.value }}</td><td class="text-nowrap">{{ level.bounds_display }}</td><td>{{ level.criteria }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body small text-body-secondary">
+        مسیر انتخابی و دلیلش الزامی است و دو ستون جمع یا میانگین نمی‌شوند. صفر رخداد در یک سال نرخ کمتر از ۰٫۱ را ثابت نمی‌کند. وقتی داده کافی نیست، A بازه یا «نامعلوم» است.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
