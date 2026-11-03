@@ -245,6 +245,13 @@ class Risk(TimeStampedModel):
         "واحد شمارش", max_length=200, blank=True, help_text="معیار هر وقوع مستقل، مثلاً «هر تلاش ورود ناموفق»."
     )
     count_exclusions = models.TextField("موارد خارج از شمارش", blank=True)
+    controls = models.ManyToManyField(
+        "controls.Control",
+        verbose_name="کنترل‌های فعلی",
+        related_name="risks",
+        blank=True,
+        help_text="کنترل‌هایی که این ریسک به آن‌ها تکیه دارد؛ ردیابی رجیستر به بیانیه‌ی کاربردپذیری از همین‌جاست.",
+    )
     channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False)
     needs_completion = models.BooleanField(
@@ -277,8 +284,8 @@ class Risk(TimeStampedModel):
     attachments = GenericRelation("core.Attachment")
     comments = GenericRelation("core.Comment")
 
-    # m2m_fields: افزودن و برداشتن بانک‌ها و برچسب‌ها هم در تاریخچه ثبت می‌شود.
-    history = HistoricalRecords(m2m_fields=[customers, tags])
+    # m2m_fields: افزودن و برداشتن بانک‌ها، برچسب‌ها و کنترل‌ها هم در تاریخچه ثبت می‌شود.
+    history = HistoricalRecords(m2m_fields=[customers, tags, controls])
 
     class Meta:
         verbose_name = "ریسک"

@@ -10,6 +10,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.catalog.permissions import visible_services
 from apps.catalog.views import BackToRecordMixin
+from apps.controls.permissions import visible_controls
 from apps.core.records import record_extras
 from apps.core.views import FilteredListView, FormPageMixin
 from apps.workflow.context import risk_workflow
@@ -236,6 +237,9 @@ class RiskDetailView(DetailView):
             # ریسک ردشده یا بسته‌شده فقط سابقه است و ویرایش نمی‌شود (بخش ۲۳).
             can_edit=risk.is_active and can_edit_register(user),
             evidence=visible_evidence(user).filter(risks=risk),
+            # نام کنترل‌های ریسک را هر کس که ریسک را می‌بیند می‌بیند و پیوندشان فقط برای کنترل‌هایی است که می‌بیند.
+            controls=risk.controls.select_related("owner").prefetch_related("iso_controls"),
+            visible_control_ids=set(visible_controls(user).filter(risks=risk).values_list("pk", flat=True)),
             can_add_evidence=can_add_evidence(user, risk),
             **record_extras(risk, user),
             **risk_workflow(risk, user),
