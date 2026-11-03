@@ -51,6 +51,8 @@
 <h2 class="h5 mt-4 mb-3" id="progress">پیشرفت</h2>
 {% if action.status == "planned" %}
   <p class="small text-body-secondary">اقدام هنوز مصوب نیست؛ با تأیید طرح به دست مالک ریسک مصوب می‌شود.</p>
+{% elif action.status == "verified" %}
+  <p class="small text-body-secondary">خروجی تأیید شد و اقدام بسته است (بخش ۲۰). اثرش روی ریسک با بازسنجی طرح دیده می‌شود.</p>
 {% elif moves or can_note %}
   <form method="post" action="{% url 'actions:action_move' action.pk %}" class="mb-3">
     {% csrf_token %}

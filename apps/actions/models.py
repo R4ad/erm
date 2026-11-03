@@ -451,3 +451,48 @@ class AcceptanceSignature(TimeStampedModel):
     @property
     def is_approval(self):
         return self.decision == self.Decision.APPROVE
+
+
+class Reassessment(TimeStampedModel):
+    """بازسنجی یک طرح مواجهه (رکورد الزامی بخش ۲۰): تاریخ و مسئول، ارزیابی جاری تازه بعد از اقدام‌ها، مقایسه با
+    ارزیابی هدف و تصمیم پذیرش یا ادامه‌ی اصلاح. طرح بعد از بازسنجی بسته است و تصمیم، گزینه‌ی طرح دور تازه را تعیین
+    می‌کند. بازسنجی ویرایش و حذف نمی‌شود."""
+
+    class Decision(models.TextChoices):
+        ACCEPT = "accept", "پذیرش ریسک باقیمانده"
+        CONTINUE = "continue", "ادامه‌ی اصلاح"
+
+    plan = models.OneToOneField(
+        TreatmentPlan, verbose_name="طرح مواجهه", on_delete=models.PROTECT, related_name="reassessment", editable=False
+    )
+    assessment = models.ForeignKey(
+        "assessments.Assessment",
+        verbose_name="ارزیابی جاری تازه",
+        on_delete=models.PROTECT,
+        related_name="reassessments",
+        editable=False,
+    )
+    performed_on = models.DateField("تاریخ بازسنجی")
+    responsible = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="مسئول بازسنجی", on_delete=models.PROTECT, related_name="+"
+    )
+    target_met = models.BooleanField(
+        "هدف محقق شد", null=True, editable=False, help_text="خالی یعنی طرح ارزیابی هدف نداشت."
+    )
+    method_changed = models.BooleanField("روش ارزیابی عوض شده", default=False, editable=False)
+    decision = models.CharField("تصمیم", max_length=20, choices=Decision.choices)
+    note = models.TextField("دلیل تصمیم", help_text="مقایسه با هدف، اقدام‌های باز و آنچه در دور تازه لازم است.")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+", editable=False
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "بازسنجی"
+        verbose_name_plural = "بازسنجی‌ها"
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.CheckConstraint(condition=~Q(note=""), name="reassessment_has_note")]
+
+    def __str__(self):
+        return f"بازسنجی {self.plan}"

@@ -8,6 +8,11 @@
     <a href="{% url 'actions:plan_create' risk.pk %}" class="btn btn-primary btn-sm">طرح مواجهه</a>
   {% endif %}
 </div>
+{% if pending_reassessment %}
+  <div class="alert alert-info py-2">
+    ارزیابی جاری تازه‌ای تأیید شده است. پیش از طرح دور تازه، <a href="{{ pending_reassessment.get_absolute_url }}#reassessment">طرح قبلی را بازسنجی کنید</a>: مقایسه با هدف و تصمیم پذیرش یا ادامه‌ی اصلاح.
+  </div>
+{% endif %}
 {% if plan_due %}
   <div class="alert {% if plan_due_passed %}alert-danger{% else %}alert-warning{% endif %} py-2">
     ریسک «{{ plan_level }}» منتظر طرح مواجهه است. مهلت طرح: {{ plan_due|jformat:"%Y/%m/%d" }}{% if plan_due_passed %} (گذشته است){% endif %}.

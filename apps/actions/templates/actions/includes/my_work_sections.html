@@ -28,6 +28,16 @@
   </ul>
 {% endif %}
 
+{% if ready_for_review %}
+  <h2 class="h5 mt-4 mb-3">طرح‌هایی که همه‌ی اقدام‌هایشان تأیید شده است</h2>
+  <p class="small text-body-secondary">آماده‌ی بازبینی ریسک و ارزیابی جاری تازه برای بازسنجی.</p>
+  <ul class="list-group mb-3">
+    {% for plan in ready_for_review %}
+      <li class="list-group-item"><a href="{{ plan.get_absolute_url }}">{{ plan }}</a> {% include "assessments/includes/level_badge.html" with level=plan.level %}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 {% if acceptances_to_sign %}
   <h2 class="h5 mt-4 mb-3">پذیرش‌های منتظر امضای شما</h2>
   {% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances_to_sign show_risk=True %}

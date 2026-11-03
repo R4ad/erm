@@ -1,0 +1,39 @@
+{% comment %}
+  جدول مقایسه‌ی ارزیابی‌ها. context از assessments.comparison.compare می‌آید؛ labels برچسب ستون‌هاست (اختیاری).
+  ↓ سبز یعنی ریسک کمتر شده و ↑ قرمز یعنی بیشتر، نسبت به ستون اول.
+{% endcomment %}
+<div class="table-responsive">
+  <table class="table table-sm table-bordered align-middle text-center">
+    <thead class="table-light">
+      <tr>
+        <th class="text-start">مؤلفه</th>
+        {% for item in profiles %}
+          <th>
+            <a href="{{ item.assessment.get_absolute_url }}">{{ item.assessment.code }}</a>
+            <div class="small fw-normal">{{ item.assessment.get_kind_display }}، روش نسخه‌ی {{ item.assessment.method_version.number }}</div>
+            {% if item.incomplete %}<div class="small fw-normal text-danger">ناقص</div>{% endif %}
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <th class="text-start fw-normal">{{ row.label }}</th>
+          {% for cell in row.cells %}
+            <td>
+              {% if row.label == "سطح پایه" or row.label == "سطح تصمیم" %}
+                {% if cell.value %}{% include "assessments/includes/level_badge.html" with level=cell.value %}{% else %}-{% endif %}
+              {% else %}{{ cell.value|default_if_none:"-" }}{% endif %}
+              {% if cell.trend == "down" %}<span class="text-success" title="کمتر از ستون اول">↓</span>{% elif cell.trend == "up" %}<span class="text-danger" title="بیشتر از ستون اول">↑</span>{% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if method_changed %}
+  <p class="small text-warning-emphasis">نسخه‌ی روش این ارزیابی‌ها یکی نیست؛ بخشی از تغییر سطح ممکن است از تغییر روش آمده باشد و جدا از اثر اقدام‌ها گزارش می‌شود (بخش ۲۱).</p>
+{% endif %}
+<p class="small text-body-secondary">پیامد هر بُعد بیشترین سطح آن در ستون‌های داتین و بانک‌هاست؛ «؟» یعنی خانه‌ای نامعلوم یا ثبت‌نشده است. ↓ یعنی کمتر از ستون اول و ↑ یعنی بیشتر.</p>

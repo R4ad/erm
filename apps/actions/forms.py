@@ -13,7 +13,8 @@ from apps.core.jalali import to_jalali
 from apps.methodology.models import Scale
 
 from .acceptance import acceptance_cap, is_non_normal
-from .models import AcceptanceSignature, RiskAcceptance, TreatmentAction, TreatmentPlan
+from .services import last_reassessment, reassessment_option_problem
+from .models import AcceptanceSignature, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
 
 MULTI_HELP = "برای انتخاب چند مورد، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید."
 
@@ -50,6 +51,12 @@ class PlanForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["target_assessment"].queryset = Assessment.objects.filter(
             risk=risk, kind=Assessment.Kind.TARGET
         ).select_related("decision_level")
+        self.risk = risk
+        reassessment = last_reassessment(risk)
+        if reassessment is not None and not self.instance.pk:
+            if reassessment.decision == Reassessment.Decision.ACCEPT:
+                self.initial.setdefault("option", TreatmentPlan.Option.ACCEPT)
+            self.fields["option"].help_text = f"تصمیم بازسنجی طرح قبلی: {reassessment.get_decision_display()}."
 
     def clean(self):
         data = super().clean()
@@ -59,6 +66,9 @@ class PlanForm(BootstrapFormMixin, forms.ModelForm):
             and not data.get("option_details", "").strip()
         ):
             self.add_error("option_details", "برای این گزینه شرط‌ها را بنویسید (بخش ۲۰).")
+        problem = reassessment_option_problem(self.risk, option)
+        if problem:
+            self.add_error("option", problem)
         return data
 
 
@@ -341,3 +351,24 @@ class AcceptanceFilterForm(BootstrapFormMixin, forms.Form):
         elif status:
             acceptances = acceptances.filter(status=status)
         return acceptances
+
+
+class ReassessmentForm(BootstrapFormMixin, forms.ModelForm):
+    performed_on = JalaliDateField(label="تاریخ بازسنجی")
+
+    class Meta:
+        model = Reassessment
+        fields = ["performed_on", "responsible", "decision", "note"]
+        field_classes = {"responsible": OwnerChoiceField}
+        widgets = {"note": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["responsible"].queryset = user_choices(self.instance.responsible_id)
+        self.initial.setdefault("performed_on", timezone.localdate())
+
+    def clean_performed_on(self):
+        day = self.cleaned_data["performed_on"]
+        if day > timezone.localdate():
+            raise forms.ValidationError("تاریخ بازسنجی بعد از امروز نیست.")
+        return day

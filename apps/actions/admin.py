@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import AcceptanceSignature, ActionUpdate, RiskAcceptance, TreatmentAction, TreatmentPlan
+from .models import AcceptanceSignature, ActionUpdate, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
 
 
 class ActionUpdateInline(admin.TabularInline):
@@ -72,3 +72,20 @@ class RiskAcceptanceAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # پذیرش حذف نمی‌شود
+
+
+@admin.register(Reassessment)
+class ReassessmentAdmin(SimpleHistoryAdmin):
+    """بازسنجی از صفحه‌ی طرح ثبت می‌شود؛ این‌جا فقط دیده می‌شود."""
+
+    list_display = ("plan", "assessment", "performed_on", "target_met", "decision")
+    list_filter = ("decision", "target_met")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # بازسنجی حذف نمی‌شود

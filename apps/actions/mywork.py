@@ -15,7 +15,7 @@ from apps.workflow.models import ChangeRequest, RiskQuestion
 from .acceptance import acceptances_to_sign
 from .models import RiskAcceptance, TreatmentAction, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_edit_plans
-from .services import current_plan, decision_due
+from .services import current_plan, decision_due, pending_reassessment
 
 ST = TreatmentAction.Status
 
@@ -48,7 +48,10 @@ def waiting_risks():
         if base is None:
             continue
         plan = current_plan(risk)
-        if plan is None:
+        previous = pending_reassessment(risk) if plan is None else None
+        if previous is not None:
+            state, due, plan = "منتظر بازسنجی طرح قبلی", decision_due(risk, base.decision_level), previous
+        elif plan is None:
             state, due = "بدون طرح", decision_due(risk, base.decision_level)
         elif not plan.is_owner_approved or plan.actions.filter(status=ST.PLANNED).exists():
             state, due = "منتظر تأیید مالک", plan.decision_due
@@ -56,6 +59,17 @@ def waiting_risks():
             state, due = "آماده‌ی شروع اجرا", plan.decision_due
         rows.append(WaitingRisk(risk, base, plan, due, state))
     return sorted(rows, key=lambda row: row.sort_key)
+
+
+def ready_for_review():
+    """طرح‌های ریسک‌های «در اجرای درمان» که همه‌ی اقدام‌هایشان تأیید شده است: آماده‌ی بازبینی و ارزیابی دوباره
+    (ردیف ۸ و ۹ جدول س۱۵). موعد بازبینی دوره‌ای با قدم ۲۳ می‌آید."""
+    plans = []
+    for risk in Risk.objects.filter(status=Risk.Status.TREATMENT).select_related("owner"):
+        plan = current_plan(risk)
+        if plan and plan.actions.exists() and not plan.actions.exclude(status=ST.VERIFIED).exists():
+            plans.append(plan)
+    return plans
 
 
 def expiring_acceptances(user):
@@ -92,6 +106,7 @@ def my_work(user):
             answered_at__isnull=True, risk__status=Risk.Status.QUESTIONS, risk__org_unit__in=user.managed_unit_ids()
         ).select_related("risk"),
         "waiting_risks": waiting_risks() if can_edit_plans(user) else [],
+        "ready_for_review": ready_for_review() if can_edit_plans(user) else [],
         "acceptances_to_sign": acceptances_to_sign(user),
         "expiring_acceptances": expiring_acceptances(user),
         "qc": [

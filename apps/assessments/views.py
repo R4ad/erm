@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
@@ -12,6 +13,7 @@ from apps.methodology.models import MethodParameter
 from apps.risks.models import Evidence
 from apps.risks.permissions import visible_risks
 
+from .comparison import compare
 from .forms import AssessmentForm, ImpactDetailForm, InitiatorForm, PathForm, ReferralForm, ReviewForm
 from .models import AssessmentReview, Path
 from .results import outcome, submission_problems
@@ -355,3 +357,33 @@ class PathDeleteView(EditablePathMixin, View):
         path.delete()
         messages.success(request, f"مسیر «{name}» حذف شد.")
         return redirect(f"{self.assessment.get_absolute_url()}#likelihood")
+
+
+class CompareView(TemplateView):
+    """مقایسه‌ی دو تا چهار ارزیابی یک ریسک. با ?ids=12,15,13 به همان ترتیب، و از فرم صفحه‌ی ریسک (?id=12&id=15) به
+    ترتیب ثبت تا قدیمی‌ترین ستون اول و مبنای جهت تغییر باشد."""
+
+    template_name = "assessments/compare.html"
+
+    def get_context_data(self, **kwargs):
+        picked = self.request.GET.getlist("id")
+        raw = picked or self.request.GET.get("ids", "").split(",")
+        try:
+            ids = list(dict.fromkeys(int(item) for item in raw if item.strip()))
+        except ValueError:
+            raise Http404 from None
+        if picked:
+            ids.sort()
+        found = {
+            item.pk: item
+            for item in visible_assessments(self.request.user)
+            .filter(pk__in=ids)
+            .select_related("risk", "method_version", "decision_level", "base_level")
+        }
+        if not ids or len(found) != len(ids) or len({item.risk_id for item in found.values()}) != 1:
+            raise Http404
+        assessments = [found[pk] for pk in ids]
+        risk = assessments[0].risk
+        if not 2 <= len(ids) <= 4:
+            return super().get_context_data(risk=risk, error="دو تا چهار ارزیابی را برای مقایسه انتخاب کنید.", **kwargs)
+        return super().get_context_data(risk=risk, **compare(assessments), **kwargs)
