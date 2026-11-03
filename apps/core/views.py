@@ -17,8 +17,12 @@ class FilteredListView(ListView):
         """داده‌ی فرم فیلتر. فهرستی که فیلتر پیش‌فرض دارد این را بازنویسی می‌کند."""
         return self.request.GET
 
+    def get_filter_form_kwargs(self):
+        """آرگومان‌های بیشتر فرم فیلتر، مثلاً کاربر برای فیلدی که گزینه‌هایش به دسترسی او بسته است."""
+        return {}
+
     def get_queryset(self):
-        self.filter_form = self.filter_form_class(self.get_filter_data())
+        self.filter_form = self.filter_form_class(self.get_filter_data(), **self.get_filter_form_kwargs())
         queryset = super().get_queryset()
         if not self.filter_form.is_valid():
             return queryset.none()
