@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ questionnaire }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ questionnaire }}
+    {% if questionnaire.is_active %}<span class="badge text-bg-success ms-1">فعال</span>{% else %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'questionnaires:question_create' questionnaire.pk %}" class="btn btn-primary btn-sm">سؤال جدید</a>
+      <a href="{% url 'questionnaires:questionnaire_update' questionnaire.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'questionnaires:questionnaire_list' %}" class="btn btn-outline-secondary btn-sm">فهرست پرسشنامه‌ها</a>
+  </div>
+</div>
+
+{% if questionnaire.description %}<p>{{ questionnaire.description|linebreaksbr }}</p>{% endif %}
+
+<p class="small text-body-secondary">
+  هر پاسخ با کارکردهای اصلی واحد و هشت پرسش جلسه‌ی شناسایی بخش ۴ سند v5 شروع می‌شود (نتیجه، تعهد، رویداد مخل، شرایط، پیامد، وابستگی، شاهد و کنترل فعلی)، بعد این سؤال‌ها می‌آیند و در آخر «مورد جدید» با شرح آزاد.
+  گزینه‌ای که «نشانه‌ی ریسک» است، با انتخاب شدن یک «ریسک در انتظار» برای بررسی GRC می‌سازد.
+</p>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>ترتیب</th>
+        <th>سؤال</th>
+        <th>نوع</th>
+        <th>گزینه‌ها</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for question in questions %}
+        <tr class="{% if not question.is_active %}text-body-secondary{% endif %}">
+          <td>{{ question.order }}</td>
+          <td>
+            {{ question.text|linebreaksbr }}
+            {% if question.is_required %}<span class="badge text-bg-light border ms-1">اجباری</span>{% endif %}
+            {% if not question.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+            {% if question.help_text %}<div class="small text-body-secondary">{{ question.help_text }}</div>{% endif %}
+          </td>
+          <td class="text-nowrap">{{ question.get_kind_display }}</td>
+          <td>
+            {% for option in question.options.all %}
+              <div class="{% if not option.is_active %}text-decoration-line-through text-body-secondary{% endif %}">
+                {{ option.text }}
+                {% if option.indicates_risk %}
+                  <span class="badge text-bg-warning">نشانه‌ی ریسک</span>
+                  {% if option.scenario %}<span class="small" title="{{ option.scenario.title }}">{{ option.scenario.code }}</span>{% endif %}
+                  {% if option.category %}<span class="small" title="{{ option.category.name }}">{{ option.category.code }}</span>{% endif %}
+                {% endif %}
+              </div>
+            {% empty %}-{% endfor %}
+          </td>
+          <td class="text-end">
+            {% if can_edit %}<a href="{% url 'questionnaires:question_update' question.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-body-secondary py-4">هنوز سؤالی ندارد.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
