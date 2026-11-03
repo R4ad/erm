@@ -1,7 +1,9 @@
-from apps.accounts.roles import Role
-from apps.catalog.permissions import visibility_condition
+from django.db.models import Q
 
-from .models import Risk
+from apps.accounts.roles import Role
+from apps.catalog.permissions import SEE_ALL_ROLES, visibility_condition
+
+from .models import Evidence, Risk
 
 # این نقش‌ها وضعیت خانه‌های جدول پوشش را ثبت و ویرایش می‌کنند (س۳۷). مدیر سامانه همیشه می‌تواند.
 COVERAGE_EDIT_ROLES = [Role.GRC_MEMBER, Role.SECURITY_WORKGROUP]
@@ -30,3 +32,34 @@ def visible_risks(user):
     condition = visibility_condition(user)
     risks = Risk.objects.all()
     return risks if condition is None else risks.filter(condition)
+
+
+def can_add_evidence(user, risk):
+    """شاهد و پیوست ریسک را عضو GRC و مدیر سامانه روی همه‌ی ریسک‌ها و مالک ریسک روی ریسک خودش اضافه می‌کند (س۵۱)."""
+    return can_edit_register(user) or risk.owner_id == user.pk
+
+
+def can_edit_evidence(user, evidence):
+    """شاهد را عضو GRC، مدیر سامانه و مالک خود شاهد ویرایش می‌کنند و به آن فایل پیوست می‌کنند."""
+    return can_edit_register(user) or evidence.owner_id == user.pk
+
+
+def visible_evidence(user):
+    """شواهدی که این کاربر می‌بیند (س۱۷). عضو GRC و مدیر سامانه همه را؛ مالک شاهد شاهد خودش را؛ شاهد «عادی» را
+    هر کس که یکی از ریسک‌های مرتبطش را می‌بیند، و کارگروه و کمیته‌ی امنیت همه‌ی شواهد عادی را؛ شاهد «محرمانه» را
+    مالک یکی از ریسک‌های مرتبطش، و ممیز در دامنه‌ی ریسک‌هایی که می‌بیند."""
+    evidence = Evidence.objects.all()
+    if can_edit_register(user):
+        return evidence
+    normal = Q(access_class=Evidence.AccessClass.NORMAL)
+    condition = Q(owner=user) | Q(risks__owner=user)
+    if user.has_role(*SEE_ALL_ROLES):
+        condition |= normal
+    else:
+        condition |= normal & Q(risks__in=visible_risks(user))
+    if user.has_role(Role.VIEWER):
+        if user.scope_unit_ids() is None:
+            return evidence  # ممیزی که دامنه‌ی مشاهده ندارد همه را می‌بیند (س۹)
+        condition |= Q(risks__in=visible_risks(user))
+    # زیرپرس‌وجو به جای distinct: شاهدی که به چند ریسک قابل‌دیدن وصل است یک بار می‌آید.
+    return evidence.filter(pk__in=Evidence.objects.filter(condition).values("pk"))

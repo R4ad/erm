@@ -1,0 +1,34 @@
+{% load jformat %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>عنوان</th>
+        <th>نوع</th>
+        <th>زمان</th>
+        <th>اعتبار</th>
+        <th>دسترسی</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in evidence_list %}
+        <tr>
+          <td class="text-nowrap"><a href="{{ item.get_absolute_url }}">{{ item.code }}</a></td>
+          <td>{{ item.title }}</td>
+          <td class="text-nowrap">{{ item.get_kind_display }}</td>
+          <td class="text-nowrap">{{ item.observed_on|jformat:"%Y/%m/%d" }}</td>
+          <td class="text-nowrap">
+            {{ item.get_reliability_display }}
+            {% if item.is_expired %}<span class="badge text-bg-secondary">منقضی</span>{% endif %}
+          </td>
+          <td>{% if item.access_class == "confidential" %}<span class="badge text-bg-danger">محرمانه</span>{% else %}عادی{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-body-secondary py-4">{{ empty_text|default:"شاهدی پیدا نشد." }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

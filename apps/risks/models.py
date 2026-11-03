@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -217,9 +218,7 @@ class Risk(TimeStampedModel):
     customers = models.ManyToManyField(
         "catalog.Customer", verbose_name="بانک‌های متأثر", related_name="risks", blank=True
     )
-    scope = models.TextField(
-        "دامنه", blank=True, help_text="محیط (تولید، آزمون، بازیابی) و مرز مسئولیت."
-    )
+    scope = models.TextField("دامنه", blank=True, help_text="محیط (تولید، آزمون، بازیابی) و مرز مسئولیت.")
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="مالک ریسک",
@@ -247,15 +246,16 @@ class Risk(TimeStampedModel):
     )
     count_exclusions = models.TextField("موارد خارج از شمارش", blank=True)
     channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
-    status = models.CharField(
-        "وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False
-    )
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False)
     needs_completion = models.BooleanField(
         "نیازمند تکمیل",
         default=True,
         editable=False,
         help_text="عامل آغازگر، واحد شمارش یا دامنه هنوز نوشته نشده است.",
     )
+
+    attachments = GenericRelation("core.Attachment")
+    comments = GenericRelation("core.Comment")
 
     # m2m_fields: افزودن و برداشتن بانک‌ها و برچسب‌ها هم در تاریخچه ثبت می‌شود.
     history = HistoricalRecords(m2m_fields=[customers, tags])
@@ -339,3 +339,78 @@ class ExternalLink(TimeStampedModel):
 
     def __str__(self):
         return f"{self.get_kind_display()} {self.ref}"
+
+
+class Evidence(TimeStampedModel):
+    """شاهد (بخش ۷ سند v5): یک ادعای قابل ردیابی، مثل گزارش رخداد یا نتیجه‌ی آزمون، که چند ریسک و بعدها چند
+    ارزیابی و کنترل به آن استناد می‌کنند. فایلش، اگر باشد، پیوست همین رکورد است. شاهد حذف نمی‌شود."""
+
+    class Kind(models.TextChoices):
+        INCIDENT = "incident", "رخداد"
+        STATISTICS = "statistics", "آمار"
+        TEST = "test", "آزمون"
+        BIA_CONTRACT = "bia_contract", "BIA یا قرارداد"
+        THREAT = "threat", "تهدید یا آسیب‌پذیری"
+        INTERVIEW = "interview", "مصاحبه"
+
+    class Reliability(models.TextChoices):
+        LOW = "low", "کم"
+        MEDIUM = "medium", "متوسط"
+        HIGH = "high", "زیاد"
+
+    class AccessClass(models.TextChoices):
+        # س۱۷: عادی برای هر کسی که ریسک مرتبط را می‌بیند؛ محرمانه فقط برای مالک ریسک، اعضای GRC و ممیز.
+        NORMAL = "normal", "عادی"
+        CONFIDENTIAL = "confidential", "محرمانه"
+
+    code = models.CharField("کد", max_length=20, unique=True, editable=False)
+    kind = models.CharField("نوع", max_length=20, choices=Kind.choices)
+    title = models.CharField("عنوان", max_length=300)
+    summary = models.TextField("خلاصه")
+    source = models.CharField("منبع", max_length=300, help_text="سامانه، گزارش یا شخص.")
+    observed_on = models.DateField("زمان", help_text="تاریخ خود شاهد، نه تاریخ ثبت.")
+    scope = models.TextField("دامنه", blank=True)
+    reliability = models.CharField("اعتبار", max_length=20, choices=Reliability.choices)
+    valid_until = models.DateField("معتبر تا", null=True, blank=True)
+    access_class = models.CharField(
+        "طبقه‌ی دسترسی", max_length=20, choices=AccessClass.choices, default=AccessClass.NORMAL
+    )
+    url = models.URLField("پیوند", blank=True, help_text="اگر فایل جای دیگری است.")
+    customer = models.ForeignKey(
+        "catalog.Customer", verbose_name="بانک", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="مالک", on_delete=models.PROTECT, related_name="owned_evidence"
+    )
+    risks = models.ManyToManyField(Risk, verbose_name="ریسک‌های مرتبط", related_name="evidence", blank=True)
+    attachments = GenericRelation("core.Attachment")
+    comments = GenericRelation("core.Comment")
+
+    history = HistoricalRecords(m2m_fields=[risks])
+
+    class Meta:
+        verbose_name = "شاهد"
+        verbose_name_plural = "شواهد"
+        ordering = ["-observed_on", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(valid_until__isnull=True) | Q(valid_until__gte=models.F("observed_on")),
+                name="evidence_valid_until_not_before_observed_on",
+                violation_error_message="«معتبر تا» نباید پیش از تاریخ خود شاهد باشد.",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} {self.title}"
+
+    def get_absolute_url(self):
+        return reverse("risks:evidence_detail", args=[self.pk])
+
+    @property
+    def is_expired(self):
+        return self.valid_until is not None and self.valid_until < timezone.localdate()
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = next_code(f"EV-{jalali_year(timezone.localdate())}")
+        super().save(*args, **kwargs)

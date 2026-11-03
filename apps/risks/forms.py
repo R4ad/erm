@@ -1,15 +1,17 @@
 from django import forms
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.catalog.forms import OwnerChoiceField, active_or_current, user_choices
 from apps.catalog.models import Customer, Service
 from apps.catalog.permissions import visible_services
-from apps.core.forms import BootstrapFormMixin
+from apps.core.forms import BootstrapFormMixin, JalaliDateField
 from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Coverage, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
+from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
+from .permissions import can_edit_register
 from .services import (
     active_categories,
     active_risks,
@@ -54,9 +56,7 @@ class CoverageForm(BootstrapFormMixin, forms.ModelForm):
 
 
 class CoverageFilterForm(BootstrapFormMixin, forms.Form):
-    q = forms.CharField(
-        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا نام خدمت"})
-    )
+    q = forms.CharField(label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا نام خدمت"}))
     unit = UnitChoiceField(OrgUnit.objects.all(), label="واحد مالک", required=False, empty_label="همه‌ی واحدها")
     is_critical = forms.ChoiceField(
         label="حیاتی", required=False, choices=[("", "همه"), ("yes", "حیاتی"), ("no", "غیرحیاتی")]
@@ -124,9 +124,7 @@ class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
     def filter(self, scenarios):
         data = self.cleaned_data
         for word in data["q"].split():
-            scenarios = scenarios.filter(
-                Q(code__icontains=word) | Q(title__icontains=word) | Q(event__icontains=word)
-            )
+            scenarios = scenarios.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(event__icontains=word))
         if data["category"]:
             scenarios = scenarios.filter(category=data["category"])
         if data["status"]:
@@ -242,9 +240,7 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
 
 
 class RiskFilterForm(BootstrapFormMixin, forms.Form):
-    q = forms.CharField(
-        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا عنوان"})
-    )
+    q = forms.CharField(label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا عنوان"}))
     status = forms.ChoiceField(label="وضعیت", required=False, choices=[("", "همه")] + Risk.Status.choices)
     category = forms.ModelChoiceField(RiskCategory.objects.all(), label="دسته", required=False, empty_label="همه")
     service = ServiceChoiceField(Service.objects.none(), label="خدمت", required=False, empty_label="همه")
@@ -290,7 +286,123 @@ class ExternalLinkForm(BootstrapFormMixin, forms.ModelForm):
         data = super().clean()
         # «ریسک» در فرم نیست، پس Django قاعده‌ی یکتایی (ریسک، نوع، شناسه) را خودش در فرم چک نمی‌کند.
         kind, ref = data.get("kind"), data.get("ref")
-        duplicate = ExternalLink.objects.filter(risk=self.instance.risk, kind=kind, ref=ref).exclude(pk=self.instance.pk)
+        duplicate = ExternalLink.objects.filter(risk=self.instance.risk, kind=kind, ref=ref).exclude(
+            pk=self.instance.pk
+        )
         if kind and ref and duplicate.exists():
             self.add_error("ref", "این شناسه با همین نوع پیش‌تر برای این ریسک ثبت شده است.")
         return data
+
+
+class RiskMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, risk):
+        return f"{risk.code} {risk.title}"
+
+
+class EvidenceForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Evidence
+        fields = [
+            "kind",
+            "title",
+            "summary",
+            "source",
+            "observed_on",
+            "scope",
+            "reliability",
+            "valid_until",
+            "access_class",
+            "url",
+            "customer",
+            "owner",
+            "risks",
+        ]
+        field_classes = {
+            "observed_on": JalaliDateField,
+            "valid_until": JalaliDateField,
+            "owner": OwnerChoiceField,
+            "risks": RiskMultipleChoiceField,
+        }
+        widgets = {
+            "summary": forms.Textarea(attrs={"rows": 3}),
+            "scope": forms.Textarea(attrs={"rows": 2}),
+            "risks": forms.SelectMultiple(attrs={"size": 6}),
+        }
+        help_texts = {
+            "access_class": "شاهد عادی را هر کس که ریسک مرتبط را می‌بیند می‌بیند؛ محرمانه را فقط مالک ریسک، اعضای GRC و ممیز.",
+            "risks": "برای انتخاب چند ریسک، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید.",
+        }
+
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        evidence = self.instance
+        self.fields["customer"].queryset = active_or_current(Customer.objects.all(), evidence.customer_id)
+        # ریسک‌هایی که کاربر می‌تواند به آن‌ها شاهد وصل کند: عضو GRC همه‌ی ریسک‌های فعال، مالک ریسک‌های خودش.
+        choosable = active_risks(Risk.objects.all())
+        if not can_edit_register(user):
+            choosable = choosable.filter(owner=user)
+        self.choosable = choosable
+        self.fields["risks"].queryset = choosable.order_by("code")
+        if can_edit_register(user):
+            self.fields["owner"].queryset = user_choices(evidence.owner_id)
+            if not evidence.pk:
+                self.fields["owner"].initial = user.pk
+        else:
+            del self.fields["owner"]  # مالک ریسک شاهدی را که می‌سازد به نام خودش ثبت می‌کند
+            if not evidence.pk:
+                evidence.owner = user
+
+    def clean(self):
+        data = super().clean()
+        observed, valid_until = data.get("observed_on"), data.get("valid_until")
+        if observed and valid_until and valid_until < observed:
+            self.add_error("valid_until", "«معتبر تا» نباید پیش از تاریخ خود شاهد باشد.")
+        if not can_edit_register(self.user) and not data.get("risks") and not self.hidden_risks():
+            self.add_error("risks", "دست‌کم یکی از ریسک‌های خودتان را انتخاب کنید.")
+        return data
+
+    def hidden_risks(self):
+        """ریسک‌هایی که شاهد به آن‌ها وصل است ولی در فهرست این کاربر نیستند؛ با ذخیره‌ی فرم برداشته نمی‌شوند."""
+        if not self.instance.pk:
+            return Risk.objects.none()
+        return self.instance.risks.exclude(pk__in=self.choosable.values("pk"))
+
+    def _save_m2m(self):
+        hidden = list(self.hidden_risks())
+        super()._save_m2m()
+        if hidden:
+            self.instance.risks.add(*hidden)
+
+
+class EvidenceFilterForm(BootstrapFormMixin, forms.Form):
+    q = forms.CharField(
+        label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد، عنوان یا منبع"})
+    )
+    kind = forms.ChoiceField(label="نوع", required=False, choices=[("", "همه")] + Evidence.Kind.choices)
+    reliability = forms.ChoiceField(
+        label="اعتبار", required=False, choices=[("", "همه")] + Evidence.Reliability.choices
+    )
+    access_class = forms.ChoiceField(
+        label="طبقه‌ی دسترسی", required=False, choices=[("", "همه")] + Evidence.AccessClass.choices
+    )
+    validity = forms.ChoiceField(
+        label="اعتبار زمانی", required=False, choices=[("", "همه"), ("valid", "معتبر"), ("expired", "منقضی")]
+    )
+
+    def filter(self, evidence):
+        data = self.cleaned_data
+        for word in data["q"].split():
+            evidence = evidence.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(source__icontains=word))
+        if data["kind"]:
+            evidence = evidence.filter(kind=data["kind"])
+        if data["reliability"]:
+            evidence = evidence.filter(reliability=data["reliability"])
+        if data["access_class"]:
+            evidence = evidence.filter(access_class=data["access_class"])
+        today = timezone.localdate()
+        if data["validity"] == "expired":
+            evidence = evidence.filter(valid_until__lt=today)
+        elif data["validity"] == "valid":
+            evidence = evidence.filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
+        return evidence

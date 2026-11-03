@@ -1,0 +1,36 @@
+{% load jformat %}
+{% comment %}
+  بخش پیوست‌های یک رکورد. context از records.record_extras می‌آید؛ record همان رکورد صفحه است.
+{% endcomment %}
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="attachments">
+  <h2 class="h5 mb-0">پیوست‌ها</h2>
+  {% if can_attach %}
+    <a href="{% url 'core:attachment_upload' record_content_type record.pk %}" class="btn btn-primary btn-sm">افزودن پیوست</a>
+  {% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>فایل</th>
+        <th>شرح</th>
+        <th>حجم</th>
+        <th>بارگذاری</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for attachment in attachments %}
+        <tr>
+          <td><a href="{{ attachment.get_absolute_url }}">{{ attachment.original_name }}</a></td>
+          <td>{{ attachment.description|default:"-" }}</td>
+          <td class="text-nowrap">{{ attachment.size|filesizeformat }}</td>
+          <td class="text-nowrap">{{ attachment.created_by.get_full_name|default:attachment.created_by.username }}، {{ attachment.created_at|jformat:"%Y/%m/%d" }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4" class="text-center text-body-secondary py-4">فایلی پیوست نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
