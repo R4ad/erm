@@ -99,7 +99,7 @@ def test_risk_codes_carry_the_jalali_year_and_count_from_one():
     first, second = make_risk(), make_risk("ریسک دوم")
 
     assert (first.code, second.code) == (f"RK-{year}-0001", f"RK-{year}-0002")
-    assert first.status == Risk.Status.DRAFT
+    assert first.status == Risk.Status.REGISTERED
 
 
 def test_needs_completion_follows_initiator_count_unit_and_scope():
@@ -318,7 +318,7 @@ def test_coverage_cells_count_active_risks():
     service = make_service("SRV-1")
     make_risk("یک", service=service)
     make_risk("دو", service=service)
-    make_risk("بازنشسته", service=service, status=Risk.Status.RETIRED)
+    make_risk("بسته", service=service, status=Risk.Status.CLOSED)
     make_risk("دسته‌ی دیگر", service=service, category=category("T3"))
 
     [(_, cells)] = coverage_rows([service], [category("T1"), category("T2")], Risk.objects.all())

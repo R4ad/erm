@@ -142,13 +142,15 @@ def test_the_grid_filters_by_completeness(client, grc):
     assert list(client.get(url, {"state": "incomplete"}).context["services"]) == [incomplete]
 
 
-def test_only_grc_and_system_admin_open_the_cell_form(client, grc, system_admin):
+def test_grc_the_security_workgroup_and_system_admin_open_the_cell_form(client, grc, system_admin):
     service = make_service("SRV-1")
     url = reverse("risks:coverage_update", args=[service.pk, RiskCategory.objects.get(code="T1").pk])
+    workgroup = make_user("workgroup", Role.SECURITY_WORKGROUP)
 
-    for user, status in [(make_user("viewer", Role.VIEWER), 403), (grc, 200), (system_admin, 200)]:
+    for user, status in [(make_user("viewer", Role.VIEWER), 403), (grc, 200), (workgroup, 200), (system_admin, 200)]:
         client.force_login(user)
         assert client.get(url).status_code == status
+    assert client.get(reverse("risks:coverage")).context["can_edit"] is True
 
 
 def test_saving_a_cell_records_the_reviewer_the_date_and_history(client, grc):
@@ -218,6 +220,9 @@ def test_everyone_sees_categories_but_only_grc_and_system_admin_change_them(clie
     client.force_login(viewer)
     assert client.get(reverse("risks:category_list")).status_code == 200
     assert client.get(reverse("risks:category_create")).status_code == 403
+    client.force_login(make_user("workgroup", Role.SECURITY_WORKGROUP))  # کارگروه فقط وضعیت خانه‌ها را ثبت می‌کند
+    assert client.get(reverse("risks:category_create")).status_code == 403
+    assert client.get(reverse("risks:category_list")).context["can_edit"] is False
 
     client.force_login(grc)
     response = client.post(reverse("risks:category_create"), {"code": "T9", "name": "دسته‌ی تازه", "is_active": "on"})

@@ -59,7 +59,7 @@ class RiskAdmin(SimpleHistoryAdmin):
     inlines = [ExternalLinkInline]
 
     def has_delete_permission(self, request, obj=None):
-        return False  # ریسک بازنشسته یا ادغام می‌شود، نه حذف (قدم ۱۴)
+        return False  # ریسک رد، بسته یا ادغام می‌شود، نه حذف (قدم ۱۴)
 
 
 @admin.register(Evidence)

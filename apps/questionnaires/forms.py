@@ -132,20 +132,12 @@ class ResponseStartForm(BootstrapFormMixin, forms.ModelForm):
 
 
 class ResponseAnswerForm(BootstrapFormMixin, forms.ModelForm):
-    """فرم پاسخ: قلم‌های ثابت بخش ۲۴، یک فیلد برای هر سؤال فعال و «مورد جدید». فیلد سؤال‌ها در فرم اجباری
+    """فرم پاسخ: قلم‌های ثابت (کارکردها و پرسش‌های جلسه‌ی بخش ۴)، یک فیلد برای هر سؤال فعال و «مورد جدید». فیلد سؤال‌ها در فرم اجباری
     نیستند تا پیش‌نویس نیمه‌کاره ذخیره شود؛ سؤال‌های اجباری هنگام ارسال چک می‌شوند."""
 
     class Meta:
         model = Response
-        fields = [
-            "mission",
-            "services_and_commitments",
-            "disruptive_event",
-            "consequence",
-            "dependencies",
-            "evidence",
-            "new_item",
-        ]
+        fields = Response.FIXED_ITEMS + ["new_item"]
         widgets = {name: forms.Textarea(attrs={"rows": 2}) for name in fields}
 
     def __init__(self, *args, **kwargs):
@@ -186,7 +178,7 @@ class ResponseAnswerForm(BootstrapFormMixin, forms.ModelForm):
         return [(question, self[self.question_field_name(question)]) for question in self.questions]
 
     def fixed_fields(self):
-        return [self[name] for name in self.Meta.fields if name != "new_item"]
+        return [self[name] for name in Response.FIXED_ITEMS]
 
     def answer_values(self):
         """(سؤال، مقدار) برای ذخیره: متن، یا فهرست گزینه‌ها."""

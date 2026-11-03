@@ -28,11 +28,13 @@ from .forms import (
 from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario
 from .permissions import (
     REGISTER_EDIT_ROLES,
-    UNIVERSE_EDIT_ROLES,
+    CATEGORY_EDIT_ROLES,
+    COVERAGE_EDIT_ROLES,
     can_add_evidence,
+    can_edit_categories,
+    can_edit_coverage,
     can_edit_evidence,
     can_edit_register,
-    can_edit_universe,
     visible_evidence,
     visible_risks,
 )
@@ -72,7 +74,7 @@ class CoverageView(FilteredListView):
             rows=coverage_rows(context["services"], categories, visible_risks(self.request.user)),
             critical=critical_coverage(services, categories),
             counts=status_counts(services, categories),
-            can_edit=can_edit_universe(self.request.user),
+            can_edit=can_edit_coverage(self.request.user),
         )
         return context
 
@@ -80,7 +82,7 @@ class CoverageView(FilteredListView):
 class CoverageUpdateView(RoleRequiredMixin, UpdateView):
     """ثبت وضعیت یک خانه‌ی «خدمت × دسته». خانه‌ای که ردیف ندارد با همین صفحه ساخته می‌شود."""
 
-    roles = UNIVERSE_EDIT_ROLES
+    roles = COVERAGE_EDIT_ROLES
     form_class = CoverageForm
     template_name = "risks/coverage_form.html"
 
@@ -126,11 +128,11 @@ class RiskCategoryListView(ListView):
     context_object_name = "categories"
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(can_edit=can_edit_universe(self.request.user), **kwargs)
+        return super().get_context_data(can_edit=can_edit_categories(self.request.user), **kwargs)
 
 
 class RiskCategoryCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, CreateView):
-    roles = UNIVERSE_EDIT_ROLES
+    roles = CATEGORY_EDIT_ROLES
     model = RiskCategory
     form_class = RiskCategoryForm
     success_url = reverse_lazy("risks:category_list")
@@ -138,7 +140,7 @@ class RiskCategoryCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMix
 
 
 class RiskCategoryUpdateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, UpdateView):
-    roles = UNIVERSE_EDIT_ROLES
+    roles = CATEGORY_EDIT_ROLES
     model = RiskCategory
     form_class = RiskCategoryForm
     success_url = reverse_lazy("risks:category_list")

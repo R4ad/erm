@@ -8,7 +8,7 @@ from django.views.generic import CreateView, DetailView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.core.views import FilteredListView, FormPageMixin
-from apps.risks.permissions import can_edit_register, can_edit_universe, visible_risks
+from apps.risks.permissions import can_edit_coverage, can_edit_register, visible_risks
 from apps.risks.services import active_categories, coverage_rows
 
 from .forms import (
@@ -121,7 +121,7 @@ class ServiceDetailView(DetailView):
                 if self.object.is_active
                 else []
             ),
-            can_edit_coverage=can_edit_universe(user),
+            can_edit_coverage=can_edit_coverage(user),
             risks=visible_risks(user).filter(service=self.object).select_related("category", "owner"),
             can_edit_risks=can_edit_register(user),
             **kwargs,
