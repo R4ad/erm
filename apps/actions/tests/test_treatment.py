@@ -4,7 +4,6 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.roles import Role
 from apps.actions.models import ActionUpdate, TreatmentAction, TreatmentPlan
 from apps.actions.mywork import my_work
 from apps.actions.services import PlanError, approve_plan, current_plan, perform_move
@@ -22,26 +21,6 @@ from apps.workflow.services import WorkflowError, perform_transition
 pytestmark = pytest.mark.django_db
 S = Risk.Status
 ST = TreatmentAction.Status
-
-
-@pytest.fixture
-def grc():
-    return make_user("grc", Role.GRC_MEMBER, first_name="سارا", last_name="احمدی")
-
-
-@pytest.fixture
-def owner():
-    return make_user("owner", first_name="رضا", last_name="مالکی")
-
-
-@pytest.fixture
-def assignee():
-    return make_user("assignee", first_name="نیما", last_name="مجری")
-
-
-@pytest.fixture
-def verifier():
-    return make_user("verifier", first_name="لیلا", last_name="آزمون")
 
 
 def level(name):

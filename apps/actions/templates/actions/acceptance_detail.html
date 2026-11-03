@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ acceptance }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">پذیرش {{ acceptance.code }} {% include "actions/includes/acceptance_status.html" %}</h1>
+  <div>
+    {% if can_edit %}<a href="{% url 'actions:acceptance_update' acceptance.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>{% endif %}
+    <a href="{{ risk.get_absolute_url }}#acceptances" class="btn btn-outline-secondary btn-sm">ریسک</a>
+  </div>
+</div>
+
+{% if acceptance.status == "active" %}
+  <div class="alert {% if acceptance.is_expired %}alert-danger{% else %}alert-success{% endif %}">
+    <div class="fw-semibold mb-1">متن تصمیم</div>
+    {{ acceptance.decision_text }}
+    {% if acceptance.is_expired %}<div class="small mt-1">تاریخ پایان گذشته و پذیرش منقضی است. تمدید خودکار نیست؛ ادامه پذیرش تازه با همه‌ی امضاها می‌خواهد.</div>
+    {% elif acceptance.days_left <= 30 %}<div class="small mt-1">{{ acceptance.days_left }} روز تا پایان اعتبار مانده است.</div>{% endif %}
+  </div>
+{% elif acceptance.status == "rejected" or acceptance.status == "revoked" %}
+  <div class="alert alert-secondary">
+    {{ acceptance.get_status_display }}، {{ acceptance.closed_by.get_full_name|default:acceptance.closed_by.username }}، {{ acceptance.closed_at|jformat:"%Y/%m/%d %H:%M" }}: {{ acceptance.closed_reason }}
+  </div>
+{% endif %}
+
+<dl class="row">
+  <dt class="col-sm-3">ریسک</dt>
+  <dd class="col-sm-9"><a href="{{ risk.get_absolute_url }}">{{ risk }}</a>، مالک: {{ risk.owner.get_full_name|default:risk.owner.username }}</dd>
+  <dt class="col-sm-3">ارزیابی</dt>
+  <dd class="col-sm-9">
+    <a href="{{ assessment.get_absolute_url }}">{{ assessment.code }}</a> (روش نسخه‌ی {{ assessment.method_version.number }})، امتیاز تصمیم {{ assessment.score_high }}، اطمینان {{ assessment.get_confidence_display|default:"-" }}،
+    سطح {% include "assessments/includes/level_badge.html" with level=level %}
+    {% if temporary %}<div class="small text-body-secondary">برای این سطح پذیرش فقط موقت و استثنایی و کنار طرح مواجهه است (بخش ۱۹).</div>{% endif %}
+    {% if non_normal %}<div class="small text-danger">ارزیابی ناقص است یا اطمینان کم دارد، پس این پذیرش عادی نیست و مهلت جمع‌آوری شاهد و مجوز موقت مقام بالاتر می‌خواهد.</div>{% endif %}
+    {% if assessment.customer_tolerance_exceeded %}<div class="small text-danger">عبور از حد تحمل مشتری اختیار پذیرش عمومی را محدود کرده است.</div>{% endif %}
+  </dd>
+  {% if acceptance.plan %}
+    <dt class="col-sm-3">طرح مواجهه</dt>
+    <dd class="col-sm-9"><a href="{{ acceptance.plan.get_absolute_url }}">{{ acceptance.plan.get_option_display }}</a></dd>
+  {% endif %}
+  {% if acceptance.renews %}
+    <dt class="col-sm-3">به جای پذیرش</dt>
+    <dd class="col-sm-9"><a href="{{ acceptance.renews.get_absolute_url }}">{{ acceptance.renews.code }}</a></dd>
+  {% endif %}
+  {% if renewals %}
+    <dt class="col-sm-3">پذیرش‌های بعدی</dt>
+    <dd class="col-sm-9">{% for item in renewals %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a> {% include "actions/includes/acceptance_status.html" with acceptance=item %}{% if not forloop.last %}، {% endif %}{% endfor %}</dd>
+  {% endif %}
+  <dt class="col-sm-3">اعتبار</dt>
+  <dd class="col-sm-9">
+    {{ acceptance.start_date|jformat:"%Y/%m/%d" }} تا {{ acceptance.end_date|jformat:"%Y/%m/%d" }}
+    <div class="small text-body-secondary">سقف سطح «{{ level }}»: {{ level.acceptance_value }} {{ level.get_acceptance_unit_display }}، یعنی تا {{ cap|jformat:"%Y/%m/%d" }}. تمدید خودکار نیست.</div>
+  </dd>
+  {% if acceptance.evidence_due %}
+    <dt class="col-sm-3">مهلت جمع‌آوری شاهد</dt>
+    <dd class="col-sm-9">{{ acceptance.evidence_due|jformat:"%Y/%m/%d" }}</dd>
+  {% endif %}
+  {% if decision_due %}
+    <dt class="col-sm-3">مهلت ثبت تصمیم</dt>
+    <dd class="col-sm-9">{{ decision_due|jformat:"%Y/%m/%d" }}{% if decision_due_passed %} <span class="badge text-bg-danger">گذشته است</span>{% endif %}
+      <div class="small text-body-secondary">سکوت، تأخیر در پاسخ یا نبود بودجه به معنی پذیرش نیست (بخش ۲۵).</div>
+    </dd>
+  {% endif %}
+  <dt class="col-sm-3">دامنه</dt>
+  <dd class="col-sm-9">{{ acceptance.scope|linebreaksbr }}</dd>
+  <dt class="col-sm-3">ضرورت و دلیل</dt>
+  <dd class="col-sm-9">{{ acceptance.reason|linebreaksbr }}</dd>
+  <dt class="col-sm-3">گزینه‌های بررسی‌شده</dt>
+  <dd class="col-sm-9">{{ acceptance.alternatives|linebreaksbr }}</dd>
+  <dt class="col-sm-3">کنترل جبرانی</dt>
+  <dd class="col-sm-9">
+    {{ acceptance.compensating_controls|linebreaksbr }}
+    {% if acceptance.controls.exists %}<div class="small">{% for control in acceptance.controls.all %}<a href="{{ control.get_absolute_url }}">{{ control.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</div>{% endif %}
+  </dd>
+  <dt class="col-sm-3">شروط ادامه</dt>
+  <dd class="col-sm-9">{{ acceptance.conditions|linebreaksbr }}</dd>
+  <dt class="col-sm-3">محدودیت مشتری</dt>
+  <dd class="col-sm-9">{{ acceptance.customer_constraints|linebreaksbr }}</dd>
+  <dt class="col-sm-3">شاخص پایش</dt>
+  <dd class="col-sm-9">{{ acceptance.monitoring|linebreaksbr }}</dd>
+  <dt class="col-sm-3">شرط لغو یا تصعید</dt>
+  <dd class="col-sm-9">{{ acceptance.revocation_triggers|linebreaksbr }}</dd>
+  <dt class="col-sm-3">مسئول پیگیری</dt>
+  <dd class="col-sm-9">{{ acceptance.follow_up_by.get_full_name|default:acceptance.follow_up_by.username }}</dd>
+</dl>
+
+{% if problems %}
+  <div class="alert alert-light border py-2">
+    {% if acceptance.status == "draft" %}پیش از ارسال برای امضا لازم است:{% else %}تا این‌ها درست نشوند امضای تأیید ثبت نمی‌شود:{% endif %}
+    <ul class="mb-0 small">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+{% if can_submit and not problems %}
+  <form method="post" action="{% url 'actions:acceptance_submit' acceptance.pk %}" class="alert alert-info py-2 d-flex align-items-center justify-content-between">
+    {% csrf_token %}
+    <span>متن پذیرش بعد از ارسال قفل می‌شود و صاحبان اختیار روی همین متن امضا می‌کنند.</span>
+    <button type="submit" class="btn btn-primary btn-sm">ارسال برای امضا</button>
+  </form>
+{% endif %}
+
+<h2 class="h5 mt-4 mb-3" id="signatures">امضاها</h2>
+<div class="list-group mb-3">
+  {% for row in rows %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between">
+        <span class="fw-semibold">{{ row.label }}</span>
+        {% if row.signature %}
+          {% if row.signature.is_approval %}<span class="badge text-bg-success">تأیید</span>{% else %}<span class="badge text-bg-danger">رد</span>{% endif %}
+        {% elif acceptance.status == "pending" %}<span class="badge text-bg-light border">منتظر</span>{% endif %}
+      </div>
+      <div class="small text-body-secondary">{{ row.reason }}</div>
+      {% if row.authority == "unit_manager" and not row.signature %}
+        <div class="small">مدیران واحد «{{ risk.org_unit }}»: {% for user in unit_managers %}{{ user.get_full_name|default:user.username }}{% if not forloop.last %}، {% endif %}{% empty %}هیچ‌کس{% endfor %}</div>
+      {% endif %}
+      {% if row.signature %}
+        <div class="small mt-1">
+          {{ row.signature.created_by.get_full_name|default:row.signature.created_by.username }}، {{ row.signature.created_at|jformat:"%Y/%m/%d %H:%M" }}{% if row.signature.reference or row.signature.reference_date %}، {% if row.authority == "committee" %}صورت‌جلسه{% else %}نامه{% endif %} {{ row.signature.reference }}{% if row.signature.reference_date %} مورخ {{ row.signature.reference_date|jformat:"%Y/%m/%d" }}{% endif %}{% endif %}{% if row.signature.letter %}، <a href="{{ row.signature.letter.get_absolute_url }}">فایل نامه</a>{% endif %}
+          {% if row.signature.note %}<div>{{ row.signature.note|linebreaksbr }}</div>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{% for form in sign_forms %}
+  <form method="post" action="{% url 'actions:acceptance_sign' acceptance.pk %}" enctype="multipart/form-data" class="border rounded p-3 mb-3">
+    {% csrf_token %}
+    <div class="fw-semibold mb-2">امضای شما به‌عنوان {{ form.authority_label }}</div>
+    {% if form.initial.authority == "senior_management" %}<p class="small text-body-secondary">تصمیم مدیریت ارشد را از روی نامه‌ی رسمی ثبت می‌کنید.</p>{% elif form.initial.authority == "committee" %}<p class="small text-body-secondary">تصمیم کمیته امنیت را از روی صورت‌جلسه ثبت می‌کنید.</p>{% endif %}
+    {{ form.authority }}
+    {% for field in form.visible_fields %}{% include "includes/field.html" %}{% endfor %}
+    <button type="submit" name="decision" value="approve" class="btn btn-success btn-sm">تأیید پذیرش</button>
+    <button type="submit" name="decision" value="reject" class="btn btn-outline-danger btn-sm">رد پذیرش</button>
+  </form>
+{% endfor %}
+
+{% if can_revoke %}
+  <details class="mb-3">
+    <summary class="small">لغو پذیرش</summary>
+    <form method="post" action="{% url 'actions:acceptance_revoke' acceptance.pk %}" class="mt-2">
+      {% csrf_token %}
+      {% for field in revoke_form %}{% include "includes/field.html" %}{% endfor %}
+      <button type="submit" class="btn btn-outline-danger btn-sm">لغو</button>
+    </form>
+  </details>
+{% endif %}
+
+{% include "core/includes/attachments.html" with record=acceptance %}
+{% include "core/includes/comments.html" with record=acceptance %}
+{% endblock %}

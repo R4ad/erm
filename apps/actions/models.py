@@ -247,3 +247,207 @@ class ActionUpdate(TimeStampedModel):
     @property
     def changes_status(self):
         return self.from_status != self.to_status
+
+
+class RiskAcceptance(TimeStampedModel):
+    """پذیرش زمان‌دار ریسک باقیمانده (بخش ۱۹ و برگه‌ی پذیرش بخش ۲۵ سند v5). پذیرش به یک ارزیابی جاری تأییدشده
+    بسته است و تاریخ پایان دارد که از سقف اعتبار سطح تصمیم بیشتر نیست. وقتی معتبر می‌شود که مالک ریسک و هر صاحب
+    اختیاری که سطح و نشان‌های ارزیابی می‌خواهند امضا کرده باشند؛ متن تصمیم فقط بعد از همین امضاها نوشته می‌شود.
+    تمدید خودکار ندارد: پذیرش تازه رکورد تازه است. پذیرش حذف نمی‌شود."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "پیش‌نویس"
+        PENDING = "pending", "منتظر امضا"
+        ACTIVE = "active", "معتبر"
+        REJECTED = "rejected", "ردشده"
+        REVOKED = "revoked", "لغوشده"
+
+    code = models.CharField("کد", max_length=20, unique=True, editable=False)
+    risk = models.ForeignKey("risks.Risk", verbose_name="ریسک", on_delete=models.PROTECT, related_name="acceptances")
+    assessment = models.ForeignKey(
+        "assessments.Assessment",
+        verbose_name="ارزیابی",
+        on_delete=models.PROTECT,
+        related_name="acceptances",
+        editable=False,
+        help_text="نسخه‌ی ارزیابی‌ای که ریسک باقیمانده‌اش پذیرفته می‌شود.",
+    )
+    plan = models.ForeignKey(
+        TreatmentPlan,
+        verbose_name="طرح مواجهه",
+        on_delete=models.PROTECT,
+        null=True,
+        related_name="acceptances",
+        editable=False,
+    )
+    renews = models.ForeignKey(
+        "self",
+        verbose_name="به جای پذیرش",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="renewals",
+        help_text="اگر این پذیرش بعد از پذیرش قبلی همین ریسک می‌آید. تمدید خودکار نیست و همه‌ی امضاها دوباره لازم است.",
+    )
+    scope = models.TextField("دامنه", help_text="خدمت، بانک‌ها، سامانه‌ها یا مسیرهایی که پذیرش شاملشان می‌شود.")
+    reason = models.TextField("ضرورت و دلیل اقتصادی یا عملیاتی")
+    alternatives = models.TextField(
+        "گزینه‌های بررسی‌شده", help_text="گزینه‌های جایگزین و نتیجه‌ی بررسی هزینه و پیامد هر کدام."
+    )
+    compensating_controls = models.TextField(
+        "کنترل جبرانی", help_text="کنترل‌هایی که تا پایان پذیرش جای شکاف را می‌گیرند؛ اگر نیست، بنویسید چرا."
+    )
+    controls = models.ManyToManyField(
+        "controls.Control", verbose_name="کنترل‌های جبرانی", related_name="acceptances", blank=True
+    )
+    conditions = models.TextField("شروط ادامه")
+    customer_constraints = models.TextField(
+        "محدودیت مشتری", help_text="قواعد خاص مشتری، قرارداد و مقررات که بررسی شد، و نتیجه‌ی بررسی."
+    )
+    monitoring = models.TextField("شاخص پایش")
+    revocation_triggers = models.TextField("شرط لغو یا تصعید")
+    start_date = models.DateField("آغاز اعتبار")
+    end_date = models.DateField("پایان اعتبار")
+    evidence_due = models.DateField(
+        "مهلت جمع‌آوری شاهد",
+        null=True,
+        blank=True,
+        help_text="برای پذیرش غیرعادی: ارزیابی ناقص یا با اطمینان کم (بخش ۱۹).",
+    )
+    follow_up_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مسئول پیگیری",
+        on_delete=models.PROTECT,
+        related_name="followed_acceptances",
+    )
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT, editable=False)
+    submitted_at = models.DateTimeField("زمان ارسال برای امضا", null=True, editable=False)
+    decided_at = models.DateTimeField("زمان تصمیم", null=True, editable=False)
+    decision_text = models.TextField("متن تصمیم", blank=True, editable=False)
+    closed_reason = models.TextField("دلیل رد یا لغو", blank=True, editable=False)
+    closed_at = models.DateTimeField("زمان رد یا لغو", null=True, editable=False)
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="ردکننده یا لغوکننده",
+        on_delete=models.PROTECT,
+        null=True,
+        editable=False,
+        related_name="+",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+", editable=False
+    )
+
+    attachments = GenericRelation("core.Attachment")
+    comments = GenericRelation("core.Comment")
+    history = HistoricalRecords(m2m_fields=[controls])
+
+    class Meta:
+        verbose_name = "پذیرش ریسک"
+        verbose_name_plural = "پذیرش‌های ریسک"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(condition=Q(end_date__gt=F("start_date")), name="acceptance_ends_after_start"),
+            models.CheckConstraint(
+                condition=Q(evidence_due__isnull=True) | Q(evidence_due__lte=F("end_date")),
+                name="acceptance_evidence_due_within_validity",
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["draft", "pending"]) | ~Q(decision_text="") | Q(closed_at__isnull=False),
+                name="decided_acceptance_has_text_or_close",
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["rejected", "revoked"], closed_at__isnull=False) & ~Q(closed_reason="")
+                | ~Q(status__in=["rejected", "revoked"]),
+                name="closed_acceptance_has_reason",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} پذیرش {self.risk.code}"
+
+    def get_absolute_url(self):
+        return reverse("actions:acceptance_detail", args=[self.pk])
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = next_code(f"AC-{jalali_year(timezone.localdate())}")
+        super().save(*args, **kwargs)
+
+    @property
+    def level(self):
+        return self.assessment.decision_level
+
+    @property
+    def is_expired(self):
+        """«منقضی» از تاریخ پایان حساب می‌شود؛ ثبت وضعیت و تصعید با یادآوری‌های قدم ۲۳ می‌آید."""
+        return self.status == self.Status.ACTIVE and self.end_date < timezone.localdate()
+
+    @property
+    def is_in_force(self):
+        today = timezone.localdate()
+        return self.status == self.Status.ACTIVE and self.start_date <= today <= self.end_date
+
+    @property
+    def state_label(self):
+        return "منقضی" if self.is_expired else self.get_status_display()
+
+    @property
+    def days_left(self):
+        return (self.end_date - timezone.localdate()).days
+
+
+class AcceptanceSignature(TimeStampedModel):
+    """امضای یک صاحب اختیار روی پذیرش: تأیید یا رد، با توضیح. امضای مدیریت ارشد را عضو GRC با شماره و تاریخ نامه و
+    فایل نامه ثبت می‌کند (جواب س۵) و تصمیم کمیته امنیت را کاربر نقش کمیته با شماره یا تاریخ صورت‌جلسه (جواب س۶۴).
+    امضا ویرایش و حذف نمی‌شود."""
+
+    class Authority(models.TextChoices):
+        OWNER = "owner", "مالک ریسک"
+        UNIT_MANAGER = "unit_manager", "مدیر واحد"
+        COMMITTEE = "committee", "کمیته امنیت"
+        SENIOR_MANAGEMENT = "senior_management", "مدیریت ارشد"
+
+    class Decision(models.TextChoices):
+        APPROVE = "approve", "تأیید"
+        REJECT = "reject", "رد"
+
+    acceptance = models.ForeignKey(
+        RiskAcceptance, verbose_name="پذیرش", on_delete=models.PROTECT, related_name="signatures"
+    )
+    authority = models.CharField("صاحب اختیار", max_length=30, choices=Authority.choices)
+    decision = models.CharField("تصمیم", max_length=10, choices=Decision.choices)
+    note = models.TextField("توضیح", blank=True)
+    reference = models.CharField("شماره‌ی صورت‌جلسه یا نامه", max_length=100, blank=True)
+    reference_date = models.DateField("تاریخ صورت‌جلسه یا نامه", null=True, blank=True)
+    letter = models.ForeignKey(
+        "core.Attachment", verbose_name="فایل نامه", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = "امضای پذیرش"
+        verbose_name_plural = "امضاهای پذیرش"
+        ordering = ["created_at", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["acceptance", "authority"], name="one_signature_per_authority"),
+            models.CheckConstraint(condition=~Q(decision="reject") | ~Q(note=""), name="rejected_signature_has_note"),
+            models.CheckConstraint(
+                condition=~Q(authority="committee") | ~Q(reference="") | Q(reference_date__isnull=False),
+                name="committee_signature_has_minutes",
+            ),
+            models.CheckConstraint(
+                condition=~Q(authority="senior_management")
+                | (~Q(reference="") & Q(reference_date__isnull=False) & Q(letter__isnull=False)),
+                name="senior_signature_has_letter",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.acceptance.code}: {self.get_authority_display()} {self.get_decision_display()}"
+
+    @property
+    def is_approval(self):
+        return self.decision == self.Decision.APPROVE

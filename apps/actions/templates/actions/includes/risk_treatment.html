@@ -44,3 +44,14 @@
 {% elif not plan_due %}
   <p class="text-body-secondary">طرح مواجهه وقتی نوشته می‌شود که ریسک با ارزیابی جاری تأییدشده به «برنامه‌ی درمان» برود.</p>
 {% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="acceptances">
+  <h2 class="h5 mb-0">پذیرش ریسک</h2>
+  {% if can_add_acceptance %}
+    <a href="{% url 'actions:acceptance_create' risk.pk %}" class="btn btn-outline-primary btn-sm">پذیرش زمان‌دار</a>
+  {% endif %}
+</div>
+{% if out_of_authority %}
+  <div class="alert alert-danger py-2">ارزیابی تصمیم نشان «منع الزام‌آور» دارد و این ریسک خارج از اختیار پذیرش است.</div>
+{% endif %}
+{% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances empty_text="پذیرشی برای این ریسک ثبت نشده است." %}

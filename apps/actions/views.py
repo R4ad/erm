@@ -1,23 +1,38 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
 
+from apps.assessments.services import decision_assessment
 from apps.core.records import record_extras
 from apps.core.views import FilteredListView
+from apps.risks.models import Risk
 from apps.risks.permissions import visible_evidence, visible_risks
 
-from .forms import ActionFilterForm, ActionForm, MoveForm, PlanForm
-from .models import TreatmentAction, TreatmentPlan
+from . import acceptance as acc
+from .forms import (
+    AcceptanceFilterForm,
+    AcceptanceForm,
+    ActionFilterForm,
+    ActionForm,
+    MoveForm,
+    PlanForm,
+    RevokeForm,
+    SignForm,
+)
+from .models import AcceptanceSignature, RiskAcceptance, TreatmentAction, TreatmentPlan
 from .mywork import my_work
 from .permissions import (
     can_add_action,
     can_approve_plan,
     can_edit_action,
     can_edit_plan,
+    can_edit_acceptance,
     can_edit_plans,
+    visible_acceptances,
     visible_actions,
     visible_plans,
 )
@@ -30,6 +45,7 @@ from .services import (
     can_move,
     containment_due,
     create_plan,
+    decision_due,
     pending_actions,
     perform_move,
     plan_creation_problems,
@@ -132,6 +148,8 @@ class PlanDetailView(DetailView):
             can_edit=can_edit_plan(user, plan),
             can_add_action=can_add_action(user, plan),
             can_approve=approvable,
+            acceptances=plan.acceptances.select_related("assessment__decision_level", "follow_up_by"),
+            can_add_acceptance=can_edit_plans(user) and not acc.creation_problems(plan.risk),
             **record_extras(plan, user),
             **kwargs,
         )
@@ -284,3 +302,223 @@ class ActionListView(FilteredListView):
 
     def get_filter_form_kwargs(self):
         return {"user": self.request.user}
+
+
+class AcceptanceFormMixin:
+    model = RiskAcceptance
+    form_class = AcceptanceForm
+    template_name = "form_page.html"
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "risk": self.risk, "assessment": self.assessment}
+
+
+class AcceptanceCreateView(AcceptanceFormMixin, CreateView):
+    @cached_property
+    def risk(self):
+        return get_object_or_404(visible_risks(self.request.user), pk=self.kwargs["risk_pk"])
+
+    @cached_property
+    def assessment(self):
+        return decision_assessment(self.risk)
+
+    def dispatch(self, request, *args, **kwargs):
+        if not can_edit_plans(request.user):
+            raise PermissionDenied
+        problems = acc.creation_problems(self.risk)
+        if problems:
+            for problem in problems:
+                messages.error(request, problem)
+            return redirect(self.risk.get_absolute_url() + "#acceptances")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        return {"follow_up_by": self.request.user.pk}
+
+    def form_valid(self, form):
+        try:
+            self.object = acc.create_acceptance(form.instance, self.risk, self.request.user)
+        except PlanError as error:
+            for problem in error.problems:
+                messages.error(self.request, problem)
+            return redirect(self.risk.get_absolute_url() + "#acceptances")
+        self.object.controls.set(form.cleaned_data["controls"])
+        messages.success(
+            self.request, f"پذیرش {self.object.code} به‌صورت پیش‌نویس ثبت شد. بعد از بازبینی برای امضا بفرستید."
+        )
+        return redirect(self.object.get_absolute_url())
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            title=f"پذیرش ریسک {self.risk.code} بر اساس {self.assessment.code}",
+            cancel_url=self.risk.get_absolute_url() + "#acceptances",
+            **kwargs,
+        )
+
+
+class AcceptanceUpdateView(AcceptanceFormMixin, UpdateView):
+    def get_queryset(self):
+        return visible_acceptances(self.request.user).select_related("risk", "assessment__decision_level")
+
+    def get_object(self, queryset=None):
+        acceptance = super().get_object(queryset)
+        if not can_edit_acceptance(self.request.user, acceptance):
+            raise PermissionDenied
+        return acceptance
+
+    @property
+    def risk(self):
+        return self.object.risk
+
+    @property
+    def assessment(self):
+        return self.object.assessment
+
+    def form_valid(self, form):
+        form.instance._history_user = self.request.user
+        response = super().form_valid(form)
+        messages.success(self.request, f"تغییرات پذیرش {self.object.code} ذخیره شد.")
+        return response
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            title=f"ویرایش پذیرش {self.object.code}", cancel_url=self.object.get_absolute_url(), **kwargs
+        )
+
+
+class AcceptanceDetailView(DetailView):
+    template_name = "actions/acceptance_detail.html"
+    context_object_name = "acceptance"
+
+    def get_queryset(self):
+        return visible_acceptances(self.request.user).select_related(
+            "risk__owner",
+            "risk__org_unit",
+            "risk__service",
+            "assessment__decision_level",
+            "assessment__method_version",
+            "plan",
+            "renews",
+            "follow_up_by",
+            "created_by",
+            "closed_by",
+        )
+
+    def get_context_data(self, **kwargs):
+        acceptance = self.object
+        user = self.request.user
+        risk = acceptance.risk
+        signatures = {item.authority: item for item in acceptance.signatures.select_related("created_by", "letter")}
+        rows = [
+            {
+                "authority": authority,
+                "label": acc.AUTH(authority).label,
+                "reason": reason,
+                "signature": signatures.get(authority),
+            }
+            for authority, reason in acc.authority_reasons(acceptance.assessment, risk)
+        ]
+        open_ = acceptance.status in acc.OPEN_STATUSES
+        context = {
+            "risk": risk,
+            "assessment": acceptance.assessment,
+            "level": acceptance.level,
+            "rows": rows,
+            "unit_managers": acc.unit_managers(risk)
+            if acc.AUTH.UNIT_MANAGER in [row["authority"] for row in rows]
+            else [],
+            "problems": acc.acceptance_problems(acceptance) if open_ else [],
+            "cap": acc.acceptance_cap(acceptance.level, acceptance.start_date),
+            "temporary": acc.is_temporary(acceptance.level),
+            "non_normal": acc.is_non_normal(acceptance.assessment),
+            "sign_forms": [SignForm(authority=authority) for authority in acc.signable_authorities(user, acceptance)],
+            "can_edit": can_edit_acceptance(user, acceptance),
+            "can_submit": can_edit_acceptance(user, acceptance),
+            "can_revoke": acc.can_revoke(user, acceptance),
+            "revoke_form": RevokeForm(),
+            "renewals": acceptance.renewals.all(),
+            **record_extras(acceptance, user),
+        }
+        if risk.status == Risk.Status.TREATMENT_PLAN and open_:
+            context["decision_due"] = decision_due(risk, acceptance.level)
+            context["decision_due_passed"] = context["decision_due"] < timezone.localdate()
+        return super().get_context_data(**context, **kwargs)
+
+
+class AcceptanceSubmitView(View):
+    def post(self, request, pk):
+        acceptance = get_object_or_404(visible_acceptances(request.user).select_related("risk"), pk=pk)
+        try:
+            acc.submit_acceptance(acceptance, request.user)
+        except PlanError as error:
+            for problem in error.problems:
+                messages.error(request, problem)
+        else:
+            messages.success(request, f"پذیرش {acceptance.code} برای امضا فرستاده شد.")
+        return redirect(acceptance.get_absolute_url())
+
+
+class AcceptanceSignView(View):
+    def post(self, request, pk):
+        acceptance = get_object_or_404(visible_acceptances(request.user).select_related("risk"), pk=pk)
+        authority = request.POST.get("authority", "")
+        if authority not in acc.AUTH.values:
+            raise PermissionDenied
+        form = SignForm(request.POST, request.FILES, authority=authority)
+        decision = request.POST.get("decision", "")
+        if decision not in AcceptanceSignature.Decision.values:
+            raise PermissionDenied
+        if not form.is_valid():
+            for errors in form.errors.values():
+                for error in errors:
+                    messages.error(request, error)
+            return redirect(acceptance.get_absolute_url() + "#signatures")
+        data = form.cleaned_data
+        try:
+            acceptance = acc.sign_acceptance(
+                acceptance,
+                request.user,
+                authority,
+                decision,
+                note=data["note"],
+                reference=data.get("reference", ""),
+                reference_date=data.get("reference_date"),
+                letter=data.get("letter"),
+            )
+        except PlanError as error:
+            for problem in error.problems:
+                messages.error(request, problem)
+        else:
+            if acceptance.status == RiskAcceptance.Status.ACTIVE:
+                messages.success(request, f"همه‌ی امضاها کامل شد و پذیرش {acceptance.code} معتبر است.")
+            elif acceptance.status == RiskAcceptance.Status.REJECTED:
+                messages.success(request, f"پذیرش {acceptance.code} رد شد.")
+            else:
+                messages.success(request, "امضای شما ثبت شد.")
+        return redirect(acceptance.get_absolute_url() + "#signatures")
+
+
+class AcceptanceRevokeView(View):
+    def post(self, request, pk):
+        acceptance = get_object_or_404(visible_acceptances(request.user).select_related("risk"), pk=pk)
+        form = RevokeForm(request.POST)
+        try:
+            acc.revoke_acceptance(acceptance, request.user, form.data.get("reason", ""))
+        except PlanError as error:
+            for problem in error.problems:
+                messages.error(request, problem)
+        else:
+            messages.success(request, f"پذیرش {acceptance.code} لغو شد.")
+        return redirect(acceptance.get_absolute_url())
+
+
+class AcceptanceListView(FilteredListView):
+    template_name = "actions/acceptance_list.html"
+    context_object_name = "acceptances"
+    filter_form_class = AcceptanceFilterForm
+
+    def get_queryset(self):
+        self.queryset = visible_acceptances(self.request.user).select_related(
+            "risk", "assessment__decision_level", "follow_up_by"
+        )
+        return super().get_queryset()
