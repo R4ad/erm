@@ -1,0 +1,42 @@
+{% load jformat %}
+{% comment %}
+  بخش ارزیابی‌های صفحه‌ی ریسک. context از assessments.context.risk_assessments می‌آید.
+{% endcomment %}
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="assessments">
+  <h2 class="h5 mb-0">ارزیابی‌ها</h2>
+  {% if can_add_assessment %}
+    <a href="{% url 'assessments:assessment_create' risk.pk %}" class="btn btn-primary btn-sm">ارزیابی تازه</a>
+  {% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>نوع</th>
+        <th>نسخه‌ی روش</th>
+        <th>افق</th>
+        <th>جلسه‌ی کارگروه</th>
+        <th>ثبت‌کننده</th>
+        <th>وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for assessment in assessments %}
+        <tr>
+          <td class="text-nowrap"><a href="{{ assessment.get_absolute_url }}">{{ assessment.code }}</a></td>
+          <td>{{ assessment.get_kind_display }}</td>
+          <td>{{ assessment.method_version.number }}</td>
+          <td>{{ assessment.horizon_months }} ماه</td>
+          <td>{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}-{% endif %}</td>
+          <td>{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}</td>
+          <td><span class="badge text-bg-light border">{{ assessment.get_status_display }}</span></td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-body-secondary py-4">هنوز ارزیابی‌ای ثبت نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

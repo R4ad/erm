@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "apps.methodology",
     "apps.questionnaires",
     "apps.controls",
+    "apps.assessments",
     "django_jalali",
     "simple_history",
 ]
