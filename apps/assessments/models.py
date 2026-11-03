@@ -7,15 +7,10 @@ from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from apps.core.choices import Confidence
 from apps.core.jalali import jalali_year
 from apps.core.models import TimeStampedModel
 from apps.core.services import next_code
-
-
-class Confidence(models.TextChoices):
-    LOW = "low", "کم"
-    MEDIUM = "medium", "متوسط"
-    HIGH = "high", "زیاد"
 
 
 class ABasis(models.TextChoices):
@@ -35,8 +30,12 @@ class Assessment(TimeStampedModel):
         TARGET = "target", "هدف"
 
     class Status(models.TextChoices):
-        # کنترل کیفیت، برگشت و تأیید در قدم ۱۸ اضافه می‌شوند.
+        # پیش‌نویس به کنترل کیفیت می‌رود؛ کنترل‌کننده تأیید می‌کند، به ارزیاب برمی‌گرداند یا به کارگروه ارجاع می‌دهد
+        # (جواب س۳۳ و س۶۲). ارزیابی تأییدشده قفل است.
         DRAFT = "draft", "پیش‌نویس"
+        IN_QC = "in_qc", "در کنترل کیفیت"
+        REFERRED = "referred", "ارجاع به کارگروه"
+        APPROVED = "approved", "تأییدشده"
 
     # ارزیابی ذاتی کنترل‌های کنارگذاشته و ارزیابی هدف اقدام و معیار آزمونش را در فرض‌ها می‌نویسد (بخش ۷).
     KINDS_NEEDING_ASSUMPTIONS = [Kind.INHERENT, Kind.TARGET]
@@ -103,7 +102,60 @@ class Assessment(TimeStampedModel):
         "risks.Evidence", verbose_name="شواهد A", related_name="assessments_for_a", blank=True
     )
 
-    history = HistoricalRecords(m2m_fields=[a_evidence])
+    # قاعده‌های تقدم بخش ۱۸. عضو GRC آن‌ها را با دلیل و شاهد ثبت می‌کند؛ امتیاز عوض نمی‌شود و فقط سطح تصمیم.
+    ongoing_incident = models.BooleanField(
+        "رویداد در حال وقوع", default=False, help_text="پاسخ اضطراری لازم دارد؛ سطح تصمیم بالاترین سطح می‌شود."
+    )
+    binding_prohibition = models.BooleanField(
+        "منع الزام‌آور یا نقض غیرقابل اغماض",
+        default=False,
+        help_text="احرازشده، با نظر حقوقی؛ «خارج از اختیار پذیرش» و سطح تصمیم بالاترین سطح.",
+    )
+    customer_tolerance_exceeded = models.BooleanField(
+        "عبور از حد تحمل خاص مشتری",
+        default=False,
+        help_text="یا دستور مصوب سخت‌گیرانه‌تر؛ اختیار پذیرش عمومی محدود می‌شود.",
+    )
+    escalation_rationale = models.TextField("دلیل قاعده‌ی تقدم", blank=True)
+    escalation_evidence = models.ManyToManyField(
+        "risks.Evidence", verbose_name="شواهد قاعده‌ی تقدم", related_name="assessments_for_escalation", blank=True
+    )
+
+    # نتیجه‌ی تأییدشده. هنگام تأیید با موتور محاسبه و نسخه‌ی روش ارزیابی حساب و ذخیره می‌شود و بعد عوض نمی‌شود؛
+    # پیش‌نویس نتیجه را هر بار از ورودی‌ها حساب می‌کند. امتیاز مستقیم ویرایش نمی‌شود (بخش ۲۲).
+    b_low = models.PositiveSmallIntegerField("B", null=True, editable=False)
+    b_high = models.PositiveSmallIntegerField("کران بالای B", null=True, editable=False)
+    likelihood_low = models.PositiveSmallIntegerField("L", null=True, editable=False)
+    likelihood_high = models.PositiveSmallIntegerField("کران بالای L", null=True, editable=False)
+    impact_low = models.PositiveSmallIntegerField("I", null=True, editable=False)
+    impact_high = models.PositiveSmallIntegerField("کران بالای I", null=True, editable=False)
+    score_low = models.PositiveSmallIntegerField("امتیاز", null=True, editable=False)
+    score_high = models.PositiveSmallIntegerField("کران بالای امتیاز", null=True, editable=False)
+    base_level = models.ForeignKey(
+        "methodology.RiskLevel",
+        verbose_name="سطح پایه",
+        on_delete=models.PROTECT,
+        null=True,
+        editable=False,
+        related_name="+",
+    )
+    decision_level = models.ForeignKey(
+        "methodology.RiskLevel",
+        verbose_name="سطح تصمیم",
+        on_delete=models.PROTECT,
+        null=True,
+        editable=False,
+        related_name="+",
+    )
+    escalation_reasons = models.JSONField("علت تصعید", default=list, editable=False)
+    incomplete_reasons = models.JSONField("علت ناقص بودن", default=list, editable=False)
+    confidence = models.CharField("اطمینان کل", max_length=10, choices=Confidence.choices, blank=True, editable=False)
+    out_of_acceptance_authority = models.BooleanField("خارج از اختیار پذیرش", default=False, editable=False)
+    acceptance_restricted = models.BooleanField("اختیار پذیرش عمومی محدود", default=False, editable=False)
+    result_detail = models.JSONField("جزئیات مسیرها هنگام تأیید", default=dict, editable=False)
+    approved_at = models.DateTimeField("زمان تأیید", null=True, editable=False)
+
+    history = HistoricalRecords(m2m_fields=[a_evidence, escalation_evidence])
 
     class Meta:
         verbose_name = "ارزیابی"
@@ -140,6 +192,19 @@ class Assessment(TimeStampedModel):
     @property
     def is_draft(self):
         return self.status == self.Status.DRAFT
+
+    @property
+    def is_approved(self):
+        return self.status == self.Status.APPROVED
+
+    @property
+    def is_incomplete(self):
+        """«ارزیابی ناقص»: کران قابل دفاعی برای دست‌کم یک جزء تعیین‌کننده نیست و پذیرش عادی مسدود است (بخش ۷)."""
+        return bool(self.incomplete_reasons)
+
+    @property
+    def has_escalation_flag(self):
+        return self.ongoing_incident or self.binding_prohibition or self.customer_tolerance_exceeded
 
     @property
     def a_recorded(self):
@@ -280,6 +345,7 @@ class Path(TimeStampedModel):
     b0 = models.PositiveSmallIntegerField("B0", null=True, blank=True, help_text="خالی یعنی نامعلوم.")
     b0_high = models.PositiveSmallIntegerField("کران بالای B0", null=True, blank=True)
     b0_rationale = models.TextField("دلیل B0")
+    b0_confidence = models.CharField("اطمینان B0", max_length=10, choices=Confidence.choices, blank=True)
     evidence = models.ManyToManyField("risks.Evidence", verbose_name="شواهد", related_name="paths", blank=True)
     control_assessments = models.ManyToManyField(
         "controls.ControlAssessment",
@@ -341,3 +407,32 @@ class Path(TimeStampedModel):
         if self.b0 is None:
             return None
         return self.b0 if self.b0_high is None else (self.b0, self.b0_high)
+
+
+class AssessmentReview(TimeStampedModel):
+    """هر قدم کنترل کیفیت یک ردیف: ارسال، تأیید، برگشت، ارجاع به کارگروه و تصمیم کارگروه (جواب س۳۳ و س۶۲). ردیف‌ها
+    ویرایش و حذف نمی‌شوند."""
+
+    class Action(models.TextChoices):
+        SUBMIT = "submit", "ارسال برای کنترل کیفیت"
+        APPROVE = "approve", "تأیید"
+        RETURN = "return", "برگشت به ارزیاب"
+        REFER = "refer", "ارجاع به کارگروه امنیت"
+        WORKGROUP_APPROVE = "workgroup_approve", "تأیید با تصمیم کارگروه"
+        WORKGROUP_RETURN = "workgroup_return", "برگشت به ارزیاب با تصمیم کارگروه"
+
+    assessment = models.ForeignKey(Assessment, verbose_name="ارزیابی", on_delete=models.PROTECT, related_name="reviews")
+    action = models.CharField("کار", max_length=20, choices=Action.choices)
+    notes = models.TextField("توضیح", blank=True)
+    meeting_date = models.DateField("تاریخ جلسه‌ی کارگروه", null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="انجام‌دهنده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = "قدم کنترل کیفیت"
+        verbose_name_plural = "سابقه‌ی کنترل کیفیت"
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"{self.assessment.code}: {self.get_action_display()}"

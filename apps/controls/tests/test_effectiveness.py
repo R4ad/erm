@@ -72,6 +72,7 @@ def sheet(**fields):
         "sample_rationale": "همه‌ی نقش‌ها و هر دو مرکز داده",
         "test_result": "هیچ ورود بدون عامل دوم موفق نشد.",
         "e": "3",
+        "confidence": "medium",
         "rationale": "پوشش و نمونه کافی و آزمون فعلی موفق است.",
     }
     data.update(fields)

@@ -4,6 +4,7 @@ from django.db.models import Count, Q
 
 from apps.catalog.forms import STATUS_CHOICES, OwnerChoiceField, user_choices
 from apps.catalog.models import Responsibility
+from apps.core.choices import Confidence
 from apps.core.forms import BootstrapFormMixin, JalaliDateField
 
 from .effectiveness import TestFacts, Thresholds, supported_level, unmet_conditions
@@ -185,7 +186,7 @@ CONTROL_ASSESSMENT_FIELDSETS = [
         ],
     ),
     ("شرط‌های E4 و E5", ["sustained", "failure_bypass_tested", "monitored"]),
-    ("نتیجه", ["e", "rationale", "verified_by", "evidence", "suspended"]),
+    ("نتیجه", ["e", "confidence", "rationale", "verified_by", "evidence", "suspended"]),
 ]
 
 
@@ -228,6 +229,7 @@ class ControlAssessmentForm(BootstrapFormMixin, forms.ModelForm):
         self.thresholds = Thresholds.of(version)
         levels = version.scales.get(code="E").levels.all()
         self.fields["e"].choices = [("", "-")] + [(level.value, f"E{level.value}: {level.name}") for level in levels]
+        self.fields["confidence"].choices = [("", "-")] + Confidence.choices
         self.fields["verified_by"].queryset = user_choices(self.instance.verified_by_id)
         self.fields["evidence"].queryset = evidence
         self.fields[
@@ -268,6 +270,9 @@ class ControlAssessmentForm(BootstrapFormMixin, forms.ModelForm):
             failure_bypass_tested=data.get("failure_bypass_tested", False),
             monitored=data.get("monitored", False),
         )
+        if e >= 2 and not data.get("confidence"):
+            # E1 اعتباری نمی‌دهد و در اطمینان کل نمی‌آید؛ از E2 به بالا اطمینان لازم است (جواب س۶۱).
+            self.add_error("confidence", "برای E2 و بالاتر اطمینان E را انتخاب کنید.")
         problems = unmet_conditions(e, facts, self.thresholds)
         if problems:
             supported = supported_level(facts, self.thresholds)

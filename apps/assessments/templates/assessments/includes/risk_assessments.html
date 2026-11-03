@@ -8,6 +8,13 @@
     <a href="{% url 'assessments:assessment_create' risk.pk %}" class="btn btn-primary btn-sm">ارزیابی تازه</a>
   {% endif %}
 </div>
+{% if current_assessment %}
+  <p class="mb-2">
+    سطح فعلی ریسک:
+    {% include "assessments/includes/level_badge.html" with level=current_assessment.decision_level %}
+    <span class="small text-body-secondary">از ارزیابی جاری <a href="{{ current_assessment.get_absolute_url }}">{{ current_assessment.code }}</a>، تأییدشده در {{ current_assessment.approved_at|jformat:"%Y/%m/%d" }}</span>
+  </p>
+{% endif %}
 <div class="table-responsive">
   <table class="table table-hover align-middle">
     <thead>
@@ -19,6 +26,7 @@
         <th>جلسه‌ی کارگروه</th>
         <th>ثبت‌کننده</th>
         <th>وضعیت</th>
+        <th>سطح تصمیم</th>
       </tr>
     </thead>
     <tbody>
@@ -31,10 +39,11 @@
           <td>{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}-{% endif %}</td>
           <td>{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}</td>
           <td><span class="badge text-bg-light border">{{ assessment.get_status_display }}</span></td>
+          <td>{% if assessment.is_approved %}{% include "assessments/includes/level_badge.html" with level=assessment.decision_level %}{% else %}-{% endif %}</td>
         </tr>
       {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-body-secondary py-4">هنوز ارزیابی‌ای ثبت نشده است.</td>
+          <td colspan="8" class="text-center text-body-secondary py-4">هنوز ارزیابی‌ای ثبت نشده است.</td>
         </tr>
       {% endfor %}
     </tbody>

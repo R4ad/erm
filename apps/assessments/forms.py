@@ -1,5 +1,6 @@
 from django import forms
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 from apps.core.forms import BootstrapFormMixin, JalaliDateField
 from apps.risks.models import Evidence
@@ -18,21 +19,52 @@ from .services import (
 UNKNOWN = "unknown"
 
 
+class EvidenceChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, evidence):
+        return f"{evidence.code} {evidence.title}"
+
+
 class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
+    FLAGS = ["ongoing_incident", "binding_prohibition", "customer_tolerance_exceeded"]
+
     class Meta:
         model = Assessment
-        fields = ["kind", "horizon_months", "meeting_date", "assumptions"]
-        field_classes = {"meeting_date": JalaliDateField}
-        widgets = {"assumptions": forms.Textarea(attrs={"rows": 3})}
+        fields = [
+            "kind",
+            "horizon_months",
+            "meeting_date",
+            "assumptions",
+            "ongoing_incident",
+            "binding_prohibition",
+            "customer_tolerance_exceeded",
+            "escalation_rationale",
+            "escalation_evidence",
+        ]
+        field_classes = {"meeting_date": JalaliDateField, "escalation_evidence": EvidenceChoiceField}
+        widgets = {
+            "assumptions": forms.Textarea(attrs={"rows": 3}),
+            "escalation_rationale": forms.Textarea(attrs={"rows": 2}),
+            "escalation_evidence": forms.SelectMultiple(attrs={"size": 4}),
+        }
+        help_texts = {
+            "escalation_rationale": "برای هر قاعده‌ی تقدم بالا: چه چیزی احراز شده و از کجا. امتیاز عوض نمی‌شود و "
+            "فقط سطح تصمیم یا اختیار پذیرش (بخش ۱۸).",
+        }
 
     def __init__(self, *args, risk, **kwargs):
         super().__init__(*args, **kwargs)
         self.risk = risk
         if self.instance.pk:
             del self.fields["kind"]  # نوع ارزیابی بعد از ثبت عوض نمی‌شود
+            current = list(self.instance.escalation_evidence.all())
         else:
             kinds = assessable_kinds(risk)
             self.fields["kind"].choices = [(kind, Assessment.Kind(kind).label) for kind in kinds]
+            current = []
+        ids = [item.pk for item in current]
+        self.fields["escalation_evidence"].queryset = (
+            Evidence.objects.filter(models.Q(risks=risk) | models.Q(pk__in=ids)).distinct().order_by("code")
+        )
 
     def clean(self):
         data = super().clean()
@@ -40,12 +72,26 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
         if kind in Assessment.KINDS_NEEDING_ASSUMPTIONS and not data.get("assumptions", "").strip():
             label = "کنترل‌های کنارگذاشته" if kind == Assessment.Kind.INHERENT else "اقدام و معیار آزمون آن"
             self.add_error("assumptions", f"برای ارزیابی {Assessment.Kind(kind).label}، {label} را بنویسید.")
+        if any(data.get(flag) for flag in self.FLAGS):
+            if not data.get("escalation_rationale", "").strip():
+                self.add_error("escalation_rationale", "قاعده‌ی تقدم با دلیل ثبت می‌شود.")
+            if not data.get("escalation_evidence"):
+                self.add_error("escalation_evidence", "قاعده‌ی تقدم با شاهد ثبت می‌شود (بخش ۱۸).")
         return data
 
 
-class EvidenceChoiceField(forms.ModelMultipleChoiceField):
-    def label_from_instance(self, evidence):
-        return f"{evidence.code} {evidence.title}"
+class ReviewForm(BootstrapFormMixin, forms.Form):
+    notes = forms.CharField(
+        label="توضیح",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="برای برگشت و ارجاع اجباری است.",
+    )
+
+
+class ReferralForm(BootstrapFormMixin, forms.Form):
+    meeting_date = JalaliDateField(label="تاریخ جلسه‌ی کارگروه", required=False)
+    notes = forms.CharField(label="تصمیم کارگروه", required=False, widget=forms.Textarea(attrs={"rows": 2}))
 
 
 def level_choices(scale, empty="ثبت‌نشده"):
@@ -295,6 +341,7 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
             "name",
             "description",
             "b0_rationale",
+            "b0_confidence",
             "evidence",
             "control_assessments",
             "critical_exception",
@@ -329,7 +376,8 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
             current = []
         self.fields["control_assessments"].queryset = path_control_choices(assessment, current)
         self.fields["evidence"].queryset = evidence
-        self.order_fields(["name", "description", "b0_level", "b0_high", "b0_rationale", "evidence"])
+        self.fields["b0_confidence"].choices = [("", "-")] + Confidence.choices
+        self.order_fields(["name", "description", "b0_level", "b0_high", "b0_confidence", "b0_rationale", "evidence"])
 
     def clean(self):
         data = super().clean()
@@ -340,6 +388,10 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
         controls = list(data.get("control_assessments") or [])
         if level and high is not None and (number is None or high <= number):
             self.add_error("b0_high", "کران بالا باید از B0 بیشتر باشد؛ برای سطح قطعی خالی بگذارید.")
+        if level and number is not None and not data.get("b0_confidence"):
+            self.add_error("b0_confidence", "اطمینان B0 را انتخاب کنید.")
+        if number is None:
+            data["b0_confidence"] = ""
         if number == 1 and not evidence:
             self.add_error(
                 "evidence", "B0 برابر ۱ یعنی نادر بودن دو شرط استثنایی با شواهد تأیید شده است؛ شاهد را انتخاب کنید."

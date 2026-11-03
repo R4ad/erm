@@ -10,6 +10,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from apps.catalog.models import Responsibility
+from apps.core.choices import Confidence
 from apps.core.jalali import jalali_year, to_jalali
 from apps.core.models import TimeStampedModel
 from apps.core.services import next_code
@@ -242,6 +243,13 @@ class ControlAssessment(TimeStampedModel):
     monitored = models.BooleanField("پایش مستمر دارد", default=False)
     # نتیجه
     e = models.PositiveSmallIntegerField("E")
+    confidence = models.CharField(
+        "اطمینان E",
+        max_length=10,
+        choices=Confidence.choices,
+        blank=True,
+        help_text="در اطمینان کل ارزیابی‌هایی می‌آید که B سناریو را از این کنترل گرفته‌اند (جواب س۶۱).",
+    )
     rationale = models.TextField("دلیل انتخاب E")
     verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

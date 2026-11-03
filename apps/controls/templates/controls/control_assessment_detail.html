@@ -77,6 +77,8 @@
 
   <dt class="col-sm-3">دلیل E</dt>
   <dd class="col-sm-9">{{ assessment.rationale|linebreaksbr }}</dd>
+  <dt class="col-sm-3">اطمینان E</dt>
+  <dd class="col-sm-9">{{ assessment.get_confidence_display|default:"-" }}</dd>
 
   <dt class="col-sm-3">تأییدکننده</dt>
   <dd class="col-sm-9">{% if assessment.verified_by %}{{ assessment.verified_by.get_full_name|default:assessment.verified_by.username }}{% else %}-{% endif %}</dd>
