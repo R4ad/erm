@@ -4,7 +4,7 @@ from apps.accounts.roles import Role
 from apps.catalog.permissions import SEE_ALL_ROLES
 from apps.risks.permissions import visible_risks
 
-from .models import Control
+from .models import Control, ControlAssessment
 
 # این نقش‌ها کنترل‌ها و بیانیه‌ی کاربردپذیری را ثبت و ویرایش می‌کنند (جواب س۵۴). مدیر سامانه همیشه می‌تواند.
 CONTROL_EDIT_ROLES = [Role.GRC_MEMBER]
@@ -35,3 +35,13 @@ def visible_controls(user):
 def can_attach_to_control(user, control):
     """شاهد آزمون و پیوست کنترل را عضو GRC و مدیر سامانه روی همه و مسئول کنترل روی کنترل خودش می‌گذارد (س۵۱)."""
     return can_edit_controls(user) or control.owner_id == user.pk
+
+
+def visible_control_assessments(user):
+    """ارزیابی اثربخشی را هر کس که کنترلش را می‌بیند می‌بیند."""
+    return ControlAssessment.objects.filter(control__in=visible_controls(user))
+
+
+def can_attach_to_control_assessment(user, assessment):
+    """شاهد آزمون را مسئول کنترل روی ارزیابی کنترل خودش پیوست می‌کند؛ عضو GRC و مدیر سامانه روی همه (جواب س۵۴)."""
+    return can_edit_controls(user) or assessment.control.owner_id == user.pk

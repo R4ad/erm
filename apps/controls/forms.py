@@ -1,11 +1,13 @@
 from django import forms
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models import Count, Q
 
 from apps.catalog.forms import STATUS_CHOICES, OwnerChoiceField, user_choices
 from apps.catalog.models import Responsibility
-from apps.core.forms import BootstrapFormMixin
+from apps.core.forms import BootstrapFormMixin, JalaliDateField
 
-from .models import Applicability, Control, IsoControl
+from .effectiveness import TestFacts, Thresholds, supported_level, unmet_conditions
+from .models import Applicability, Control, ControlAssessment, IsoControl
 
 YES_NO_CHOICES = [("", "همه"), ("yes", "بله"), ("no", "خیر")]
 
@@ -147,3 +149,129 @@ class SoaFilterForm(BootstrapFormMixin, forms.Form):
         if data["implementation"]:
             iso_controls = iso_controls.filter(applicability__implementation=data["implementation"])
         return iso_controls
+
+
+class EvidenceChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, evidence):
+        return f"{evidence.code} {evidence.title}"
+
+
+CONTROL_ASSESSMENT_FIELDSETS = [
+    (
+        "دامنه، طراحی و پوشش",
+        [
+            "scope",
+            "exists",
+            "design_ok",
+            "population",
+            "coverage_pct",
+            "critical_points",
+            "critical_points_covered",
+            "exceptions",
+            "known_gap",
+        ],
+    ),
+    (
+        "آزمون",
+        [
+            "test_method",
+            "test_from",
+            "test_to",
+            "sample_size",
+            "sample_rationale",
+            "test_result",
+            "failures",
+            "operating_ok",
+        ],
+    ),
+    ("شرط‌های E4 و E5", ["sustained", "failure_bypass_tested", "monitored"]),
+    ("نتیجه", ["e", "rationale", "verified_by", "evidence", "suspended"]),
+]
+
+
+class ControlAssessmentForm(BootstrapFormMixin, forms.ModelForm):
+    """برگه‌ی آزمون کنترل (بخش ۲۵). E انتخاب ارزیاب است، ولی فقط اگر همه‌ی شرط‌های آن سطح برقرار باشد پذیرفته
+    می‌شود (بخش ۱۶ و ۲۳)."""
+
+    e = forms.TypedChoiceField(
+        label="E",
+        coerce=int,
+        help_text="سطح با احراز همه‌ی شرط‌های آن سطح و سطح‌های پایین‌تر پذیرفته می‌شود؛ میانگین خوب شکست یک شرط "
+        "را نمی‌پوشاند.",
+    )
+
+    class Meta:
+        model = ControlAssessment
+        fields = [name for _, names in CONTROL_ASSESSMENT_FIELDSETS for name in names]
+        field_classes = {
+            "test_from": JalaliDateField,
+            "test_to": JalaliDateField,
+            "verified_by": OwnerChoiceField,
+            "evidence": EvidenceChoiceField,
+        }
+        widgets = {
+            name: forms.Textarea(attrs={"rows": 2})
+            for name in [
+                "scope",
+                "critical_points",
+                "exceptions",
+                "sample_rationale",
+                "test_result",
+                "failures",
+                "rationale",
+            ]
+        } | {"evidence": forms.SelectMultiple(attrs={"size": 5})}
+
+    def __init__(self, *args, control, version, evidence, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.control = control
+        self.thresholds = Thresholds.of(version)
+        levels = version.scales.get(code="E").levels.all()
+        self.fields["e"].choices = [("", "-")] + [(level.value, f"E{level.value}: {level.name}") for level in levels]
+        self.fields["verified_by"].queryset = user_choices(self.instance.verified_by_id)
+        self.fields["evidence"].queryset = evidence
+        self.fields[
+            "evidence"
+        ].help_text = "شاهد اجرا یا آزمون. برای انتخاب چند شاهد، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید."
+        self.fields["coverage_pct"].validators += [MinValueValidator(0), MaxValueValidator(100)]
+        if not self.instance.pk:
+            del self.fields["suspended"]  # ارزیابی تازه معلق نیست؛ تعلیق بعد از شکست کنترل ثبت می‌شود
+
+    def fieldsets(self):
+        return [
+            (title, [self[name] for name in names if name in self.fields])
+            for title, names in CONTROL_ASSESSMENT_FIELDSETS
+        ]
+
+    def clean(self):
+        data = super().clean()
+        start, end = data.get("test_from"), data.get("test_to")
+        if start and end and end < start:
+            self.add_error("test_to", "پایان بازه‌ی آزمون پیش از آغاز آن است.")
+        e = data.get("e")
+        if e is None:
+            return data
+        verifier = data.get("verified_by")
+        facts = TestFacts(
+            exists=data.get("exists", False),
+            design_ok=data.get("design_ok", False),
+            operating_ok=data.get("operating_ok", False),
+            coverage_pct=data.get("coverage_pct"),
+            critical_points_covered=data.get("critical_points_covered", False),
+            known_gap=data.get("known_gap", False),
+            test_to=end,
+            sample_size=data.get("sample_size"),
+            has_evidence=bool(data.get("evidence")),
+            verifier_id=verifier.pk if verifier else None,
+            owner_id=self.control.owner_id,
+            sustained=data.get("sustained", False),
+            failure_bypass_tested=data.get("failure_bypass_tested", False),
+            monitored=data.get("monitored", False),
+        )
+        problems = unmet_conditions(e, facts, self.thresholds)
+        if problems:
+            supported = supported_level(facts, self.thresholds)
+            self.add_error(
+                "e", [f"E{e} پذیرفته نمی‌شود؛ داده‌های این برگه تا E{supported} را پشتیبانی می‌کنند."] + problems
+            )
+        return data

@@ -9,4 +9,8 @@ urlpatterns = [
     path("<int:pk>/", views.AssessmentDetailView.as_view(), name="assessment_detail"),
     path("<int:pk>/edit/", views.AssessmentUpdateView.as_view(), name="assessment_update"),
     path("<int:pk>/impacts/", views.ImpactProfileView.as_view(), name="impact_profile"),
+    path("<int:pk>/initiator/", views.InitiatorView.as_view(), name="initiator"),
+    path("<int:pk>/paths/new/", views.PathCreateView.as_view(), name="path_create"),
+    path("paths/<int:pk>/edit/", views.PathUpdateView.as_view(), name="path_update"),
+    path("paths/<int:pk>/delete/", views.PathDeleteView.as_view(), name="path_delete"),
 ]

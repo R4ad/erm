@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db import transaction
@@ -6,9 +7,21 @@ from django.db.models import F
 from django.utils import timezone
 
 from apps.catalog.models import ServiceCustomer
-from apps.methodology.engine import Impact, check_impacts, impact_band
-from apps.methodology.models import MethodParameter, MethodVersion, Scale
-from apps.methodology.services import MethodTables
+from apps.controls.models import Control as ControlRecord
+from apps.controls.models import ControlAssessment
+from apps.methodology.engine import (
+    A_UNKNOWN,
+    NO_PATH,
+    Control,
+    Impact,
+    check_impacts,
+    check_likelihood,
+    impact_band,
+    likelihood_result,
+)
+from apps.methodology.engine import Path as EnginePath
+from apps.methodology.models import MethodParameter, Scale
+from apps.methodology.services import MethodTables, active_version, parameter
 from apps.risks.models import Risk
 
 from .models import Assessment
@@ -24,16 +37,8 @@ ASSESSABLE_STATUSES = {
 # پیشنهاد سطح از روی عدد فقط برای این دو بُعد است (جواب س۵۶). کد بُعد از نسخه‌ی روش می‌آید.
 DURATION_SCALE = "S"
 FINANCIAL_SCALE = "F"
+INITIATOR_SCALE = "A"
 UNITS = {DURATION_SCALE: "دقیقه", FINANCIAL_SCALE: "ریال"}
-
-
-def active_version():
-    return MethodVersion.objects.filter(status=MethodVersion.Status.ACTIVE).first()
-
-
-def parameter(version, key):
-    row = version.parameters.filter(key=key).first()
-    return row.value if row else None
 
 
 def creation_problems(risk, kind=None):
@@ -221,3 +226,149 @@ def impact_summary(assessment):
     checked = check_impacts(tables, impacts, problems)
     band = None if problems else impact_band(tables, checked, incomplete)
     return ImpactSummary(rows, columns, band, problems, incomplete, missing, unknown)
+
+
+@dataclass(frozen=True)
+class RateCheck:
+    """نرخ سالانه‌ی آغازگر از داده‌ی مشاهده‌شده و این‌که داده برای یک سطح قطعی کافی هست یا نه (بخش ۱۴)."""
+
+    rate: Decimal
+    suggestion: Suggestion
+    insufficient: list  # چرا داده برای سطح قطعی کافی نیست؛ خالی یعنی کافی است
+
+
+def check_rate(count, months, coverage, scale, period_min, coverage_min):
+    """نرخ = تعداد آغازگر یکتا تقسیم بر سال‌های مشاهده، با مرزهای جدول A همان نسخه‌ی روش."""
+    if count is None or not months:
+        return None
+    rate = Decimal(count) * 12 / Decimal(months)
+    shown = f"{rate:.4f}".rstrip("0").rstrip(".")
+    insufficient = []
+    if months < period_min:
+        insufficient.append(f"دوره‌ی مشاهده {months} ماه است و کمتر از {period_min} ماه.")
+    if coverage is None:
+        insufficient.append("پوشش ثبت دامنه‌ی آغازگر معلوم نیست.")
+    elif coverage < coverage_min:
+        insufficient.append(
+            f"پوشش ثبت {coverage.normalize():f} درصد است و کمتر از {coverage_min.normalize():f} درصد؛ "
+            "تعداد مشاهده‌شده کران پایین است."
+        )
+    lowest = scale.levels.all()[0]
+    if count == 0 and lowest.upper is not None:
+        # صفر رخداد فقط وقتی نرخ کمتر از مرز بالای A1 را نشان می‌دهد که دوره دست‌کم یک بار در همان مرز باشد.
+        needed = math.ceil(12 / lowest.upper)
+        if months < needed:
+            insufficient.append(
+                f"صفر رخداد در {months} ماه نرخ کمتر از {lowest.upper.normalize():f} را ثابت نمی‌کند (بخش ۱۴)."
+            )
+            return RateCheck(rate, Suggestion(None, "صفر رخداد در این دوره سطح A را پیشنهاد نمی‌کند."), insufficient)
+    level = scale.level_for(rate)
+    if level is None:
+        return RateCheck(rate, Suggestion(None, f"نرخ {shown} بار در سال در مرزهای جدول A نمی‌افتد."), insufficient)
+    return RateCheck(rate, Suggestion(level.value, f"نرخ {shown} بار در سال."), insufficient)
+
+
+def initiator_scale(version):
+    return version.scales.prefetch_related("levels").get(code=INITIATOR_SCALE)
+
+
+def assessment_rate_check(assessment, count=None, months=None, coverage=None):
+    """همان check_rate با پارامترهای نسخه‌ی روش ارزیابی. بی‌آرگومان، داده‌ی ذخیره‌شده‌ی خود ارزیابی را می‌خواند."""
+    version = assessment.method_version
+    if count is None and months is None and coverage is None:
+        count, months, coverage = assessment.a_count, assessment.a_period_months, assessment.a_coverage
+    return check_rate(
+        count,
+        months,
+        coverage,
+        initiator_scale(version),
+        int(parameter(version, MethodParameter.Key.A_DATA_PERIOD)),
+        parameter(version, MethodParameter.Key.A_DATA_COVERAGE),
+    )
+
+
+@dataclass
+class ControlRow:
+    control_assessment: object
+    e: int  # E که در Bc به کار رفته
+    note: str = ""  # چرا کمتر از E ثبت‌شده حساب شده
+
+
+@dataclass
+class PathRow:
+    path: object
+    controls: list
+    result: object = None  # PathResult موتور
+    notes: list = field(default_factory=list)
+
+
+@dataclass
+class LikelihoodSummary:
+    rate: RateCheck | None
+    paths: list
+    b: object  # Band یا None
+    likelihood: object  # Band یا None
+    problems: list  # ورودی نامعتبر
+    incomplete: list  # چرا L هنوز کران بالای قابل دفاعی ندارد
+    blockers: list  # آن‌چه تأیید نهایی ارزیابی را می‌بندد
+
+
+def likelihood_summary(assessment, on=None):
+    """A، B هر مسیر، B سناریو و L همان‌طور که موتور محاسبه با نسخه‌ی روش ارزیابی حساب می‌کند. E هر کنترل از
+    ارزیابی اثربخشی‌اش می‌آید و کنترل معلق یا با شاهد کهنه E1 حساب می‌شود."""
+    tables = MethodTables(assessment.method_version)
+    rows, engine_paths = [], []
+    for path in assessment.paths.prefetch_related("control_assessments__control", "evidence"):
+        controls = [
+            ControlRow(item, item.effective_e(on), item.credit_problem(on) or "")
+            for item in sorted(path.control_assessments.all(), key=lambda item: item.control.code)
+        ]
+        notes = []
+        if path.critical_exception:
+            notes.append("استثنای بحرانی باز کاهش کنترل را در این مسیر می‌بندد (بخش ۲۳).")
+        credited = (
+            ()
+            if path.critical_exception
+            else tuple(Control(e=row.e, name=row.control_assessment.control.code) for row in controls)
+        )
+        engine_paths.append(
+            EnginePath(b0=path.b0_engine_value, controls=credited, independent=path.independent, name=path.name)
+        )
+        rows.append(PathRow(path, controls, notes=notes))
+
+    problems, incomplete = [], []
+    checked = check_likelihood(tables, assessment.a_engine_value, engine_paths, problems)
+    if NO_PATH in problems:
+        problems.remove(NO_PATH)
+        incomplete.append("هنوز مسیر تحققی ثبت نشده است؛ " + NO_PATH)
+    b = likelihood = None
+    if not problems:
+        results, b, likelihood = likelihood_result(tables, engine_paths, checked, incomplete)
+        for row, result in zip(rows, results):
+            row.result = result
+    if not assessment.a_recorded:
+        incomplete = ["A هنوز ثبت نشده است." if reason == A_UNKNOWN else reason for reason in incomplete]
+
+    blockers = []
+    if assessment.risk.needs_completion:
+        blockers.append("تعریف آغازگر، واحد شمارش یا دامنه‌ی ریسک کامل نیست؛ A نهایی تأیید نمی‌شود (بخش ۱۳).")
+    if assessment.a_recorded and not assessment.a_evidence.exists():
+        blockers.append("A شاهد ندارد؛ هر امتیاز شناسه‌ی شاهد می‌خواهد (بخش ۲۴).")
+    for row in rows:
+        if not row.path.evidence.all():
+            blockers.append(f"B0 مسیر «{row.path.name}» شاهد ندارد.")
+    rate = assessment_rate_check(assessment) if assessment.a_basis == "rate" else None
+    return LikelihoodSummary(rate, rows, b, likelihood, problems, incomplete, blockers)
+
+
+def path_control_choices(assessment, current=()):
+    """ارزیابی‌های اثربخشی که به مسیرهای این ارزیابی وصل می‌شوند: کنترل پیشگیرانه‌ی همین ریسک (بخش ۱۵: کنترل
+    بازیابی و مهار در پیامد ارزیابی می‌شود) که الان اعتبار کاهش دارد، به‌اضافه‌ی آن‌هایی که همین مسیر قبلاً
+    انتخاب کرده تا با کهنه‌شدن شاهد بی‌صدا حذف نشوند."""
+    today = timezone.localdate()
+    candidates = ControlAssessment.objects.filter(
+        control__in=assessment.risk.controls.all(), control__kind=ControlRecord.Kind.PREVENTIVE
+    ).select_related("control")
+    current_ids = {item.pk for item in current}
+    keep = [item.pk for item in candidates if item.pk in current_ids or not item.credit_problem(today)]
+    return candidates.filter(pk__in=keep).order_by("control__code", "-created_at")

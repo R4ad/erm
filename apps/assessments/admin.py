@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Assessment, ImpactDetail
+from .models import Assessment, ImpactDetail, Path
 
 
 class ImpactDetailInline(admin.TabularInline):
@@ -12,13 +12,20 @@ class ImpactDetailInline(admin.TabularInline):
     filter_horizontal = ("evidence",)
 
 
+class PathInline(admin.StackedInline):
+    model = Path
+    extra = 0
+    filter_horizontal = ("evidence", "control_assessments")
+
+
 @admin.register(Assessment)
 class AssessmentAdmin(SimpleHistoryAdmin):
     list_display = ("code", "risk", "kind", "method_version", "meeting_date", "status")
     list_filter = ("kind", "status")
     search_fields = ("code", "risk__code")
     raw_id_fields = ("risk",)
-    inlines = [ImpactDetailInline]
+    filter_horizontal = ("a_evidence",)
+    inlines = [ImpactDetailInline, PathInline]
 
     def has_delete_permission(self, request, obj=None):
         return False  # ارزیابی حذف نمی‌شود

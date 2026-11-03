@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
@@ -16,11 +18,16 @@ class Confidence(models.TextChoices):
     HIGH = "high", "زیاد"
 
 
+class ABasis(models.TextChoices):
+    RATE = "rate", "نرخ سالانه"
+    FORWARD = "forward", "شواهد آینده‌نگر"
+
+
 class Assessment(TimeStampedModel):
     """یک ارزیابی ریسک (بخش ۷ و ۸ سند v5). هر ارزیابی ردیف تازه است و روی قبلی نمی‌نویسد، و با نسخه‌ی روشی که هنگام
     ساختنش فعال بوده محاسبه می‌شود. ارزیابی در جلسه‌ی کارگروه انجام می‌شود و عضو GRC آن را با تاریخ جلسه ثبت می‌کند
-    (جواب س۳۳ و س۵۲). این قدم پروفایل پیامد را دارد؛ احتمال در قدم ۱۷ و نتیجه، کنترل کیفیت و تأیید در قدم ۱۸ می‌آید.
-    ارزیابی حذف نمی‌شود."""
+    (جواب س۳۳ و س۵۲). ارزیابی پروفایل پیامد (ImpactDetail)، عامل آغازگر (A) و مسیرهای تحقق (Path) دارد؛ نتیجه،
+    کنترل کیفیت و تأیید در قدم ۱۸ می‌آید. ارزیابی حذف نمی‌شود."""
 
     class Kind(models.TextChoices):
         INHERENT = "inherent", "ذاتی"
@@ -63,7 +70,40 @@ class Assessment(TimeStampedModel):
         settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+", editable=False
     )
 
-    history = HistoricalRecords()
+    # عامل آغازگر (بخش ۱۴). تعریف آغازگر، واحد شمارش و دامنه روی خود ریسک است، چون در همه‌ی ارزیابی‌های آن ثابت
+    # می‌ماند (بخش ۱۳). مسیر خالی یعنی A هنوز ثبت نشده؛ مسیر با A خالی یعنی «نامعلوم».
+    a_basis = models.CharField(
+        "مسیر A",
+        max_length=20,
+        choices=ABasis.choices,
+        blank=True,
+        help_text="نرخ سالانه برای آغازگر غیرعمدی یا تکرارشونده با داده‌ی قابل مقایسه؛ شواهد آینده‌نگر برای حمله‌ی "
+        "هدفمند یا نبود داده‌ی معتبر. دو ستون جمع یا میانگین نمی‌شوند.",
+    )
+    a_count = models.PositiveIntegerField(
+        "تعداد آغازگر یکتا", null=True, blank=True, help_text="با همان واحد شمارش ریسک؛ هشدارهای یک رخداد یکی‌اند."
+    )
+    a_period_months = models.PositiveSmallIntegerField("دوره‌ی مشاهده (ماه)", null=True, blank=True)
+    a_denominator = models.CharField(
+        "مخرج", max_length=200, blank=True, help_text="مثلاً «۱۰۰۰ بسته‌ی انتشار بررسی‌شده»، اگر نرخ مخرج دارد."
+    )
+    a_coverage = models.DecimalField(
+        "پوشش ثبت (درصد)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="چه درصدی از دامنه‌ی آغازگر در منبع داده ثبت می‌شود.",
+    )
+    a = models.PositiveSmallIntegerField("A", null=True, blank=True)
+    a_high = models.PositiveSmallIntegerField("کران بالای A", null=True, blank=True)
+    a_confidence = models.CharField("اطمینان A", max_length=10, choices=Confidence.choices, blank=True)
+    a_rationale = models.TextField("دلیل A", blank=True)
+    a_evidence = models.ManyToManyField(
+        "risks.Evidence", verbose_name="شواهد A", related_name="assessments_for_a", blank=True
+    )
+
+    history = HistoricalRecords(m2m_fields=[a_evidence])
 
     class Meta:
         verbose_name = "ارزیابی"
@@ -71,6 +111,24 @@ class Assessment(TimeStampedModel):
         ordering = ["-created_at", "-pk"]
         constraints = [
             models.CheckConstraint(condition=Q(horizon_months__gte=1), name="assessment_horizon_positive"),
+            models.CheckConstraint(condition=Q(a__isnull=True) | Q(a__range=(1, 5)), name="assessment_a_1_to_5"),
+            models.CheckConstraint(
+                condition=Q(a_high__isnull=True) | (Q(a__isnull=False) & Q(a_high__gt=F("a")) & Q(a_high__lte=5)),
+                name="assessment_a_high_above_a",
+            ),
+            # A ثبت‌نشده مقدار ندارد و A ثبت‌شده، حتی نامعلوم، دلیل دارد (بخش ۱۴: مسیر انتخابی و دلیلش الزامی است).
+            models.CheckConstraint(
+                condition=(Q(a_basis="") & Q(a__isnull=True)) | (~Q(a_basis="") & ~Q(a_rationale="")),
+                name="assessment_a_recorded_with_rationale",
+            ),
+            models.CheckConstraint(
+                condition=~Q(a_basis="rate") | (Q(a_count__isnull=False) & Q(a_period_months__gte=1)),
+                name="assessment_rate_has_count_and_period",
+            ),
+            models.CheckConstraint(
+                condition=Q(a_coverage__isnull=True) | Q(a_coverage__range=(0, 100)),
+                name="assessment_coverage_0_to_100",
+            ),
         ]
 
     def __str__(self):
@@ -82,6 +140,31 @@ class Assessment(TimeStampedModel):
     @property
     def is_draft(self):
         return self.status == self.Status.DRAFT
+
+    @property
+    def a_recorded(self):
+        return bool(self.a_basis)
+
+    @property
+    def a_display(self):
+        if not self.a_recorded:
+            return "ثبت‌نشده"
+        if self.a is None:
+            return "نامعلوم"
+        return str(self.a) if self.a_high is None else f"{self.a} تا {self.a_high}"
+
+    @property
+    def a_engine_value(self):
+        if self.a is None:
+            return None
+        return self.a if self.a_high is None else (self.a, self.a_high)
+
+    @property
+    def a_rate(self):
+        """نرخ سالانه‌ی مشاهده‌شده: تعداد آغازگر یکتا تقسیم بر سال‌های مشاهده (بخش ۱۴)."""
+        if self.a_count is None or not self.a_period_months:
+            return None
+        return Decimal(self.a_count) * 12 / Decimal(self.a_period_months)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -181,3 +264,80 @@ class ImpactDetail(TimeStampedModel):
         if self.level is None:
             return None
         return self.level if self.level_high is None else (self.level, self.level_high)
+
+
+class Path(TimeStampedModel):
+    """یک مسیر تحقق (بخش ۱۵): مراحلی که بعد از آغازگر طی می‌شود تا رویداد اصلی رخ دهد. B0 قابلیت پایه‌ی مسیر بدون
+    اعتبار کنترل‌هاست و Bc از E کنترل‌های پیشگیرانه‌ی مسیر و قاعده‌های Bc نسخه‌ی روش می‌آید؛ B مسیر کمترِ این دو
+    است و B سناریو بیشترین B مسیرها. راه دورزدن یا حساب استثنایی که از همه‌ی موانع عبور می‌کند مسیر جداست
+    (جواب س۵۹). استقلال موانع یک نشان روی مسیر است که فقط برای Bc=1 به کار می‌آید (جواب س۵۷)."""
+
+    assessment = models.ForeignKey(Assessment, verbose_name="ارزیابی", on_delete=models.CASCADE, related_name="paths")
+    name = models.CharField("نام مسیر", max_length=200, help_text="مثلاً «ورود مستقیم با حساب محلی».")
+    description = models.TextField(
+        "مراحل مسیر", help_text="مراحل از آغازگر تا رویداد اصلی، و این‌که هر کنترل کدام مرحله‌ی ضروری را قطع می‌کند."
+    )
+    b0 = models.PositiveSmallIntegerField("B0", null=True, blank=True, help_text="خالی یعنی نامعلوم.")
+    b0_high = models.PositiveSmallIntegerField("کران بالای B0", null=True, blank=True)
+    b0_rationale = models.TextField("دلیل B0")
+    evidence = models.ManyToManyField("risks.Evidence", verbose_name="شواهد", related_name="paths", blank=True)
+    control_assessments = models.ManyToManyField(
+        "controls.ControlAssessment",
+        verbose_name="کنترل‌های پیشگیرانه",
+        related_name="paths",
+        blank=True,
+        help_text="ارزیابی اثربخشی کنترل‌های پیشگیرانه‌ی همین ریسک که یک مرحله‌ی ضروری مسیر را قطع می‌کنند.",
+    )
+    critical_exception = models.BooleanField(
+        "استثنای بحرانی باز",
+        default=False,
+        help_text="استثنای بحرانی باز، کاهش کنترل را در این مسیر می‌بندد و Bc بیشترین سطح می‌شود (بخش ۲۳).",
+    )
+    exceptions = models.TextField("استثناها", blank=True)
+    independent = models.BooleanField(
+        "موانع مستقل‌اند",
+        default=False,
+        help_text="شکست یا دورزدن یک کنترل دیگری را بی‌اثر نمی‌کند و وابستگی‌های مشترک بررسی شده‌اند؛ فقط برای Bc=1.",
+    )
+    independence_rationale = models.TextField(
+        "دلیل استقلال", blank=True, help_text="حساب مدیریتی، احراز هویت، تنظیمات، زیرساخت و اختیار دورزدن مشترک."
+    )
+
+    history = HistoricalRecords(m2m_fields=[evidence, control_assessments])
+
+    class Meta:
+        verbose_name = "مسیر تحقق"
+        verbose_name_plural = "مسیرهای تحقق"
+        ordering = ["assessment", "pk"]
+        constraints = [
+            models.CheckConstraint(condition=Q(b0__isnull=True) | Q(b0__range=(1, 5)), name="path_b0_1_to_5"),
+            models.CheckConstraint(
+                condition=Q(b0_high__isnull=True) | (Q(b0__isnull=False) & Q(b0_high__gt=F("b0")) & Q(b0_high__lte=5)),
+                name="path_b0_high_above_b0",
+            ),
+            models.CheckConstraint(condition=~Q(b0_rationale=""), name="path_b0_has_rationale"),
+            models.CheckConstraint(
+                condition=Q(independent=False) | ~Q(independence_rationale=""), name="path_independence_has_rationale"
+            ),
+            models.CheckConstraint(
+                condition=Q(critical_exception=False) | ~Q(exceptions=""), name="path_critical_exception_described"
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return f"{self.assessment.get_absolute_url()}#path-{self.pk}"
+
+    @property
+    def b0_display(self):
+        if self.b0 is None:
+            return "نامعلوم"
+        return str(self.b0) if self.b0_high is None else f"{self.b0} تا {self.b0_high}"
+
+    @property
+    def b0_engine_value(self):
+        if self.b0 is None:
+            return None
+        return self.b0 if self.b0_high is None else (self.b0, self.b0_high)

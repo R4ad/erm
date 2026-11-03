@@ -38,6 +38,113 @@
   <dd class="col-sm-9">{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}، {{ assessment.created_at|jformat:"%Y/%m/%d" }}</dd>
 </dl>
 
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="likelihood">
+  <h2 class="h5 mb-0">احتمال</h2>
+  {% if can_edit %}
+    <div>
+      <a href="{% url 'assessments:initiator' assessment.pk %}" class="btn btn-outline-primary btn-sm">عامل آغازگر (A)</a>
+      <a href="{% url 'assessments:path_create' assessment.pk %}" class="btn btn-outline-primary btn-sm">مسیر تازه</a>
+    </div>
+  {% endif %}
+</div>
+<div class="mb-3">
+  <span class="fs-5 me-3">A: {{ assessment.a_display }}</span>
+  <span class="fs-5 me-3">B: {% if likelihood.b %}{{ likelihood.b }}{% else %}-{% endif %}</span>
+  <span class="fs-5">احتمال (L): {% if likelihood.likelihood %}{{ likelihood.likelihood }}{% else %}هنوز معلوم نیست{% endif %}</span>
+  <div class="small text-body-secondary">B سناریو بزرگ‌ترین B مسیرهاست و L فقط از جدول A × B نسخه‌ی روش می‌آید.</div>
+</div>
+{% for problem in likelihood.problems %}<div class="alert alert-danger py-2">{{ problem }}</div>{% endfor %}
+{% if likelihood.incomplete %}
+  <div class="alert alert-warning py-2">
+    {% for reason in likelihood.incomplete %}<div>{{ reason }}</div>{% endfor %}
+  </div>
+{% endif %}
+{% if likelihood.blockers %}
+  <div class="alert alert-light border py-2 small">
+    برای تأیید نهایی لازم است:
+    <ul class="mb-0">{% for blocker in likelihood.blockers %}<li>{{ blocker }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<h3 class="h6">عامل آغازگر</h3>
+{% if assessment.a_recorded %}
+  <dl class="row small">
+    <dt class="col-sm-3">مسیر</dt>
+    <dd class="col-sm-9">{{ assessment.get_a_basis_display }}</dd>
+    {% if assessment.a_basis == "rate" %}
+      <dt class="col-sm-3">داده</dt>
+      <dd class="col-sm-9">
+        {{ assessment.a_count }} آغازگر یکتا در {{ assessment.a_period_months }} ماه{% if assessment.a_denominator %} از {{ assessment.a_denominator }}{% endif %}{% if assessment.a_coverage is not None %}، پوشش ثبت {{ assessment.a_coverage.normalize }} درصد{% endif %}
+        {% if likelihood.rate %}
+          <div>{{ likelihood.rate.suggestion.note }}{% if likelihood.rate.suggestion.level %} پیشنهاد سامانه: A{{ likelihood.rate.suggestion.level }}.{% endif %}</div>
+          {% for reason in likelihood.rate.insufficient %}<div class="text-warning-emphasis">{{ reason }}</div>{% endfor %}
+        {% endif %}
+      </dd>
+    {% endif %}
+    <dt class="col-sm-3">A</dt>
+    <dd class="col-sm-9">{{ assessment.a_display }}{% if assessment.a_confidence %}، اطمینان {{ assessment.get_a_confidence_display }}{% endif %}</dd>
+    <dt class="col-sm-3">دلیل</dt>
+    <dd class="col-sm-9">{{ assessment.a_rationale|linebreaksbr }}</dd>
+    <dt class="col-sm-3">شواهد</dt>
+    <dd class="col-sm-9">{% for item in assessment.a_evidence.all %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  </dl>
+{% else %}
+  <p class="small text-body-secondary">A هنوز ثبت نشده است.</p>
+{% endif %}
+
+<h3 class="h6 mt-3">مسیرهای تحقق</h3>
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead>
+      <tr>
+        <th>مسیر</th>
+        <th class="text-center">B0</th>
+        <th>کنترل‌های پیشگیرانه</th>
+        <th class="text-center">Bc</th>
+        <th class="text-center">B مسیر</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in likelihood.paths %}
+        <tr id="path-{{ row.path.pk }}">
+          <td>
+            <div class="fw-bold">{{ row.path.name }}</div>
+            <div class="small text-body-secondary">{{ row.path.description|truncatechars:160 }}</div>
+            {% if row.path.independent %}<div class="small">موانع مستقل‌اند: {{ row.path.independence_rationale|truncatechars:100 }}</div>{% endif %}
+            {% if row.path.exceptions %}<div class="small">استثناها: {{ row.path.exceptions|truncatechars:100 }}</div>{% endif %}
+            {% for note in row.notes %}<div class="small text-danger">{{ note }}</div>{% endfor %}
+          </td>
+          <td class="text-center" title="{{ row.path.b0_rationale }}">{{ row.path.b0_display }}</td>
+          <td class="small">
+            {% for item in row.controls %}
+              <div>
+                <a href="{{ item.control_assessment.get_absolute_url }}">{{ item.control_assessment.control.code }}</a>
+                E{{ item.e }}{% if item.note %} <span class="text-danger">(ثبت‌شده E{{ item.control_assessment.e }}، {{ item.note }})</span>{% endif %}
+              </div>
+            {% empty %}
+              <span class="text-body-secondary">بدون کنترل</span>
+            {% endfor %}
+          </td>
+          <td class="text-center">{% if row.result %}{{ row.result.bc }}{% else %}-{% endif %}</td>
+          <td class="text-center fw-bold">{% if row.result.b %}{{ row.result.b }}{% else %}نامعلوم{% endif %}</td>
+          {% if can_edit %}
+            <td class="text-nowrap">
+              <a href="{% url 'assessments:path_update' row.path.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+              <form method="post" action="{% url 'assessments:path_delete' row.path.pk %}" class="d-inline" onsubmit="return confirm('این مسیر حذف شود؟')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+              </form>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="{% if can_edit %}6{% else %}5{% endif %}" class="text-center text-body-secondary py-4">هنوز مسیری ثبت نشده است.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <h2 class="h5 mt-4 mb-3">پروفایل پیامد</h2>
 <div class="mb-3">
   {% if summary.impact %}
@@ -89,6 +196,6 @@
   </table>
 </div>
 <p class="small text-body-secondary">
-  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود. احتمال (A و مسیرها) در قدم بعد به ارزیابی اضافه می‌شود.
+  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود.
 </p>
 {% endblock %}

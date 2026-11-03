@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Applicability, Control, IsoControl
+from .models import Applicability, Control, ControlAssessment, IsoControl
 
 
 @admin.register(IsoControl)
@@ -36,3 +36,15 @@ class ApplicabilityAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ControlAssessment)
+class ControlAssessmentAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "control", "e", "test_to", "valid_until", "suspended")
+    list_filter = ("e", "suspended")
+    search_fields = ("code", "control__code", "control__title")
+    raw_id_fields = ("control", "verified_by")
+    filter_horizontal = ("evidence",)
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # آزمون تازه ردیف تازه است و ردیف قبلی سابقه می‌ماند
