@@ -8,7 +8,7 @@ from django.views.generic import CreateView, DetailView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.core.views import FilteredListView, FormPageMixin
-from apps.risks.permissions import can_edit_universe
+from apps.risks.permissions import can_edit_coverage
 from apps.risks.services import active_categories, coverage_rows
 
 from .forms import (
@@ -117,7 +117,7 @@ class ServiceDetailView(DetailView):
             dependents=visible_dependents(self.object, user),
             # جهان ریسک فقط خدمت‌های فعال را دارد (قدم ۱۰).
             coverage=coverage_rows([self.object], active_categories())[0][1] if self.object.is_active else [],
-            can_edit_coverage=can_edit_universe(user),
+            can_edit_coverage=can_edit_coverage(user),
             **kwargs,
         )
 
