@@ -24,6 +24,11 @@ class MethodTables:
         self.cells = {(cell.a, cell.b): cell.likelihood for cell in version.likelihood_cells.all()}
         self.levels = list(version.risk_levels.all())  # به ترتیب رتبه، طبق Meta.ordering
         self.floors = list(version.impact_floors.select_related("min_level"))
+        self.bc_rules = list(version.bc_rules.all())
+        # سطح‌های مجاز هر مقیاس، مثل {"A": [1, 2, 3, 4, 5], "S": [0, 1, 2, 3, 4, 5]}
+        scales = list(version.scales.prefetch_related("levels"))
+        self.scale_values = {scale.code: [level.value for level in scale.levels.all()] for scale in scales}
+        self.impact_codes = [scale.code for scale in scales if scale.kind == Scale.Kind.IMPACT]
 
     def likelihood(self, a, b):
         """L از جدول A × B (بخش ۱۷)."""
@@ -43,6 +48,17 @@ class MethodTables:
             if impact >= floor.min_impact and floor.min_level.rank > level.rank:
                 level = floor.min_level
         return level
+
+    def bc(self, e_values, independent):
+        """Bc یک مسیر از E کنترل‌های پیشگیرانه‌اش (بخش ۱۵ و س۱۱ قدم ۸). از قاعده‌های برقرار کمترین Bc انتخاب
+        می‌شود و اگر هیچ قاعده‌ای برقرار نباشد، Bc بزرگ‌ترین سطح مقیاس Bc است (۵ در v5: «فاقد مانع با اثر
+        اثبات‌شده»). independent یعنی استقلال موانع این مسیر با شواهد تأیید شده است (بخش ۱۵، قاعده‌ی ۴)."""
+        bc = max(self.scale_values["Bc"])
+        for rule in self.bc_rules:
+            enough = sum(1 for e in e_values if e >= rule.min_e) >= rule.min_count
+            if enough and (independent or not rule.needs_independence):
+                bc = min(bc, rule.bc)
+        return bc
 
     def likelihood_grid(self):
         """سطرهای جدول احتمال برای نمایش: [(a، [L برای B1 تا B5])]. خانه‌ی خالی None است."""
