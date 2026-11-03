@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ iso_control }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ iso_control }}
+    <div class="small text-body-secondary mt-1" dir="ltr" style="text-align: right">{{ iso_control.code }} {{ iso_control.title_en }}</div>
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'controls:soa_update' iso_control.pk %}" class="btn btn-outline-secondary btn-sm">{% if applicability %}ویرایش{% else %}تعیین کاربرد{% endif %}</a>
+    {% endif %}
+    <a href="{% url 'controls:soa_list' %}" class="btn btn-outline-secondary btn-sm">بیانیه‌ی کاربردپذیری</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">موضوع</dt>
+  <dd class="col-sm-9">{{ iso_control.get_theme_display }}</dd>
+
+  <dt class="col-sm-3">کاربرد</dt>
+  <dd class="col-sm-9">{% include "controls/includes/applicability_badge.html" %}</dd>
+
+  {% if applicability %}
+    <dt class="col-sm-3">دلیل</dt>
+    <dd class="col-sm-9">{{ applicability.justification|linebreaksbr }}</dd>
+
+    <dt class="col-sm-3">آخرین تغییر</dt>
+    <dd class="col-sm-9">{{ applicability.updated_at|jformat:"%Y/%m/%d" }}</dd>
+  {% endif %}
+</dl>
+
+{% if applicability.applicable and not has_active_controls %}
+  <div class="alert alert-warning">این کنترل کاربرد دارد ولی هیچ کنترل فعال سازمان به آن نگاشت نشده است.</div>
+{% elif applicability and not applicability.applicable and has_active_controls %}
+  <div class="alert alert-warning">این کنترل «کاربرد ندارد» ثبت شده ولی کنترل‌های سازمانی به آن نگاشت شده‌اند؛ یکی از این دو را اصلاح کنید.</div>
+{% endif %}
+
+<h2 class="h5 mt-4 mb-3">کنترل‌های سازمان</h2>
+{% include "controls/includes/control_table.html" with visible_control_ids=None empty_text="کنترل سازمانی به این کنترل نگاشت نشده است." %}
+
+<h2 class="h5 mt-4 mb-3">ریسک‌هایی که به این کنترل‌ها تکیه دارند</h2>
+{% include "risks/includes/risk_table.html" with empty_text="ریسکی که شما ببینید به این کنترل‌ها تکیه ندارد." %}
+{% endblock %}

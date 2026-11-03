@@ -1,4 +1,4 @@
-{% load static %}
+{% load static controls_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -45,6 +45,17 @@
               <li><a class="dropdown-item" href="{% url 'workflow:question_list' %}">پرسش‌های ریسک</a></li>
               <li><a class="dropdown-item" href="{% url 'questionnaires:response_list' %}">پاسخ‌ها و بررسی</a></li>
               <li><a class="dropdown-item" href="{% url 'questionnaires:questionnaire_list' %}">تعریف پرسشنامه‌ها</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              کنترل‌ها
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'controls:control_list' %}">کتابخانه‌ی کنترل</a></li>
+              {% if user|can_view_soa %}
+              <li><a class="dropdown-item" href="{% url 'controls:soa_list' %}">بیانیه‌ی کاربردپذیری</a></li>
+              {% endif %}
             </ul>
           </li>
           <li class="nav-item"><a class="nav-link" href="#">اقدامات</a></li>

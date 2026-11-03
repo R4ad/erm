@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}کتابخانه‌ی کنترل{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">کتابخانه‌ی کنترل</h1>
+  {% if can_edit %}
+    <a href="{% url 'controls:control_create' %}" class="btn btn-primary btn-sm">کنترل جدید</a>
+  {% endif %}
+</div>
+
+<p class="text-body-secondary small">
+  کنترل سازمان یک سازوکار مشخص با مسئول است که ریسک‌ها به آن تکیه دارند و به کنترل‌های پیوست A استاندارد ۲۷۰۰۱ نگاشت می‌شود.
+</p>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  {% include "controls/includes/control_table.html" with visible_control_ids=None empty_text="کنترلی با این مشخصات پیدا نشد." %}
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

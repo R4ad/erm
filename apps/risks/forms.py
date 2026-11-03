@@ -5,6 +5,8 @@ from django.utils import timezone
 from apps.catalog.forms import OwnerChoiceField, active_or_current, user_choices
 from apps.catalog.models import Customer, Service
 from apps.catalog.permissions import visible_services
+from apps.controls.forms import ControlChoiceField
+from apps.controls.models import Control
 from apps.core.forms import BootstrapFormMixin, JalaliDateField
 from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
@@ -166,14 +168,21 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
             "initiator",
             "count_unit",
             "count_exclusions",
+            "controls",
         ]
-        field_classes = {"service": ServiceChoiceField, "org_unit": UnitChoiceField, "owner": OwnerChoiceField}
+        field_classes = {
+            "service": ServiceChoiceField,
+            "org_unit": UnitChoiceField,
+            "owner": OwnerChoiceField,
+            "controls": ControlChoiceField,
+        }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
             "scope": forms.Textarea(attrs={"rows": 2}),
             "initiator": forms.Textarea(attrs={"rows": 2}),
             "count_exclusions": forms.Textarea(attrs={"rows": 2}),
             "customers": forms.SelectMultiple(attrs={"size": 6}),
+            "controls": forms.SelectMultiple(attrs={"size": 6}),
         }
         help_texts = {
             "org_unit": "اگر خالی بماند، واحد مالک خدمت گذاشته می‌شود. دسترسی مدیر واحد به ریسک از همین واحد است.",
@@ -194,6 +203,10 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["category"].queryset = active_or_current(RiskCategory.objects.all(), risk.category_id)
         current = risk.customers.all() if risk.pk else Customer.objects.none()
         self.fields["customers"].queryset = Customer.objects.filter(Q(is_active=True) | Q(pk__in=current))
+        current_controls = risk.controls.all() if risk.pk else Control.objects.none()
+        self.fields["controls"].queryset = Control.objects.filter(
+            Q(is_active=True) | Q(pk__in=current_controls)
+        ).order_by("code")
         # واحد و دسته از خدمت و سناریو پر می‌شوند؛ اگر هیچ‌کدام نباشد clean خطا می‌دهد.
         self.fields["org_unit"].required = False
         self.fields["category"].required = False

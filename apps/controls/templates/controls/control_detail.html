@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load controls_tags %}
+
+{% block title %}{{ control }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ control }}
+    {% if control.is_key %}<span class="badge text-bg-warning ms-1">کنترل کلیدی</span>{% endif %}
+    {% if not control.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'controls:control_update' control.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'controls:control_list' %}" class="btn btn-outline-secondary btn-sm">کتابخانه‌ی کنترل</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">هدف و سازوکار</dt>
+  <dd class="col-sm-9">{{ control.objective|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">نوع</dt>
+  <dd class="col-sm-9">{{ control.get_kind_display }}</dd>
+
+  <dt class="col-sm-3">مسئول کنترل</dt>
+  <dd class="col-sm-9">{{ control.owner.get_full_name|default:control.owner.username }}</dd>
+
+  <dt class="col-sm-3">اجراکننده</dt>
+  <dd class="col-sm-9">{{ control.get_operated_by_display }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3">کنترل‌های پیوست A</h2>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>شماره</th>
+        <th>عنوان</th>
+        <th>بیانیه‌ی کاربردپذیری</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for iso in iso_controls %}
+        <tr>
+          <td class="text-nowrap">{% if user|can_view_soa %}<a href="{{ iso.get_absolute_url }}">{{ iso.code }}</a>{% else %}{{ iso.code }}{% endif %}</td>
+          <td>{{ iso.title }}</td>
+          <td>{% include "controls/includes/applicability_badge.html" with applicability=iso.applicability %}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="3" class="text-center text-body-secondary py-4">به کنترلی از پیوست A نگاشت نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="h5 mt-4 mb-3">ریسک‌هایی که به این کنترل تکیه دارند</h2>
+{% include "risks/includes/risk_table.html" with empty_text="ریسکی که شما ببینید به این کنترل تکیه ندارد." %}
+
+{% include "core/includes/attachments.html" with record=control %}
+{% include "core/includes/comments.html" with record=control %}
+{% endblock %}
