@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ scenario }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ scenario }}
+    <span class="badge text-bg-light border ms-1">نسخه‌ی {{ scenario.version }}</span>
+    {% if not scenario.is_active %}<span class="badge text-bg-secondary ms-1">غیرفعال</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      {% if scenario.is_active %}
+        <a href="{% url 'risks:risk_create' %}?scenario={{ scenario.pk }}" class="btn btn-primary btn-sm">ثبت ریسک از این سناریو</a>
+      {% endif %}
+      <a href="{% url 'risks:scenario_update' scenario.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'risks:scenario_list' %}" class="btn btn-outline-secondary btn-sm">کتابخانه‌ی سناریو</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">دسته‌ی اصلی</dt>
+  <dd class="col-sm-9">{{ scenario.category }}</dd>
+
+  <dt class="col-sm-3">رویداد اصلی</dt>
+  <dd class="col-sm-9">{{ scenario.event|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">شرایط</dt>
+  <dd class="col-sm-9">{{ scenario.conditions|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">پیامد</dt>
+  <dd class="col-sm-9">{{ scenario.consequence|linebreaksbr }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3">ریسک‌های ساخته‌شده از این سناریو</h2>
+{% include "risks/includes/risk_table.html" with empty_text="ریسکی از این سناریو که شما ببینید ثبت نشده است." %}
+{% endblock %}

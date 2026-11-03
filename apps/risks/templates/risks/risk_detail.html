@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ risk }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">{{ risk }} {% include "risks/includes/risk_status.html" %}</h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'risks:risk_update' risk.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'risks:risk_list' %}" class="btn btn-outline-secondary btn-sm">رجیستر ریسک</a>
+  </div>
+</div>
+
+{% if risk.scenario_changed %}
+  <div class="alert alert-warning">
+    سناریوی مرجع این ریسک بعد از ثبت آن تغییر اساسی کرده است (نسخه‌ی {{ risk.scenario_version }} به {{ risk.scenario.version }}). شرح ریسک را با سناریو مقایسه کنید.
+  </div>
+{% endif %}
+
+<dl class="row">
+  <dt class="col-sm-3">سناریوی مرجع</dt>
+  <dd class="col-sm-9">
+    {% if risk.scenario %}
+      <a href="{{ risk.scenario.get_absolute_url }}">{{ risk.scenario }}</a>
+      <span class="small text-body-secondary">(نسخه‌ی {{ risk.scenario_version }})</span>
+    {% else %}
+      مورد جدید، بدون سناریوی مرجع
+    {% endif %}
+  </dd>
+
+  <dt class="col-sm-3">شرح</dt>
+  <dd class="col-sm-9">{{ risk.description|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">کانال ورود</dt>
+  <dd class="col-sm-9">{{ risk.get_channel_display }}</dd>
+
+  <dt class="col-sm-3">خدمت</dt>
+  <dd class="col-sm-9">
+    {% if not risk.service %}-{% elif service_url %}<a href="{{ service_url }}">{{ risk.service }}</a>{% else %}{{ risk.service }}{% endif %}
+  </dd>
+
+  <dt class="col-sm-3">واحد</dt>
+  <dd class="col-sm-9">{{ risk.org_unit }}</dd>
+
+  <dt class="col-sm-3">بانک‌های متأثر</dt>
+  <dd class="col-sm-9">{% for customer in customers %}{{ customer }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+
+  <dt class="col-sm-3">مالک ریسک</dt>
+  <dd class="col-sm-9">{% if risk.owner %}{{ risk.owner.get_full_name|default:risk.owner.username }}{% else %}هنوز تعیین نشده{% endif %}</dd>
+
+  <dt class="col-sm-3">دسته‌ی اصلی</dt>
+  <dd class="col-sm-9">{{ risk.category }}</dd>
+
+  <dt class="col-sm-3">برچسب‌ها</dt>
+  <dd class="col-sm-9">
+    {% for tag in tags %}<a href="{% url 'risks:risk_list' %}?tag={{ tag.pk }}" class="badge text-bg-light border text-decoration-none ms-1">{{ tag }}</a>{% empty %}-{% endfor %}
+  </dd>
+
+  <dt class="col-sm-3">دامنه</dt>
+  <dd class="col-sm-9">{{ risk.scope|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">طبقه‌ی اطلاعات</dt>
+  <dd class="col-sm-9">{{ risk.get_data_class_display|default:"-" }}</dd>
+
+  <dt class="col-sm-3">برچسب CIA</dt>
+  <dd class="col-sm-9">{{ risk.cia_labels|default:"-" }}</dd>
+
+  <dt class="col-sm-3">عامل آغازگر</dt>
+  <dd class="col-sm-9">{{ risk.initiator|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">واحد شمارش</dt>
+  <dd class="col-sm-9">{{ risk.count_unit|default:"-" }}</dd>
+
+  <dt class="col-sm-3">موارد خارج از شمارش</dt>
+  <dd class="col-sm-9">{{ risk.count_exclusions|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">ثبت</dt>
+  <dd class="col-sm-9">{{ risk.created_at|jformat:"%Y/%m/%d" }}</dd>
+</dl>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3">
+  <h2 class="h5 mb-0">پیوندهای بیرونی</h2>
+  {% if can_edit %}
+    <a href="{% url 'risks:link_create' risk.pk %}" class="btn btn-primary btn-sm">افزودن پیوند</a>
+  {% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>نوع</th>
+        <th>شناسه</th>
+        <th>نشانی</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for link in links %}
+        <tr>
+          <td>{{ link.get_kind_display }}</td>
+          <td class="text-nowrap" dir="ltr">{{ link.ref }}</td>
+          <td>{% if link.url %}<a href="{{ link.url }}" dir="ltr" rel="noopener noreferrer" target="_blank">{{ link.url|truncatechars:60 }}</a>{% else %}-{% endif %}</td>
+          {% if can_edit %}<td class="text-end"><a href="{% url 'risks:link_update' link.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a></td>{% endif %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4" class="text-center text-body-secondary py-4">هنوز پیوندی به درخواست تغییر، رخداد یا آسیب‌پذیری ثبت نشده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -45,4 +45,12 @@
     </form>
   </div>
 </div>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3">
+  <h2 class="h5 mb-0">ریسک‌های فعال این خانه</h2>
+  {% if can_edit_register %}
+    <a href="{% url 'risks:risk_create' %}?service={{ cell.service_id }}&amp;category={{ cell.category_id }}" class="btn btn-primary btn-sm">ثبت ریسک برای این خانه</a>
+  {% endif %}
+</div>
+{% include "risks/includes/risk_table.html" with risks=cell_risks hide_service=True empty_text="ریسک فعالی در این خدمت و دسته ثبت نشده است." %}
 {% endblock %}

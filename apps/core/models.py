@@ -35,3 +35,18 @@ class ValidityPeriod(models.Model):
     @property
     def is_expired(self):
         return self.valid_until is not None and self.valid_until < timezone.localdate()
+
+
+class CodeCounter(models.Model):
+    """شمارنده‌ی کدهای خودکار، مثل SC-0012 یا RK-1405-0012. هر پیشوند یک ردیف دارد که شماره‌ی آخرش را نگه
+    می‌دارد؛ قفل همین ردیف نمی‌گذارد دو ثبت هم‌زمان یک کد بگیرند."""
+
+    prefix = models.CharField("پیشوند", max_length=30, unique=True)
+    last = models.PositiveIntegerField("آخرین شماره", default=0)
+
+    class Meta:
+        verbose_name = "شمارنده‌ی کد"
+        verbose_name_plural = "شمارنده‌های کد"
+
+    def __str__(self):
+        return f"{self.prefix}: {self.last}"

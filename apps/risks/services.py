@@ -1,7 +1,9 @@
+import re
+
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from .models import Coverage, RiskCategory
+from .models import Coverage, Risk, RiskCategory, Tag
 
 
 def active_categories():
@@ -9,19 +11,29 @@ def active_categories():
     return list(RiskCategory.objects.filter(is_active=True))
 
 
-def coverage_rows(services, categories):
+def coverage_rows(services, categories, risks=None):
     """برای هر خدمت فهرست خانه‌هایش به ترتیب دسته‌ها. خانه‌ای که ردیف ندارد یک Coverage ذخیره‌نشده با وضعیت
-    «در انتظار بررسی» است؛ پس قالب برای همه‌ی خانه‌ها یک‌جور کار می‌کند."""
+    «در انتظار بررسی» است؛ پس قالب برای همه‌ی خانه‌ها یک‌جور کار می‌کند. اگر risks (ریسک‌هایی که کاربر می‌بیند)
+    داده شود، هر خانه risk_count هم دارد: تعداد ریسک‌های فعال همان خدمت و دسته."""
     services = list(services)
     saved = Coverage.objects.filter(service__in=services, category__in=categories).select_related("reviewed_by")
     by_key = {(cell.service_id, cell.category_id): cell for cell in saved}
-    return [
-        (
-            service,
-            [by_key.get((service.pk, category.pk)) or Coverage(service=service, category=category) for category in categories],
-        )
-        for service in services
-    ]
+    counts = {}
+    if risks is not None:
+        in_grid = active_risks(risks).filter(service__in=services, category__in=categories)
+        counts = {
+            (row["service"], row["category"]): row["count"]
+            for row in in_grid.values("service", "category").annotate(count=Count("pk")).order_by()
+        }
+    rows = []
+    for service in services:
+        cells = []
+        for category in categories:
+            cell = by_key.get((service.pk, category.pk)) or Coverage(service=service, category=category)
+            cell.risk_count = counts.get((service.pk, category.pk), 0)
+            cells.append(cell)
+        rows.append((service, cells))
+    return rows
 
 
 def done_cells_count(categories):
@@ -68,3 +80,38 @@ def save_coverage(cell, user, status, reason):
     cell.reviewed_on = timezone.localdate()
     cell.save()
     return cell
+
+
+def active_risks(risks):
+    """ریسک‌هایی که بازنشسته یا ادغام نشده‌اند."""
+    return risks.exclude(status__in=Risk.CLOSED_STATUSES)
+
+
+def mark_covered_by_risk(risk, user):
+    """ریسک فعالی که خدمت دارد، خانه‌ی «خدمت × دسته‌ی» خودش را اگر «در انتظار» است «بررسی‌شده» می‌کند (س۳۸)
+    و همان خانه را برمی‌گرداند؛ اگر چیزی عوض نشد None. خانه‌ی «بررسی‌شده» دست نمی‌خورد و فرم ریسک نمی‌گذارد
+    ریسک در خانه‌ی «نامرتبط» ثبت شود."""
+    if not (risk.is_active and risk.service_id):
+        return None
+    cell = Coverage.objects.filter(service=risk.service, category=risk.category).first()
+    if cell and not cell.is_pending:
+        return None
+    cell = cell or Coverage(service=risk.service, category=risk.category)
+    return save_coverage(cell, user, Coverage.Status.REVIEWED, f"ریسک {risk.code} برای این خانه ثبت شد.")
+
+
+def parse_tag_names(text):
+    """متن برچسب‌ها را که با ویرگول فارسی یا انگلیسی جدا شده‌اند به فهرست نام‌های یکتا تبدیل می‌کند،
+    با همان ترتیب و بدون فاصله‌ی اضافه."""
+    names = []
+    for part in re.split(r"[,،]", text):
+        name = " ".join(part.split())
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def set_tags(risk, names):
+    """برچسب‌های ریسک را همین نام‌ها می‌کند؛ برچسبی که نیست ساخته می‌شود."""
+    tags = [Tag.objects.get_or_create(name=name)[0] for name in names]
+    risk.tags.set(tags)

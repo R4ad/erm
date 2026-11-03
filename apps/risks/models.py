@@ -1,10 +1,15 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.urls import reverse
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
-from apps.core.jalali import to_jalali
+from apps.catalog.models import DataClass
+from apps.core.jalali import jalali_year, to_jalali
 from apps.core.models import TimeStampedModel
+from apps.core.services import next_code
 
 
 class RiskCategory(TimeStampedModel):
@@ -98,3 +103,241 @@ class Coverage(TimeStampedModel):
             reviewer = self.reviewed_by.get_full_name() or self.reviewed_by.username
             text += f" ({reviewer}، {to_jalali(self.reviewed_on)})"
         return text
+
+
+class Tag(TimeStampedModel):
+    """برچسب فرعی ریسک، کنار دسته‌ی اصلی؛ مثل «پرداخت» یا «ابری». برچسب‌ها از فرم ریسک ساخته می‌شوند."""
+
+    name = models.CharField(
+        "نام", max_length=50, unique=True, error_messages={"unique": "برچسبی با همین نام ثبت شده است."}
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "برچسب"
+        verbose_name_plural = "برچسب‌ها"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class RiskScenario(TimeStampedModel):
+    """سناریوی مرجع (بخش ۶ سند v5)، همان «ریسک اولیه‌ی GRC» سند قبلی: یک الگوی عمومی که به خدمت، دارایی یا بانک
+    خاصی بسته نیست و هر نمونه‌ی ریسک می‌تواند از آن ساخته شود. سناریوی قدیمی غیرفعال می‌شود، نه حذف."""
+
+    code = models.CharField("کد", max_length=20, unique=True, editable=False)
+    version = models.PositiveSmallIntegerField(
+        "نسخه", default=1, editable=False, help_text="با هر تغییر اساسی یکی بالا می‌رود."
+    )
+    title = models.CharField("عنوان", max_length=300)
+    event = models.TextField("رویداد اصلی")
+    conditions = models.TextField("شرایط", help_text="علت یا شرط تحقق رویداد.")
+    consequence = models.TextField("پیامد")
+    category = models.ForeignKey(
+        RiskCategory, verbose_name="دسته‌ی اصلی", on_delete=models.PROTECT, related_name="scenarios"
+    )
+    is_active = models.BooleanField(
+        "فعال", default=True, help_text="از سناریوی غیرفعال ریسک تازه ساخته نمی‌شود، ولی ریسک‌های قبلی می‌مانند."
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "سناریوی مرجع"
+        verbose_name_plural = "سناریوهای مرجع"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} {self.title}"
+
+    def get_absolute_url(self):
+        return reverse("risks:scenario_detail", args=[self.pk])
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = next_code("SC")
+        super().save(*args, **kwargs)
+
+
+class Risk(TimeStampedModel):
+    """نمونه‌ی ریسک (بخش ۱ و ۶ سند v5): کاربرد یک سناریو در یک خدمت، بانک و دامنه‌ی مشخص، با یک مالک. تعریف عامل
+    آغازگر هم اینجاست، چون بخش ۱۳ می‌گوید در همه‌ی ارزیابی‌های یک ریسک ثابت می‌ماند. ریسک حذف نمی‌شود؛ بازنشسته
+    یا ادغام می‌شود (قدم ۱۴)."""
+
+    class Status(models.TextChoices):
+        # ده وضعیت بخش ۲۳. تا قدم ۱۴ که انتقال‌ها ساخته می‌شوند، هر ریسک تازه «پیش‌نویس» است.
+        DRAFT = "draft", "پیش‌نویس"
+        IDENTIFIED = "identified", "شناسایی‌شده"
+        ASSESSING = "assessing", "در ارزیابی"
+        QUALITY_CHECK = "quality_check", "در کنترل کیفیت"
+        DECISION = "decision", "در تصمیم"
+        TREATING = "treating", "در مواجهه"
+        ACCEPTED = "accepted", "پذیرفته‌شده"
+        REASSESSING = "reassessing", "در بازسنجی"
+        RETIRED = "retired", "بازنشسته"
+        MERGED = "merged", "ادغام‌شده"
+
+    class Channel(models.TextChoices):
+        INTERVIEW = "interview", "مصاحبه"
+        QUESTIONNAIRE = "questionnaire", "پرسشنامه"
+        INCIDENT = "incident", "رخداد"
+        CHANGE = "change", "تغییر"
+        SCAN = "scan", "اسکن"
+        AUDIT = "audit", "ممیزی"
+        V4_MIGRATION = "v4_migration", "مهاجرت v4"
+
+    # ریسک بازنشسته یا ادغام‌شده فقط سابقه است.
+    CLOSED_STATUSES = [Status.RETIRED, Status.MERGED]
+
+    code = models.CharField("کد", max_length=20, unique=True, editable=False)
+    scenario = models.ForeignKey(
+        RiskScenario,
+        verbose_name="سناریوی مرجع",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="risks",
+        help_text="خالی یعنی «مورد جدید» که سناریوی مرجع ندارد.",
+    )
+    scenario_version = models.PositiveSmallIntegerField("نسخه‌ی سناریو", null=True, blank=True, editable=False)
+    title = models.CharField("عنوان", max_length=300, help_text="می‌تواند نام خدمت یا بانک را داشته باشد.")
+    description = models.TextField(
+        "شرح",
+        help_text="با الگوی بخش ۴: در اثر [علت یا شرط]، ممکن است [رویداد] رخ دهد که به [پیامد] برای [ذی‌نفع] منجر شود.",
+    )
+    service = models.ForeignKey(
+        "catalog.Service",
+        verbose_name="خدمت",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="risks",
+        help_text="پیش از تأیید ارزیابی اجباری است.",
+    )
+    customers = models.ManyToManyField(
+        "catalog.Customer", verbose_name="بانک‌های متأثر", related_name="risks", blank=True
+    )
+    scope = models.TextField(
+        "دامنه", blank=True, help_text="محیط (تولید، آزمون، بازیابی) و مرز مسئولیت."
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مالک ریسک",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="owned_risks",
+        help_text="یک شخص حقیقی؛ پیش از «شناسایی‌شده» باید تعیین شود.",
+    )
+    org_unit = models.ForeignKey(
+        "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, related_name="risks"
+    )
+    category = models.ForeignKey(
+        RiskCategory, verbose_name="دسته‌ی اصلی", on_delete=models.PROTECT, related_name="risks"
+    )
+    tags = models.ManyToManyField(Tag, verbose_name="برچسب‌ها", related_name="risks", blank=True)
+    data_class = models.CharField("طبقه‌ی اطلاعات", max_length=20, choices=DataClass.choices, blank=True)
+    # برچسب‌های CIA طبق بخش ۸ سند v5؛ امتیاز جدا نمی‌گیرند.
+    cia_c = models.BooleanField("محرمانگی (C)", default=False)
+    cia_i = models.BooleanField("صحت (I)", default=False)
+    cia_a = models.BooleanField("دسترس‌پذیری (A)", default=False)
+    initiator = models.TextField("عامل آغازگر", blank=True, help_text="چه اتفاقی شروع سناریوست (بخش ۱۳).")
+    count_unit = models.CharField(
+        "واحد شمارش", max_length=200, blank=True, help_text="معیار هر وقوع مستقل، مثلاً «هر تلاش ورود ناموفق»."
+    )
+    count_exclusions = models.TextField("موارد خارج از شمارش", blank=True)
+    channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
+    status = models.CharField(
+        "وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT, editable=False
+    )
+    needs_completion = models.BooleanField(
+        "نیازمند تکمیل",
+        default=True,
+        editable=False,
+        help_text="عامل آغازگر، واحد شمارش یا دامنه هنوز نوشته نشده است.",
+    )
+
+    # m2m_fields: افزودن و برداشتن بانک‌ها و برچسب‌ها هم در تاریخچه ثبت می‌شود.
+    history = HistoricalRecords(m2m_fields=[customers, tags])
+
+    class Meta:
+        verbose_name = "ریسک"
+        verbose_name_plural = "ریسک‌ها"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.code} {self.title}"
+
+    def get_absolute_url(self):
+        return reverse("risks:risk_detail", args=[self.pk])
+
+    @property
+    def is_active(self):
+        return self.status not in self.CLOSED_STATUSES
+
+    @property
+    def scenario_changed(self):
+        """سناریوی مرجع بعد از ساختن این ریسک تغییر اساسی کرده است."""
+        return bool(self.scenario_id and self.scenario_version and self.scenario.version > self.scenario_version)
+
+    @property
+    def cia_labels(self):
+        labels = [("C", self.cia_c), ("I", self.cia_i), ("A", self.cia_a)]
+        return "، ".join(letter for letter, checked in labels if checked)
+
+    def clean(self):
+        errors = {}
+        # ریسک فعال باید واحد و مالک فعال داشته باشد، مثل خدمت و دارایی.
+        if self.is_active and self.org_unit_id and not self.org_unit.is_active:
+            errors["org_unit"] = "این واحد غیرفعال است؛ ریسک فعال باید مال یک واحد فعال باشد."
+        if self.is_active and self.owner_id and not self.owner.is_active:
+            errors["owner"] = "این کاربر غیرفعال است؛ مالک دیگری انتخاب کنید."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            # کد با سال شمسی ثبت، مثل RK-1405-0012؛ شماره‌ی هر سال از یک شروع می‌شود.
+            self.code = next_code(f"RK-{jalali_year(timezone.localdate())}")
+        if self.scenario_id and self.scenario_version is None:
+            self.scenario_version = self.scenario.version  # نسخه‌ای از سناریو که ریسک از رویش ساخته شد
+        self.needs_completion = not (self.initiator.strip() and self.count_unit.strip() and self.scope.strip())
+        super().save(*args, **kwargs)
+
+
+class ExternalLink(TimeStampedModel):
+    """شناسه‌ی همین ریسک در سامانه‌های دیگر (بخش ۳)، مثل درخواست تغییر، رخداد یا آسیب‌پذیری. حذف نمی‌شود؛
+    پیوند اشتباه ویرایش می‌شود و تاریخچه‌اش می‌ماند."""
+
+    class Kind(models.TextChoices):
+        CHANGE = "change", "تغییر"
+        INCIDENT = "incident", "رخداد"
+        PROBLEM = "problem", "مشکل"
+        VULNERABILITY = "vulnerability", "آسیب‌پذیری"
+        CONTRACT = "contract", "قرارداد"
+        SUPPLIER = "supplier", "تأمین‌کننده"
+        CONTINUITY_PLAN = "continuity_plan", "برنامه‌ی تداوم"
+
+    risk = models.ForeignKey(Risk, verbose_name="ریسک", on_delete=models.CASCADE, related_name="links")
+    kind = models.CharField("نوع", max_length=20, choices=Kind.choices)
+    ref = models.CharField("شناسه", max_length=100, help_text="شناسه در سامانه‌ی مبدأ، مثل CHG-2231.")
+    url = models.URLField("نشانی", blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "پیوند بیرونی"
+        verbose_name_plural = "پیوندهای بیرونی"
+        ordering = ["kind", "ref"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["risk", "kind", "ref"],
+                name="unique_external_link_per_risk",
+                violation_error_message="این شناسه با همین نوع پیش‌تر برای این ریسک ثبت شده است.",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} {self.ref}"

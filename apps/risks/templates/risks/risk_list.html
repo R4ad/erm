@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}رجیستر ریسک{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">رجیستر ریسک</h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'risks:risk_create' %}" class="btn btn-primary btn-sm">ریسک جدید</a>
+    {% endif %}
+    <a href="{% url 'risks:scenario_list' %}" class="btn btn-outline-secondary btn-sm">کتابخانه‌ی سناریو</a>
+  </div>
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>کد</th>
+          <th>عنوان</th>
+          <th>خدمت</th>
+          <th>دسته</th>
+          <th>واحد</th>
+          <th>مالک</th>
+          <th>وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for risk in risks %}
+          <tr>
+            <td class="text-nowrap"><a href="{{ risk.get_absolute_url }}">{{ risk.code }}</a></td>
+            <td>{{ risk.title }}</td>
+            <td class="text-nowrap" title="{{ risk.service.name }}">{{ risk.service.code|default:"-" }}</td>
+            <td class="text-nowrap" title="{{ risk.category.name }}">{{ risk.category.code }}</td>
+            <td>{{ risk.org_unit }}</td>
+            <td>{% if risk.owner %}{{ risk.owner.get_full_name|default:risk.owner.username }}{% else %}-{% endif %}</td>
+            <td class="text-nowrap">{% include "risks/includes/risk_status.html" %}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-body-secondary py-4">ریسکی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

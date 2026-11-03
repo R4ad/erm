@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Coverage, RiskCategory
+from .models import Coverage, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
 
 
 @admin.register(RiskCategory)
@@ -23,3 +23,40 @@ class CoverageAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # وضعیت خانه عوض می‌شود و تاریخچه‌اش می‌ماند؛ حذف نمی‌شود
+
+
+@admin.register(Tag)
+class TagAdmin(SimpleHistoryAdmin):
+    search_fields = ("name",)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RiskScenario)
+class RiskScenarioAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "title", "version", "category", "is_active")
+    list_filter = ("is_active", "category")
+    search_fields = ("code", "title")
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # سناریو غیرفعال می‌شود، نه حذف
+
+
+class ExternalLinkInline(admin.TabularInline):
+    model = ExternalLink
+    extra = 0
+    can_delete = False
+
+
+@admin.register(Risk)
+class RiskAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "title", "status", "service", "category", "org_unit", "owner")
+    list_filter = ("status", "category", "channel", "needs_completion")
+    search_fields = ("code", "title")
+    raw_id_fields = ("scenario", "service", "owner")
+    filter_horizontal = ("customers", "tags")
+    inlines = [ExternalLinkInline]
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # ریسک بازنشسته یا ادغام می‌شود، نه حذف (قدم ۱۴)
