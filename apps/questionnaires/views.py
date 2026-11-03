@@ -387,7 +387,7 @@ class PendingDecisionMixin(RoleRequiredMixin):
 
 
 class PendingRiskConvertView(PendingDecisionMixin, RiskCreateView):
-    """تبدیل ریسک در انتظار به پیش‌نویس ریسک در رجیستر، با داده‌های پاسخ که از پیش پر شده‌اند."""
+    """تبدیل ریسک در انتظار به ریسک «ثبت‌شده در رجیستر»، با داده‌های پاسخ که از پیش پر شده‌اند."""
 
     def get(self, request, *args, **kwargs):
         return self.check_pending() or super().get(request, *args, **kwargs)

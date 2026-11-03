@@ -216,6 +216,34 @@ def test_grc_records_an_interview_in_the_name_of_a_unit_manager(client, grc, que
     assert (created.respondent, created.recorded_by, created.channel) == (manager, grc, "interview")
 
 
+def test_every_response_starts_with_the_unit_functions_and_the_eight_session_questions(
+    client, questionnaire, unit, manager
+):
+    response = start(questionnaire, unit, manager)
+    client.force_login(manager)
+    url = reverse("questionnaires:response_answer", args=[response.pk])
+
+    form = client.get(url).context["form"]
+    labels = [field.label for field in form.fixed_fields()]
+    assert labels[0] == "کارکردهای اصلی و تعهدهای واحد"
+    assert labels[1:] == [
+        "چه نتیجه‌ای لازم است برای شرکت یا مشتری ایجاد شود؟",
+        "چه تعهد زمانی یا کیفی داریم؟",
+        "چه اتفاقی می‌تواند مانع انجام آن شود؟",
+        "در چه شرایطی این اتفاق ممکن می‌شود؟",
+        "اگر رخ دهد چه کسی و چگونه آسیب می‌بیند؟",
+        "به چه افراد یا خدماتی وابسته‌ایم؟",
+        "چه شاهد، تجربه یا تغییر تازه‌ای داریم؟",
+        "امروز چه چیزی جلوی وقوع یا خسارت را می‌گیرد؟",
+    ]
+
+    client.post(
+        url, {"conditions": "وقتی تنظیمات مقصد دستی وارد می‌شود", "current_controls": "بازبینی دونفره", "save": ""}
+    )
+    page = client.get(response.get_absolute_url()).content.decode()
+    assert "وقتی تنظیمات مقصد دستی وارد می‌شود" in page and "بازبینی دونفره" in page
+
+
 def test_a_draft_is_saved_and_submit_checks_required_questions(client, questionnaire, unit, manager):
     tools = add_question(questionnaire, "چه ابزارهایی به کار می‌برید؟", Question.Kind.TEXT, is_required=True)
     backup = add_question(questionnaire, "پشتیبان آزموده شده؟", Question.Kind.YES_NO, [("بله", False), ("خیر", True)])
@@ -323,7 +351,7 @@ def test_a_response_is_reviewed_only_after_every_pending_risk_is_decided(client,
     assert (response.status, response.reviewed_by) == ("reviewed", grc)
 
 
-def test_converting_a_pending_risk_prefills_and_registers_a_draft_risk(client, grc, questionnaire, unit, manager):
+def test_converting_a_pending_risk_prefills_and_registers_the_risk(client, grc, questionnaire, unit, manager):
     service = make_service("SRV-1", org_unit=unit)
     category = RiskCategory.objects.get(code="T4")
     response = start(questionnaire, unit, manager, service=service, new_item="خطای ورود دستی در تسویه")
@@ -353,7 +381,7 @@ def test_converting_a_pending_risk_prefills_and_registers_a_draft_risk(client, g
     pending.refresh_from_db()
     assert page.url == risk.get_absolute_url()
     assert (pending.status, pending.risk, pending.decided_by) == ("converted", risk, grc)
-    assert (risk.org_unit, risk.channel, risk.status) == (unit, "questionnaire", Risk.Status.DRAFT)
+    assert (risk.org_unit, risk.channel, risk.status) == (unit, "questionnaire", Risk.Status.REGISTERED)
     assert Coverage.objects.get(service=service, category=category).status == Coverage.Status.REVIEWED
     assert client.get(url).status_code == 302  # تکلیفش تعیین شده و دوباره ثبت نمی‌شود
 

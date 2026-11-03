@@ -118,8 +118,8 @@ class Option(TimeStampedModel):
 
 
 class Response(TimeStampedModel):
-    """پاسخ یک واحد به یک پرسشنامه، در صورت نیاز درباره‌ی یک خدمت همان واحد. بالای آن قلم‌های ثابت فرم ورودی
-    بخش ۲۴ است، بعد جواب سؤال‌ها و در آخر «مورد جدید». بعد از ارسال فقط وقتی ویرایش می‌شود که عضو GRC آن را با
+    """پاسخ یک واحد به یک پرسشنامه، در صورت نیاز درباره‌ی یک خدمت همان واحد. بالای آن کارکردهای واحد و پرسش‌های
+    جلسه‌ی بخش ۴ است، بعد جواب سؤال‌ها و در آخر «مورد جدید». بعد از ارسال فقط وقتی ویرایش می‌شود که عضو GRC آن را با
     سؤال مشخص برگرداند (س۴۹)."""
 
     class Status(models.TextChoices):
@@ -166,29 +166,58 @@ class Response(TimeStampedModel):
     channel = models.CharField("کانال", max_length=20, choices=Channel.choices)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT)
 
-    # قلم‌های ثابت فرم ورودی مدیر واحد، بخش ۲۴
-    mission = models.TextField("مأموریت و خروجی اصلی", blank=True, help_text="سه تا پنج کارکرد اصلی و ذی‌نفع آن‌ها.")
-    services_and_commitments = models.TextField(
-        "خدمت و مشتری و تعهد", blank=True, help_text="SLA، مهلت، صحت خروجی و حدود تحمل."
+    # قلم‌های ثابت پرسشنامه: کارکردهای واحد و هشت پرسش جلسه‌ی شناسایی بخش ۴ سند v5 (جواب س۴۸). برچسب هر قلم همان
+    # پرسش جلسه است و راهنمایش خروجی مورد انتظار آن. فهرست دارایی و نام تهدید شرط جواب دادن نیست.
+    functions = models.TextField(
+        "کارکردهای اصلی و تعهدهای واحد",
+        blank=True,
+        help_text="سه تا پنج کارکرد اصلی و تعهدهای قابل مشاهده‌ی واحد. پرسش‌های بعدی درباره‌ی همین‌هاست.",
+    )
+    mission = models.TextField(
+        "چه نتیجه‌ای لازم است برای شرکت یا مشتری ایجاد شود؟", blank=True, help_text="مأموریت، خروجی و ذی‌نفع."
+    )
+    commitments = models.TextField(
+        "چه تعهد زمانی یا کیفی داریم؟", blank=True, help_text="SLA، مهلت، صحت خروجی و حدود تحمل."
     )
     disruptive_event = models.TextField(
-        "رویداد مخل و شرایط آن", blank=True, help_text="چه اتفاقی مانع کار می‌شود و در چه شرایطی ممکن است."
+        "چه اتفاقی می‌تواند مانع انجام آن شود؟", blank=True, help_text="رویداد مخل، به زبان کسب‌وکار."
+    )
+    conditions = models.TextField(
+        "در چه شرایطی این اتفاق ممکن می‌شود؟",
+        blank=True,
+        help_text="علت یا شرط قابل بررسی؛ لازم نیست نام تهدید را بدانید.",
     )
     consequence = models.TextField(
-        "پیامد برای شرکت و مشتری", blank=True, help_text="چه کسی و چگونه آسیب می‌بیند؛ اثر زنجیره‌ای."
+        "اگر رخ دهد چه کسی و چگونه آسیب می‌بیند؟", blank=True, help_text="پیامد داخلی، مشتری و اثر زنجیره‌ای."
     )
     dependencies = models.TextField(
-        "وابستگی و جایگزین", blank=True, help_text="افراد، خدمات، تأمین‌کنندگان و ابزارهایی که به آن‌ها وابسته‌اید."
+        "به چه افراد یا خدماتی وابسته‌ایم؟", blank=True, help_text="وابستگی داخلی، مشتری، تأمین‌کننده و جایگزین."
     )
     evidence = models.TextField(
-        "شاهد و تجربه و تغییر اخیر", blank=True, help_text="رخداد، نزدیک‌به‌رخداد، تیکت، تغییر یا آزمون."
+        "چه شاهد، تجربه یا تغییر تازه‌ای داریم؟", blank=True, help_text="رخداد، نزدیک‌به‌رخداد، تیکت، تغییر یا آزمون."
+    )
+    current_controls = models.TextField(
+        "امروز چه چیزی جلوی وقوع یا خسارت را می‌گیرد؟", blank=True, help_text="کنترل فعلی و محل شواهد آن."
     )
     new_item = models.TextField(
         "مورد جدید",
         blank=True,
-        help_text="هر ریسک دیگری که در سؤال‌ها نیامده، با شرح آزاد. الگو: در [خدمت]، به علت [شرایط]، ممکن است "
-        "[رویداد] رخ دهد و [تعهد] را برای [داتین یا مشتری] مختل کند؛ پیامدش [نوع و دامنه] است.",
+        help_text="هر ریسک دیگری که در پرسش‌ها نیامده، با شرح آزاد. الگو: «در خدمت یا فرآیند [نام]، به علت یا در "
+        "شرایط [عامل و وضعیت]، ممکن است [رویداد مشخص] رخ دهد و انجام [هدف یا تعهد] برای [داتین یا مشتری] را "
+        "مختل کند؛ پیامد قابل مشاهده‌ی آن [نوع و دامنه‌ی پیامد] است.»",
     )
+
+    FIXED_ITEMS = [
+        "functions",
+        "mission",
+        "commitments",
+        "disruptive_event",
+        "conditions",
+        "consequence",
+        "dependencies",
+        "evidence",
+        "current_controls",
+    ]
 
     submitted_at = models.DateTimeField("زمان ارسال", null=True, blank=True)
     return_question = models.TextField("سؤال برگشت", blank=True)
@@ -232,9 +261,8 @@ class Response(TimeStampedModel):
         )
 
     def fixed_items(self):
-        """قلم‌های ثابت بخش ۲۴ با برچسبشان، برای نمایش."""
-        names = ["mission", "services_and_commitments", "disruptive_event", "consequence", "dependencies", "evidence"]
-        return [(self._meta.get_field(name).verbose_name, getattr(self, name)) for name in names]
+        """قلم‌های ثابت با برچسبشان، برای نمایش."""
+        return [(self._meta.get_field(name).verbose_name, getattr(self, name)) for name in self.FIXED_ITEMS]
 
 
 class Answer(TimeStampedModel):
@@ -265,8 +293,8 @@ class Answer(TimeStampedModel):
 
 
 class PendingRisk(TimeStampedModel):
-    """«ریسک در انتظار»: نشانه‌ی ریسکی که از یک پاسخ آمده و عضو GRC باید تعیین تکلیفش کند؛ یا آن را به پیش‌نویس
-    ریسک در رجیستر تبدیل می‌کند یا با دلیل کنار می‌گذارد (س۵۰). حذف نمی‌شود."""
+    """«ریسک در انتظار»: نشانه‌ی ریسکی که از یک پاسخ آمده و عضو GRC باید تعیین تکلیفش کند؛ یا آن را به ریسک
+    «ثبت‌شده در رجیستر» تبدیل می‌کند یا با دلیل کنار می‌گذارد (س۵۰). حذف نمی‌شود."""
 
     class Source(models.TextChoices):
         OPTION = "option", "گزینه‌ی نشانه‌ی ریسک"
