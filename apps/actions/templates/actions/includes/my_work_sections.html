@@ -1,0 +1,79 @@
+{% load jformat %}
+{% comment %}
+  بخش‌های «کارهای من». context از actions.mywork.my_work می‌آید.
+{% endcomment %}
+{% if not has_work %}
+  <p class="text-body-secondary">الان کاری منتظر شما نیست.</p>
+{% endif %}
+
+{% if my_actions %}
+  <h2 class="h5 mt-4 mb-3">اقدام‌های من</h2>
+  {% include "actions/includes/action_table.html" with action_list=my_actions show_risk=True %}
+{% endif %}
+
+{% if to_verify %}
+  <h2 class="h5 mt-4 mb-3">منتظر تأیید نتیجه‌ی شما</h2>
+  {% include "actions/includes/action_table.html" with action_list=to_verify show_risk=True %}
+{% endif %}
+
+{% if plans_to_approve %}
+  <h2 class="h5 mt-4 mb-3">طرح‌های مواجهه‌ی منتظر تأیید شما</h2>
+  <ul class="list-group mb-3">
+    {% for plan in plans_to_approve %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span><a href="{{ plan.get_absolute_url }}">{{ plan }}</a> {% include "assessments/includes/level_badge.html" with level=plan.assessment.decision_level %}</span>
+        <span class="small text-nowrap">مهلت {{ plan.decision_due|jformat:"%Y/%m/%d" }}{% if plan.is_overdue %} <span class="badge text-bg-danger">گذشته</span>{% endif %}</span>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if waiting_risks %}
+  <h2 class="h5 mt-4 mb-3">ریسک‌های منتظر طرح مواجهه</h2>
+  <p class="small text-body-secondary">به ترتیب سطح تصمیم، امتیاز و مهلت.</p>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>ریسک</th><th>سطح</th><th>امتیاز</th><th>مالک</th><th>وضعیت طرح</th><th>مهلت طرح</th></tr></thead>
+      <tbody>
+        {% for row in waiting_risks %}
+          <tr>
+            <td><a href="{{ row.risk.get_absolute_url }}#treatment">{{ row.risk }}</a></td>
+            <td>{% include "assessments/includes/level_badge.html" with level=row.level %}</td>
+            <td>{{ row.assessment.score_high }}</td>
+            <td>{{ row.risk.owner.get_full_name|default:row.risk.owner.username|default:"-" }}</td>
+            <td>{% if row.plan %}<a href="{{ row.plan.get_absolute_url }}">{{ row.state }}</a>{% else %}{{ row.state }}{% endif %}</td>
+            <td class="text-nowrap">{{ row.due|jformat:"%Y/%m/%d" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% if qc %}
+  <h2 class="h5 mt-4 mb-3">ارزیابی‌های منتظر کنترل کیفیت شما</h2>
+  <ul class="list-group mb-3">
+    {% for item in qc %}<li class="list-group-item"><a href="{{ item.get_absolute_url }}#review">{{ item.code }}</a> - {{ item.risk }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+{% if referrals %}
+  <h2 class="h5 mt-4 mb-3">اختلاف‌های ارجاع‌شده به کارگروه امنیت</h2>
+  <ul class="list-group mb-3">
+    {% for item in referrals %}<li class="list-group-item"><a href="{{ item.get_absolute_url }}#review">{{ item.code }}</a> - {{ item.risk }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+{% if change_requests %}
+  <h2 class="h5 mt-4 mb-3">درخواست‌های ادغام و تفکیک منتظر تأیید شما</h2>
+  <ul class="list-group mb-3">
+    {% for item in change_requests %}<li class="list-group-item"><a href="{{ item.get_absolute_url }}">{{ item.get_kind_display }} {{ item.risk.code }}</a></li>{% endfor %}
+  </ul>
+{% endif %}
+
+{% if questions %}
+  <h2 class="h5 mt-4 mb-3">پرسش‌های ریسک منتظر جواب</h2>
+  <ul class="list-group mb-3">
+    {% for item in questions %}<li class="list-group-item d-flex justify-content-between"><a href="{% url 'workflow:question_answer' item.pk %}">{{ item.risk.code }}: {{ item.text|truncatechars:80 }}</a><span class="small text-nowrap">مهلت {{ item.due|jformat:"%Y/%m/%d" }}</span></li>{% endfor %}
+  </ul>
+{% endif %}

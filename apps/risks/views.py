@@ -8,6 +8,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
+from apps.actions.context import risk_treatment
 from apps.assessments.context import risk_assessments
 from apps.catalog.permissions import visible_services
 from apps.catalog.views import BackToRecordMixin
@@ -245,6 +246,7 @@ class RiskDetailView(DetailView):
             **record_extras(risk, user),
             **risk_workflow(risk, user),
             **risk_assessments(risk, user),
+            **risk_treatment(risk, user),
             **kwargs,
         )
 

@@ -75,6 +75,30 @@ class AssessmentError(Exception):
 
 
 @transaction.atomic
+def assessment_round_start(risk):
+    """زمان آخرین ورود ریسک به «در ارزیابی». ارزیابی‌ای که پیش از آن تأیید شده مال دور قبل است، مثلاً ریسکی که از
+    بازبینی برگشته (ردیف ۹ جدول س۱۵)."""
+    return risk.transitions.filter(to_status=Risk.Status.ASSESSMENT).values_list("created_at", flat=True).first()
+
+
+def round_current_assessments(risk):
+    """ارزیابی‌های جاری تأییدشده‌ی دور فعلی ارزیابی ریسک."""
+    approved = Assessment.objects.filter(risk=risk, kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED)
+    start = assessment_round_start(risk)
+    return approved.filter(approved_at__gte=start) if start else approved
+
+
+def decision_assessment(risk):
+    """ارزیابی‌ای که تصمیم مواجهه بر آن است: آخرین ارزیابی جاری تأییدشده‌ی دور فعلی که سطح تصمیم دارد."""
+    return (
+        round_current_assessments(risk)
+        .filter(decision_level__isnull=False)
+        .select_related("decision_level")
+        .order_by("-approved_at", "-pk")
+        .first()
+    )
+
+
 def create_assessment(risk, user, kind, **fields):
     problems = creation_problems(risk, kind)
     if problems:
