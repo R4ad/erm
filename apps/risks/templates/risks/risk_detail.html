@@ -14,6 +14,8 @@
   </div>
 </div>
 
+{% include "workflow/includes/risk_actions.html" %}
+
 {% if risk.scenario_changed %}
   <div class="alert alert-warning">
     سناریوی مرجع این ریسک بعد از ثبت آن تغییر اساسی کرده است (نسخه‌ی {{ risk.scenario_version }} به {{ risk.scenario.version }}). شرح ریسک را با سناریو مقایسه کنید.
@@ -121,6 +123,8 @@
   {% endif %}
 </div>
 {% include "risks/includes/evidence_table.html" with evidence_list=evidence empty_text="شاهدی که شما ببینید به این ریسک وصل نیست. نبود شاهد دلیل رد ریسک نیست؛ ریسک با عدم قطعیت بیشتر ارزیابی می‌شود." %}
+
+{% include "workflow/includes/risk_timeline.html" %}
 
 {% include "core/includes/attachments.html" with record=risk %}
 {% include "core/includes/comments.html" with record=risk %}

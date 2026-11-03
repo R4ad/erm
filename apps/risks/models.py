@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
@@ -254,6 +254,26 @@ class Risk(TimeStampedModel):
         help_text="عامل آغازگر، واحد شمارش یا دامنه هنوز نوشته نشده است.",
     )
 
+    # ادغام و تفکیک (قدم ۱۴): شناسه‌ی مبدأ و سابقه‌اش می‌ماند و فقط این پیوندها ثبت می‌شوند.
+    merged_into = models.ForeignKey(
+        "self",
+        verbose_name="ادغام در",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="merged_risks",
+    )
+    split_from = models.ForeignKey(
+        "self",
+        verbose_name="تفکیک از",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="split_parts",
+    )
+
     attachments = GenericRelation("core.Attachment")
     comments = GenericRelation("core.Comment")
 
@@ -264,6 +284,14 @@ class Risk(TimeStampedModel):
         verbose_name = "ریسک"
         verbose_name_plural = "ریسک‌ها"
         ordering = ["-created_at"]
+        constraints = [
+            # ریسکی که در ریسک دیگری ادغام شده بسته است، و هیچ ریسکی در خودش ادغام نمی‌شود.
+            models.CheckConstraint(
+                condition=Q(merged_into__isnull=True) | Q(status="closed"),
+                name="risk_merged_only_when_closed",
+            ),
+            models.CheckConstraint(condition=~Q(merged_into=F("pk")), name="risk_not_merged_into_itself"),
+        ]
 
     def __str__(self):
         return f"{self.code} {self.title}"

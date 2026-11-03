@@ -9,6 +9,13 @@
   با جواب دادن به این پرسشنامه‌ها، فرایندها، شیوه‌ی کار و ابزارهای واحدتان را شرح می‌دهید. کارشناس ریسک جواب‌ها را بررسی می‌کند و ریسک‌ها را در رجیستر ثبت می‌کند.
 </p>
 
+{% if risk_question_count %}
+  <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3">
+    <span>{{ risk_question_count }} پرسش درباره‌ی ریسک‌های واحد شما منتظر جواب است.</span>
+    <a href="{% url 'workflow:question_list' %}" class="btn btn-warning btn-sm text-nowrap">پرسش‌های ریسک</a>
+  </div>
+{% endif %}
+
 <h2 class="h5 mt-4 mb-3">پرسشنامه‌های فعال</h2>
 <div class="list-group mb-4">
   {% for questionnaire in questionnaires %}

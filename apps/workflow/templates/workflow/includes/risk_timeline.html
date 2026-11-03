@@ -1,0 +1,57 @@
+{% load jformat %}
+{% comment %}
+  پایین صفحه‌ی ریسک: پرسش‌های طرح‌شده در ارزیابی و تاریخچه‌ی انتقال وضعیت.
+{% endcomment %}
+{% if risk_questions %}
+  <h2 class="h5 mt-4 mb-3" id="questions">پرسش‌ها</h2>
+  {% for question in risk_questions %}
+    <div class="border rounded p-3 mb-2">
+      <div class="d-flex justify-content-between small text-body-secondary mb-1">
+        <span>{{ question.asked_by.get_full_name|default:question.asked_by.username }}، {{ question.created_at|jformat:"%Y/%m/%d" }}</span>
+        <span>
+          {% if question.is_open %}
+            مهلت {{ question.due|jformat:"%Y/%m/%d" }}
+            {% if question.is_overdue %}<span class="badge text-bg-danger">عقب‌افتاده</span>{% endif %}
+          {% else %}
+            <span class="badge text-bg-success">جواب داده شد</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="fw-semibold">{{ question.text|linebreaksbr }}</div>
+      {% if not question.is_open %}
+        <div class="mt-2">{{ question.answer|linebreaksbr }}</div>
+        <div class="small text-body-secondary mt-1">{{ question.answered_by.get_full_name|default:question.answered_by.username }}، {{ question.answered_at|jformat:"%Y/%m/%d" }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}
+
+<h2 class="h5 mt-4 mb-3" id="timeline">تاریخچه‌ی وضعیت</h2>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>زمان</th>
+        <th>انتقال</th>
+        <th>ثبت‌کننده</th>
+        <th>جلسه‌ی کارگروه</th>
+        <th>دلیل یا توضیح</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in timeline %}
+        <tr>
+          <td class="text-nowrap">{{ item.created_at|jformat:"%Y/%m/%d %H:%M" }}</td>
+          <td class="text-nowrap">{{ item.get_from_status_display }} ← {{ item.get_to_status_display }}</td>
+          <td class="text-nowrap">{{ item.created_by.get_full_name|default:item.created_by.username }}</td>
+          <td class="text-nowrap">{% if item.meeting_date %}{{ item.meeting_date|jformat:"%Y/%m/%d" }}{% else %}-{% endif %}</td>
+          <td>{{ item.reason|default:"-"|linebreaksbr }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-body-secondary py-4">ریسک از ثبت تا حالا در «{{ risk.get_status_display }}» مانده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

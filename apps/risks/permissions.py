@@ -35,8 +35,9 @@ def visible_risks(user):
 
 
 def can_add_evidence(user, risk):
-    """شاهد و پیوست ریسک را عضو GRC و مدیر سامانه روی همه‌ی ریسک‌ها و مالک ریسک روی ریسک خودش اضافه می‌کند (س۵۱)."""
-    return can_edit_register(user) or risk.owner_id == user.pk
+    """شاهد و پیوست ریسک را عضو GRC و مدیر سامانه روی همه‌ی ریسک‌ها و مالک ریسک روی ریسک خودش اضافه می‌کند (س۵۱).
+    ریسک ردشده یا بسته‌شده فقط سابقه است و شاهد و پیوست تازه نمی‌گیرد."""
+    return risk.is_active and (can_edit_register(user) or risk.owner_id == user.pk)
 
 
 def can_edit_evidence(user, evidence):

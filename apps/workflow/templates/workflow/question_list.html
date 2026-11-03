@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}پرسش‌های ریسک{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-1">پرسش‌های ریسک</h1>
+<p class="text-body-secondary mb-3">
+  پرسش‌هایی که عضو GRC برای تکمیل ارزیابی ریسک‌های واحد شما طرح کرده است. مهلت جواب پنج روز کاری است.
+</p>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>ریسک</th>
+        <th>واحد</th>
+        <th>پرسش</th>
+        <th>مهلت</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for question in questions %}
+        <tr>
+          <td class="text-nowrap">{{ question.risk.code }}<div class="small text-body-secondary">{{ question.risk.title|truncatechars:50 }}</div></td>
+          <td class="text-nowrap">{{ question.risk.org_unit }}</td>
+          <td>{{ question.text|linebreaksbr }}</td>
+          <td class="text-nowrap">
+            {{ question.due|jformat:"%Y/%m/%d" }}
+            {% if question.is_overdue %}<span class="badge text-bg-danger">عقب‌افتاده</span>{% endif %}
+          </td>
+          <td class="text-end"><a href="{% url 'workflow:question_answer' question.pk %}" class="btn btn-primary btn-sm">جواب</a></td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-body-secondary py-4">پرسش بی‌جوابی برای شما نیست.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

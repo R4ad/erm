@@ -12,6 +12,7 @@ from apps.accounts.permissions import RoleRequiredMixin
 from apps.catalog.views import BackToRecordMixin
 from apps.core.views import FilteredListView, FormPageMixin
 from apps.risks.views import RiskCreateView
+from apps.workflow.permissions import answerable_questions
 
 from .forms import (
     DismissForm,
@@ -59,6 +60,8 @@ class AnswerHomeView(ListView):
         return super().get_context_data(
             my_responses=mine.select_related("questionnaire", "org_unit", "service", "respondent"),
             can_answer=answerable_units(user).exists(),
+            # پرسش‌هایی که عضو GRC برای ارزیابی ریسک‌های واحد طرح کرده است (قدم ۱۴).
+            risk_question_count=answerable_questions(user).count(),
             **kwargs,
         )
 
