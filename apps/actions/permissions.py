@@ -4,7 +4,7 @@ from apps.accounts.roles import Role
 from apps.risks.models import Risk
 from apps.risks.permissions import visible_risks
 
-from .models import TreatmentAction, TreatmentPlan
+from .models import RiskAcceptance, TreatmentAction, TreatmentPlan
 
 # طرح مواجهه و اقدام‌هایش را عضو GRC می‌نویسد و مالک ریسک طرح را تأیید می‌کند (بخش ۲۰ و جواب س۳۶). مدیر سامانه همیشه
 # می‌تواند بنویسد، ولی جای مالک ریسک تأیید نمی‌کند.
@@ -70,3 +70,18 @@ def can_attach_to_plan(user, plan):
 def can_attach_to_action(user, action):
     """پیوست اقدام را مالک، مجری و تأییدکننده‌ی آن، و عضو GRC و مدیر سامانه می‌گذارند (جواب س۵۱)."""
     return can_edit_plans(user) or user.pk in action.people_ids
+
+
+def visible_acceptances(user):
+    """پذیرش را هر کس که ریسکش را می‌بیند می‌بیند."""
+    return RiskAcceptance.objects.filter(risk__in=visible_risks(user))
+
+
+def can_edit_acceptance(user, acceptance):
+    """متن پذیرش را عضو GRC یا مدیر سامانه تا پیش از ارسال برای امضا می‌نویسد؛ امضاها روی متن ثابت است."""
+    return can_edit_plans(user) and acceptance.status == RiskAcceptance.Status.DRAFT and acceptance.risk.is_active
+
+
+def can_attach_to_acceptance(user, acceptance):
+    """پیوست پذیرش را عضو GRC، مدیر سامانه، مالک ریسک و مسئول پیگیری می‌گذارند."""
+    return can_edit_plans(user) or user.pk in (acceptance.risk.owner_id, acceptance.follow_up_by_id)

@@ -12,7 +12,7 @@ from apps.methodology.models import PeriodUnit, RiskLevel
 from apps.risks.models import Risk
 from apps.workcalendar.workdays import add_period
 
-from .models import ActionUpdate, TreatmentAction, TreatmentPlan
+from .models import ActionUpdate, RiskAcceptance, TreatmentAction, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_approve_plan, is_action_worker
 
 ST = TreatmentAction.Status
@@ -102,6 +102,11 @@ def plan_problems(plan):
         problems.append(f"شرط‌های گزینه‌ی «{plan.get_option_display()}» نوشته نشده است (بخش ۲۰).")
     if plan.needs_actions and not plan.actions.exists():
         problems.append(f"گزینه‌ی «{plan.get_option_display()}» دست‌کم یک اقدام می‌خواهد.")
+    if plan.option == OPTION.ACCEPT and not plan_required(level) and not has_valid_acceptance(plan.assessment):
+        problems.append(
+            "گزینه‌ی پذیرش یک پذیرش معتبر برای همین ارزیابی می‌خواهد که مالک ریسک و صاحبان اختیار امضا کرده باشند "
+            "(بخش ۱۹ و ۲۵)."
+        )
     if plan.option == OPTION.REDUCE:
         target = plan.target_assessment
         if target is None:
@@ -109,6 +114,12 @@ def plan_problems(plan):
         elif not target.is_approved:
             problems.append(f"ارزیابی هدف {target.code} هنوز کنترل کیفیت و تأیید نشده است.")
     return problems
+
+
+def has_valid_acceptance(assessment):
+    return RiskAcceptance.objects.filter(
+        assessment=assessment, status=RiskAcceptance.Status.ACTIVE, end_date__gte=timezone.localdate()
+    ).exists()
 
 
 def pending_actions(plan):

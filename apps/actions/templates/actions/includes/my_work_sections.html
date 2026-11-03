@@ -28,6 +28,17 @@
   </ul>
 {% endif %}
 
+{% if acceptances_to_sign %}
+  <h2 class="h5 mt-4 mb-3">پذیرش‌های منتظر امضای شما</h2>
+  {% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances_to_sign show_risk=True %}
+{% endif %}
+
+{% if expiring_acceptances %}
+  <h2 class="h5 mt-4 mb-3">پذیرش‌های رو به انقضا</h2>
+  <p class="small text-body-secondary">تا ۳۰ روز دیگر تمام می‌شوند یا تمام شده‌اند. تمدید خودکار نیست.</p>
+  {% include "actions/includes/acceptance_table.html" with acceptance_list=expiring_acceptances show_risk=True %}
+{% endif %}
+
 {% if waiting_risks %}
   <h2 class="h5 mt-4 mb-3">ریسک‌های منتظر طرح مواجهه</h2>
   <p class="small text-body-secondary">به ترتیب سطح تصمیم، امتیاز و مهلت.</p>

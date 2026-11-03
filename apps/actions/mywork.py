@@ -1,8 +1,10 @@
 """صفحه‌ی «کارهای من»: فهرست شخصی هر کاربر از کارهایی که منتظر خود اوست."""
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.assessments.models import Assessment
 from apps.assessments.review import can_decide_referral, can_review
@@ -10,7 +12,8 @@ from apps.assessments.services import decision_assessment
 from apps.risks.models import Risk
 from apps.workflow.models import ChangeRequest, RiskQuestion
 
-from .models import TreatmentAction, TreatmentPlan
+from .acceptance import acceptances_to_sign
+from .models import RiskAcceptance, TreatmentAction, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_edit_plans
 from .services import current_plan, decision_due
 
@@ -55,6 +58,16 @@ def waiting_risks():
     return sorted(rows, key=lambda row: row.sort_key)
 
 
+def expiring_acceptances(user):
+    """پذیرش‌های معتبری که تا ۳۰ روز دیگر تمام می‌شوند یا تمام شده‌اند: برای مسئول پیگیری، و برای عضو GRC همه.
+    یادآوری و تصعید خودکار با قدم ۲۳ می‌آید."""
+    soon = timezone.localdate() + timedelta(days=30)
+    acceptances = RiskAcceptance.objects.filter(status=RiskAcceptance.Status.ACTIVE, end_date__lte=soon)
+    if not can_edit_plans(user):
+        acceptances = acceptances.filter(follow_up_by=user)
+    return acceptances.select_related("risk", "assessment__decision_level", "follow_up_by").order_by("end_date")
+
+
 def my_work(user):
     """هر بخش فقط وقتی پر است که چیزی منتظر همین کاربر باشد."""
     people = Q(owner=user) | Q(assignee=user)
@@ -79,6 +92,8 @@ def my_work(user):
             answered_at__isnull=True, risk__status=Risk.Status.QUESTIONS, risk__org_unit__in=user.managed_unit_ids()
         ).select_related("risk"),
         "waiting_risks": waiting_risks() if can_edit_plans(user) else [],
+        "acceptances_to_sign": acceptances_to_sign(user),
+        "expiring_acceptances": expiring_acceptances(user),
         "qc": [
             item
             for item in Assessment.objects.filter(status=Assessment.Status.IN_QC).select_related("risk")

@@ -71,6 +71,17 @@
 </div>
 {% include "actions/includes/action_table.html" with action_list=actions empty_text="هنوز اقدامی ثبت نشده است." %}
 
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="acceptances">
+  <h2 class="h5 mb-0">پذیرش</h2>
+  {% if can_add_acceptance %}<a href="{% url 'actions:acceptance_create' risk.pk %}" class="btn btn-outline-primary btn-sm">پذیرش زمان‌دار</a>{% endif %}
+</div>
+<p class="small text-body-secondary">
+  {% if plan.option == "accept" %}گزینه‌ی پذیرش با یک پذیرش معتبر، با امضای مالک ریسک و صاحبان اختیار، تأیید می‌شود.
+  {% elif plan_required %}برای این سطح پذیرش فقط موقت و استثنایی است و کنار اقدام‌های طرح ثبت می‌شود.
+  {% else %}پذیرش ریسک باقیمانده، اگر لازم است، با امضای صاحبان اختیار ثبت می‌شود.{% endif %}
+</p>
+{% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances empty_text="پذیرشی برای این طرح ثبت نشده است." %}
+
 {% include "core/includes/attachments.html" with record=plan %}
 {% include "core/includes/comments.html" with record=plan %}
 {% endblock %}
