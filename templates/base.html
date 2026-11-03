@@ -37,6 +37,7 @@
               <li><a class="dropdown-item" href="{% url 'catalog:customer_list' %}">بانک‌ها</a></li>
             </ul>
           </li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'methodology:active' %}">روش ارزیابی</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'organization:unit_list' %}">ساختار سازمانی</a></li>
           {% if user.is_system_admin %}
           <li class="nav-item"><a class="nav-link" href="{% url 'accounts:user_list' %}">کاربران</a></li>

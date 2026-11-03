@@ -1,6 +1,24 @@
 from django import template
+from django.utils.html import escape, format_html
+from django.utils.safestring import mark_safe
 
 register = template.Library()
+
+
+@register.filter
+def paragraphs(text):
+    """متن بلند را بند به بند نشان می‌دهد. بندها با یک خط خالی از هم جدا می‌شوند و بندی که با «## » شروع شود
+    عنوان است. همه‌چیز escape می‌شود، پس متنی که در پنل مدیریت نوشته شده نمی‌تواند HTML یا اسکریپت به صفحه بیاورد."""
+    html = []
+    for block in (text or "").split("\n\n"):
+        block = block.strip()
+        if not block:
+            continue
+        if block.startswith("## "):
+            html.append(format_html('<h4 class="h6 mt-3">{}</h4>', block[3:]))
+        else:
+            html.append(format_html("<p>{}</p>", mark_safe(escape(block).replace("\n", "<br>"))))
+    return mark_safe("".join(html))
 
 
 @register.filter

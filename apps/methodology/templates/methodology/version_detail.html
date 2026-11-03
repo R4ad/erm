@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load formatting jformat %}
+
+{% block title %}روش ارزیابی - {{ version }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <h1 class="h4 mb-0">
+    روش ارزیابی، {{ version }}
+    <span class="badge {% if version.status == 'active' %}text-bg-success{% else %}text-bg-secondary{% endif %} ms-1">{{ version.get_status_display }}</span>
+    {% if version.is_trial %}<span class="badge text-bg-warning ms-1">آزمایشی</span>{% endif %}
+  </h1>
+  {% if versions|length > 1 %}
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        نسخه‌های دیگر
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        {% for other in versions %}
+          <li>
+            <a class="dropdown-item{% if other.pk == version.pk %} active{% endif %}" href="{{ other.get_absolute_url }}">
+              {{ other }} ({{ other.get_status_display }})
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+</div>
+
+{% if version.is_trial %}
+  <div class="alert alert-warning">
+    این نسخه هنوز تصویب نشده است. طبق «شرط اجرای سازمانی» سند v5، تا پیش از ابلاغ فقط برای ارزیابی آزمایشی به کار می‌رود
+    و جایگزین اختیارات و تعهدات مصوب جاری نمی‌شود.
+  </div>
+{% endif %}
+{% if version.status != "active" %}
+  <div class="alert alert-info">
+    این نسخه فعال نیست. ارزیابی‌های تازه با <a href="{% url 'methodology:active' %}">نسخه‌ی فعال</a> انجام می‌شوند.
+  </div>
+{% endif %}
+
+<dl class="row">
+  <dt class="col-sm-3">منبع</dt>
+  <dd class="col-sm-9">{{ version.source|default:"-" }}</dd>
+
+  {% if version.based_on %}
+    <dt class="col-sm-3">کپی‌شده از</dt>
+    <dd class="col-sm-9">{{ version.based_on }}</dd>
+  {% endif %}
+
+  <dt class="col-sm-3">تصویب</dt>
+  <dd class="col-sm-9">
+    {% if version.approved_on %}
+      نامه‌ی شماره‌ی {{ version.approval_ref }} به تاریخ {{ version.approved_on|jformat:"%Y/%m/%d" }}
+      {% if version.approval_recorded_by %}<span class="text-body-secondary">(ثبت: {{ version.approval_recorded_by.get_full_name|default:version.approval_recorded_by.username }})</span>{% endif %}
+    {% else %}
+      تصویب نشده
+    {% endif %}
+  </dd>
+
+  {% if version.activated_at %}
+    <dt class="col-sm-3">زمان فعال شدن</dt>
+    <dd class="col-sm-9"><span dir="ltr">{{ version.activated_at|jformat:"%Y/%m/%d %H:%M" }}</span></dd>
+  {% endif %}
+
+  {% if version.change_notes %}
+    <dt class="col-sm-3">شرح تغییرات</dt>
+    <dd class="col-sm-9">{{ version.change_notes|paragraphs }}</dd>
+  {% endif %}
+</dl>
+
+<nav class="mb-4" aria-label="بخش‌های صفحه">
+  <a href="#likelihood" class="btn btn-outline-secondary btn-sm">احتمال</a>
+  <a href="#impact" class="btn btn-outline-secondary btn-sm">پیامد</a>
+  <a href="#levels" class="btn btn-outline-secondary btn-sm">سطح ریسک و تصمیم</a>
+  <a href="#rules" class="btn btn-outline-secondary btn-sm">قواعد هر سطح</a>
+  <a href="#parameters" class="btn btn-outline-secondary btn-sm">پارامترها</a>
+</nav>
+
+<h2 class="h5 border-bottom pb-2 mt-4" id="likelihood">احتمال</h2>
+<p>
+  راهبرد: {{ version.get_likelihood_strategy_display }}.
+  {% if version.likelihood_strategy == "paths_v5" %}
+    در هر مسیر، B کمینه‌ی B0 و Bc همان مسیر است؛ B سناریو بیشینه‌ی B مسیرهاست و L از جدول A × B خوانده می‌شود
+    (بخش ۱۵ و ۱۷ سند v5).
+  {% endif %}
+</p>
+
+{% for scale in likelihood_scales %}
+  {% include "methodology/includes/scale.html" %}
+  {% if scale.code == "Bc" %}
+    <h4 class="h6 mt-3">قاعده‌های Bc</h4>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle w-auto">
+        <thead class="table-light"><tr><th>شرط</th><th class="text-center">Bc</th></tr></thead>
+        <tbody>
+          {% for rule in bc_rules %}
+            <tr><td>{{ rule.condition_display }}</td><td class="text-center">{{ rule.bc }}</td></tr>
+          {% endfor %}
+          <tr><td>هیچ‌کدام از شرط‌های بالا برقرار نیست</td><td class="text-center">{{ bc_default|default:"-" }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small text-body-secondary">اگر چند شرط برقرار باشد، کمترین Bc انتخاب می‌شود.</p>
+  {% endif %}
+{% endfor %}
+
+{% if l_scale %}
+  <section class="mt-4" id="scale-L">
+    <h3 class="h6">{{ l_scale.code }}: {{ l_scale.name }}</h3>
+    {% if l_scale.scope %}<p class="text-body-secondary">{{ l_scale.scope }}</p>{% endif %}
+    {{ l_scale.description|paragraphs }}
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle text-center w-auto">
+        <thead class="table-light">
+          <tr>
+            <th>A در سطر و B در ستون</th>
+            {% for b in levels_range %}<th>B{{ b }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for a, row in likelihood_grid %}
+            <tr>
+              <th class="table-light">A{{ a }}</th>
+              {% for value in row %}<td>{{ value|default:"-" }}</td>{% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ l_scale.guidance|paragraphs }}
+  </section>
+{% endif %}
+
+<h2 class="h5 border-bottom pb-2 mt-5" id="impact">پیامد</h2>
+<p>
+  راهبرد: {{ version.get_impact_strategy_display }}.
+  {% if version.impact_strategy == "max" %}
+    پیامد نهایی بزرگ‌ترین سطح معتبر بین بُعدها و ذی‌نفعان است:
+    <span dir="ltr">I = max({% for scale in impact_scales %}{{ scale.code }}{% if not forloop.last %}, {% endif %}{% endfor %})</span>
+  {% endif %}
+</p>
+{{ version.impact_guidance|paragraphs }}
+
+<div class="table-responsive">
+  <table class="table table-sm table-bordered align-middle">
+    <thead class="table-light"><tr><th>نماد</th><th>بُعد</th><th>دامنه</th></tr></thead>
+    <tbody>
+      {% for scale in impact_scales %}
+        <tr><td><a href="#scale-{{ scale.code }}">{{ scale.code }}</a></td><td>{{ scale.name }}</td><td>{{ scale.scope }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% for scale in impact_scales %}
+  {% include "methodology/includes/scale.html" %}
+{% endfor %}
+
+<h2 class="h5 border-bottom pb-2 mt-5" id="levels">سطح ریسک و تصمیم</h2>
+<p><span dir="ltr">Score = L × I</span></p>
+{{ version.decision_guidance|paragraphs }}
+
+<div class="row g-4">
+  <div class="col-md-5">
+    <h3 class="h6">مرز سطح‌ها</h3>
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-light"><tr><th>سطح</th><th>امتیاز</th></tr></thead>
+      <tbody>
+        {% for level in risk_levels %}
+          <tr>
+            <td><span class="badge" style="background-color: {{ level.color }}; color: {{ level.text_color }}">{{ level.name }}</span></td>
+            <td>{{ level.min_score }} تا {{ level.max_score }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3 class="h6">کف سطح تصمیم</h3>
+    <ul>
+      {% for floor in floors %}
+        <li>پیامد {{ floor.min_impact }} یا بیشتر: دست‌کم «{{ floor.min_level }}»، هر چه امتیاز باشد</li>
+      {% empty %}
+        <li class="text-body-secondary">کفی تعریف نشده است.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="col-md-7">
+    <h3 class="h6">سطح تصمیم برای هر L و I</h3>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle text-center">
+        <thead class="table-light">
+          <tr>
+            <th>احتمال و پیامد</th>
+            {% for impact in levels_range %}<th>I{{ impact }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for likelihood, cells in decision_matrix %}
+            <tr>
+              <th class="table-light">L{{ likelihood }}</th>
+              {% for cell in cells %}
+                {% if cell.level %}
+                  <td style="background-color: {{ cell.level.color }}; color: {{ cell.level.text_color }}">
+                    {{ cell.level.name }}
+                    <div class="small">{{ cell.score }}{% if cell.raised %} · کف{% endif %}</div>
+                  </td>
+                {% else %}
+                  <td>-<div class="small">{{ cell.score }}</div></td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="small text-body-secondary">عدد کوچک هر خانه امتیاز L × I است. «کف» یعنی کف پیامد سطح را بالاتر از سطح پایه‌ی امتیاز برده است.</p>
+  </div>
+</div>
+
+<h2 class="h5 border-bottom pb-2 mt-5" id="rules">قواعد هر سطح و پذیرش</h2>
+{{ version.acceptance_guidance|paragraphs }}
+<div class="table-responsive">
+  <table class="table table-sm table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>سطح</th>
+        <th>تصمیم و مرجع مجاز</th>
+        <th>امضای کنار مالک ریسک</th>
+        <th class="text-nowrap">مهلت مهار</th>
+        <th class="text-nowrap">مهلت طرح</th>
+        <th>حداکثر اعتبار پذیرش</th>
+        <th>دوره‌ی بازبینی</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for level in risk_levels %}
+        <tr>
+          <td><span class="badge" style="background-color: {{ level.color }}; color: {{ level.text_color }}">{{ level.name }}</span></td>
+          <td>{{ level.decision_rule }}</td>
+          <td>{{ level.get_co_approver_display }}</td>
+          <td class="text-nowrap">{% if level.containment_value %}{{ level.containment_value }} {{ level.get_containment_unit_display }}{% else %}-{% endif %}</td>
+          <td class="text-nowrap">{{ level.plan_value }} {{ level.get_plan_unit_display }}</td>
+          <td class="text-nowrap">{{ level.acceptance_value }} {{ level.get_acceptance_unit_display }}</td>
+          <td class="text-nowrap">{{ level.review_value }} {{ level.get_review_unit_display }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="small text-body-secondary">ماه، ماه تقویم شمسی است؛ مثلاً پذیرش ۶ ماهه از ۱۰ مهر تا ۱۰ فروردین اعتبار دارد.</p>
+
+<h2 class="h5 border-bottom pb-2 mt-5" id="parameters">پارامترها</h2>
+<div class="table-responsive">
+  <table class="table table-sm table-bordered align-middle">
+    <thead class="table-light"><tr><th>پارامتر</th><th>مقدار</th><th>واحد</th><th>منبع</th></tr></thead>
+    <tbody>
+      {% for parameter in parameters %}
+        <tr>
+          <td>{{ parameter.get_key_display }}</td>
+          <td class="text-nowrap">{{ parameter.value_display }}</td>
+          <td class="text-nowrap">{{ parameter.unit }}</td>
+          <td>{{ parameter.note|default:"-" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-body-secondary">پارامتری ثبت نشده است.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
