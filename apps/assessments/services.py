@@ -12,8 +12,10 @@ from apps.controls.models import ControlAssessment
 from apps.methodology.engine import (
     A_UNKNOWN,
     NO_PATH,
+    Band,
     Control,
     Impact,
+    PathResult,
     check_impacts,
     check_likelihood,
     impact_band,
@@ -200,6 +202,7 @@ class ImpactSummary:
     incomplete: list  # چرا I هنوز کران بالای قابل دفاعی ندارد
     missing: list  # خانه‌هایی که هنوز ثبت نشده‌اند
     unknown: list  # خانه‌هایی که «نامعلوم» ثبت شده‌اند
+    cells: list = field(default_factory=list)  # [(Impact موتور، ImpactDetail یا None)] به ترتیب جدول
 
 
 def impact_summary(assessment):
@@ -208,7 +211,7 @@ def impact_summary(assessment):
     scales = impact_scales(assessment)
     columns = stakeholders(assessment)
     cells = {(impact.customer_id, impact.scale_id): impact for impact in assessment.impacts.select_related("customer")}
-    rows, impacts, missing, unknown = [], [], [], []
+    rows, impacts, missing, unknown, pairs = [], [], [], [], []
     for scale in scales:
         row = []
         for customer in columns:
@@ -220,12 +223,13 @@ def impact_summary(assessment):
             elif detail.is_unknown:
                 unknown.append(f"{scale.code} برای {name}")
             impacts.append(Impact(name, scale.code, detail.engine_level if detail else None))
+            pairs.append((impacts[-1], detail))
         rows.append((scale, row))
     problems, incomplete = [], []
     tables = MethodTables(assessment.method_version)
     checked = check_impacts(tables, impacts, problems)
     band = None if problems else impact_band(tables, checked, incomplete)
-    return ImpactSummary(rows, columns, band, problems, incomplete, missing, unknown)
+    return ImpactSummary(rows, columns, band, problems, incomplete, missing, unknown, pairs)
 
 
 @dataclass(frozen=True)
@@ -311,11 +315,25 @@ class LikelihoodSummary:
     problems: list  # ورودی نامعتبر
     incomplete: list  # چرا L هنوز کران بالای قابل دفاعی ندارد
     blockers: list  # آن‌چه تأیید نهایی ارزیابی را می‌بندد
+    engine_paths: list = field(default_factory=list)  # مسیرها به زبان موتور محاسبه
+
+
+def band_or_none(low, high):
+    return None if low is None else Band(low, high)
+
+
+def band_list(band):
+    return None if band is None else [band.low, band.high]
 
 
 def likelihood_summary(assessment, on=None):
     """A، B هر مسیر، B سناریو و L همان‌طور که موتور محاسبه با نسخه‌ی روش ارزیابی حساب می‌کند. E هر کنترل از
-    ارزیابی اثربخشی‌اش می‌آید و کنترل معلق یا با شاهد کهنه E1 حساب می‌شود."""
+    ارزیابی اثربخشی‌اش می‌آید و کنترل معلق یا با شاهد کهنه E1 حساب می‌شود. ارزیابی تأییدشده همان چیزی را نشان
+    می‌دهد که هنگام تأیید حساب و ذخیره شده است، حتی اگر شاهد کنترلی بعداً کهنه شده باشد."""
+    rate = assessment_rate_check(assessment) if assessment.a_basis == "rate" else None
+    if assessment.is_approved and "paths" in assessment.result_detail:
+        return approved_likelihood(assessment, rate)
+
     tables = MethodTables(assessment.method_version)
     rows, engine_paths = [], []
     for path in assessment.paths.prefetch_related("control_assessments__control", "evidence"):
@@ -357,8 +375,51 @@ def likelihood_summary(assessment, on=None):
     for row in rows:
         if not row.path.evidence.all():
             blockers.append(f"B0 مسیر «{row.path.name}» شاهد ندارد.")
-    rate = assessment_rate_check(assessment) if assessment.a_basis == "rate" else None
-    return LikelihoodSummary(rate, rows, b, likelihood, problems, incomplete, blockers)
+    return LikelihoodSummary(rate, rows, b, likelihood, problems, incomplete, blockers, engine_paths)
+
+
+def likelihood_snapshot(summary):
+    """مسیرها همان‌طور که هنگام تأیید حساب شده‌اند، برای ذخیره در result_detail."""
+    return [
+        {
+            "path": row.path.pk,
+            "controls": [
+                {"assessment": item.control_assessment.pk, "e": item.e, "note": item.note} for item in row.controls
+            ],
+            "b0": band_list(row.result.b0),
+            "bc": band_list(row.result.bc),
+            "b": band_list(row.result.b),
+            "notes": row.notes,
+        }
+        for row in summary.paths
+    ]
+
+
+def approved_likelihood(assessment, rate):
+    detail = assessment.result_detail
+    paths = {path.pk: path for path in assessment.paths.all()}
+    ids = [item["assessment"] for row in detail["paths"] for item in row["controls"]]
+    found = {item.pk: item for item in ControlAssessment.objects.filter(pk__in=ids).select_related("control")}
+    rows = []
+    for row in detail["paths"]:
+        path = paths[row["path"]]
+        controls = [ControlRow(found[item["assessment"]], item["e"], item["note"]) for item in row["controls"]]
+        result = PathResult(
+            name=path.name,
+            b0=band_or_none(*(row["b0"] or [None, None])),
+            bc=band_or_none(*row["bc"]),
+            b=band_or_none(*(row["b"] or [None, None])),
+        )
+        rows.append(PathRow(path, controls, result, row["notes"]))
+    return LikelihoodSummary(
+        rate,
+        rows,
+        band_or_none(assessment.b_low, assessment.b_high),
+        band_or_none(assessment.likelihood_low, assessment.likelihood_high),
+        problems=[],
+        incomplete=[],
+        blockers=[],
+    )
 
 
 def path_control_choices(assessment, current=()):

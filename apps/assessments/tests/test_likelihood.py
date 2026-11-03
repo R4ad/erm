@@ -165,6 +165,7 @@ def path_data(**fields):
         "name": "انتشار از مسیر رسمی",
         "description": "بسته از خط انتشار می‌گذرد.",
         "b0_level": "5",
+        "b0_confidence": "medium",
         "b0_rationale": "مسیر عادی",
         **fields,
     }

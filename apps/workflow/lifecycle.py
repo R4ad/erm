@@ -4,13 +4,14 @@
 پرسشنامه است (قدم ۱۲)؛ ریسک با «ثبت‌شده در رجیستر» به دنیا می‌آید. «برگشت به رجیستر» همان ردیف ۲ است برای ریسکی
 که با «طرح پرسش‌های جدید» (ردیف ۴) به پاسخ به پرسش‌ها برگشته است.
 
-شرط‌هایی که به ماژول‌های بعدی بسته‌اند، وقتی همان ماژول ساخته شود اضافه می‌شوند: ارزیابی تأییدشده برای ردیف ۶
-(قدم ۱۸)، طرح درمان برای ردیف ۷ (قدم ۱۹) و موعد بازبینی برای ردیف ۸ (قدم ۲۳).
+شرط‌هایی که به ماژول‌های بعدی بسته‌اند، وقتی همان ماژول ساخته شود اضافه می‌شوند: ارزیابی جاری تأییدشده برای ردیف
+۶ از قدم ۱۸ آمده است؛ طرح درمان برای ردیف ۷ (قدم ۱۹) و موعد بازبینی برای ردیف ۸ (قدم ۲۳) می‌آیند.
 """
 
 from dataclasses import dataclass, field
 
 from apps.accounts.roles import Role
+from apps.assessments.models import Assessment
 from apps.risks.models import Risk
 
 S = Risk.Status
@@ -62,6 +63,22 @@ def ready_for_assessment(risk, data):
     if not risk.evidence.exists() and not (data.get("reason") or "").strip():
         problems.append("شاهدی به ریسک وصل نیست؛ فرض قابل آزمون را بنویسید.")
     return problems
+
+
+def approved_current_assessment(risk, data):
+    """ردیف ۶: کارگروه ریسک را با نتیجه‌ی یک ارزیابی جاری تأییدشده به برنامه‌ی درمان می‌فرستد. ارزیابی باید بعد از
+    آخرین ورود ریسک به «در ارزیابی» تأیید شده باشد، تا ریسکی که از بازبینی برگشته (ردیف ۹) با نتیجه‌ی تازه تصمیم
+    بگیرد، و سطح تصمیم داشته باشد، چون برنامه‌ی درمان از روی همین سطح طراحی می‌شود. ارزیابی ناقصی که کران قابل
+    دفاعی ندارد سطح تصمیم ندارد، مگر یک قاعده‌ی تقدم سطح را بالا برده باشد."""
+    approved = Assessment.objects.filter(risk=risk, kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED)
+    entered = risk.transitions.filter(to_status=S.ASSESSMENT).values_list("created_at", flat=True).first()
+    if entered:
+        approved = approved.filter(approved_at__gte=entered)
+    if not approved.exists():
+        return ["هنوز ارزیابی جاری تأییدشده‌ای برای این دور ارزیابی ریسک نیست."]
+    if not approved.filter(decision_level__isnull=False).exists():
+        return ["ارزیابی جاری تأییدشده ناقص است و سطح تصمیم ندارد؛ جزء نامعلوم را روشن کنید و دوباره ارزیابی کنید."]
+    return []
 
 
 TRANSITIONS = [
@@ -117,6 +134,7 @@ TRANSITIONS = [
         description="کارگروه امنیت ریسک را تأیید کرده است و برنامه‌ی درمان طراحی می‌شود.",
         roles=WORKGROUP,
         meeting_date=True,
+        checks=(approved_current_assessment,),
     ),
     Transition(
         name="start_treatment",

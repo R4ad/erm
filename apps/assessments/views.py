@@ -12,8 +12,18 @@ from apps.methodology.models import MethodParameter
 from apps.risks.models import Evidence
 from apps.risks.permissions import visible_risks
 
-from .forms import AssessmentForm, ImpactDetailForm, InitiatorForm, PathForm
-from .models import Path
+from .forms import AssessmentForm, ImpactDetailForm, InitiatorForm, PathForm, ReferralForm, ReviewForm
+from .models import AssessmentReview, Path
+from .results import outcome, submission_problems
+from .review import (
+    ReviewError,
+    can_decide_referral,
+    can_review,
+    can_submit,
+    decide_referral,
+    review,
+    submit,
+)
 from .permissions import ASSESSMENT_EDIT_ROLES, can_edit_assessment, visible_assessments
 from .services import (
     AssessmentError,
@@ -90,12 +100,71 @@ class AssessmentDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         assessment = self.object
+        user = self.request.user
+        submit_allowed = can_submit(user, assessment)
         return super().get_context_data(
             summary=impact_summary(assessment),
             likelihood=likelihood_summary(assessment),
-            can_edit=can_edit_assessment(self.request.user, assessment),
+            outcome=outcome(assessment),
+            can_edit=can_edit_assessment(user, assessment),
+            can_submit=submit_allowed,
+            submission_problems=submission_problems(assessment) if submit_allowed else [],
+            can_review=can_review(user, assessment),
+            can_decide_referral=can_decide_referral(user, assessment),
+            reviews=assessment.reviews.select_related("created_by"),
+            review_form=ReviewForm(),
+            referral_form=ReferralForm(),
             **kwargs,
         )
+
+
+class ReviewActionView(View):
+    """کارهای کنترل کیفیت. هر ایراد به صورت پیام برمی‌گردد و صفحه‌ی ارزیابی دوباره باز می‌شود."""
+
+    def post(self, request, pk):
+        assessment = get_object_or_404(
+            visible_assessments(request.user).select_related("risk", "method_version"), pk=pk
+        )
+        try:
+            message = self.perform(assessment, request)
+        except ReviewError as error:
+            for problem in error.problems:
+                messages.error(request, problem)
+        else:
+            messages.success(request, message)
+        return redirect(f"{assessment.get_absolute_url()}#review")
+
+
+class SubmitView(ReviewActionView):
+    def perform(self, assessment, request):
+        if not can_submit(request.user, assessment):
+            raise PermissionDenied
+        submit(assessment, request.user, request.POST.get("notes", ""))
+        return f"ارزیابی {assessment.code} برای کنترل کیفیت فرستاده شد."
+
+
+class ReviewView(ReviewActionView):
+    def perform(self, assessment, request):
+        if not can_review(request.user, assessment):
+            raise PermissionDenied
+        form = ReviewForm(request.POST)
+        form.is_valid()
+        action = request.POST.get("action", "")
+        review(assessment, request.user, action, form.cleaned_data.get("notes", ""))
+        return f"ارزیابی {assessment.code}: {AssessmentReview.Action(action).label} ثبت شد."
+
+
+class ReferralView(ReviewActionView):
+    def perform(self, assessment, request):
+        if not can_decide_referral(request.user, assessment):
+            raise PermissionDenied
+        form = ReferralForm(request.POST)
+        if not form.is_valid():
+            raise ReviewError([error for errors in form.errors.values() for error in errors])
+        action = request.POST.get("action", "")
+        data = form.cleaned_data
+        decide_referral(assessment, request.user, action, data.get("notes", ""), data.get("meeting_date"))
+        return f"تصمیم کارگروه برای ارزیابی {assessment.code} ثبت شد."
 
 
 class EditableAssessmentMixin:
