@@ -5,6 +5,7 @@ from apps.actions.mywork import my_work
 
 from . import formatting as fmt
 from .base import ApiView
+from .routes import spa_route
 
 
 def risk_ref(risk):
@@ -12,12 +13,13 @@ def risk_ref(risk):
 
 
 def item(key, label, href, risk=None, level=None, due=None, status=None, meta=None, route=None):
-    """یک ردیف «کارهای من»؛ همه‌ی بخش‌ها یک شکل دارند تا رابط React یک جور نشانشان دهد."""
+    """یک ردیف «کارهای من»؛ همه‌ی بخش‌ها یک شکل دارند تا رابط React یک جور نشانشان دهد. route مسیر همان کار در
+    رابط React است و اگر داده نشود از جدول routes.py ساخته می‌شود."""
     return {
         "key": key,
         "label": label,
         "href": href,
-        "route": route,
+        "route": route or spa_route(href),
         "risk": risk_ref(risk) if risk else None,
         "level": fmt.level(level),
         "due": fmt.deadline(due),
@@ -133,7 +135,6 @@ def sections(user):
                     level=row.level,
                     due=row.due,
                     meta=f"امتیاز {row.assessment.score_high}" if row.assessment.score_high else None,
-                    route=None if row.plan else f"/risks/{row.risk.pk}",
                 )
                 for row in work["waiting_risks"]
             ],

@@ -50,7 +50,56 @@ function defaults(): Record<string, Handler | unknown> {
     "GET questionnaires/1/start/": data.startForm(),
     "GET responses/1/": data.response(),
     "GET risk-questions/": data.riskQuestions(),
+    // پل فرم‌ها و صفحه‌های جنگو: هر نشانی جنگو (?path=) جواب خودش را دارد.
+    "GET forms/": byPath({
+      "/risks/1/edit/": data.riskForm(),
+      "/attachments/29/1/new/": data.uploadForm(),
+      "/workflow/risks/1/transition/start_treatment/": data.transitionForm(),
+    }),
+    "POST forms/": (call: ApiCall) => saved(call),
+    "GET pages/": byPath({
+      "/risks/evidence/": (call: ApiCall) => {
+        const page = data.evidenceList();
+        const kind = djangoQuery(call).get("kind");
+        page.results = page.results.filter((row) => !kind || row.kind.value === kind);
+        page.count = page.results.length;
+        return page;
+      },
+      "/risks/evidence/1/": data.evidenceDetail(),
+      "/risks/coverage/": data.coverage(),
+      "/workflow/requests/7/": data.changeDetail(),
+    }),
   };
+}
+
+/** نشانی جنگویی که رابط از پل خواسته، با query خودش. */
+function djangoQuery(call: ApiCall) {
+  return new URL(call.query.get("path") ?? "/", "http://django.test").searchParams;
+}
+
+/** جواب پل بر پایه‌ی نشانی جنگو (بدون query)؛ نشانی ناشناخته همان ۴۰۴ جنگوست. */
+function byPath(pages: Record<string, Handler | unknown>): Handler {
+  return (call) => {
+    const path = (call.query.get("path") ?? "").split("?")[0]!;
+    const page = pages[path];
+    if (page === undefined) return reply(404, { detail: "صفحه پیدا نشد." });
+    return typeof page === "function" ? (page as Handler)(call) : page;
+  };
+}
+
+/** جواب ذخیره‌ی موفق، مثل جنگو: پیام و مقصد بعدی. */
+function saved(call: ApiCall) {
+  const path = call.query.get("path") ?? "";
+  if (path.startsWith("/attachments/")) {
+    return {
+      message: "پیوست بارگذاری شد.",
+      redirect: { href: "/risks/1/#attachments", route: "/risks/1#attachments" },
+    };
+  }
+  if (path.startsWith("/workflow/requests/")) {
+    return { message: "پیشنهاد تأیید شد.", redirect: { href: "/workflow/requests/7/", route: "/workflow/requests/7" } };
+  }
+  return { message: "ریسک ذخیره شد.", redirect: { href: "/risks/1/", route: "/risks/1" } };
 }
 
 export class MockApi {
@@ -87,12 +136,15 @@ export class MockApi {
 function toCall(request: Request): ApiCall {
   const url = new URL(request.url());
   const raw = request.postData();
+  const headers = request.headers();
+  // فرم با فایل multipart است و همان متن خام می‌ماند تا آزمون نام فایل و فیلدها را در آن ببیند.
+  const json = headers["content-type"]?.includes("application/json");
   return {
     method: request.method(),
     path: url.pathname.replace(/^\/api\//, ""),
     query: url.searchParams,
-    body: raw ? JSON.parse(raw) : undefined,
-    headers: request.headers(),
+    body: raw ? (json ? JSON.parse(raw) : raw) : undefined,
+    headers,
   };
 }
 

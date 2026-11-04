@@ -8,9 +8,12 @@ from apps.core.jalali import WEEKDAY_NAMES, to_jalali, to_jalali_datetime
 
 
 def day(value):
-    """تاریخ: iso برای مقایسه و jalali (مثل 1405/08/13) برای نمایش."""
+    """تاریخ: iso برای مقایسه و jalali (مثل 1405/08/13) برای نمایش. لحظه (datetime) روز همان لحظه به وقت تهران
+    است، نه روز UTC آن؛ ثبت ساعت ۱ بامداد تهران روز قبل نشان داده نمی‌شود."""
     if value is None:
         return None
+    if isinstance(value, datetime.datetime):
+        value = timezone.localdate(value)
     return {"iso": value.isoformat(), "jalali": to_jalali(value)}
 
 

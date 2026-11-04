@@ -18,6 +18,7 @@ from apps.workflow.context import risk_workflow
 
 from . import formatting as fmt
 from .base import ApiView
+from .records import record_parts
 
 PAGE_SIZE = 25
 
@@ -61,7 +62,7 @@ def risk_row(risk, level):
         "org_unit": risk.org_unit.name,
         "owner": fmt.person(risk.owner),
         "channel": fmt.choice(risk, "channel"),
-        "created_at": fmt.day(risk.created_at.date()),
+        "created_at": fmt.day(risk.created_at),
     }
 
 
@@ -117,6 +118,12 @@ def transition_link(risk, transition):
     }
 
 
+def related_risk(risk, visible):
+    if risk is None:
+        return None
+    return {"code": risk.code, "href": risk.get_absolute_url() if visible else None}
+
+
 def assessment_row(assessment):
     return {
         "id": assessment.pk,
@@ -148,6 +155,8 @@ class RiskDetailView(ApiView):
         service_visible = risk.service_id and visible_services(user).filter(pk=risk.service_id).exists()
         visible_control_ids = set(visible_controls(user).filter(risks=risk).values_list("pk", flat=True))
         plan = treatment["current_plan"]
+        # ریسک ردشده یا بسته‌شده فقط سابقه است و ویرایش نمی‌شود، مثل صفحه‌ی جنگو.
+        can_edit = risk.is_active and can_edit_register(user)
         return Response(
             {
                 "id": risk.pk,
@@ -159,7 +168,7 @@ class RiskDetailView(ApiView):
                 "needs_completion": risk.needs_completion,
                 "level": fmt.level(current.decision_level if current else None),
                 "score": [current.score_low, current.score_high] if current and current.score_low else None,
-                "created_at": fmt.day(risk.created_at.date()),
+                "created_at": fmt.day(risk.created_at),
                 "updated_at": fmt.moment(risk.updated_at),
                 "channel": fmt.choice(risk, "channel"),
                 "scenario": (
@@ -194,7 +203,13 @@ class RiskDetailView(ApiView):
                 "data_class": fmt.choice(risk, "data_class"),
                 "cia": risk.cia_labels,
                 "links": [
-                    {"kind": link.get_kind_display(), "ref": link.ref, "url": link.url} for link in risk.links.all()
+                    {
+                        "kind": link.get_kind_display(),
+                        "ref": link.ref,
+                        "url": link.url,
+                        "edit_url": reverse("risks:link_update", args=[link.pk]) if can_edit else None,
+                    }
+                    for link in risk.links.all()
                 ],
                 "evidence": [
                     {
@@ -244,11 +259,20 @@ class RiskDetailView(ApiView):
                     "pending_change": (
                         {
                             "label": str(workflow["pending_change"]),
+                            "merge_into": workflow["pending_change"].merge_into.code
+                            if workflow["pending_change"].merge_into_id
+                            else None,
+                            "can_decide": workflow["can_decide_change"],
                             "href": workflow["pending_change"].get_absolute_url(),
                         }
                         if workflow["pending_change"]
                         else None
                     ),
+                    # ادغام و تفکیک: کد همیشه دیده می‌شود و پیوند فقط برای ریسکی که کاربر می‌بیند.
+                    "merged_into": related_risk(risk.merged_into, workflow["merged_into_visible"]),
+                    "split_from": related_risk(risk.split_from, workflow["split_from_visible"]),
+                    "merged_risks": [related_risk(item, True) for item in workflow["merged_risks"]],
+                    "split_parts": [related_risk(item, True) for item in workflow["split_parts"]],
                 },
                 "assessments": [assessment_row(item) for item in assessments["assessments"]],
                 "treatment": {
@@ -287,30 +311,16 @@ class RiskDetailView(ApiView):
                         for acceptance in treatment["acceptances"]
                     ],
                 },
-                "attachments": [
-                    {
-                        "name": attachment.original_name,
-                        "size": attachment.size,
-                        "description": attachment.description,
-                        "by": fmt.person(attachment.created_by),
-                        "at": fmt.moment(attachment.created_at),
-                        "href": attachment.get_absolute_url(),
-                    }
-                    for attachment in extras["attachments"]
-                ],
-                "comments": [
-                    {
-                        "text": comment.text,
-                        "by": fmt.person(comment.created_by),
-                        "at": fmt.moment(comment.created_at),
-                        "edited": comment.was_edited,
-                    }
-                    for comment in extras["comments"]
-                ],
+                **record_parts(risk, user, extras),
                 "actions": {
                     "classic": risk.get_absolute_url(),
-                    "edit": reverse("risks:risk_update", args=[risk.pk])
-                    if risk.is_active and can_edit_register(user)
+                    "edit": reverse("risks:risk_update", args=[risk.pk]) if can_edit else None,
+                    "add_link": reverse("risks:link_create", args=[risk.pk]) if can_edit else None,
+                    "propose_merge": reverse("workflow:change_request_create", args=[risk.pk, "merge"])
+                    if workflow["can_propose_change"]
+                    else None,
+                    "propose_split": reverse("workflow:change_request_create", args=[risk.pk, "split"])
+                    if workflow["can_propose_change"]
                     else None,
                     "add_evidence": reverse("risks:evidence_create") + f"?risk={risk.pk}"
                     if can_add_evidence(user, risk)

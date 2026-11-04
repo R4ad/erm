@@ -13,10 +13,10 @@ import {
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ClassicLink } from "@/components/ui/classic-link";
 import { Field, Input, Select } from "@/components/ui/field";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -249,10 +249,10 @@ export function RiskListPage() {
         }
         actions={
           page?.can_create && (
-            <ClassicLink href={page.create_url} button={{ variant: "primary" }}>
+            <AppLink href={page.create_url} button={{ variant: "primary" }}>
               <Plus aria-hidden />
               ثبت ریسک تازه
-            </ClassicLink>
+            </AppLink>
           )
         }
       />

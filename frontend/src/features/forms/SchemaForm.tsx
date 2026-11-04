@@ -1,0 +1,392 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Save } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useController, useForm, useFormState, type Control } from "react-hook-form";
+
+import { AppLink } from "@/components/ui/app-link";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Checkbox, Field, FieldError, FieldSet, Input, Radio, Select, Textarea } from "@/components/ui/field";
+import { FileInput } from "@/components/ui/file-input";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Alert } from "@/components/ui/states";
+import { useToast } from "@/components/ui/toast";
+import { useGoTo } from "@/features/session/links";
+import { ApiError, bridge, errorMessage, post } from "@/lib/api";
+import { faText, formatNumber } from "@/lib/format";
+import type { JalaliDate } from "@/lib/jalali";
+import type { AppHref, FormChoice, FormField, FormResult, FormSchema } from "@/lib/types";
+
+import { LeaveGuard } from "./leave-guard";
+import { editable, formSchema, initialValues, needsMultipart, toFormData, toJson, type FormValues } from "./schema";
+
+// فرم عمومی هر صفحه‌ی فرم جنگو از روی توصیف همان فرم. کنترل هر فیلد از نوعش می‌آید، خطاهای جنگو کنار همان فیلد
+// می‌نشیند و بعد از ذخیره پیام جنگو نشان داده می‌شود و کاربر به همان صفحه‌ای می‌رود که جنگو گفته است.
+
+const fieldId = (name: string) => `field-${name}`;
+
+/** «---------» پیش‌فرض جنگو برای گزینه‌ی خالی، در رابط «انتخاب کنید» است. */
+function emptyLabel(label: string | undefined) {
+  return !label || /^-+$/.test(label.trim()) ? "انتخاب کنید" : label;
+}
+
+function grouped(choices: FormChoice[]) {
+  const groups: { name: string | undefined; items: FormChoice[] }[] = [];
+  for (const choice of choices) {
+    const last = groups.at(-1);
+    if (last && last.name === choice.group) last.items.push(choice);
+    else groups.push({ name: choice.group, items: [choice] });
+  }
+  return groups;
+}
+
+interface SchemaFieldProps {
+  field: FormField;
+  control: Control<FormValues>;
+  today?: JalaliDate;
+}
+
+/** هر فیلد با useController خودش مشترک وضعیت همان فیلد است؛ پس با React Compiler خطا و مقدارش تازه می‌ماند. */
+function SchemaField({ field, control, today }: SchemaFieldProps) {
+  // ref جدا گرفته می‌شود تا بقیه‌ی مقدارهای کنترل در رندر خواندنی بمانند (قاعده‌ی react-hooks/refs).
+  const {
+    field: { ref, name, value, onChange, onBlur },
+    fieldState,
+  } = useController({ name: field.name, control });
+  const error = fieldState.error?.message;
+  const id = fieldId(field.name);
+  const common = { label: field.label, hint: field.help || undefined, error, required: field.required };
+
+  switch (field.kind) {
+    case "hidden":
+      return null;
+    case "checkbox":
+      return (
+        <div className="flex flex-col gap-1.5">
+          <Checkbox
+            id={id}
+            ref={ref}
+            name={name}
+            label={field.label}
+            description={field.help || undefined}
+            checked={Boolean(value)}
+            disabled={field.disabled}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-error` : undefined}
+            onChange={(event) => onChange(event.target.checked)}
+            onBlur={onBlur}
+          />
+          <FieldError id={`${id}-error`} messages={error ? [error] : []} />
+        </div>
+      );
+    case "radio":
+      return (
+        <FieldSet id={id} legend={field.label} hint={common.hint} error={error} required={field.required}>
+          <div className="flex flex-col gap-2">
+            {(field.choices ?? []).map((choice) => (
+              <Radio
+                key={choice.value}
+                card
+                name={name}
+                value={choice.value}
+                label={choice.label}
+                checked={value === choice.value}
+                disabled={field.disabled}
+                onChange={() => onChange(choice.value)}
+                onBlur={onBlur}
+              />
+            ))}
+          </div>
+        </FieldSet>
+      );
+    case "multiselect":
+      return (
+        <FieldSet id={id} legend={field.label} hint={common.hint} error={error} required={field.required}>
+          <MultiSelect
+            name={name}
+            label={field.label}
+            choices={field.choices ?? []}
+            value={Array.isArray(value) ? value : []}
+            disabled={field.disabled}
+            invalid={Boolean(error)}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
+        </FieldSet>
+      );
+    case "select":
+      return (
+        <Field id={id} {...common}>
+          <Select
+            ref={ref}
+            name={name}
+            value={typeof value === "string" ? value : ""}
+            disabled={field.disabled}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          >
+            {field.empty_label !== undefined && <option value="">{emptyLabel(field.empty_label)}</option>}
+            {grouped(field.choices ?? []).map((group, index) =>
+              group.name ? (
+                <optgroup key={`${group.name}-${index}`} label={group.name}>
+                  {group.items.map((choice) => (
+                    <option key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                group.items.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))
+              ),
+            )}
+          </Select>
+        </Field>
+      );
+    case "textarea":
+      return (
+        <Field id={id} {...common}>
+          <Textarea
+            ref={ref}
+            name={name}
+            rows={field.rows}
+            maxLength={field.max_length}
+            placeholder={field.placeholder}
+            value={typeof value === "string" ? value : ""}
+            disabled={field.disabled}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          />
+        </Field>
+      );
+    case "date":
+      return (
+        <Field id={id} {...common}>
+          <DatePicker
+            ref={ref}
+            name={name}
+            today={today}
+            placeholder={field.placeholder ? faText(field.placeholder) : undefined}
+            value={typeof value === "string" ? value : ""}
+            disabled={field.disabled}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
+        </Field>
+      );
+    case "file":
+      return (
+        <Field id={id} {...common}>
+          <FileInput
+            ref={ref}
+            name={name}
+            accept={field.accept}
+            maxSize={field.max_size}
+            value={value instanceof File ? value : null}
+            disabled={field.disabled}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
+        </Field>
+      );
+    default:
+      return (
+        <Field id={id} {...common}>
+          <Input
+            ref={ref}
+            name={name}
+            type={field.kind}
+            dir={field.kind === "url" || field.kind === "email" ? "ltr" : undefined}
+            inputMode={field.kind === "number" ? "decimal" : undefined}
+            maxLength={field.max_length}
+            placeholder={field.placeholder}
+            value={typeof value === "string" ? value : ""}
+            disabled={field.disabled}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          />
+        </Field>
+      );
+  }
+}
+
+interface SchemaFormProps {
+  schema: FormSchema;
+  /** نشانی جنگوی صفحه‌ی فرم؛ فرم به همان view جنگو فرستاده می‌شود. */
+  path: string;
+  submitLabel?: string;
+  submitIcon?: ReactNode;
+  cancel?: AppHref | null;
+  /** بعد از ذخیره؛ پیش‌فرض رفتن به همان صفحه‌ای است که جنگو گفته است. */
+  onSaved?: (result: FormResult) => void;
+  today?: JalaliDate;
+  /** چیزی میان فیلدها و دکمه‌ها، مثل توضیح پیامد. */
+  footer?: ReactNode;
+}
+
+export function SchemaForm({
+  schema,
+  path,
+  submitLabel = "ذخیره",
+  submitIcon = <Save aria-hidden />,
+  cancel,
+  onSaved,
+  today,
+  footer,
+}: SchemaFormProps) {
+  const fields = schema.fields;
+  const form = useForm<FormValues>({
+    defaultValues: initialValues(fields),
+    resolver: zodResolver(formSchema(fields)),
+    reValidateMode: "onChange",
+    // فوکوس بعد از فرستادن ناموفق روی خلاصه‌ی خطاهاست (پایین‌تر)، نه اولین فیلد؛ خلاصه به همه‌ی فیلدها پیوند دارد.
+    shouldFocusError: false,
+  });
+  const formState = useFormState({ control: form.control });
+  const [problems, setProblems] = useState<string[]>(schema.errors);
+  const [attempt, setAttempt] = useState(0);
+  const summary = useRef<HTMLDivElement>(null);
+  const focusSummary = useRef(false);
+  const released = useRef(false);
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const goTo = useGoTo();
+  const multipart = needsMultipart(fields, schema.multipart);
+
+  const save = useMutation({
+    mutationFn: (values: FormValues) =>
+      post<FormResult>(bridge("forms", path), multipart ? toFormData(fields, values) : toJson(fields, values)),
+    onSuccess: (result) => {
+      toast({ title: faText(result.message) });
+      // هر صفحه‌ای که این ذخیره عوضش کرده باشد دوباره خوانده می‌شود.
+      queryClient.removeQueries({ queryKey: ["form"] });
+      void queryClient.invalidateQueries();
+      // جواب ممکن است پیش از رندرِ «در حال ذخیره» برسد؛ پس رفتن بعد از ذخیره صریحاً از پرسش ترک صفحه آزاد است.
+      released.current = true;
+      if (onSaved) onSaved(result);
+      else goTo(result.redirect, cancel?.route ?? "/");
+    },
+    onError: (error) => {
+      const messages: string[] = [];
+      if (error instanceof ApiError && error.status === 400) {
+        const byName = new Map(fields.map((field) => [field.name, field]));
+        for (const [name, list] of Object.entries(error.errors)) {
+          const field = byName.get(name);
+          if (field && editable(field)) form.setError(name, { type: "server", message: list.join(" ") });
+          else messages.push(...list);
+        }
+        if (!Object.keys(error.errors).length) messages.push(error.message);
+      } else {
+        messages.push(errorMessage(error));
+      }
+      setProblems(messages);
+      failed();
+    },
+  });
+
+  function failed() {
+    focusSummary.current = true;
+    setAttempt((count) => count + 1);
+  }
+
+  // بعد از هر فرستادن ناموفق، فوکوس روی خلاصه‌ی خطاها می‌رود تا صفحه‌خوان و صفحه‌کلید از آن‌جا شروع کنند. خطاهای
+  // فیلدها ممکن است یک رندر بعد از شمارش تلاش برسند، پس فوکوس وقتی داده می‌شود که خلاصه واقعاً روی صفحه باشد.
+  useEffect(() => {
+    if (focusSummary.current && summary.current) {
+      focusSummary.current = false;
+      summary.current.focus();
+    }
+  });
+
+  const invalid = fields.filter((field) => form.getFieldState(field.name, formState).error);
+  const showSummary = attempt > 0 && (invalid.length > 0 || problems.length > 0);
+
+  function focusField(name: string) {
+    const element = document.getElementById(fieldId(name));
+    element?.scrollIntoView({ block: "center" });
+    const target = element?.matches("input, select, textarea")
+      ? element
+      : element?.querySelector<HTMLElement>("input, select, textarea, button");
+    target?.focus({ preventScroll: true });
+  }
+
+  return (
+    <>
+      <form
+        noValidate
+        encType={multipart ? "multipart/form-data" : undefined}
+        aria-busy={save.isPending}
+        className="flex flex-col gap-6"
+        onSubmit={(event) =>
+          void form.handleSubmit(
+            (values) => {
+              setProblems([]);
+              save.mutate(values);
+            },
+            () => {
+              setProblems([]);
+              failed();
+            },
+          )(event)
+        }
+      >
+        {showSummary && (
+          <Alert
+            ref={summary}
+            tabIndex={-1}
+            role="alert"
+            tone="danger"
+            className="outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
+            title={invalid.length ? `${formatNumber(invalid.length)} مورد فرم درست نیست:` : "فرم ذخیره نشد."}
+          >
+            <ul className="mt-1 flex flex-col gap-1">
+              {problems.map((problem) => (
+                <li key={problem}>{faText(problem)}</li>
+              ))}
+              {invalid.map((field) => (
+                <li key={field.name}>
+                  <a
+                    href={`#${fieldId(field.name)}`}
+                    className="text-fg underline underline-offset-4 hover:text-danger"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      focusField(field.name);
+                    }}
+                  >
+                    {field.label}: {form.getFieldState(field.name, formState).error?.message}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Alert>
+        )}
+
+        <div className="flex flex-col gap-5">
+          {fields.map((field) => (
+            <SchemaField key={field.name} field={field} control={form.control} today={today} />
+          ))}
+        </div>
+
+        {footer}
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-5">
+          <Button type="submit" variant="primary" loading={save.isPending}>
+            {!save.isPending && submitIcon}
+            {submitLabel}
+          </Button>
+          {cancel && (
+            <AppLink href={cancel.href} button={{ variant: "secondary" }}>
+              انصراف
+            </AppLink>
+          )}
+        </div>
+      </form>
+      {/* بعد از ذخیره پرسشی نمی‌آید؛ هنگام ذخیره هم نه، چون رفتن را خود فرم انجام می‌دهد. */}
+      <LeaveGuard when={formState.isDirty && !save.isPending && !save.isSuccess} released={released} />
+    </>
+  );
+}

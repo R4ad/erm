@@ -51,13 +51,31 @@ export interface NavGroup {
   items: NavLink[];
 }
 
+/** یک سطر جدول پیوندها (apps/api/routes.py): نشانی جنگو با این الگو در رابط React همین مسیر است. */
+export interface RouteEntry {
+  name: string;
+  /** regex جاوااسکریپت نشانی جنگو با گروه‌های نام‌دار، مثل ^/risks/(?<pk>[0-9]+)/edit/$ */
+  pattern: string;
+  /** مسیر React با همان نام‌ها، مثل /risks/:pk/edit */
+  route: string;
+  /** صفحه را فرم عمومی رابط با /api/forms/ نشان می‌دهد. */
+  form: boolean;
+}
+
 export interface Session {
   user: Person & { username: string; roles: string[]; job_title: string; org_unit: string | null };
   today: Today;
   navigation: NavGroup[];
+  routes: RouteEntry[];
   logout_url: string;
   classic_home: string;
   csrf_token: string;
+}
+
+/** نشانی جنگو، و مسیر همان صفحه در رابط React اگر آن صفحه این‌جا هم هست. */
+export interface AppHref {
+  href: string;
+  route: string | null;
 }
 
 export interface RiskRef {
@@ -140,7 +158,41 @@ export interface AssessmentRow {
   href: string;
 }
 
-export interface RiskDetail {
+/** ریسک مرتبط در ادغام و تفکیک؛ پیوند فقط وقتی هست که کاربر آن ریسک را می‌بیند. */
+export interface RelatedRisk {
+  code: string;
+  href: string | null;
+}
+
+export interface Attachment {
+  id: number;
+  name: string;
+  size: number;
+  description: string;
+  by: Person | null;
+  at: Moment;
+  href: string;
+}
+
+export interface Comment {
+  id: number;
+  text: string;
+  by: Person | null;
+  at: Moment;
+  edited: boolean;
+  /** فقط برای نویسنده‌ی همان نظر. */
+  edit_url: string | null;
+}
+
+/** پیوست‌ها و نظرهای یک رکورد (apps/api/records.py). */
+export interface RecordParts {
+  attachments: Attachment[];
+  comments: Comment[];
+  attach_url: string | null;
+  comment_url: string;
+}
+
+export interface RiskDetail extends RecordParts {
   id: number;
   code: string;
   title: string;
@@ -166,7 +218,7 @@ export interface RiskDetail {
   count_exclusions: string;
   data_class: Choice | null;
   cia: string;
-  links: { kind: string; ref: string; url: string }[];
+  links: { kind: string; ref: string; url: string; edit_url: string | null }[];
   evidence: {
     code: string;
     title: string;
@@ -196,7 +248,11 @@ export interface RiskDetail {
       answered_by: Person | null;
       is_open: boolean;
     }[];
-    pending_change: { label: string; href: string } | null;
+    pending_change: { label: string; merge_into: string | null; can_decide: boolean; href: string } | null;
+    merged_into: RelatedRisk | null;
+    split_from: RelatedRisk | null;
+    merged_risks: RelatedRisk[];
+    split_parts: RelatedRisk[];
   };
   assessments: AssessmentRow[];
   treatment: {
@@ -217,11 +273,12 @@ export interface RiskDetail {
       href: string;
     }[];
   };
-  attachments: { name: string; size: number; description: string; by: Person | null; at: Moment; href: string }[];
-  comments: { text: string; by: Person | null; at: Moment; edited: boolean }[];
   actions: {
     classic: string;
     edit: string | null;
+    add_link: string | null;
+    propose_merge: string | null;
+    propose_split: string | null;
     add_evidence: string | null;
     add_assessment: string | null;
     add_plan: string | null;
@@ -308,4 +365,248 @@ export interface RiskQuestion {
 export interface CsrfState {
   csrf_token: string;
   authenticated: boolean;
+}
+
+// فرم‌های جنگو از راه /api/forms/ (apps/api/forms.py و bridge.py)
+
+export type FieldKind =
+  | "hidden"
+  | "checkbox"
+  | "radio"
+  | "multiselect"
+  | "select"
+  | "textarea"
+  | "date"
+  | "file"
+  | "number"
+  | "url"
+  | "email"
+  | "password"
+  | "text";
+
+export interface FormChoice {
+  value: string;
+  label: string;
+  /** نام گروه (optgroup) گزینه، اگر گزینه‌ها گروه‌بندی شده‌اند. */
+  group?: string;
+}
+
+export type FieldValue = string | boolean | string[] | File | null;
+
+export interface FormField {
+  name: string;
+  label: string;
+  help: string;
+  required: boolean;
+  disabled: boolean;
+  kind: FieldKind;
+  value: string | boolean | string[] | null;
+  errors: string[];
+  choices?: FormChoice[];
+  empty_label?: string;
+  rows?: number;
+  placeholder?: string;
+  max_length?: number;
+  accept?: string;
+  max_size?: number;
+}
+
+export interface FormSchema {
+  fields: FormField[];
+  /** خطاهای کل فرم (non_field_errors). */
+  errors: string[];
+  multipart: boolean;
+}
+
+export interface PageMessage {
+  level: "debug" | "info" | "success" | "warning" | "error";
+  text: string;
+}
+
+export interface FormPageData {
+  view: string;
+  title: string;
+  form: FormSchema | null;
+  cancel: AppHref | null;
+  messages: PageMessage[];
+  /** برچسب دکمه‌ی فرستادن، اگر «ذخیره» نیست. */
+  submit?: string;
+  intro?: string;
+  // انتقال گردش کار
+  risk?: { id: number; code: string; title: string; status: Choice };
+  transition?: { label: string; description: string; source: string; target: string };
+  problems?: string[];
+  // خانه‌ی جهان ریسک
+  cell?: {
+    service: { code: string; name: string };
+    category: { code: string; name: string };
+    status: Choice;
+    reviewed_by: Person | null;
+    reviewed_on: Day | null;
+  };
+  risks?: { id: number; code: string; title: string; owner: Person | null; href: string }[];
+}
+
+export interface FormResult {
+  message: string;
+  redirect: AppHref | null;
+}
+
+// صفحه‌های خواندنی جنگو از راه /api/pages/ (apps/api/pages.py)
+
+export interface Listing<T> {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  results: T[];
+  count: number;
+  page: number;
+  pages: number;
+  filters: FormSchema | null;
+}
+
+export interface RiskBrief {
+  id: number;
+  code: string;
+  title: string;
+  status: Choice;
+  is_active: boolean;
+  service: string | null;
+  category: { code: string; name: string };
+  owner: Person | null;
+  href: string;
+}
+
+export interface EvidenceRow {
+  id: number;
+  code: string;
+  title: string;
+  kind: Choice;
+  observed_on: Day;
+  reliability: Choice;
+  expired: boolean;
+  confidential: boolean;
+  href: string;
+}
+
+export interface EvidenceList extends Listing<EvidenceRow> {
+  create_url: string | null;
+}
+
+export interface EvidenceDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  evidence: EvidenceRow & {
+    summary: string;
+    source: string;
+    scope: string;
+    valid_until: Day | null;
+    access_class: Choice;
+    url: string;
+    customer: string | null;
+    owner: Person | null;
+  };
+  risks: RiskBrief[];
+  edit_url: string | null;
+  list_url: string;
+}
+
+export interface ScenarioRow {
+  id: number;
+  code: string;
+  title: string;
+  category: { code: string; name: string };
+  version: number;
+  is_active: boolean;
+  href: string;
+}
+
+export interface ScenarioList extends Listing<ScenarioRow> {
+  create_url: string | null;
+}
+
+export interface ScenarioDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  scenario: ScenarioRow & { event: string; conditions: string; consequence: string };
+  risks: RiskBrief[];
+  edit_url: string | null;
+  create_risk_url: string | null;
+  list_url: string;
+}
+
+export interface CategoryRow {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  edit_url: string | null;
+}
+
+export interface CategoryList extends Listing<CategoryRow> {
+  create_url: string | null;
+  coverage_url: string;
+}
+
+export interface CoverageCell {
+  category: string;
+  status: Choice;
+  summary: string;
+  risk_count: number;
+  risks_url: string | null;
+  edit_url: string | null;
+}
+
+export interface CoverageRow {
+  service: { id: number; code: string; name: string; is_critical: boolean; org_unit: string; href: string };
+  cells: CoverageCell[];
+}
+
+export interface CoveragePage extends Listing<CoverageRow> {
+  categories: { id: number; code: string; name: string }[];
+  critical: { total: number; complete: number; percent: number | null };
+  counts: { reviewed: number; not_relevant: number; pending: number };
+  can_edit: boolean;
+  categories_url: string;
+}
+
+export interface ChangeRiskRef {
+  id: number;
+  code: string;
+  title: string;
+  status: Choice;
+  href: string;
+}
+
+export interface ChangeRow {
+  id: number;
+  kind: Choice;
+  status: Choice;
+  risk: ChangeRiskRef;
+  merge_into: ChangeRiskRef | null;
+  owner: Person | null;
+  proposed_by: Person | null;
+  created_at: Day;
+  href: string;
+}
+
+export type ChangeList = Listing<ChangeRow>;
+
+export interface ChangeDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  change: ChangeRow & {
+    part_titles: string[];
+    parts: { code: string; href: string }[];
+    reason: string;
+    decided_by: Person | null;
+    decided_at: Day | null;
+    decision_note: string;
+  };
+  /** فقط برای مالک ریسک و فقط تا وقتی درخواست منتظر تصمیم است. */
+  decision: { url: string; effect: string; note: FormField } | null;
+  list_url: string;
 }

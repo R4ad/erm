@@ -4,7 +4,16 @@
 
 import type {
   AnswerHome,
+  ChangeDetail,
+  CoverageCell,
+  CoveragePage,
   CsrfState,
+  EvidenceDetail,
+  EvidenceList,
+  EvidenceRow,
+  FormField,
+  FormPageData,
+  FormSchema,
   Level,
   MyWork,
   ResponseDetail,
@@ -12,7 +21,9 @@ import type {
   RiskFilters,
   RiskPage,
   RiskQuestion,
+  RiskBrief,
   RiskRow,
+  RouteEntry,
   Session,
   StartForm,
 } from "../lib/types";
@@ -26,6 +37,115 @@ export const levels = {
 const today = { iso: "2026-11-04", jalali: "1405/08/13", weekday: "چهارشنبه" };
 const tester = { id: 3, name: "کاربر آزمون" };
 const reviewer = { id: 1, name: "بازبین آزمون" };
+
+/** همان جدول پیوندهای apps/api/routes.py (route_table) در زمان نوشتن آزمون‌ها. */
+export const routeTable: RouteEntry[] = [
+  { name: "actions:my_work", pattern: "^/actions/mine/$", route: "/", form: false },
+  { name: "questionnaires:answer_home", pattern: "^/questionnaires/$", route: "/questionnaires", form: false },
+  {
+    name: "questionnaires:response_start",
+    pattern: "^/questionnaires/(?<questionnaire_pk>[0-9]+)/respond/$",
+    route: "/questionnaires/:questionnaire_pk/start",
+    form: false,
+  },
+  {
+    name: "questionnaires:response_answer",
+    pattern: "^/questionnaires/responses/(?<pk>[0-9]+)/answer/$",
+    route: "/responses/:pk",
+    form: false,
+  },
+  {
+    name: "workflow:question_list",
+    pattern: "^/workflow/questions/$",
+    route: "/questionnaires/risk-questions",
+    form: false,
+  },
+  { name: "risks:risk_list", pattern: "^/risks/$", route: "/risks", form: false },
+  { name: "risks:risk_detail", pattern: "^/risks/(?<pk>[0-9]+)/$", route: "/risks/:pk", form: false },
+  { name: "risks:evidence_list", pattern: "^/risks/evidence/$", route: "/risks/evidence", form: false },
+  {
+    name: "risks:evidence_detail",
+    pattern: "^/risks/evidence/(?<pk>[0-9]+)/$",
+    route: "/risks/evidence/:pk",
+    form: false,
+  },
+  { name: "risks:scenario_list", pattern: "^/risks/scenarios/$", route: "/risks/scenarios", form: false },
+  {
+    name: "risks:scenario_detail",
+    pattern: "^/risks/scenarios/(?<pk>[0-9]+)/$",
+    route: "/risks/scenarios/:pk",
+    form: false,
+  },
+  { name: "risks:category_list", pattern: "^/risks/categories/$", route: "/risks/categories", form: false },
+  { name: "risks:coverage", pattern: "^/risks/coverage/$", route: "/risks/coverage", form: false },
+  { name: "workflow:change_request_list", pattern: "^/workflow/requests/$", route: "/workflow/requests", form: false },
+  {
+    name: "workflow:change_request_detail",
+    pattern: "^/workflow/requests/(?<pk>[0-9]+)/$",
+    route: "/workflow/requests/:pk",
+    form: false,
+  },
+  { name: "risks:risk_create", pattern: "^/risks/new/$", route: "/risks/new", form: true },
+  { name: "risks:risk_update", pattern: "^/risks/(?<pk>[0-9]+)/edit/$", route: "/risks/:pk/edit", form: true },
+  {
+    name: "risks:link_create",
+    pattern: "^/risks/(?<risk_pk>[0-9]+)/links/new/$",
+    route: "/risks/:risk_pk/links/new",
+    form: true,
+  },
+  {
+    name: "risks:link_update",
+    pattern: "^/risks/links/(?<pk>[0-9]+)/edit/$",
+    route: "/risks/links/:pk/edit",
+    form: true,
+  },
+  { name: "risks:evidence_create", pattern: "^/risks/evidence/new/$", route: "/risks/evidence/new", form: true },
+  {
+    name: "risks:evidence_update",
+    pattern: "^/risks/evidence/(?<pk>[0-9]+)/edit/$",
+    route: "/risks/evidence/:pk/edit",
+    form: true,
+  },
+  { name: "risks:scenario_create", pattern: "^/risks/scenarios/new/$", route: "/risks/scenarios/new", form: true },
+  {
+    name: "risks:scenario_update",
+    pattern: "^/risks/scenarios/(?<pk>[0-9]+)/edit/$",
+    route: "/risks/scenarios/:pk/edit",
+    form: true,
+  },
+  { name: "risks:category_create", pattern: "^/risks/categories/new/$", route: "/risks/categories/new", form: true },
+  {
+    name: "risks:category_update",
+    pattern: "^/risks/categories/(?<pk>[0-9]+)/edit/$",
+    route: "/risks/categories/:pk/edit",
+    form: true,
+  },
+  {
+    name: "risks:coverage_update",
+    pattern: "^/risks/coverage/(?<service_pk>[0-9]+)/(?<category_pk>[0-9]+)/$",
+    route: "/risks/coverage/:service_pk/:category_pk",
+    form: true,
+  },
+  {
+    name: "workflow:transition",
+    pattern: "^/workflow/risks/(?<risk_pk>[0-9]+)/transition/(?<name>[-a-zA-Z0-9_]+)/$",
+    route: "/workflow/risks/:risk_pk/transition/:name",
+    form: true,
+  },
+  {
+    name: "workflow:change_request_create",
+    pattern: "^/workflow/risks/(?<risk_pk>[0-9]+)/requests/(?<kind>[-a-zA-Z0-9_]+)/$",
+    route: "/workflow/risks/:risk_pk/requests/:kind",
+    form: true,
+  },
+  {
+    name: "core:attachment_upload",
+    pattern: "^/attachments/(?<content_type>[0-9]+)/(?<object_id>[0-9]+)/new/$",
+    route: "/attachments/:content_type/:object_id/new",
+    form: true,
+  },
+  { name: "core:comment_update", pattern: "^/comments/(?<pk>[0-9]+)/edit/$", route: "/comments/:pk/edit", form: true },
+];
 
 export function csrf(authenticated = false): CsrfState {
   return { csrf_token: "test-csrf-token", authenticated };
@@ -52,10 +172,12 @@ export function session(): Session {
         title: "ریسک‌ها",
         items: [
           { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
-          { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: null },
+          { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
+          { key: "controls:control_list", label: "کنترل‌ها", href: "/controls/", route: null },
         ],
       },
     ],
+    routes: routeTable,
     logout_url: "/api/auth/logout/",
     classic_home: "/",
     csrf_token: "test-csrf-token",
@@ -207,17 +329,19 @@ export function riskDetail(): RiskDetail {
     count_exclusions: "",
     data_class: null,
     cia: "A",
-    links: [{ kind: "تیکت", ref: "TEST-1", url: "https://tickets.example.test/TEST-1" }],
+    links: [
+      { kind: "تیکت", ref: "TEST-1", url: "https://tickets.example.test/TEST-1", edit_url: "/risks/links/1/edit/" },
+    ],
     evidence: [],
     controls: [],
     workflow: {
       transitions: [
         {
-          name: "review",
-          label: "ارسال به بازبینی",
+          name: "start_treatment",
+          label: "شروع اجرا",
           description: "",
-          target: "در بازبینی",
-          href: "/risks/1/go/review/",
+          target: "در اجرا",
+          href: "/workflow/risks/1/transition/start_treatment/",
         },
       ],
       timeline: [
@@ -232,6 +356,10 @@ export function riskDetail(): RiskDetail {
       ],
       questions: [],
       pending_change: null,
+      merged_into: null,
+      split_from: null,
+      merged_risks: [{ code: "RK-1405-0009", href: "/risks/9/" }],
+      split_parts: [],
     },
     assessments: [
       {
@@ -265,11 +393,26 @@ export function riskDetail(): RiskDetail {
       plan_due: null,
       acceptances: [],
     },
-    attachments: [],
-    comments: [{ text: "یادداشت آزمون", by: reviewer, at, edited: false }],
+    attachments: [
+      {
+        id: 1,
+        name: "پیوست-آزمون.pdf",
+        size: 2048,
+        description: "شرح پیوست آزمون",
+        by: reviewer,
+        at,
+        href: "/attachments/1/",
+      },
+    ],
+    comments: [{ id: 1, text: "یادداشت آزمون", by: reviewer, at, edited: false, edit_url: null }],
+    attach_url: "/attachments/29/1/new/",
+    comment_url: "/comments/29/1/new/",
     actions: {
       classic: "/risks/1/",
       edit: "/risks/1/edit/",
+      add_link: "/risks/1/links/new/",
+      propose_merge: "/workflow/risks/1/requests/merge/",
+      propose_split: "/workflow/risks/1/requests/split/",
       add_evidence: "/risks/evidence/new/?risk=1",
       add_assessment: null,
       add_plan: null,
@@ -388,5 +531,300 @@ export function riskQuestions(): { questions: RiskQuestion[] } {
       { id: 4, text: "پرسش آزمون اول؟", ...base },
       { id: 3, text: "پرسش آزمون دوم؟", ...base },
     ],
+  };
+}
+
+// فرم‌ها و صفحه‌های خواندنی پل جنگو (/api/forms/ و /api/pages/)
+
+const field = (overrides: Partial<FormField> & Pick<FormField, "name" | "label" | "kind">): FormField => ({
+  help: "",
+  required: false,
+  disabled: false,
+  value: "",
+  errors: [],
+  ...overrides,
+});
+
+/** فرم ویرایش ریسک با همه‌ی نوع فیلدها: متن، شرح، انتخاب، چندتایی، تاریخ، تیک و فیلد پنهان. */
+export function riskForm(): FormPageData {
+  return {
+    view: "risks:risk_update",
+    title: "ویرایش ریسک",
+    cancel: { href: "/risks/1/", route: "/risks/1" },
+    messages: [],
+    form: {
+      multipart: false,
+      errors: [],
+      fields: [
+        field({
+          name: "title",
+          label: "عنوان",
+          kind: "text",
+          required: true,
+          value: "ریسک آزمون شماره‌ی ۱",
+          max_length: 300,
+        }),
+        field({
+          name: "description",
+          label: "شرح",
+          kind: "textarea",
+          required: true,
+          value: "شرح آزمونی ریسک.",
+          rows: 4,
+        }),
+        field({
+          name: "category",
+          label: "دسته",
+          kind: "select",
+          required: true,
+          value: "1",
+          empty_label: "---------",
+          choices: [
+            { value: "1", label: "T1 دسته‌ی آزمون" },
+            { value: "2", label: "T2 دسته‌ی آزمون دوم" },
+          ],
+        }),
+        field({
+          name: "customers",
+          label: "بانک‌ها",
+          kind: "multiselect",
+          help: "بانک‌هایی که این ریسک به آن‌ها می‌رسد.",
+          value: ["11"],
+          choices: [
+            { value: "11", label: "بانک آزمون یک" },
+            { value: "12", label: "بانک آزمون دو" },
+            { value: "13", label: "بانک آزمون سه" },
+          ],
+        }),
+        field({
+          name: "identified_on",
+          label: "تاریخ شناسایی",
+          kind: "date",
+          value: "1405/08/10",
+          placeholder: "مثلاً 1405/01/15",
+        }),
+        field({ name: "is_confidential", label: "محرمانه", kind: "checkbox", value: false }),
+        field({ name: "next", label: "", kind: "hidden", value: "/risks/" }),
+      ],
+    },
+  };
+}
+
+export function uploadForm(): FormPageData {
+  return {
+    view: "core:attachment_upload",
+    title: "پیوست تازه برای RK-1405-0001 ریسک آزمون شماره‌ی ۱",
+    cancel: { href: "/risks/1/", route: "/risks/1" },
+    messages: [],
+    submit: "بارگذاری پیوست",
+    form: {
+      multipart: true,
+      errors: [],
+      fields: [
+        field({
+          name: "file",
+          label: "فایل",
+          kind: "file",
+          required: true,
+          value: null,
+          help: "حداکثر 20 مگابایت؛ pdf، docx",
+          accept: ".pdf,.docx",
+          max_size: 20 * 1024 * 1024,
+        }),
+        field({ name: "description", label: "شرح", kind: "text", max_length: 300 }),
+      ],
+    },
+  };
+}
+
+export function transitionForm(): FormPageData {
+  return {
+    view: "workflow:transition",
+    title: "شروع اجرا",
+    cancel: { href: "/risks/1/", route: "/risks/1" },
+    messages: [],
+    submit: "شروع اجرا",
+    risk: {
+      id: 1,
+      code: "RK-1405-0001",
+      title: "ریسک آزمون شماره‌ی ۱",
+      status: { value: "treatment_plan", label: "برنامه‌ی درمان" },
+    },
+    transition: { label: "شروع اجرا", description: "شرح آزمونی انتقال.", source: "برنامه‌ی درمان", target: "در اجرا" },
+    problems: ["مالک ریسک هنوز طرح مواجهه را تأیید نکرده است."],
+    form: {
+      multipart: false,
+      errors: [],
+      fields: [field({ name: "reason", label: "توضیح", kind: "textarea", rows: 3 })],
+    },
+  };
+}
+
+const evidenceRow = (id: number, overrides: Partial<EvidenceRow> = {}): EvidenceRow => ({
+  id,
+  code: `EV-1405-000${id}`,
+  title: `شاهد آزمون ${id}`,
+  kind: { value: "incident", label: "رخداد" },
+  observed_on: { iso: "2026-10-01", jalali: "1405/07/09" },
+  reliability: { value: "high", label: "زیاد" },
+  expired: false,
+  confidential: false,
+  href: `/risks/evidence/${id}/`,
+  ...overrides,
+});
+
+const filters = (fields: FormField[]): FormSchema => ({ fields, errors: [], multipart: false });
+
+export function evidenceList(): EvidenceList {
+  return {
+    view: "risks:evidence_list",
+    title: "شواهد",
+    messages: [],
+    results: [
+      evidenceRow(1),
+      evidenceRow(2, { confidential: true, expired: true, kind: { value: "test", label: "آزمون" } }),
+    ],
+    count: 2,
+    page: 1,
+    pages: 1,
+    filters: filters([
+      field({ name: "q", label: "جست‌وجو", kind: "text", placeholder: "کد، عنوان یا منبع" }),
+      field({
+        name: "kind",
+        label: "نوع",
+        kind: "select",
+        empty_label: "همه",
+        choices: [
+          { value: "incident", label: "رخداد" },
+          { value: "test", label: "آزمون" },
+        ],
+      }),
+    ]),
+    create_url: "/risks/evidence/new/",
+  };
+}
+
+const riskBrief = (id: number): RiskBrief => ({
+  id,
+  code: `RK-1405-000${id}`,
+  title: `ریسک آزمون شماره‌ی ${id}`,
+  status: { value: "registered", label: "ثبت‌شده" },
+  is_active: true,
+  service: "IPG",
+  category: { code: "T1", name: "دسته‌ی آزمون" },
+  owner: tester,
+  href: `/risks/${id}/`,
+});
+
+export function evidenceDetail(): EvidenceDetail {
+  const at = { iso: "2026-11-02T07:07:07+00:00", jalali: "1405/08/11 10:37" };
+  return {
+    view: "risks:evidence_detail",
+    title: "EV-1405-0001 شاهد آزمون 1",
+    messages: [],
+    evidence: {
+      ...evidenceRow(1),
+      summary: "خلاصه‌ی آزمونی شاهد.",
+      source: "منبع آزمون",
+      scope: "",
+      valid_until: { iso: "2027-01-01", jalali: "1405/10/11" },
+      access_class: { value: "normal", label: "عادی" },
+      url: "https://tickets.example.test/INC-1",
+      customer: null,
+      owner: reviewer,
+    },
+    risks: [riskBrief(1)],
+    attachments: [],
+    comments: [{ id: 5, text: "نظر آزمون روی شاهد", by: tester, at, edited: true, edit_url: "/comments/5/edit/" }],
+    attach_url: "/attachments/31/1/new/",
+    comment_url: "/comments/31/1/new/",
+    edit_url: "/risks/evidence/1/edit/",
+    list_url: "/risks/evidence/",
+  };
+}
+
+export function coverage(): CoveragePage {
+  const cell = (category: string, status: string, label: string, extra: Partial<CoverageCell> = {}): CoverageCell => ({
+    category,
+    status: { value: status, label },
+    summary: `${category} دسته‌ی آزمون`,
+    risk_count: 0,
+    risks_url: null,
+    edit_url: `/risks/coverage/1/${category === "T1" ? 1 : 2}/?next=%2Frisks%2Fcoverage%2F`,
+    ...extra,
+  });
+  return {
+    view: "risks:coverage",
+    title: "جهان ریسک",
+    messages: [],
+    results: [
+      {
+        service: {
+          id: 1,
+          code: "IPG",
+          name: "خدمت آزمون",
+          is_critical: true,
+          org_unit: "واحد آزمون",
+          href: "/catalog/services/1/",
+        },
+        cells: [
+          cell("T1", "reviewed", "بررسی‌شده", { risk_count: 2, risks_url: "/risks/?service=1&category=1" }),
+          cell("T2", "pending", "در انتظار بررسی"),
+        ],
+      },
+    ],
+    count: 1,
+    page: 1,
+    pages: 1,
+    filters: filters([field({ name: "q", label: "جست‌وجو", kind: "text", placeholder: "کد یا نام خدمت" })]),
+    categories: [
+      { id: 1, code: "T1", name: "دسته‌ی آزمون" },
+      { id: 2, code: "T2", name: "دسته‌ی آزمون دوم" },
+    ],
+    critical: { total: 1, complete: 0, percent: 0 },
+    counts: { reviewed: 1, not_relevant: 0, pending: 1 },
+    can_edit: true,
+    categories_url: "/risks/categories/",
+  };
+}
+
+export function changeDetail(decision = true): ChangeDetail {
+  const risk = {
+    id: 1,
+    code: "RK-1405-0001",
+    title: "ریسک آزمون شماره‌ی ۱",
+    status: { value: "registered", label: "ثبت‌شده" },
+    href: "/risks/1/",
+  };
+  const target = { ...risk, id: 2, code: "RK-1405-0002", title: "ریسک آزمون دوم", href: "/risks/2/" };
+  return {
+    view: "workflow:change_request_detail",
+    title: "پیشنهاد ادغام RK-1405-0001",
+    messages: [],
+    change: {
+      id: 7,
+      kind: { value: "merge", label: "ادغام" },
+      status: { value: "pending", label: "منتظر تأیید" },
+      risk,
+      merge_into: target,
+      owner: tester,
+      proposed_by: reviewer,
+      created_at: { iso: "2026-11-03", jalali: "1405/08/12" },
+      href: "/workflow/requests/7/",
+      part_titles: [],
+      parts: [],
+      reason: "دلیل آزمونی ادغام.",
+      decided_by: null,
+      decided_at: null,
+      decision_note: "",
+    },
+    decision: decision
+      ? {
+          url: "/workflow/requests/7/",
+          effect: "با تأیید، ریسک RK-1405-0001 با همین کد و سابقه «بسته‌شده» می‌شود و به RK-1405-0002 اشاره می‌کند.",
+          note: field({ name: "note", label: "توضیح", kind: "textarea", help: "برای رد اجباری است.", rows: 3 }),
+        }
+      : null,
+    list_url: "/workflow/requests/",
   };
 }

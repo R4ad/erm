@@ -50,7 +50,8 @@ export function mockApi(routes: Record<string, Route>) {
       path,
       query: url.searchParams,
       headers: new Headers(init.headers),
-      body: typeof init.body === "string" ? JSON.parse(init.body) : undefined,
+      // بدنه‌ی JSON خوانده می‌شود و FormData (بارگذاری فایل) همان‌طور که هست می‌ماند.
+      body: typeof init.body === "string" ? JSON.parse(init.body) : init.body,
     };
     calls.push(call);
     const key = `${method} ${path}`;

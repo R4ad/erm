@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { useParams, type RouteObject } from "react-router-dom";
+import { useLocation, useParams, type RouteObject } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { PageSkeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,35 @@ function keyedById(Page: ComponentType) {
     return <Page key={id} />;
   };
 }
+
+/** مثل keyedById برای صفحه‌هایی که نشانی‌شان چند پارامتر دارد (فرم‌ها و پرونده‌ها). */
+function keyedByPath(Page: ComponentType) {
+  return function Keyed() {
+    const { pathname } = useLocation();
+    return <Page key={pathname} />;
+  };
+}
+
+// فرم‌های جنگو که فرم عمومی رابط نشان می‌دهد (apps/api/bridge_pages.py)، با همان نشانی جنگو بدون / آخر.
+const FORM_ROUTES = [
+  "risks/new",
+  "risks/:pk/edit",
+  "risks/:risk_pk/links/new",
+  "risks/links/:pk/edit",
+  "risks/evidence/new",
+  "risks/evidence/:pk/edit",
+  "risks/scenarios/new",
+  "risks/scenarios/:pk/edit",
+  "risks/categories/new",
+  "risks/categories/:pk/edit",
+  "risks/coverage/:service_pk/:category_pk",
+  "workflow/risks/:risk_pk/transition/:name",
+  "workflow/risks/:risk_pk/requests/:kind",
+  "attachments/:content_type/:object_id/new",
+  "comments/:pk/edit",
+];
+
+const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
 
 // هر صفحه بخش جدای کد خودش است و فقط وقتی باز می‌شود دانلود می‌شود.
 export const routes: RouteObject[] = [
@@ -44,6 +73,51 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import("@/features/risks/RiskDetailPage")).RiskDetailPage }),
           },
           {
+            path: "risks/evidence",
+            lazy: async () => ({ Component: (await import("@/features/evidence/EvidencePages")).EvidenceListPage }),
+          },
+          {
+            path: "risks/evidence/:id",
+            lazy: async () => ({
+              Component: keyedById((await import("@/features/evidence/EvidencePages")).EvidenceDetailPage),
+            }),
+          },
+          {
+            path: "risks/scenarios",
+            lazy: async () => ({ Component: (await import("@/features/scenarios/ScenarioPages")).ScenarioListPage }),
+          },
+          {
+            path: "risks/scenarios/:id",
+            lazy: async () => ({
+              Component: keyedById((await import("@/features/scenarios/ScenarioPages")).ScenarioDetailPage),
+            }),
+          },
+          {
+            path: "risks/categories",
+            lazy: async () => ({
+              Component: (await import("@/features/categories/CategoryListPage")).CategoryListPage,
+            }),
+          },
+          {
+            path: "risks/coverage",
+            lazy: async () => ({ Component: (await import("@/features/coverage/CoveragePage")).CoveragePage }),
+          },
+          {
+            path: "workflow/requests",
+            lazy: async () => ({
+              Component: (await import("@/features/change-requests/ChangeRequestPages")).ChangeRequestListPage,
+            }),
+          },
+          {
+            path: "workflow/requests/:id",
+            lazy: async () => ({
+              Component: keyedById(
+                (await import("@/features/change-requests/ChangeRequestPages")).ChangeRequestDetailPage,
+              ),
+            }),
+          },
+          ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),
+          {
             path: "questionnaires",
             lazy: async () => ({
               Component: (await import("@/features/questionnaires/AnswerHomePage")).AnswerHomePage,
@@ -68,8 +142,9 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            // فرمی که بعداً به جدول پیوندهای سرور اضافه شود، بی‌تغییر این فهرست هم با فرم عمومی باز می‌شود.
             path: "*",
-            lazy: async () => ({ Component: (await import("@/features/errors/NotFoundPage")).NotFoundPage }),
+            lazy: async () => ({ Component: (await import("@/features/errors/FallbackPage")).FallbackPage }),
           },
         ],
       },

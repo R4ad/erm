@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import auth, mywork, questionnaires, risks, session
+from . import auth, bridge, mywork, questionnaires, risks, session
 
 app_name = "api"
 
@@ -9,6 +9,8 @@ urlpatterns = [
     path("auth/login/", auth.LoginView.as_view(), name="login"),
     path("auth/logout/", auth.LogoutView.as_view(), name="logout"),
     path("session/", session.SessionView.as_view(), name="session"),
+    path("forms/", bridge.FormBridgeView.as_view(), name="form_bridge"),
+    path("pages/", bridge.PageBridgeView.as_view(), name="page_bridge"),
     path("my-work/", mywork.MyWorkView.as_view(), name="my_work"),
     path("risks/", risks.RiskListView.as_view(), name="risk_list"),
     path("risks/filters/", risks.RiskFiltersView.as_view(), name="risk_filters"),

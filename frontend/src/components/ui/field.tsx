@@ -17,7 +17,7 @@ const FieldContext = createContext<FieldContextValue | null>(null);
 
 type AriaInvalid = boolean | "true" | "false" | "grammar" | "spelling" | undefined;
 
-function useFieldControl(props: { id?: string; "aria-describedby"?: string; "aria-invalid"?: AriaInvalid }) {
+export function useFieldControl(props: { id?: string; "aria-describedby"?: string; "aria-invalid"?: AriaInvalid }) {
   const field = useContext(FieldContext);
   return {
     id: props.id ?? field?.id,
@@ -182,5 +182,45 @@ function ChoiceText({ label, description }: { label: ReactNode; description?: Re
       <span className="text-fg">{label}</span>
       {description && <span className="text-xs text-muted">{description}</span>}
     </span>
+  );
+}
+
+interface FieldSetProps {
+  legend: ReactNode;
+  hint?: ReactNode;
+  error?: string | string[];
+  required?: boolean;
+  className?: string;
+  id?: string;
+  children: ReactNode;
+}
+
+/** گروهی از کنترل‌ها با یک برچسب (fieldset و legend)، مثل گزینه‌های رادیویی یا انتخاب چندتایی. */
+export function FieldSet({ legend, hint, error, required = false, className, id, children }: FieldSetProps) {
+  const generated = useId();
+  const baseId = id ?? `fieldset${generated}`;
+  const messages = Array.isArray(error) ? error : error ? [error] : [];
+  const hintId = hint ? `${baseId}-hint` : undefined;
+  const errorId = messages.length ? `${baseId}-error` : undefined;
+  return (
+    <fieldset
+      id={baseId}
+      aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
+      className={cn("min-w-0", className)}
+    >
+      <legend className="mb-1.5 flex items-center gap-2 text-sm font-medium text-fg">
+        {legend}
+        {required && <RequiredMark />}
+      </legend>
+      <div className="flex flex-col gap-2">
+        {hint && (
+          <p id={hintId} className="-mt-1 text-xs text-muted">
+            {hint}
+          </p>
+        )}
+        {children}
+        <FieldError id={errorId} messages={messages} />
+      </div>
+    </fieldset>
   );
 }
