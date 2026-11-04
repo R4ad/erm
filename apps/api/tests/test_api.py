@@ -3,12 +3,17 @@
 import datetime
 
 import pytest
+from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.roles import Role
+from apps.assessments.models import Assessment
+from apps.assessments.services import create_assessment
 from apps.audit.models import AuditEvent
 from apps.catalog.tests.factories import make_user
 from apps.core.jalali import to_jalali
+from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, PendingRisk, Question, Questionnaire, Response
 from apps.risks.models import Risk, RiskCategory
@@ -74,7 +79,7 @@ def test_an_api_request_without_login_gets_json_not_the_login_page(client):
 
     assert response.status_code == 403
     assert response["Content-Type"] == "application/json"
-    assert response.json()["login_url"] == reverse("accounts:login")
+    assert response.json()["login_url"] == "/app/login/"
 
 
 def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_admin):
@@ -86,6 +91,9 @@ def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_ad
     assert "مدیریت سامانه" not in titles
     routes = {item["route"] for group in data["navigation"] for item in group["items"] if item["route"]}
     assert routes == {"/", "/risks", "/questionnaires", "/questionnaires/risk-questions"}
+    keys = [item["key"] for group in data["navigation"] for item in group["items"]]
+    assert "risks:risk_list" in keys and len(keys) == len(set(keys))
+    assert data["logout_url"] == reverse("api:logout")
     assert data["csrf_token"]
     assert data["today"]["weekday"]
 
@@ -324,8 +332,157 @@ def test_the_app_page_serves_the_built_index_for_every_route(client, manager, se
         assert "csrftoken" in response.cookies
 
 
-def test_the_app_page_needs_login(client):
-    response = client.get(reverse("spa_path", args=["risks"]))
+def test_the_app_page_opens_without_login_and_locks_down_scripts(client, settings, tmp_path):
+    # صفحه فقط پوسته‌ی React است و صفحه‌ی ورود هم در آن است؛ داده‌ها را API فقط به کاربر واردشده می‌دهد.
+    settings.SPA_DIST = tmp_path
+    (tmp_path / "index.html").write_text('<script nonce="__CSP_NONCE__" src="/a.js"></script>', encoding="utf-8")
 
+    response = client.get(reverse("spa_path", args=["login/"]))
+    again = client.get(reverse("spa_path", args=["login/"]))
+
+    assert response.status_code == 200
+    policy = response["Content-Security-Policy"]
+    nonce = response.content.decode().split('nonce="')[1].split('"')[0]
+    assert nonce != "__CSP_NONCE__" and len(nonce) >= 20
+    assert f"script-src 'self' 'nonce-{nonce}'" in policy
+    assert nonce not in again["Content-Security-Policy"]  # هر بار nonce تازه
+    assert "frame-ancestors 'none'" in policy
+    assert "require-trusted-types-for 'script'" in policy
+    assert client.get(reverse("api:my_work")).status_code == 403
+
+
+def csrf_client():
+    """کلاینتی که مثل مرورگر توکن CSRF را چک می‌کند؛ کلاینت عادی تست این چک را خاموش دارد."""
+    client = Client(enforce_csrf_checks=True)
+    token = client.get(reverse("api:csrf")).json()["csrf_token"]
+    return client, token
+
+
+def post_json(client, url, data, token=None):
+    headers = {"HTTP_X_CSRFTOKEN": token} if token else {}
+    return client.post(url, data, content_type="application/json", **headers)
+
+
+def test_the_csrf_endpoint_sets_the_cookie_and_says_who_is_logged_in(client, manager):
+    response = client.get(reverse("api:csrf"))
+    assert response.status_code == 200
+    assert response.json()["authenticated"] is False
+    assert "csrftoken" in response.cookies
+
+    client.force_login(manager)
+    assert client.get(reverse("api:csrf")).json()["authenticated"] is True
+
+
+def test_login_needs_the_csrf_token_even_before_login(manager):
+    manager.set_password("pass-1405-safe")
+    manager.save()
+    client, token = csrf_client()
+    data = {"username": "manager", "password": "pass-1405-safe"}
+
+    assert post_json(client, reverse("api:login"), data).status_code == 403
+    assert client.get(reverse("api:csrf")).json()["authenticated"] is False
+
+    assert post_json(client, reverse("api:login"), data, token).status_code == 200
+    assert client.get(reverse("api:csrf")).json()["authenticated"] is True
+
+
+def test_a_wrong_password_is_refused_and_written_to_the_audit_log(manager):
+    client, token = csrf_client()
+
+    response = post_json(client, reverse("api:login"), {"username": "manager", "password": "guess"}, token)
+
+    assert response.status_code == 400
+    assert response.json()["message"]
+    assert "__all__" in response.json()["errors"]
+    event = AuditEvent.objects.get(event=AuditEvent.Event.LOGIN_FAILED)
+    assert (event.user, event.username) == (None, "manager")
+    assert "guess" not in str(event.details)
+
+
+def test_login_sends_the_user_on_only_to_this_site(manager):
+    manager.set_password("pass-1405-safe")
+    manager.save()
+    cases = {
+        "/risks/?status=questions": "/risks/?status=questions",
+        "/app/risks/12": "/app/risks/12",
+        "https://evil.example/app/": "/app/",
+        "//evil.example/": "/app/",
+        "javascript:alert(1)": "/app/",
+        "": "/app/",
+    }
+    for asked, expected in cases.items():
+        client, token = csrf_client()
+        data = {"username": "manager", "password": "pass-1405-safe", "next": asked}
+        response = post_json(client, reverse("api:login"), data, token)
+        assert response.json()["next"] == expected, asked
+
+    login = AuditEvent.objects.filter(event=AuditEvent.Event.LOGIN, user=manager)
+    assert login.count() == len(cases)
+
+
+def test_logout_needs_the_csrf_token_and_ends_the_session(manager):
+    manager.set_password("pass-1405-safe")
+    manager.save()
+    client, token = csrf_client()
+    post_json(client, reverse("api:login"), {"username": "manager", "password": "pass-1405-safe"}, token)
+    token = client.cookies["csrftoken"].value  # ورود توکن را عوض می‌کند
+
+    assert post_json(client, reverse("api:logout"), {}).status_code == 403
+    response = post_json(client, reverse("api:logout"), {}, token)
+
+    assert response.status_code == 200
+    assert response.json()["login_url"] == "/app/login/"
+    assert client.get(reverse("api:csrf")).json()["authenticated"] is False
+    assert AuditEvent.objects.filter(event=AuditEvent.Event.LOGOUT, user=manager).exists()
+
+
+def test_the_django_login_page_hands_over_to_the_new_login_once_it_is_built(client, settings, tmp_path):
+    settings.SPA_DIST = tmp_path
+    url = reverse("accounts:login")
+
+    # تا npm run build اجرا نشده، همان فرم جنگو.
+    assert client.get(url).status_code == 200
+
+    (tmp_path / "index.html").write_text('<div id="root"></div>', encoding="utf-8")
+    response = client.get(url, {"next": "/risks/?status=questions"})
     assert response.status_code == 302
-    assert response.url.startswith(reverse("accounts:login"))
+    assert response.url == "/app/login/?next=%2Frisks%2F%3Fstatus%3Dquestions"
+    assert client.get(url).url == "/app/login/"
+
+    # راه برگشت اگر رابط تازه مشکلی داشت.
+    classic = client.get(url, {"classic": "1"})
+    assert classic.status_code == 200
+    assert b"csrfmiddlewaretoken" in classic.content
+
+
+def level(name):
+    return MethodVersion.objects.get(number=1).risk_levels.get(name=name)
+
+
+def approve(risk, user, level_name):
+    status = risk.status
+    risk.status = Risk.Status.ASSESSMENT
+    risk.save()
+    assessment = create_assessment(risk, user, "current", horizon_months=12)
+    risk.status = status
+    risk.save()
+    Assessment.objects.filter(pk=assessment.pk).update(
+        status=Assessment.Status.APPROVED, decision_level=level(level_name), approved_at=timezone.now()
+    )
+
+
+def test_the_register_sorts_by_code_and_by_current_level(api, grc, unit):
+    low = make_risk("قطع درگاه پرداخت", unit)
+    unrated = make_risk("نشت داده", unit)
+    critical = make_risk("از کار افتادن مرکز داده", unit)
+    approve(low, grc, "پایین")
+    approve(critical, grc, "بحرانی")
+
+    def codes(ordering):
+        data = api(grc).get(reverse("api:risk_list"), {"ordering": ordering}).json()
+        return [row["code"] for row in data["results"]], data["ordering"]
+
+    assert codes("level") == ([critical.code, low.code, unrated.code], "level")
+    assert codes("-level") == ([low.code, critical.code, unrated.code], "-level")
+    assert codes("code") == (sorted([low.code, unrated.code, critical.code]), "code")
+    assert codes("nonsense") == ([critical.code, unrated.code, low.code], "newest")

@@ -9,8 +9,9 @@ from .base import ApiView
 
 
 def link(label, url_name, route=None):
-    """یک پیوند منو. route یعنی همین صفحه در رابط React هست؛ بقیه صفحه‌های جنگو‌اند و با بارگذاری کامل باز می‌شوند."""
-    return {"label": label, "href": reverse(url_name), "route": route}
+    """یک پیوند منو. route یعنی همین صفحه در رابط React هست؛ بقیه صفحه‌های جنگو‌اند و با بارگذاری کامل باز می‌شوند.
+    key نام ثابت همان صفحه است و رابط React آیکون پیوند را با آن انتخاب می‌کند."""
+    return {"key": url_name, "label": label, "href": reverse(url_name), "route": route}
 
 
 def navigation(user):
@@ -94,7 +95,7 @@ class SessionView(ApiView):
                 },
                 "today": fmt.today(),
                 "navigation": navigation(user),
-                "logout_url": reverse("accounts:logout"),
+                "logout_url": reverse("api:logout"),
                 "classic_home": reverse("core:home"),
                 # کوکی csrftoken را می‌سازد تا درخواست‌های POST و PUT بعدی آن را بفرستند.
                 "csrf_token": get_token(request),
