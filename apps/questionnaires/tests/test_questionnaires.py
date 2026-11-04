@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.accounts.roles import Role
 from apps.catalog.tests.factories import make_service, make_user
+from apps.core.jalali import to_jalali
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Answer, Option, PendingRisk, Question, Questionnaire, Response
 from apps.questionnaires.services import submit_response
@@ -305,8 +306,12 @@ def test_a_submitted_response_is_locked_until_grc_returns_it(client, grc, questi
     assert client.get(reverse("questionnaires:response_return", args=[response.pk])).status_code == 403
 
     client.force_login(grc)
-    client.post(reverse("questionnaires:response_return", args=[response.pk]), {"question": "کدام سامانه؟"})
+    page = client.post(
+        reverse("questionnaires:response_return", args=[response.pk]), {"question": "کدام سامانه؟"}, follow=True
+    )
     response.refresh_from_db()
+    # مهلت در پیام هم مثل همه‌جای سامانه شمسی است.
+    assert f"مهلت جواب تا {to_jalali(response.return_due)}" in page.content.decode()
     assert response.status == Response.Status.RETURNED
     assert response.return_question == "کدام سامانه؟"
     assert response.return_due == add_working_days(timezone.localdate(), 5)
@@ -410,6 +415,18 @@ def test_responses_are_visible_to_their_unit_managers_and_grc_only(client, grc, 
     assert list(client.get(reverse("questionnaires:response_list"), {"status": "draft"}).context["responses"]) == [
         response
     ]
+
+
+def test_the_pending_count_stays_right_when_the_list_is_filtered_by_pending(client, grc, questionnaire, unit, manager):
+    response = start(questionnaire, unit, manager, new_item="وابستگی به یک نفر")
+    submit_response(response)
+    for text in ["قطع برق", "خطای انسانی"]:
+        PendingRisk.objects.create(response=response, source=PendingRisk.Source.MANUAL, description=text)
+    client.force_login(grc)
+
+    for params in [{}, {"pending": "yes"}]:
+        responses = list(client.get(reverse("questionnaires:response_list"), params).context["responses"])
+        assert [(item, item.pending_count) for item in responses] == [(response, 3)], params
 
 
 def test_the_database_guards_pending_risk_decisions(questionnaire, unit, manager):

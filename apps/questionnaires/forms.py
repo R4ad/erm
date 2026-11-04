@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Exists, OuterRef
 from django.forms import inlineformset_factory
 
 from apps.catalog.forms import OwnerChoiceField
@@ -251,8 +252,11 @@ class ResponseFilterForm(BootstrapFormMixin, forms.Form):
             responses = responses.filter(questionnaire=data["questionnaire"])
         if data["unit"]:
             responses = responses.filter(org_unit__in=get_subtree_ids(data["unit"]))
+        # Exists به جای join: join روی pending_risks ردیف‌ها را چند برابر می‌کرد و شمارش «ریسک در انتظار» فهرست را
+        # (که روی همین رابطه annotate شده) بیشتر از واقع نشان می‌داد.
+        has_pending = Exists(PendingRisk.objects.filter(response=OuterRef("pk"), status=PendingRisk.Status.PENDING))
         if data["pending"] == "yes":
-            responses = responses.filter(pending_risks__status=PendingRisk.Status.PENDING).distinct()
+            responses = responses.filter(has_pending)
         elif data["pending"] == "no":
-            responses = responses.exclude(pending_risks__status=PendingRisk.Status.PENDING)
+            responses = responses.filter(~has_pending)
         return responses
