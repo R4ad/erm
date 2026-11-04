@@ -149,4 +149,4 @@ pipenv run pytest
 - `frontend/` رابط تازه با React
 - `templates/` و `static/` قالب پایه، فونت وزیرمتن، Bootstrap راست‌چین و htmx
 - `docker/nginx/` تنظیمات nginx
-- `docs/` قواعد کسب‌وکار
+- `docs/` قواعد کسب‌وکار، و [راهنمای جامع کاربران](docs/user-guide.md) با گردش‌کارها و راهنمای هر نقش
