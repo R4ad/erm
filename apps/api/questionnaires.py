@@ -32,7 +32,7 @@ def response_row(response):
         "status": fmt.choice(response, "status"),
         "is_editable": response.is_editable,
         "is_overdue": response.is_overdue,
-        "updated_at": fmt.day(response.updated_at.date()),
+        "updated_at": fmt.day(response.updated_at),
     }
 
 
@@ -270,7 +270,7 @@ class RiskQuestionListView(ApiView):
                             "org_unit": question.risk.org_unit.name,
                         },
                         "asked_by": fmt.person(question.asked_by),
-                        "asked_at": fmt.day(question.created_at.date()),
+                        "asked_at": fmt.day(question.created_at),
                         "due": fmt.deadline(question.due),
                     }
                     for question in questions

@@ -6,12 +6,14 @@ from apps.controls.permissions import can_view_soa
 
 from . import formatting as fmt
 from .base import ApiView
+from .routes import route_table, spa_route
 
 
-def link(label, url_name, route=None):
-    """یک پیوند منو. route یعنی همین صفحه در رابط React هست؛ بقیه صفحه‌های جنگو‌اند و با بارگذاری کامل باز می‌شوند.
-    key نام ثابت همان صفحه است و رابط React آیکون پیوند را با آن انتخاب می‌کند."""
-    return {"key": url_name, "label": label, "href": reverse(url_name), "route": route}
+def link(label, url_name):
+    """یک پیوند منو. route یعنی همین صفحه در رابط React هست (routes.py)؛ بقیه صفحه‌های جنگو‌اند و با بارگذاری کامل
+    باز می‌شوند. key نام ثابت همان صفحه است و رابط React آیکون پیوند را با آن انتخاب می‌کند."""
+    href = reverse(url_name)
+    return {"key": url_name, "label": label, "href": href, "route": spa_route(href)}
 
 
 def navigation(user):
@@ -20,14 +22,14 @@ def navigation(user):
         {
             "title": "کار روزانه",
             "items": [
-                link("کارهای من", "actions:my_work", "/"),
-                link("پاسخ به سؤال‌ها", "questionnaires:answer_home", "/questionnaires"),
+                link("کارهای من", "actions:my_work"),
+                link("پاسخ به سؤال‌ها", "questionnaires:answer_home"),
             ],
         },
         {
             "title": "ریسک‌ها",
             "items": [
-                link("رجیستر ریسک", "risks:risk_list", "/risks"),
+                link("رجیستر ریسک", "risks:risk_list"),
                 link("کتابخانه‌ی سناریو", "risks:scenario_list"),
                 link("شواهد", "risks:evidence_list"),
                 link("ادغام و تفکیک", "workflow:change_request_list"),
@@ -38,7 +40,7 @@ def navigation(user):
         {
             "title": "پرسشنامه",
             "items": [
-                link("پرسش‌های ریسک", "workflow:question_list", "/questionnaires/risk-questions"),
+                link("پرسش‌های ریسک", "workflow:question_list"),
                 link("پاسخ‌ها و بررسی", "questionnaires:response_list"),
                 link("تعریف پرسشنامه‌ها", "questionnaires:questionnaire_list"),
             ],
@@ -95,6 +97,8 @@ class SessionView(ApiView):
                 },
                 "today": fmt.today(),
                 "navigation": navigation(user),
+                # کدام نشانی‌های جنگو در رابط React هم هستند؛ رابط هر پیوند سرور را با این جدول به صفحه‌ی خودش می‌برد.
+                "routes": route_table(),
                 "logout_url": reverse("api:logout"),
                 "classic_home": reverse("core:home"),
                 # کوکی csrftoken را می‌سازد تا درخواست‌های POST و PUT بعدی آن را بفرستند.
