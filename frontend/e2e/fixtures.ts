@@ -1,0 +1,171 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test as base, type Page, type Request } from "@playwright/test";
+
+import * as data from "../src/test/fixtures";
+
+// هر آزمون سرتاسری API را در خود مرورگر جواب می‌دهد، با همان داده‌ی آزمون Vitest (src/test/fixtures.ts). جنگو و
+// پایگاه داده لازم نیست و هیچ‌کدام از این جواب‌ها در برنامه نیست؛ برنامه همیشه از API واقعی می‌خواند.
+
+export interface ApiCall {
+  method: string;
+  path: string;
+  query: URLSearchParams;
+  body: unknown;
+  headers: Record<string, string>;
+}
+
+type Answer = { status: number; body: unknown };
+type Handler = (call: ApiCall) => Answer | unknown;
+
+const REPLY = Symbol.for("e2e-reply");
+
+export function reply(status: number, body: unknown = {}): Answer {
+  return { [REPLY]: true, status, body } as Answer;
+}
+
+function isReply(value: unknown): value is Answer {
+  return typeof value === "object" && value !== null && REPLY in value;
+}
+
+function defaults(): Record<string, Handler | unknown> {
+  return {
+    "GET auth/csrf/": data.csrf(),
+    "GET session/": data.session(),
+    "GET my-work/": data.myWork(),
+    "GET risks/filters/": data.riskFilters(),
+    "GET risks/": (call: ApiCall) => {
+      const page = data.riskPage({ pages: 3 });
+      const q = call.query.get("q");
+      const status = call.query.get("status");
+      page.results = page.results.filter(
+        (risk) => (!q || risk.title.includes(q) || risk.code.includes(q)) && (!status || risk.status.value === status),
+      );
+      page.count = page.results.length;
+      page.page = Number(call.query.get("page") ?? 1);
+      page.ordering = (call.query.get("ordering") ?? "newest") as typeof page.ordering;
+      return page;
+    },
+    "GET risks/1/": data.riskDetail(),
+    "GET questionnaires/": data.answerHome(),
+    "GET questionnaires/1/start/": data.startForm(),
+    "GET responses/1/": data.response(),
+    "GET risk-questions/": data.riskQuestions(),
+  };
+}
+
+export class MockApi {
+  readonly calls: ApiCall[] = [];
+  private routes = defaults();
+
+  /** جواب یک «روش مسیر» را برای همین آزمون عوض می‌کند. */
+  on(key: string, handler: Handler | unknown) {
+    this.routes[key] = handler;
+  }
+
+  callsTo(key: string) {
+    return this.calls.filter((call) => `${call.method} ${call.path}` === key);
+  }
+
+  async install(page: Page) {
+    await page.route("**/api/**", async (route) => {
+      const call = toCall(route.request());
+      this.calls.push(call);
+      const key = `${call.method} ${call.path}`;
+      const handler = this.routes[key];
+      if (handler === undefined) {
+        console.warn(`e2e: no mock for ${key}`);
+        await route.fulfill({ status: 502, json: {} });
+        return;
+      }
+      const answer = typeof handler === "function" ? await (handler as Handler)(call) : handler;
+      const { status, body } = isReply(answer) ? answer : { status: 200, body: answer };
+      await route.fulfill({ status, json: body });
+    });
+  }
+}
+
+function toCall(request: Request): ApiCall {
+  const url = new URL(request.url());
+  const raw = request.postData();
+  return {
+    method: request.method(),
+    path: url.pathname.replace(/^\/api\//, ""),
+    query: url.searchParams,
+    body: raw ? JSON.parse(raw) : undefined,
+    headers: request.headers(),
+  };
+}
+
+export type Theme = "dark" | "light";
+
+export interface TestOptions {
+  theme: Theme;
+  /** خطاهای کنسول که این آزمون انتظارشان را دارد (مثلاً جواب ۴۰۰ ورود اشتباه). */
+  allowConsoleErrors: RegExp[];
+}
+
+export const test = base.extend<TestOptions & { api: MockApi }>({
+  theme: ["dark", { option: true }],
+  allowConsoleErrors: [[], { option: true }],
+  // خودکار: حتی آزمونی که api را نمی‌خواهد، جواب‌های پیش‌فرض را می‌گیرد.
+  api: [
+    async ({ page }, use) => {
+      const api = new MockApi();
+      await api.install(page);
+      await use(api);
+    },
+    { auto: true },
+  ],
+  page: async ({ page, theme, allowConsoleErrors }, use) => {
+    await page.addInitScript((choice) => {
+      try {
+        // فقط بار اول همین برگه؛ بعد از reload، انتخاب خود کاربر می‌ماند.
+        if (!window.sessionStorage.getItem("e2e:theme")) {
+          window.localStorage.setItem("erm:theme", choice);
+          window.sessionStorage.setItem("e2e:theme", choice);
+        }
+      } catch {
+        // بدون localStorage هم تم پیش‌فرض کار می‌کند.
+      }
+      (window as unknown as { __csp: string[] }).__csp = [];
+      document.addEventListener("securitypolicyviolation", (event) => {
+        (window as unknown as { __csp: string[] }).__csp.push(`${event.violatedDirective} ${event.blockedURI}`);
+      });
+    }, theme);
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+    await use(page);
+    // هر صفحه باید زیر CSP و Trusted Types واقعی بدون هیچ تخلف و خطای پیش‌بینی‌نشده‌ای کار کند.
+    const violations = await page
+      .evaluate(() => (window as unknown as { __csp?: string[] }).__csp ?? [])
+      .catch(() => []);
+    expect(violations, "CSP violations").toEqual([]);
+    expect(
+      errors.filter((text) => !allowConsoleErrors.some((pattern) => pattern.test(text))),
+      "console errors",
+    ).toEqual([]);
+  },
+});
+
+export { expect };
+
+/** axe روی صفحه‌ی فعلی با قاعده‌های WCAG 2.2 AA، از جمله تضاد رنگ در تم فعلی. */
+export async function expectAccessible(page: Page, include?: string) {
+  // انیمیشن ورود عناصر تمام شود تا axe رنگ نیمه‌شفاف میانه‌ی انیمیشن را تضاد کم نبیند.
+  await page.waitForTimeout(400);
+  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]);
+  if (include) builder = builder.include(include);
+  const result = await builder.analyze();
+  const report = result.violations.map(
+    (violation) =>
+      `${violation.id} (${violation.impact}): ${violation.help}\n` +
+      violation.nodes
+        .slice(0, 5)
+        .map((node) => `  ${node.target.join(" ")} ${node.failureSummary?.split("\n").slice(1, 2).join("") ?? ""}`)
+        .join("\n"),
+  );
+  expect(report, report.join("\n\n")).toEqual([]);
+}
