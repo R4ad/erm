@@ -19,6 +19,10 @@ export class ApiError extends Error {
 
 function describeStatus(status: number) {
   if (status === 403) return "اجازه‌ی این کار را ندارید.";
+  // ۵۰۲ و ۵۰۴ یعنی جنگو اصلاً جواب نداده: پشت nginx روی سرور، یا پشت npm run dev وقتی runserver اجرا نشده است.
+  if (status === 502 || status === 504) {
+    return "سرور جنگو جواب نداد. در اجرای محلی، اول در ریشه‌ی پروژه pipenv run python manage.py runserver را اجرا کنید؛ روی سرور به مدیر سامانه خبر دهید.";
+  }
   if (status === 404) return "پیدا نشد؛ یا وجود ندارد یا اجازه‌ی دیدنش را ندارید.";
   if (status >= 500) return "سرور خطا داد. چند دقیقه‌ی دیگر دوباره امتحان کنید و اگر تکرار شد به مدیر سامانه خبر دهید.";
   return `درخواست انجام نشد (کد ${status}).`;
