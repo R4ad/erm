@@ -11,6 +11,7 @@ django-simple-history = "*"
 django-jalali = "*"
 gunicorn = "*"
 openpyxl = "*"
+djangorestframework = "*"
 
 [dev-packages]
 pytest = "*"

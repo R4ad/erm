@@ -6,7 +6,7 @@
 ## پیش‌نیازها
 
 - برای اجرای کامل روی سرور: Docker و Docker Compose
-- برای توسعه روی سیستم خودتان: Python 3.14، pipenv و Docker (فقط برای PostgreSQL)
+- برای توسعه روی سیستم خودتان: Python 3.14، pipenv و Docker (فقط برای PostgreSQL)، و Node.js 22 برای رابط React
 
 ## تنظیمات (‎.env)
 
@@ -54,6 +54,11 @@ pipenv run python manage.py runserver
 
 سامانه روی `http://127.0.0.1:8000/` باز می‌شود.
 
+بعد از هر `git pull` یا عوض کردن شاخه، اگر `Pipfile.lock` تغییر کرده باشد دوباره `pipenv install --dev` و بعد
+`migrate` را بزنید. بدون آن، بسته‌ی تازه نصب نمی‌شود و دستورها با خطایی مثل
+`ModuleNotFoundError: No module named 'rest_framework'` می‌افتند. اگر virtualenv را خودتان فعال کرده‌اید، pipenv همان را
+به‌کار می‌برد و بسته‌ها در همان نصب می‌شوند.
+
 ### خطای «column ... does not exist»
 
 اگر صفحه‌ای با خطای `ProgrammingError` و «column ... does not exist» یا «relation ... does not exist» باز نشد، اول
@@ -70,6 +75,53 @@ pipenv run python manage.py check_schema
 مهاجرتی که در شاخه‌ای push شده، حتی اگر شاخه هنوز ادغام نشده، دیگر از نو ساخته یا ویرایش نمی‌شود؛ هر تغییر مدل
 مهاجرت تازه می‌گیرد. پایگاهی که نسخه‌ی قبلی را اجرا کرده، آن مهاجرت را اجراشده می‌داند و نسخه‌ی تازه را هیچ‌وقت
 اجرا نمی‌کند.
+
+## رابط تازه (React)
+
+رابط تازه‌ی سامانه در پوشه‌ی `frontend/` با React و Vite ساخته شده و از API جنگو (`/api/`) می‌خواند. صفحه‌ها یکی‌یکی
+به آن منتقل می‌شوند؛ تا هر صفحه منتقل نشده، منو همان صفحه‌ی جنگو را باز می‌کند. الان «کارهای من»، رجیستر و پرونده‌ی
+ریسک، پاسخ به پرسشنامه و پرسش‌های ریسک در رابط تازه‌اند. طرح رنگ و حروف در `frontend/DESIGN.md` آمده است.
+
+پیش‌نیاز: Node.js 22. رابط تازه در حالت توسعه دو برنامه‌ی هم‌زمان می‌خواهد، هر کدام در یک ترمینال. ترتیب مهم است: اول
+جنگو، بعد رابط.
+
+**ترمینال ۱، جنگو** (در ریشه‌ی پروژه):
+
+```bash
+docker compose up -d db
+pipenv install --dev
+pipenv run python manage.py migrate
+pipenv run python manage.py runserver
+```
+
+این ترمینال را باز نگه دارید. تا `runserver` اجرا نشده، رابط فقط خطای «سرور جنگو جواب نداد» نشان می‌دهد و ترمینال ۲
+`http proxy error ... ECONNREFUSED 127.0.0.1:8000` می‌نویسد.
+
+**ترمینال ۲، رابط React:**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+حالا `http://localhost:5173/app/` را باز کنید. اول صفحه‌ی ورود جنگو می‌آید و بعد از ورود به همان صفحه‌ی رابط
+برمی‌گردید. تغییرهای کد رابط بلافاصله دیده می‌شوند. همه‌ی نشانی‌های دیگر (API، صفحه‌ی ورود و صفحه‌های جنگو) از
+همین آدرس به جنگو فرستاده می‌شوند. اگر جنگو روی پورت دیگری است: `DJANGO_URL=http://127.0.0.1:8001 npm run dev`.
+
+هشدار `npm warn allow-scripts ... fsevents` روی مک را می‌توانید نادیده بگیرید؛ fsevents فقط برای دیدن تغییر فایل‌هاست
+و `npm run dev` بدون اجرای اسکریپت نصب آن هم بالا می‌آید.
+
+برای ساختن نسخه‌ای که خود جنگو سرو کند:
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+بعد از آن رابط تازه روی `http://127.0.0.1:8000/app/` هم باز می‌شود. در Docker این ساخت هنگام `docker compose build`
+خودکار انجام می‌شود. تست‌های رابط: `npm test`.
 
 ## تست‌ها
 
@@ -92,7 +144,9 @@ pipenv run pytest
 ## ساختار پروژه
 
 - `config/` تنظیمات و آدرس‌های اصلی
-- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `workcalendar`، `audit`، `catalog`، `risks`، `actions`، `workflow`، `reports`
+- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `workcalendar`، `audit`، `catalog`، `risks`، `actions`، `workflow`، `reports`،
+  و `api` که API رابط React است
+- `frontend/` رابط تازه با React
 - `templates/` و `static/` قالب پایه، فونت وزیرمتن، Bootstrap راست‌چین و htmx
 - `docker/nginx/` تنظیمات nginx
 - `docs/` قواعد کسب‌وکار

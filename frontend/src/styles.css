@@ -1,0 +1,1231 @@
+/* طرح رنگ و حروف در DESIGN.md توضیح داده شده است. همه‌ی فاصله‌ها با ویژگی‌های منطقی (inline/block) نوشته شده‌اند
+   تا راست‌چین بودن از dir="rtl" بیاید، نه از left و right. */
+
+:root {
+  --paper: #f6f7f9;
+  --sheet: #ffffff;
+  --ink: #1d2440;
+  --muted: #5d6579;
+  --rule: #d3dae8;
+  --rule-strong: #aeb9cf;
+  --wash: #eef1f6;
+  --stamp: #5b3f9e;
+  --stamp-deep: #47307f;
+  --stamp-wash: #f1edf9;
+  --late: #b3261e;
+  --late-wash: #fcefee;
+  --ok: #1d6b45;
+  --ok-wash: #eaf5ef;
+
+  --font-ui: "Vazirmatn", Tahoma, sans-serif;
+  --font-head: "Noto Naskh Arabic", "Vazirmatn", serif;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.25rem;
+  --step-3: 1.625rem;
+  --step-4: 2.125rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-sheet: 10px;
+  --radius-control: 6px;
+  --measure: 68ch;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  line-height: 1.8;
+  font-feature-settings: "ss01";
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-head);
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--step-3);
+}
+
+h2 {
+  font-size: var(--step-2);
+}
+
+h3 {
+  font-size: var(--step-1);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 0.3em;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 3px solid var(--stamp);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  inset-block-start: -4rem;
+  background: var(--ink);
+  color: var(--sheet);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+  z-index: 10;
+}
+
+.skip-link:focus {
+  inset-block-start: var(--space-4);
+}
+
+/* ---------- پوسته: منوی راست و ستون محتوا ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-block-size: 100vh;
+}
+
+.rail {
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100vh;
+  overflow-y: auto;
+  background: var(--sheet);
+  border-inline-end: 1px solid var(--rule);
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.brand {
+  font-family: var(--font-head);
+  font-size: var(--step-2);
+  font-weight: 700;
+  text-decoration: none;
+  padding-inline: var(--space-2);
+}
+
+.rail-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.rail-group h2 {
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--muted);
+  padding-inline: var(--space-2);
+  margin-block-end: var(--space-1);
+}
+
+.rail-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  text-decoration: none;
+  line-height: 1.9;
+}
+
+.rail-link:hover {
+  background: var(--wash);
+}
+
+.rail-link[aria-current="page"] {
+  background: var(--wash);
+  font-weight: 700;
+  box-shadow: inset -3px 0 0 var(--ink);
+}
+
+.rail-link.is-classic {
+  color: var(--muted);
+}
+
+.rail-link.is-classic svg {
+  flex: none;
+  opacity: 0.7;
+}
+
+.rail-user {
+  border-block-start: 1px solid var(--rule);
+  padding-block-start: var(--space-4);
+  padding-inline: var(--space-2);
+  font-size: var(--step--1);
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rail-user strong {
+  color: var(--ink);
+  font-size: var(--step-0);
+  font-weight: 500;
+}
+
+.topbar {
+  display: none;
+}
+
+.main {
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  min-inline-size: 0;
+}
+
+.main:focus {
+  outline: none;
+}
+
+.page {
+  max-inline-size: 68rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.page-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.page-lead {
+  color: var(--muted);
+  max-inline-size: var(--measure);
+}
+
+.today {
+  font-family: var(--font-head);
+  font-size: var(--step-1);
+  color: var(--muted);
+}
+
+/* ---------- برگه و دفتر ---------- */
+
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sheet);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.section-head .hint {
+  flex-basis: 100%;
+}
+
+.tally {
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding-inline: var(--space-2);
+  line-height: 1.7;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--step--1);
+  max-inline-size: var(--measure);
+}
+
+.ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ledger > li + li {
+  border-block-start: 1px solid var(--rule);
+}
+
+.work-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 8.5rem;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.work-label {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.work-label:hover {
+  text-decoration: underline;
+}
+
+.work-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.work-row .deadline {
+  justify-self: end;
+}
+
+.work-row.without-level {
+  grid-template-columns: minmax(0, 1fr) 8.5rem;
+}
+
+.work-row.flush {
+  padding: 0;
+}
+
+.divided {
+  border-block-start: 1px solid var(--rule);
+}
+
+/* ---------- داده‌های کوچک ---------- */
+
+.code {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+a.code {
+  text-decoration: none;
+  color: var(--stamp-deep);
+}
+
+a.code:hover {
+  text-decoration: underline;
+}
+
+.level {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 4.5rem;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  font-size: var(--step--1);
+  font-weight: 700;
+  line-height: 1.9;
+  white-space: nowrap;
+}
+
+.level-none {
+  color: var(--muted);
+  font-size: var(--step--1);
+  white-space: nowrap;
+}
+
+.level-large {
+  font-size: var(--step-1);
+  min-inline-size: 7rem;
+  padding: var(--space-1) var(--space-4);
+}
+
+.deadline {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-align: end;
+}
+
+.deadline-words {
+  font-weight: 500;
+}
+
+.deadline-date {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.deadline.is-late .deadline-words {
+  color: var(--late);
+  font-weight: 700;
+}
+
+.status {
+  font-size: var(--step--1);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.status.is-alert {
+  color: var(--late);
+  font-weight: 700;
+}
+
+.status.is-done {
+  color: var(--ok);
+  font-weight: 500;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tags li {
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding-inline: var(--space-2);
+  font-size: var(--step--1);
+  line-height: 1.8;
+}
+
+/* ---------- دکمه، پیوند صفحه‌ی جنگو و فرم ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: 2.5rem;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  border-color: var(--ink);
+}
+
+.button-primary {
+  background: var(--stamp);
+  border-color: var(--stamp);
+  color: #fff;
+}
+
+.button-primary:hover {
+  background: var(--stamp-deep);
+  border-color: var(--stamp-deep);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.button-small {
+  min-block-size: 2rem;
+  padding: 0 var(--space-3);
+  font-size: var(--step--1);
+}
+
+/* نشانه‌ی «صفحه‌ی جنگو» درون همان سطر متن می‌نشیند، حتی وقتی متن پیوند دو سطر شود. */
+.classic-link svg {
+  display: inline-block;
+  vertical-align: -0.15em;
+  margin-inline-start: 0.35em;
+  flex: none;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field-label {
+  font-weight: 500;
+}
+
+.field-help {
+  color: var(--muted);
+  font-size: var(--step--1);
+  max-inline-size: var(--measure);
+}
+
+.field-error {
+  color: var(--late);
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.required {
+  color: var(--late);
+  font-size: var(--step--1);
+  font-weight: 500;
+  margin-inline-start: var(--space-2);
+}
+
+.input,
+.select,
+.textarea {
+  inline-size: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  background: var(--sheet);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.7;
+}
+
+.select {
+  padding-inline-end: var(--space-6);
+}
+
+.textarea {
+  min-block-size: 5.5rem;
+  resize: vertical;
+  max-inline-size: 48rem;
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--muted);
+}
+
+[aria-invalid="true"] {
+  border-color: var(--late);
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  cursor: pointer;
+}
+
+.choice input {
+  margin-block-start: 0.45em;
+  accent-color: var(--stamp);
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex: none;
+}
+
+/* ---------- پیام‌ها و حالت‌ها ---------- */
+
+.notice {
+  border-inline-start: 4px solid var(--ink);
+  background: var(--wash);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  max-inline-size: 52rem;
+}
+
+.notice-success {
+  border-color: var(--ok);
+  background: var(--ok-wash);
+}
+
+.notice-error {
+  border-color: var(--late);
+  background: var(--late-wash);
+}
+
+.notice-stamp {
+  border-color: var(--stamp);
+  background: var(--stamp-wash);
+}
+
+.empty {
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.empty h2 {
+  font-size: var(--step-2);
+}
+
+.loading {
+  color: var(--muted);
+  padding: var(--space-6) 0;
+}
+
+.loading-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 40rem;
+}
+
+.loading-lines span {
+  display: block;
+  block-size: 0.9rem;
+  border-radius: 4px;
+  background: var(--wash);
+}
+
+.loading-lines span:nth-child(2) {
+  inline-size: 80%;
+}
+
+.loading-lines span:nth-child(3) {
+  inline-size: 60%;
+}
+
+/* ---------- رجیستر ---------- */
+
+.filters {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(3, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.filters-more {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}
+
+.filters-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: start;
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--muted);
+  padding: var(--space-3) var(--space-4);
+  border-block-end: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-block-end: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-block-end: 0;
+}
+
+.table tbody tr:hover {
+  background: #fafbfd;
+}
+
+.table .title-cell {
+  min-inline-size: 16rem;
+}
+
+.title-cell a {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.title-cell a:hover {
+  text-decoration: underline;
+}
+
+.cell-sub {
+  display: block;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--muted);
+}
+
+/* ---------- پرونده‌ی ریسک: سربرگ نامه و مهر ---------- */
+
+.letterhead {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-block-end: 1px solid var(--rule);
+}
+
+.crumbs {
+  font-size: var(--step--1);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dossier-title {
+  font-size: var(--step-4);
+  line-height: 1.45;
+  margin-block: var(--space-3) var(--space-2);
+  max-inline-size: 22em;
+}
+
+.dossier-sub {
+  color: var(--muted);
+}
+
+.letter-block {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: start;
+  gap: 0 var(--space-3);
+  font-size: var(--step-0);
+  padding-block-start: var(--space-1);
+}
+
+.letter-block dt {
+  color: var(--muted);
+}
+
+.letter-block dd {
+  margin: 0;
+  font-weight: 500;
+  border-block-end: 1px dotted var(--rule-strong);
+  min-inline-size: 8rem;
+}
+
+.stamp {
+  position: absolute;
+  inset-inline-end: var(--space-6);
+  inset-block-end: calc(-1 * var(--space-5));
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-1) var(--space-4);
+  border: 3px double var(--stamp);
+  border-radius: 8px;
+  color: var(--stamp);
+  background: color-mix(in srgb, var(--sheet) 82%, transparent);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--step-1);
+  line-height: 1.5;
+  transform: rotate(-6deg);
+  mix-blend-mode: multiply;
+  animation: stamp-land 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 180ms both;
+}
+
+.stamp small {
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.stamp.is-archived {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
+@keyframes stamp-land {
+  from {
+    opacity: 0;
+    transform: rotate(-6deg) scale(1.35);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+.dossier-actions {
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dossier-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.dossier-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-inline-size: 0;
+}
+
+.prose {
+  max-inline-size: var(--measure);
+  white-space: pre-line;
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  border-inline-start: 1px solid var(--rule);
+  padding-inline-start: var(--space-5);
+}
+
+.facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.timeline {
+  list-style-type: persian;
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.timeline li::marker {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.timeline-meta {
+  display: block;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.question-card {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.question-card blockquote {
+  margin: 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--rule-strong);
+}
+
+/* ---------- پرسشنامه ---------- */
+
+.form-sheet {
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.form-sheet + .form-sheet {
+  margin-block-start: var(--space-5);
+}
+
+.form-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+.form-meta dt {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.form-meta dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.questions {
+  list-style-type: persian;
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.questions > li::marker {
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.question-text {
+  font-weight: 500;
+  white-space: pre-line;
+}
+
+.question-lead {
+  font-size: var(--step-1);
+  max-inline-size: var(--measure);
+}
+
+.answer-readonly {
+  white-space: pre-line;
+  border-inline-start: 3px solid var(--rule);
+  padding-inline-start: var(--space-3);
+}
+
+.save-bar {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  background: color-mix(in srgb, var(--sheet) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-block-start: 1px solid var(--rule);
+  border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
+}
+
+.save-state {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.save-state.is-dirty {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.start-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-4);
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4);
+}
+
+.list-row h3 {
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  font-weight: 700;
+}
+
+/* ---------- موبایل و تبلت ---------- */
+
+@media (max-width: 1100px) {
+  .dossier-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+    border-block-start: 1px solid var(--rule);
+    padding-block-start: var(--space-5);
+  }
+
+  .filters-row,
+  .filters-more {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters-row > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--sheet);
+    border-block-end: 1px solid var(--rule);
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 5;
+  }
+
+  .rail {
+    display: none;
+    position: static;
+    block-size: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .rail.is-open {
+    display: flex;
+  }
+
+  .rail .brand {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+
+  .work-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--space-3);
+  }
+
+  .work-row .level,
+  .work-row .level-none {
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .work-row.without-level {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .work-row .deadline {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    align-self: start;
+  }
+
+  .letterhead {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+  }
+
+  .dossier-title {
+    font-size: var(--step-3);
+  }
+
+  .stamp {
+    position: relative;
+    inset: auto;
+    justify-self: end;
+  }
+
+  .dossier-actions,
+  .dossier-body {
+    padding-inline: var(--space-4);
+  }
+
+  .form-sheet {
+    padding: var(--space-4);
+  }
+
+  .save-bar {
+    padding-inline: var(--space-4);
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+  }
+
+  .table tr {
+    padding: var(--space-3) var(--space-4);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .table td {
+    border: 0;
+    padding: 0;
+  }
+
+  .table td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--muted);
+    font-size: var(--step--1);
+  }
+
+  .table .title-cell {
+    min-inline-size: 0;
+    margin-block: var(--space-1);
+  }
+}
+
+@media (max-width: 560px) {
+  .filters-row,
+  .filters-more {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .list-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
