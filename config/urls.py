@@ -18,6 +18,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from apps.api import spa
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
@@ -32,6 +34,9 @@ urlpatterns = [
     path("controls/", include("apps.controls.urls")),
     path("assessments/", include("apps.assessments.urls")),
     path("actions/", include("apps.actions.urls")),
+    path("api/", include("apps.api.urls")),
+    path("app/", spa.index, name="spa"),
+    path("app/<path:path>", spa.index, name="spa_path"),
     path("", include("apps.core.urls")),
 ]
 

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}رابط تازه{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-3">رابط تازه هنوز ساخته نشده است</h1>
+<p>فایل‌های رابط React (پوشه‌ی <code dir="ltr">frontend/dist</code>) روی این سرور نیست. برای ساختن آن در ریشه‌ی پروژه:</p>
+<pre dir="ltr" class="bg-body-tertiary p-3 rounded">cd frontend
+npm ci
+npm run build</pre>
+<p>در Docker این کار هنگام ساختن image انجام می‌شود. تا آن موقع همه‌ی کارها از <a href="{% url 'core:home' %}">صفحه‌های فعلی</a> انجام می‌شود.</p>
+{% endblock %}
