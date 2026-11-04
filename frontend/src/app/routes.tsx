@@ -38,6 +38,11 @@ const FORM_ROUTES = [
   "workflow/risks/:risk_pk/requests/:kind",
   "attachments/:content_type/:object_id/new",
   "comments/:pk/edit",
+  "assessments/risks/:risk_pk/new",
+  "assessments/:pk/edit",
+  "assessments/:pk/initiator",
+  "assessments/:pk/paths/new",
+  "assessments/paths/:pk/edit",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -114,6 +119,24 @@ export const routes: RouteObject[] = [
               Component: keyedById(
                 (await import("@/features/change-requests/ChangeRequestPages")).ChangeRequestDetailPage,
               ),
+            }),
+          },
+          {
+            path: "assessments/compare",
+            lazy: async () => ({ Component: (await import("@/features/assessments/ComparePage")).ComparePage }),
+          },
+          {
+            path: "assessments/:pk",
+            lazy: async () => ({
+              Component: keyedByPath(
+                (await import("@/features/assessments/AssessmentDetailPage")).AssessmentDetailPage,
+              ),
+            }),
+          },
+          {
+            path: "assessments/:pk/impacts",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/assessments/ImpactProfilePage")).ImpactProfilePage),
             }),
           },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),

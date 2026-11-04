@@ -445,6 +445,40 @@ export interface FormPageData {
     reviewed_on: Day | null;
   };
   risks?: { id: number; code: string; title: string; owner: Person | null; href: string }[];
+  // چیزهای کنار فرم‌هایی که قالب اختصاصی دارند (عامل آغازگر، مسیر تحقق و...)
+  alerts?: FormAlert[];
+  facts?: { title: string; rows: { label: string; value: string }[] };
+  guides?: FormGuide[];
+  // پروفایل پیامد: چند فرم با پیشوند، یک گروه برای هر ذی‌نفع
+  groups?: ImpactGroup[];
+}
+
+export interface FormAlert {
+  tone: "info" | "warning" | "danger";
+  text: string;
+  items?: string[];
+  link?: { label: string; href: string };
+}
+
+/** راهنمای کنار فرم، مثل جدول سطح‌های A یا B0. */
+export interface FormGuide {
+  title: string;
+  items: { term: string; label: string; text: string }[];
+  notes: string[];
+}
+
+export interface ImpactRow extends FormSchema {
+  prefix: string;
+  scale: { code: string; name: string };
+  suggestion: { level: number | null; note: string } | null;
+  provisional_note: string;
+}
+
+export interface ImpactGroup {
+  name: string;
+  is_datin: boolean;
+  facts: { critical: boolean; rto: number | null; mtpd: number | null; basis: number | null };
+  rows: ImpactRow[];
 }
 
 export interface FormResult {
@@ -609,4 +643,157 @@ export interface ChangeDetail {
   /** فقط برای مالک ریسک و فقط تا وقتی درخواست منتظر تصمیم است. */
   decision: { url: string; effect: string; note: FormField } | null;
   list_url: string;
+}
+
+// ارزیابی ریسک (apps/api/assessments.py)
+
+export type Band = [number, number];
+
+export interface EvidenceRef {
+  code: string;
+  href: string;
+}
+
+export interface AssessmentHeader {
+  id: number;
+  code: string;
+  kind: Choice;
+  status: Choice;
+  is_approved: boolean;
+  risk: { id: number; code: string; title: string; href: string };
+  method_version: { label: string; number: number; href: string };
+  horizon_months: number;
+  meeting_date: Day | null;
+  assumptions: string;
+  created_by: Person | null;
+  created_at: Moment;
+  approved_at: Moment | null;
+  escalation: {
+    flags: { label: string; tone: "danger" | "warning" }[];
+    rationale: string;
+    evidence: EvidenceRef[];
+  } | null;
+  href: string;
+}
+
+export interface AssessmentOutcome {
+  provisional: boolean;
+  problems: string[];
+  likelihood: Band | null;
+  impact: Band | null;
+  score: Band | null;
+  decision_score: number | null;
+  base_level: Level | null;
+  decision_level: Level | null;
+  confidence: string;
+  incomplete_reasons: string[];
+  escalation_reasons: string[];
+  out_of_acceptance_authority: boolean;
+  acceptance_restricted: boolean;
+}
+
+export interface AssessmentReviewItem {
+  id: number;
+  action: Choice;
+  by: Person | null;
+  at: Moment;
+  meeting_date: Day | null;
+  notes: string;
+}
+
+export interface AssessmentReview {
+  can_submit: boolean;
+  submission_problems: string[];
+  submit_url: string | null;
+  can_review: boolean;
+  review_url: string | null;
+  review_notes: FormField;
+  can_decide_referral: boolean;
+  referral_url: string | null;
+  referral_form: FormSchema;
+  history: AssessmentReviewItem[];
+}
+
+export interface AssessmentPath {
+  id: number;
+  name: string;
+  description: string;
+  independent: boolean;
+  independence_rationale: string;
+  exceptions: string;
+  notes: string[];
+  b0: string;
+  b0_confidence: string;
+  b0_rationale: string;
+  controls: { code: string; href: string; e: number; recorded_e: number; note: string }[];
+  bc: Band | null;
+  b: Band | null;
+  edit_url: string | null;
+  delete_url: string | null;
+}
+
+export interface AssessmentLikelihood {
+  a: string;
+  b: Band | null;
+  likelihood: Band | null;
+  problems: string[];
+  incomplete: string[];
+  blockers: string[];
+  initiator: {
+    basis: Choice;
+    rate: {
+      count: number | null;
+      months: number | null;
+      denominator: string;
+      coverage: string | null;
+      suggestion: { level: number | null; note: string } | null;
+      insufficient: string[];
+    } | null;
+    confidence: string;
+    rationale: string;
+    evidence: EvidenceRef[];
+  } | null;
+  paths: AssessmentPath[];
+}
+
+export interface ImpactCell {
+  level: string;
+  unknown: boolean;
+  value: string | null;
+  unit: string;
+  confidence: string;
+  rationale: string;
+}
+
+export interface AssessmentImpacts {
+  impact: Band | null;
+  problems: string[];
+  incomplete: string[];
+  unknown: string[];
+  missing: string[];
+  stakeholders: string[];
+  rows: { code: string; name: string; cells: (ImpactCell | null)[] }[];
+}
+
+export interface AssessmentDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  assessment: AssessmentHeader;
+  outcome: AssessmentOutcome;
+  review: AssessmentReview;
+  likelihood: AssessmentLikelihood;
+  impacts: AssessmentImpacts;
+  actions: { edit: string | null; impact_profile: string | null; initiator: string | null; add_path: string | null };
+}
+
+export interface ComparePage {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  risk: { id: number; code: string; title: string; href: string };
+  error: string | null;
+  profiles: { id: number; code: string; kind: Choice; method_version: number; incomplete: boolean; href: string }[];
+  rows: { label: string; cells: { text: string; level: Level | null; trend: "" | "up" | "down" }[] }[];
+  method_changed: boolean;
 }

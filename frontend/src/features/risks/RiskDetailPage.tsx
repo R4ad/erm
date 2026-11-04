@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronDown,
   ClipboardCheck,
+  Columns3,
   FilePlus2,
   FileSearch,
   FileText,
@@ -20,7 +21,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ClassicLink } from "@/components/ui/classic-link";
 import { Deadline } from "@/components/ui/deadline";
+import { Checkbox } from "@/components/ui/field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +44,9 @@ import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Attachments, Comments } from "@/features/records/RecordSections";
-import { useRouteOf } from "@/features/session/links";
+import { useGoTo, useRouteOf } from "@/features/session/links";
 import { get } from "@/lib/api";
-import { dateTime, fa, formatNumber, longDate, safeExternalUrl, shortDate } from "@/lib/format";
+import { band, dateTime, formatNumber, longDate, safeExternalUrl, shortDate } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
 import { t } from "@/lib/i18n";
 import type { RelatedRisk, RiskDetail } from "@/lib/types";
@@ -52,10 +54,7 @@ import type { RelatedRisk, RiskDetail } from "@/lib/types";
 const TABS = ["overview", "workflow", "assessments", "treatment", "evidence", "comments"] as const;
 type Tab = (typeof TABS)[number];
 
-function score(value: [number, number] | null) {
-  if (!value) return null;
-  return value[0] === value[1] ? fa(value[0]) : `${fa(value[0])} تا ${fa(value[1])}`;
-}
+const score = band;
 
 function Hero({ risk }: { risk: RiskDetail }) {
   return (
@@ -341,55 +340,98 @@ function Timeline({ risk }: { risk: RiskDetail }) {
 }
 
 function Assessments({ risk }: { risk: RiskDetail }) {
+  const [picked, setPicked] = useState<number[]>([]);
+  const goTo = useGoTo();
   if (!risk.assessments.length) {
     return <EmptyState as="h3" icon={<ClipboardCheck />} title="هنوز ارزیابی‌ای ثبت نشده" />;
   }
+  // مقایسه مثل فرم صفحه‌ی ریسک جنگو: ?id=…&id=…، که جنگو به ترتیب ثبت می‌چیند تا قدیمی‌ترین ستون اول باشد.
+  const comparable = risk.assessments.length > 1;
+  const canCompare = picked.length >= 2 && picked.length <= 4;
   return (
-    <Card className="table-shell overflow-clip">
-      <table className="data-table">
-        <caption className="sr-only">ارزیابی‌های این ریسک</caption>
-        <thead>
-          <tr>
-            <th scope="col">کد</th>
-            <th scope="col">نوع</th>
-            <th scope="col">وضعیت</th>
-            <th scope="col">سطح</th>
-            <th scope="col">امتیاز</th>
-            <th scope="col">تأیید</th>
-          </tr>
-        </thead>
-        <tbody>
-          {risk.assessments.map((assessment) => (
-            <tr key={assessment.id}>
-              <td data-primary>
-                <ClassicLink href={assessment.href} className="code">
-                  {assessment.code}
-                </ClassicLink>
-              </td>
-              <td data-label="نوع">{assessment.kind.label}</td>
-              <td data-label="وضعیت">
-                <Badge tone={assessment.status.value === "approved" ? "success" : "neutral"}>
-                  {assessment.status.label}
-                </Badge>
-              </td>
-              <td data-label="سطح">
-                <LevelBadge level={assessment.level} />
-              </td>
-              <td data-label="امتیاز" data-empty={assessment.score ? undefined : ""} className="tabular">
-                {score(assessment.score)}
-              </td>
-              <td
-                data-label="تأیید"
-                data-empty={assessment.approved_at ? undefined : ""}
-                className="whitespace-nowrap text-muted"
-              >
-                {assessment.approved_at && shortDate(assessment.approved_at)}
-              </td>
+    <div className="flex flex-col gap-3">
+      <Card className="table-shell overflow-clip">
+        <table className="data-table">
+          <caption className="sr-only">ارزیابی‌های این ریسک</caption>
+          <thead>
+            <tr>
+              {comparable && (
+                <th scope="col" className="w-0">
+                  <span className="sr-only">انتخاب برای مقایسه</span>
+                </th>
+              )}
+              <th scope="col">کد</th>
+              <th scope="col">نوع</th>
+              <th scope="col">وضعیت</th>
+              <th scope="col">سطح</th>
+              <th scope="col">امتیاز</th>
+              <th scope="col">تأیید</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
+          </thead>
+          <tbody>
+            {risk.assessments.map((assessment) => (
+              <tr key={assessment.id}>
+                {comparable && (
+                  <td data-label="مقایسه" className="w-0">
+                    <Checkbox
+                      label={<span className="sr-only">مقایسه‌ی {assessment.code}</span>}
+                      checked={picked.includes(assessment.id)}
+                      onChange={(event) =>
+                        setPicked((current) =>
+                          event.target.checked
+                            ? [...current, assessment.id]
+                            : current.filter((id) => id !== assessment.id),
+                        )
+                      }
+                    />
+                  </td>
+                )}
+                <td data-primary>
+                  <AppLink href={assessment.href} className="code">
+                    {assessment.code}
+                  </AppLink>
+                </td>
+                <td data-label="نوع">{assessment.kind.label}</td>
+                <td data-label="وضعیت">
+                  <Badge tone={assessment.status.value === "approved" ? "success" : "neutral"}>
+                    {assessment.status.label}
+                  </Badge>
+                </td>
+                <td data-label="سطح">
+                  <LevelBadge level={assessment.level} />
+                </td>
+                <td data-label="امتیاز" data-empty={assessment.score ? undefined : ""} className="tabular">
+                  {score(assessment.score)}
+                </td>
+                <td
+                  data-label="تأیید"
+                  data-empty={assessment.approved_at ? undefined : ""}
+                  className="whitespace-nowrap text-muted"
+                >
+                  {assessment.approved_at && shortDate(assessment.approved_at)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      {comparable && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!canCompare}
+            onClick={() => goTo(`/assessments/compare/?${picked.map((id) => `id=${id}`).join("&")}`)}
+          >
+            <Columns3 aria-hidden />
+            مقایسه‌ی انتخاب‌شده‌ها
+          </Button>
+          <span className="text-xs text-muted" aria-live="polite">
+            {picked.length > 4 ? "حداکثر چهار ارزیابی را انتخاب کنید." : "دو تا چهار ارزیابی؛ قدیمی‌ترین ستون اول است."}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 

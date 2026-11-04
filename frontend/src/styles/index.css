@@ -373,6 +373,11 @@
     overscroll-behavior-x: contain;
   }
 
+  /* جعبه‌ی پیمایش افقی خودش ظرف چسبیدن سرستون‌هاست؛ فاصله‌ی نوار بالا در آن سرستون را روی سطر اول می‌انداخت. */
+  .table-scroll .data-table thead th {
+    top: 0;
+  }
+
   .data-table tbody tr {
     transition: background-color 140ms;
   }
@@ -386,8 +391,27 @@
     border-bottom: 0;
   }
 
+  /*
+   * جدول ماتریسی (مقایسه‌ی ارزیابی‌ها) در عرض کم هم جدول می‌ماند، چون معنی هر خانه از سرستون و سرسطرش است؛ ستون
+   * اول هنگام پیمایش افقی سر جایش می‌ماند.
+   */
+  .data-matrix tbody th[scope="row"],
+  .data-matrix thead th:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    background-color: var(--panel);
+  }
+
+  .data-matrix tbody th[scope="row"] {
+    z-index: 1;
+  }
+
+  .data-matrix thead th:first-child {
+    z-index: 2;
+  }
+
   @container table (max-width: 44rem) {
-    .data-table thead {
+    .data-table:not(.data-matrix) thead {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -396,13 +420,13 @@
       white-space: nowrap;
     }
 
-    .data-table,
-    .data-table tbody,
-    .data-table tr {
+    .data-table:not(.data-matrix),
+    .data-table:not(.data-matrix) tbody,
+    .data-table:not(.data-matrix) tr {
       display: block;
     }
 
-    .data-table tbody tr {
+    .data-table:not(.data-matrix) tbody tr {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 0.375rem 1rem;
@@ -410,12 +434,12 @@
       border-bottom: 1px solid var(--line);
     }
 
-    .data-table tbody tr:last-child {
+    .data-table:not(.data-matrix) tbody tr:last-child {
       border-bottom: 0;
     }
 
-    .data-table td,
-    .data-table tbody th {
+    .data-table:not(.data-matrix) td,
+    .data-table:not(.data-matrix) tbody th {
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -423,20 +447,20 @@
       border: 0;
     }
 
-    .data-table td[data-label]::before {
+    .data-table:not(.data-matrix) td[data-label]::before {
       content: attr(data-label);
       color: var(--muted);
       font-size: var(--text-xs);
       min-width: 4.5rem;
     }
 
-    .data-table td[data-primary],
-    .data-table tbody th[data-primary] {
+    .data-table:not(.data-matrix) td[data-primary],
+    .data-table:not(.data-matrix) tbody th[data-primary] {
       grid-column: 1 / -1;
       display: block;
     }
 
-    .data-table td[data-empty] {
+    .data-table:not(.data-matrix) td[data-empty] {
       display: none;
     }
   }

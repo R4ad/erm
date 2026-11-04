@@ -12,6 +12,7 @@ from django.urls import reverse
 from apps.workflow.models import ChangeRequest
 
 from . import formatting as fmt
+from .assessments import ASSESSMENT_PAGES
 from .forms import describe_field, describe_form
 from .records import record_parts
 
@@ -271,4 +272,5 @@ READ_PAGES = {
     "risks:coverage": coverage,
     "workflow:change_request_list": change_request_list,
     "workflow:change_request_detail": change_request_detail,
+    **ASSESSMENT_PAGES,
 }

@@ -55,6 +55,8 @@ function defaults(): Record<string, Handler | unknown> {
       "/risks/1/edit/": data.riskForm(),
       "/attachments/29/1/new/": data.uploadForm(),
       "/workflow/risks/1/transition/start_treatment/": data.transitionForm(),
+      "/assessments/1/initiator/": data.initiatorForm(),
+      "/assessments/1/impacts/": data.impactProfileForm(),
     }),
     "POST forms/": (call: ApiCall) => saved(call),
     "GET pages/": byPath({
@@ -68,6 +70,8 @@ function defaults(): Record<string, Handler | unknown> {
       "/risks/evidence/1/": data.evidenceDetail(),
       "/risks/coverage/": data.coverage(),
       "/workflow/requests/7/": data.changeDetail(),
+      "/assessments/1/": data.assessmentDetail(),
+      "/assessments/compare/": data.compareAssessments(),
     }),
   };
 }
@@ -94,6 +98,18 @@ function saved(call: ApiCall) {
     return {
       message: "پیوست بارگذاری شد.",
       redirect: { href: "/risks/1/#attachments", route: "/risks/1#attachments" },
+    };
+  }
+  if (path.startsWith("/assessments/1/submit/")) {
+    return {
+      message: "ارزیابی AS-1405-0001 برای کنترل کیفیت فرستاده شد.",
+      redirect: { href: "/assessments/1/#review", route: "/assessments/1#review" },
+    };
+  }
+  if (path.startsWith("/assessments/")) {
+    return {
+      message: "پروفایل پیامد ارزیابی AS-1405-0001 ذخیره شد.",
+      redirect: { href: "/assessments/1/", route: "/assessments/1" },
     };
   }
   if (path.startsWith("/workflow/requests/")) {

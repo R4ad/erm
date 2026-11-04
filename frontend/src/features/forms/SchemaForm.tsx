@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { useGoTo } from "@/features/session/links";
 import { ApiError, bridge, errorMessage, post } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { faText, formatNumber } from "@/lib/format";
 import type { JalaliDate } from "@/lib/jalali";
 import type { AppHref, FormChoice, FormField, FormResult, FormSchema } from "@/lib/types";
@@ -226,6 +227,15 @@ interface SchemaFormProps {
   today?: JalaliDate;
   /** چیزی میان فیلدها و دکمه‌ها، مثل توضیح پیامد. */
   footer?: ReactNode;
+  /**
+   * چیدمان دلخواه فیلدها برای فرم‌هایی مثل پروفایل پیامد؛ field(name) کنترل همان فیلد را می‌دهد. بی آن، فیلدها
+   * پشت سر هم می‌آیند.
+   */
+  layout?: (field: (name: string) => ReactNode) => ReactNode;
+  /** نام فیلد در خلاصه‌ی خطاها، وقتی برچسب خودش تنها کافی نیست (مثل «سطح» در چند ردیف). */
+  summaryLabel?: (field: FormField) => string;
+  /** دکمه‌ها در فرم بلند پایین صفحه می‌مانند تا ذخیره بی‌رفتن به ته فرم در دسترس باشد. */
+  stickyActions?: boolean;
 }
 
 export function SchemaForm({
@@ -237,8 +247,12 @@ export function SchemaForm({
   onSaved,
   today,
   footer,
+  layout,
+  summaryLabel = (field) => field.label,
+  stickyActions = false,
 }: SchemaFormProps) {
   const fields = schema.fields;
+  const byName = new Map(fields.map((field) => [field.name, field]));
   const form = useForm<FormValues>({
     defaultValues: initialValues(fields),
     resolver: zodResolver(formSchema(fields)),
@@ -273,7 +287,6 @@ export function SchemaForm({
     onError: (error) => {
       const messages: string[] = [];
       if (error instanceof ApiError && error.status === 400) {
-        const byName = new Map(fields.map((field) => [field.name, field]));
         for (const [name, list] of Object.entries(error.errors)) {
           const field = byName.get(name);
           if (field && editable(field)) form.setError(name, { type: "server", message: list.join(" ") });
@@ -357,7 +370,7 @@ export function SchemaForm({
                       focusField(field.name);
                     }}
                   >
-                    {field.label}: {form.getFieldState(field.name, formState).error?.message}
+                    {summaryLabel(field)}: {form.getFieldState(field.name, formState).error?.message}
                   </a>
                 </li>
               ))}
@@ -365,15 +378,28 @@ export function SchemaForm({
           </Alert>
         )}
 
-        <div className="flex flex-col gap-5">
-          {fields.map((field) => (
-            <SchemaField key={field.name} field={field} control={form.control} today={today} />
-          ))}
-        </div>
+        {layout ? (
+          layout((name) => {
+            const field = byName.get(name);
+            return field ? <SchemaField key={name} field={field} control={form.control} today={today} /> : null;
+          })
+        ) : (
+          <div className="flex flex-col gap-5">
+            {fields.map((field) => (
+              <SchemaField key={field.name} field={field} control={form.control} today={today} />
+            ))}
+          </div>
+        )}
 
         {footer}
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-5">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 border-t border-line pt-5",
+            stickyActions &&
+              "sticky bottom-0 z-10 -mx-1 bg-canvas/90 px-1 pb-4 backdrop-blur supports-[backdrop-filter]:bg-canvas/75",
+          )}
+        >
           <Button type="submit" variant="primary" loading={save.isPending}>
             {!save.isPending && submitIcon}
             {submitLabel}

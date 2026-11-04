@@ -73,7 +73,8 @@ def describe_field(bound):
     kind = field_kind(field)
     attrs = field.widget.attrs
     data = {
-        "name": bound.name,
+        # نام با پیشوند فرم، همان نامی که در داده‌ی POST می‌آید؛ صفحه‌ای مثل پروفایل پیامد چند فرم با پیشوند دارد.
+        "name": bound.html_name,
         "label": str(bound.label or ""),
         "help": str(field.help_text or ""),
         "required": field.required,
