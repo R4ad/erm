@@ -74,7 +74,7 @@ def test_an_api_request_without_login_gets_json_not_the_login_page(client):
 
     assert response.status_code == 403
     assert response["Content-Type"] == "application/json"
-    assert "detail" in response.json()
+    assert response.json()["login_url"] == reverse("accounts:login")
 
 
 def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_admin):
@@ -115,6 +115,7 @@ def test_a_denied_api_request_is_written_to_the_audit_log(api, unit):
     )
 
     assert response.status_code == 403
+    assert "login_url" not in response.json()
     event = AuditEvent.objects.get(event=AuditEvent.Event.PERMISSION_DENIED)
     assert event.user == staff
     assert event.details["path"] == reverse("api:response_start", args=[questionnaire.pk])

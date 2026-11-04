@@ -6,7 +6,7 @@
 ## پیش‌نیازها
 
 - برای اجرای کامل روی سرور: Docker و Docker Compose
-- برای توسعه روی سیستم خودتان: Python 3.14، pipenv و Docker (فقط برای PostgreSQL)
+- برای توسعه روی سیستم خودتان: Python 3.14، pipenv و Docker (فقط برای PostgreSQL)، و Node.js 22 برای رابط React
 
 ## تنظیمات (‎.env)
 
@@ -71,6 +71,34 @@ pipenv run python manage.py check_schema
 مهاجرت تازه می‌گیرد. پایگاهی که نسخه‌ی قبلی را اجرا کرده، آن مهاجرت را اجراشده می‌داند و نسخه‌ی تازه را هیچ‌وقت
 اجرا نمی‌کند.
 
+## رابط تازه (React)
+
+رابط تازه‌ی سامانه در پوشه‌ی `frontend/` با React و Vite ساخته شده و از API جنگو (`/api/`) می‌خواند. صفحه‌ها یکی‌یکی
+به آن منتقل می‌شوند؛ تا هر صفحه منتقل نشده، منو همان صفحه‌ی جنگو را باز می‌کند. الان «کارهای من»، رجیستر و پرونده‌ی
+ریسک، پاسخ به پرسشنامه و پرسش‌های ریسک در رابط تازه‌اند. طرح رنگ و حروف در `frontend/DESIGN.md` آمده است.
+
+پیش‌نیاز: Node.js 22. برای کار روی رابط، جنگو را مثل بالا روی پورت 8000 اجرا کنید و در ترمینال دیگر:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+رابط روی `http://localhost:5173/app/` باز می‌شود و تغییرهای کد بلافاصله دیده می‌شوند. همه‌ی نشانی‌های دیگر (API، صفحه‌ی
+ورود و صفحه‌های جنگو) به جنگو فرستاده می‌شوند. اگر جنگو جای دیگری است: `DJANGO_URL=http://127.0.0.1:8001 npm run dev`.
+
+برای ساختن نسخه‌ای که خود جنگو سرو کند:
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+بعد از آن رابط تازه روی `http://127.0.0.1:8000/app/` هم باز می‌شود. در Docker این ساخت هنگام `docker compose build`
+خودکار انجام می‌شود. تست‌های رابط: `npm test`.
+
 ## تست‌ها
 
 پایگاه داده باید بالا باشد (`docker compose up -d db`):
@@ -92,7 +120,9 @@ pipenv run pytest
 ## ساختار پروژه
 
 - `config/` تنظیمات و آدرس‌های اصلی
-- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `workcalendar`، `audit`، `catalog`، `risks`، `actions`، `workflow`، `reports`
+- `apps/` بخش‌های سامانه: `core`، `accounts`، `organization`، `workcalendar`، `audit`، `catalog`، `risks`، `actions`، `workflow`، `reports`،
+  و `api` که API رابط React است
+- `frontend/` رابط تازه با React
 - `templates/` و `static/` قالب پایه، فونت وزیرمتن، Bootstrap راست‌چین و htmx
 - `docker/nginx/` تنظیمات nginx
 - `docs/` قواعد کسب‌وکار
