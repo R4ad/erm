@@ -10,6 +10,7 @@ from django.views.generic import CreateView, DetailView, FormView, ListView, Upd
 
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.catalog.views import BackToRecordMixin
+from apps.core.jalali import to_jalali
 from apps.core.views import FilteredListView, FormPageMixin
 from apps.risks.views import RiskCreateView
 from apps.workflow.permissions import answerable_questions
@@ -321,7 +322,7 @@ class ResponseReturnView(ReviewActionMixin, FormView):
 
     def form_valid(self, form):
         return_response(self.response, form.cleaned_data["question"])
-        messages.success(self.request, f"پاسخ برگشت داده شد؛ مهلت جواب تا {self.response.return_due:%Y-%m-%d}.")
+        messages.success(self.request, f"پاسخ برگشت داده شد؛ مهلت جواب تا {to_jalali(self.response.return_due)}.")
         return redirect(self.response.get_absolute_url())
 
     def get_context_data(self, **kwargs):
