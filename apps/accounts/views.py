@@ -1,18 +1,39 @@
 import uuid
 from pathlib import Path
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.api.spa import spa_login_url, spa_ready
 from apps.core.views import FilteredListView
 
-from .forms import StaffFileForm, StaffImportConfirmForm, UserFilterForm
+from .forms import LoginForm, StaffFileForm, StaffImportConfirmForm, UserFilterForm
 from .models import User
 from .permissions import RoleRequiredMixin, role_required
 from .roles import Role
 from .staff_import import StaffFileError, run_import
+
+
+class LoginView(auth_views.LoginView):
+    """صفحه‌ی ورود. وقتی رابط React ساخته شده باشد، ورود در همان رابط است و این صفحه کاربر را با همان next به آن‌جا
+    می‌فرستد. با ?classic=1 همین فرم جنگو باز می‌شود تا اگر رابط تازه مشکلی داشت راه ورود بسته نشود."""
+
+    template_name = "accounts/login.html"
+    authentication_form = LoginForm
+    redirect_authenticated_user = True
+
+    def get(self, request, *args, **kwargs):
+        if spa_ready() and "classic" not in request.GET:
+            target = spa_login_url()
+            next_url = request.GET.get(self.redirect_field_name)
+            if next_url:
+                target = f"{target}?{urlencode({'next': next_url})}"
+            return redirect(target)
+        return super().get(request, *args, **kwargs)
 
 
 def pending_file(token):

@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.db.models import OuterRef, Subquery
+from django.db.models import F, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from rest_framework import status
@@ -21,14 +21,27 @@ from .base import ApiView
 
 PAGE_SIZE = 25
 
+# مرتب‌سازی‌های رجیستر. پیش‌فرض همان صفحه‌ی جنگوست: تازه‌ترین بالا. بی‌سطح‌ها در مرتب‌سازی سطح همیشه آخرند.
+ORDERINGS = {
+    "newest": ("-created_at", "-pk"),
+    "oldest": ("created_at", "pk"),
+    "code": ("code", "pk"),
+    "-code": ("-code", "-pk"),
+    "level": (F("level_rank").desc(nulls_last=True), "-created_at", "-pk"),
+    "-level": (F("level_rank").asc(nulls_last=True), "-created_at", "-pk"),
+}
+
+
+def latest_current_assessment():
+    """آخرین ارزیابی جاری تأییدشده‌ی هر ریسک؛ سطح تصمیم آن «سطح فعلی» ریسک است، همان که صفحه‌ی ریسک می‌گوید."""
+    return Assessment.objects.filter(
+        risk=OuterRef("pk"), kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED
+    ).order_by("-approved_at", "-pk")
+
 
 def current_levels(risks):
     """سطح فعلی هر ریسک: سطح تصمیم آخرین ارزیابی جاری تأییدشده، همان که صفحه‌ی ریسک «سطح فعلی» می‌داند."""
-    latest = (
-        Assessment.objects.filter(risk=OuterRef("pk"), kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED)
-        .order_by("-approved_at", "-pk")
-        .values("decision_level")[:1]
-    )
+    latest = latest_current_assessment().values("decision_level")[:1]
     level_ids = dict(risks.annotate(level_id=Subquery(latest)).values_list("pk", "level_id"))
     levels = RiskLevel.objects.in_bulk({pk for pk in level_ids.values() if pk})
     return {risk_id: levels.get(level_id) for risk_id, level_id in level_ids.items()}
@@ -60,9 +73,13 @@ class RiskListView(ApiView):
         form = RiskFilterForm(request.query_params, user=user)
         if not form.is_valid():
             return Response({"errors": fmt.form_errors(form)}, status=status.HTTP_400_BAD_REQUEST)
-        risks = form.filter(visible_risks(user).select_related("service", "category", "org_unit", "owner")).order_by(
-            "-created_at", "-pk"
-        )
+        ordering = request.query_params.get("ordering", "newest")
+        if ordering not in ORDERINGS:
+            ordering = "newest"
+        risks = form.filter(visible_risks(user).select_related("service", "category", "org_unit", "owner"))
+        if ordering.endswith("level"):
+            risks = risks.annotate(level_rank=Subquery(latest_current_assessment().values("decision_level__rank")[:1]))
+        risks = risks.order_by(*ORDERINGS[ordering])
         page = Paginator(risks, PAGE_SIZE).get_page(request.query_params.get("page"))
         page_risks = list(page.object_list)
         levels = current_levels(visible_risks(user).filter(pk__in=[risk.pk for risk in page_risks]))
@@ -71,6 +88,7 @@ class RiskListView(ApiView):
                 "count": page.paginator.count,
                 "page": page.number,
                 "pages": page.paginator.num_pages,
+                "ordering": ordering,
                 "results": [risk_row(risk, levels.get(risk.pk)) for risk in page_risks],
                 "can_create": can_edit_register(user),
                 "create_url": reverse("risks:risk_create"),

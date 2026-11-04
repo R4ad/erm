@@ -1,10 +1,13 @@
 from django.urls import path
 
-from . import mywork, questionnaires, risks, session
+from . import auth, mywork, questionnaires, risks, session
 
 app_name = "api"
 
 urlpatterns = [
+    path("auth/csrf/", auth.CsrfView.as_view(), name="csrf"),
+    path("auth/login/", auth.LoginView.as_view(), name="login"),
+    path("auth/logout/", auth.LogoutView.as_view(), name="logout"),
     path("session/", session.SessionView.as_view(), name="session"),
     path("my-work/", mywork.MyWorkView.as_view(), name="my_work"),
     path("risks/", risks.RiskListView.as_view(), name="risk_list"),
