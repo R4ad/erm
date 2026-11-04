@@ -242,6 +242,7 @@ def test_a_transition_shows_its_conditions_and_moves_the_risk(api, grc, owner):
 
     data = form(client, f"/workflow/risks/{incomplete.pk}/transition/send_to_assessment/").json()
     assert data["transition"]["target"]
+    assert data["submit"] == data["transition"]["label"]
     assert "مالک ریسک تعیین نشده است." in data["problems"]
     assert data["risk"]["code"] == incomplete.code
 
@@ -281,8 +282,13 @@ def test_an_attachment_uploads_as_multipart(api, grc, owner):
     path = f"/attachments/{content_type}/{risk.pk}/new/"
     client = api(grc)
 
-    described = form(client, path).json()["form"]
+    data = form(client, path).json()
+    assert data["submit"] == "بارگذاری پیوست"
+    described = data["form"]
     assert described["multipart"] is True
+    file_field = next(field for field in described["fields"] if field["name"] == "file")
+    assert file_field["max_size"] == 20 * 1024 * 1024
+    assert ".pdf" in file_field["accept"]
     assert {"file": "file", "description": "text"}.items() <= {
         field["name"]: field["kind"] for field in described["fields"]
     }.items()

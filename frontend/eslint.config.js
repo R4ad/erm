@@ -32,7 +32,15 @@ export default tseslint.config(
         "warn",
         {
           allowConstantExport: true,
-          allowExportNames: ["buttonClasses", "pageWindow", "useToast", "useTheme", "useSession", "useLogout"],
+          allowExportNames: [
+            "buttonClasses",
+            "pageWindow",
+            "useToast",
+            "useTheme",
+            "useSession",
+            "useLogout",
+            "useFieldControl",
+          ],
         },
       ],
     },

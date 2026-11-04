@@ -47,7 +47,8 @@ describe("format", () => {
 
   it("writes sizes and counts in Persian", () => {
     expect(fileSize(2048)).toBe("۲ کیلوبایت");
-    expect(fileSize(3 * 1024 * 1024)).toBe("۳٫۰ مگابایت");
+    expect(fileSize(3 * 1024 * 1024)).toBe("۳ مگابایت");
+    expect(fileSize(2.5 * 1024 * 1024)).toBe("۲٫۵ مگابایت");
     expect(count(0, "ریسک")).toBe("هیچ ریسکی");
     expect(count(4, "ریسک")).toBe("۴ ریسک");
   });

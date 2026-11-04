@@ -96,6 +96,7 @@ class AttachmentForm(BootstrapFormMixin, forms.Form):
         types = "، ".join(settings.ATTACHMENT_EXTENSIONS)
         self.fields["file"].help_text = f"حداکثر {size} مگابایت؛ {types}"
         self.fields["file"].widget.attrs["accept"] = ",".join(f".{ext}" for ext in settings.ATTACHMENT_EXTENSIONS)
+        self.fields["file"].widget.attrs["data-max-size"] = settings.ATTACHMENT_MAX_SIZE
 
     def clean_file(self):
         upload = self.cleaned_data["file"]

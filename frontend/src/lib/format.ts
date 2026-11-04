@@ -68,7 +68,8 @@ export function daysLeft(deadline: Deadline): string {
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${fa(bytes)} بایت`;
   if (bytes < 1024 * 1024) return `${fa(Math.round(bytes / 1024))} کیلوبایت`;
-  return `${fa((bytes / (1024 * 1024)).toFixed(1)).replace(".", "٫")} مگابایت`;
+  // «۲۰ مگابایت» به‌جای «۲۰٫۰ مگابایت»؛ کسر فقط وقتی هست که چیزی بگوید.
+  return `${fa((bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")).replace(".", "٫")} مگابایت`;
 }
 
 /** شمار با نام چیز: «۳ ریسک»، و برای صفر «هیچ ریسکی». */

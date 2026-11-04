@@ -8,20 +8,22 @@ import {
   FileSearch,
   FileText,
   GitBranch,
+  GitMerge,
   History,
+  Link2,
   Lock,
-  MessageSquare,
   MessageCircleQuestionMark,
-  Paperclip,
   PencilLine,
   ShieldCheck,
+  Split,
   SquareArrowOutUpLeft,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
+import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -39,11 +41,13 @@ import { LevelBadge } from "@/components/ui/level-badge";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Attachments, Comments } from "@/features/records/RecordSections";
+import { useRouteOf } from "@/features/session/links";
 import { get } from "@/lib/api";
-import { dateTime, fa, fileSize, formatNumber, longDate, safeExternalUrl, shortDate } from "@/lib/format";
+import { dateTime, fa, formatNumber, longDate, safeExternalUrl, shortDate } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
 import { t } from "@/lib/i18n";
-import type { RiskDetail } from "@/lib/types";
+import type { RelatedRisk, RiskDetail } from "@/lib/types";
 
 const TABS = ["overview", "workflow", "assessments", "treatment", "evidence", "comments"] as const;
 type Tab = (typeof TABS)[number];
@@ -116,29 +120,73 @@ function Hero({ risk }: { risk: RiskDetail }) {
   );
 }
 
+/** یک کار در منوی «کارهای دیگر»: در همین رابط اگر صفحه‌اش هست، وگرنه صفحه‌ی جنگو با نشانه‌اش. */
+function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
+  const route = useRouteOf()(href);
+  return (
+    <DropdownMenuItem asChild>
+      {route ? (
+        <Link to={route} viewTransition>
+          <Icon aria-hidden />
+          {label}
+        </Link>
+      ) : (
+        <a href={href}>
+          <Icon aria-hidden />
+          {label}
+          <span className="sr-only">({t("shell.classic")})</span>
+        </a>
+      )}
+    </DropdownMenuItem>
+  );
+}
+
+function Related({ risk }: { risk: RelatedRisk }) {
+  return risk.href ? (
+    <AppLink href={risk.href}>
+      <bdi className="code">{risk.code}</bdi>
+    </AppLink>
+  ) : (
+    <bdi className="code">{risk.code}</bdi>
+  );
+}
+
+function RelatedList({ risks }: { risks: RelatedRisk[] }) {
+  return risks.map((item, index) => (
+    <span key={item.code}>
+      {index > 0 && "، "}
+      <Related risk={item} />
+    </span>
+  ));
+}
+
 function Actions({ risk }: { risk: RiskDetail }) {
-  const { transitions, pending_change: pending } = risk.workflow;
+  const { transitions, pending_change: pending, merged_into, split_from, merged_risks, split_parts } = risk.workflow;
   const extra: { href: string | null; label: string; icon: LucideIcon }[] = [
     { href: risk.actions.edit, label: "ویرایش ریسک", icon: PencilLine },
+    { href: risk.actions.add_link, label: "افزودن پیوند بیرونی", icon: Link2 },
+    { href: risk.actions.add_evidence, label: "شاهد تازه", icon: FilePlus2 },
+    { href: risk.actions.propose_merge, label: "پیشنهاد ادغام", icon: GitMerge },
+    { href: risk.actions.propose_split, label: "پیشنهاد تفکیک", icon: Split },
     { href: risk.actions.add_assessment, label: "ارزیابی تازه", icon: ClipboardCheck },
     { href: risk.actions.add_plan, label: "طرح مواجهه‌ی تازه", icon: GitBranch },
-    { href: risk.actions.add_evidence, label: "شاهد تازه", icon: FilePlus2 },
   ];
   const available = extra.filter((action): action is { href: string; label: string; icon: LucideIcon } =>
     Boolean(action.href),
   );
+  const relations = merged_into || split_from || merged_risks.length > 0 || split_parts.length > 0;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         {transitions.map((transition, index) => (
-          <ClassicLink
+          <AppLink
             key={transition.name}
             href={transition.href}
             title={transition.description || undefined}
             button={{ variant: index === 0 ? "primary" : "secondary" }}
           >
             {transition.label}
-          </ClassicLink>
+          </AppLink>
         ))}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -149,13 +197,7 @@ function Actions({ risk }: { risk: RiskDetail }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {available.map((action) => (
-              <DropdownMenuItem key={action.label} asChild>
-                <a href={action.href}>
-                  <action.icon aria-hidden />
-                  {action.label}
-                  <span className="sr-only">({t("shell.classic")})</span>
-                </a>
-              </DropdownMenuItem>
+              <MenuLink key={action.label} {...action} />
             ))}
             {available.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem asChild>
@@ -167,13 +209,47 @@ function Actions({ risk }: { risk: RiskDetail }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {transitions.length > 0 && (
-        <p className="text-xs text-muted">مرحله‌های بعد هنوز در صفحه‌های فعلی سامانه انجام می‌شوند.</p>
+      {transitions.length === 0 && (
+        <p className="text-xs text-muted">
+          {risk.is_active ? "از وضعیت فعلی کاری در گردش کار با نقش شما نیست." : "این ریسک فقط سابقه است."}
+        </p>
       )}
       {pending && (
         <Alert tone="warning">
-          درخواست <ClassicLink href={pending.href}>{pending.label}</ClassicLink> برای این ریسک منتظر تصمیم است.
+          پیشنهاد {pending.label}
+          {pending.merge_into && (
+            <>
+              {" "}
+              در <bdi className="code">{pending.merge_into}</bdi>
+            </>
+          )}{" "}
+          منتظر تأیید مالک ریسک است.{" "}
+          <AppLink href={pending.href}>{pending.can_decide ? "بررسی و تأیید یا رد" : "جزئیات"}</AppLink>
         </Alert>
+      )}
+      {relations && (
+        <ul className="flex flex-col gap-1 text-xs text-muted">
+          {merged_into && (
+            <li>
+              این ریسک در <Related risk={merged_into} /> ادغام شده است.
+            </li>
+          )}
+          {split_from && (
+            <li>
+              از ریسک <Related risk={split_from} /> تفکیک شده است.
+            </li>
+          )}
+          {merged_risks.length > 0 && (
+            <li>
+              ریسک‌های ادغام‌شده در این ریسک: <RelatedList risks={merged_risks} />
+            </li>
+          )}
+          {split_parts.length > 0 && (
+            <li>
+              ریسک‌های تفکیک‌شده از این ریسک: <RelatedList risks={split_parts} />
+            </li>
+          )}
+        </ul>
       )}
     </div>
   );
@@ -391,83 +467,48 @@ function Treatment({ risk }: { risk: RiskDetail }) {
 }
 
 function Evidence({ risk }: { risk: RiskDetail }) {
-  if (!risk.evidence.length && !risk.attachments.length) {
-    return <EmptyState as="h3" icon={<FileSearch />} title="هنوز شاهد یا پیوستی ندارد" />;
-  }
-  return (
-    <Card className="overflow-clip">
-      <ul className="divide-y divide-line">
-        {risk.evidence.map((item) => (
-          <li key={item.code} className="flex items-start gap-3 px-5 py-4">
-            <FileSearch aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-accent-text" />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <ClassicLink href={item.href} className="font-medium text-fg">
-                {item.title}
-              </ClassicLink>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                <bdi className="code">{item.code}</bdi>
-                <span>{item.kind}</span>
-                <span>اعتبار {item.reliability}</span>
-                {item.observed_on && <span>مشاهده {longDate(item.observed_on)}</span>}
-                {item.expired && <Badge tone="danger">منقضی</Badge>}
-                {item.confidential && (
-                  <Badge tone="info">
-                    <Lock aria-hidden />
-                    محرمانه
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </li>
-        ))}
-        {risk.attachments.map((attachment) => (
-          <li key={attachment.href} className="flex items-start gap-3 px-5 py-4">
-            <Paperclip aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-muted" />
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <a href={attachment.href} className="font-medium text-fg hover:text-accent-text">
-                <bdi>{attachment.name}</bdi>
-              </a>
-              <p className="flex flex-wrap gap-x-3 text-xs text-muted">
-                <span>{fileSize(attachment.size)}</span>
-                {attachment.description && <span>{attachment.description}</span>}
-                <span>
-                  {attachment.by?.name}، {longDate(attachment.at)}
-                </span>
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Card>
+  const add = risk.actions.add_evidence && (
+    <AppLink href={risk.actions.add_evidence} button={{ variant: "secondary", size: "sm" }}>
+      <FilePlus2 aria-hidden />
+      شاهد تازه
+    </AppLink>
   );
-}
-
-function Comments({ risk }: { risk: RiskDetail }) {
-  if (!risk.comments.length) {
-    return <EmptyState as="h3" icon={<MessageSquare />} title="هنوز یادداشتی ندارد" />;
-  }
   return (
-    <Card>
-      <ul className="divide-y divide-line">
-        {risk.comments.map((comment, index) => (
-          <li key={index} className="flex gap-3 px-5 py-4">
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface text-xs font-semibold text-muted"
-            >
-              {comment.by?.name.trim()[0] ?? "؟"}
-            </span>
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-xs text-muted">
-                <span className="font-medium text-fg">{comment.by?.name}</span>، {dateTime(comment.at)}
-                {comment.edited && "، ویرایش‌شده"}
-              </p>
-              <Prose>{comment.text}</Prose>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <div className="flex flex-col gap-4">
+      {risk.evidence.length ? (
+        <Card className="overflow-clip">
+          <CardHeader icon={<FileSearch />} title="شواهد" as="h3" actions={add} />
+          <ul className="divide-y divide-line border-t border-line">
+            {risk.evidence.map((item) => (
+              <li key={item.code} className="flex items-start gap-3 px-5 py-4">
+                <FileSearch aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-accent-text" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <AppLink href={item.href} className="font-medium text-fg">
+                    {item.title}
+                  </AppLink>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                    <bdi className="code">{item.code}</bdi>
+                    <span>{item.kind}</span>
+                    <span>اعتبار {item.reliability}</span>
+                    {item.observed_on && <span>مشاهده {longDate(item.observed_on)}</span>}
+                    {item.expired && <Badge tone="danger">منقضی</Badge>}
+                    {item.confidential && (
+                      <Badge tone="info">
+                        <Lock aria-hidden />
+                        محرمانه
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : (
+        <EmptyState as="h3" icon={<FileSearch />} title="هنوز شاهدی ندارد" action={add} />
+      )}
+      <Attachments record={risk} as="h3" />
+    </div>
   );
 }
 
@@ -489,16 +530,12 @@ function Facts({ risk }: { risk: RiskDetail }) {
         <dl className="flex flex-col divide-y divide-line">
           <Fact label="خدمت">
             {risk.service &&
-              (risk.service.href ? (
-                <ClassicLink href={risk.service.href}>{risk.service.name}</ClassicLink>
-              ) : (
-                risk.service.name
-              ))}
+              (risk.service.href ? <AppLink href={risk.service.href}>{risk.service.name}</AppLink> : risk.service.name)}
           </Fact>
           <Fact label="سناریو">
             {risk.scenario && (
               <span className="flex flex-wrap items-center gap-2">
-                <ClassicLink href={risk.scenario.href}>{risk.scenario.title}</ClassicLink>
+                <AppLink href={risk.scenario.href}>{risk.scenario.title}</AppLink>
                 {risk.scenario.changed && <Badge tone="warning">نسخه‌ی تازه‌تری دارد</Badge>}
               </span>
             )}
@@ -538,20 +575,27 @@ function Facts({ risk }: { risk: RiskDetail }) {
                 {risk.links.map((link) => {
                   const url = safeExternalUrl(link.url);
                   return (
-                    <li key={`${link.kind}-${link.ref}`}>
-                      {link.kind}:{" "}
-                      {url ? (
-                        <a
-                          href={url}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                          className="text-accent-text hover:underline"
-                        >
+                    <li key={`${link.kind}-${link.ref}`} className="flex flex-wrap items-baseline gap-x-2">
+                      <span>
+                        {link.kind}:{" "}
+                        {url ? (
+                          <a
+                            href={url}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            className="text-accent-text hover:underline"
+                          >
+                            <bdi>{link.ref}</bdi>
+                            <span className="sr-only"> (در برگه‌ی تازه)</span>
+                          </a>
+                        ) : (
                           <bdi>{link.ref}</bdi>
-                          <span className="sr-only"> (در برگه‌ی تازه)</span>
-                        </a>
-                      ) : (
-                        <bdi>{link.ref}</bdi>
+                        )}
+                      </span>
+                      {link.edit_url && (
+                        <AppLink href={link.edit_url} className="text-xs">
+                          ویرایش<span className="sr-only"> پیوند {link.ref}</span>
+                        </AppLink>
                       )}
                     </li>
                   );
@@ -572,7 +616,15 @@ export function RiskDetailPage() {
   useTitle(risk.data ? `${risk.data.code} ${risk.data.title}` : "پرونده‌ی ریسک");
 
   const asked = params.get("tab");
-  const tab: Tab = TABS.includes(asked as Tab) ? (asked as Tab) : "overview";
+  // بعد از ذخیره‌ی پیوست یا نظر، جنگو به #attachments یا #comments همان پرونده برمی‌گرداند.
+  const { hash } = useLocation();
+  const fromHash: Partial<Record<string, Tab>> = {
+    "#attachments": "evidence",
+    "#comments": "comments",
+    "#treatment": "treatment",
+    "#evidence": "evidence",
+  };
+  const tab: Tab = TABS.includes(asked as Tab) ? (asked as Tab) : (fromHash[hash] ?? "overview");
 
   if (risk.isPending) return <PageSkeleton rows={6} />;
   if (risk.isError) {
@@ -599,7 +651,7 @@ export function RiskDetailPage() {
     assessments: "ارزیابی‌ها",
     treatment: "مواجهه",
     evidence: "شواهد و پیوست‌ها",
-    comments: "یادداشت‌ها",
+    comments: "نظرها",
   };
   const openQuestions = data.workflow.questions.filter((question) => question.is_open).length;
 
@@ -675,7 +727,7 @@ export function RiskDetailPage() {
           </TabsContent>
           <TabsContent value="comments">
             <h2 className="sr-only">{labels.comments}</h2>
-            <Comments risk={data} />
+            <Comments record={data} as="h3" />
           </TabsContent>
         </Tabs>
         <aside aria-label="مشخصات ریسک">

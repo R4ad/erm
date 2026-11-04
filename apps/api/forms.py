@@ -99,6 +99,9 @@ def describe_field(bound):
         data["max_length"] = field.max_length
     if kind == "file" and attrs.get("accept"):
         data["accept"] = attrs["accept"]
+    if kind == "file" and attrs.get("data-max-size"):
+        # فقط برای پیام زودتر در رابط؛ اندازه را خود فرم جنگو هم چک می‌کند.
+        data["max_size"] = int(attrs["data-max-size"])
     return data
 
 

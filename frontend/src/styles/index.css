@@ -344,7 +344,7 @@
     font-size: var(--text-sm);
   }
 
-  .data-table th {
+  .data-table thead th {
     position: sticky;
     top: var(--topbar-h);
     z-index: 1;
@@ -358,10 +358,19 @@
     border-bottom: 1px solid var(--line);
   }
 
-  .data-table td {
+  /* سرسطر (th در tbody) مثل خانه‌ی عادی است، فقط برای صفحه‌خوان سرسطر است؛ مثل نام خدمت در جدول جهان ریسک. */
+  .data-table td,
+  .data-table tbody th {
     padding: 0.8125rem 1rem;
     vertical-align: middle;
+    text-align: start;
     border-bottom: 1px solid var(--line);
+  }
+
+  /* جدول پهن (مثل جهان ریسک با یک ستون برای هر دسته) در عرض متوسط افقی جابه‌جا می‌شود. */
+  .table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .data-table tbody tr {
@@ -372,7 +381,8 @@
     background-color: color-mix(in oklab, var(--surface) 70%, transparent);
   }
 
-  .data-table tbody tr:last-child td {
+  .data-table tbody tr:last-child td,
+  .data-table tbody tr:last-child th {
     border-bottom: 0;
   }
 
@@ -404,7 +414,8 @@
       border-bottom: 0;
     }
 
-    .data-table td {
+    .data-table td,
+    .data-table tbody th {
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -419,7 +430,8 @@
       min-width: 4.5rem;
     }
 
-    .data-table td[data-primary] {
+    .data-table td[data-primary],
+    .data-table tbody th[data-primary] {
       grid-column: 1 / -1;
       display: block;
     }

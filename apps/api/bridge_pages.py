@@ -15,6 +15,7 @@ def _transition(context, request):
             "target": transition.target_label,
         },
         "problems": [str(problem) for problem in context["problems"]],
+        "submit": transition.label,
     }
 
 
@@ -46,6 +47,11 @@ def _intro(context, request):
     return {"intro": str(context["intro"])} if context.get("intro") else {}
 
 
+def _submit(label):
+    """فقط دکمه‌ی فرستادن برچسب دیگری از «ذخیره» دارد."""
+    return lambda context, request: {"submit": label}
+
+
 # نام صفحه‌ی جنگو → تابعی که چیزهای بیشتر صفحه را از context می‌خواند (یا None)، و روش‌های مجاز.
 FORM_PAGES = {
     "risks:risk_create": None,
@@ -60,8 +66,8 @@ FORM_PAGES = {
     "risks:category_update": None,
     "risks:coverage_update": _coverage,
     "workflow:transition": _transition,
-    "workflow:change_request_create": None,
-    "core:attachment_upload": None,
+    "workflow:change_request_create": _submit("ثبت پیشنهاد"),
+    "core:attachment_upload": _submit("بارگذاری پیوست"),
     "core:comment_update": _intro,
 }
 

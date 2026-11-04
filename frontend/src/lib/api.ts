@@ -56,8 +56,10 @@ export interface RequestOptions {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
+  // FormData (فرم با فایل) را مرورگر خودش با مرز multipart می‌فرستد؛ بقیه JSON است.
+  const multipart = options.body instanceof FormData;
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  if (options.body !== undefined && !multipart) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
 
   let response: Response;
@@ -67,7 +69,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       credentials: "same-origin",
       signal: options.signal,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body:
+        options.body === undefined ? undefined : multipart ? (options.body as FormData) : JSON.stringify(options.body),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -84,6 +87,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 export const get = <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal });
 export const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body });
 export const put = <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body });
+
+/** نشانی endpoint پل برای یک صفحه‌ی جنگو: forms/?path=/risks/12/edit/ */
+export const bridge = (kind: "forms" | "pages", djangoPath: string) =>
+  `${kind}/?path=${encodeURIComponent(djangoPath)}`;
 
 /** پیام قابل نمایش هر خطا. */
 export function errorMessage(error: unknown): string {

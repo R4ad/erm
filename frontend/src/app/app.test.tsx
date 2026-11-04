@@ -1,12 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, matchRoutes, RouterProvider } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { leaveTo } from "@/lib/navigation";
 import { mockApi, reply } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
-import { myWork, riskDetail, riskFilters, riskPage, session } from "@/test/fixtures";
+import { myWork, riskDetail, riskFilters, riskForm, riskPage, routeTable, session } from "@/test/fixtures";
 
 import { Providers } from "./providers";
 import { createQueryClient } from "./query-client";
@@ -35,6 +35,17 @@ function api(extra = {}) {
   });
 }
 
+describe("route table", () => {
+  it("has a page for every Django page the server says this app shows", () => {
+    for (const entry of routeTable) {
+      const sample = entry.route.replace(/:(\w+)/g, "1");
+      const leaf = matchRoutes(routes, sample)?.at(-1)?.route;
+      expect(leaf?.path, `${entry.name} → ${sample}`).not.toBe("*");
+      expect(leaf, `${entry.name} → ${sample}`).toBeDefined();
+    }
+  });
+});
+
 describe("app shell", () => {
   it("shows the user's menu, marks the current page and links classic pages", async () => {
     api();
@@ -42,8 +53,10 @@ describe("app shell", () => {
     expect(await screen.findByRole("heading", { name: "کارهای من", level: 1 })).toBeInTheDocument();
     const [nav] = screen.getAllByRole("navigation", { name: "منوی اصلی" });
     expect(within(nav!).getByRole("link", { name: "کارهای من" })).toHaveAttribute("aria-current", "page");
-    const classic = within(nav!).getByRole("link", { name: /شواهد/ });
-    expect(classic).toHaveAttribute("href", "/risks/evidence/");
+    // صفحه‌ای که در رابط تازه هست با مسیر خود رابط باز می‌شود و بقیه هنوز با صفحه‌ی کلاسیک جنگو.
+    expect(within(nav!).getByRole("link", { name: "شواهد" })).toHaveAttribute("href", "/risks/evidence");
+    const classic = within(nav!).getByRole("link", { name: /کنترل‌ها/ });
+    expect(classic).toHaveAttribute("href", "/controls/");
     expect(classic).toHaveAccessibleName(/در صفحه‌های فعلی سامانه باز می‌شود/);
     expect(screen.getByRole("link", { name: "رفتن به محتوای صفحه" })).toHaveAttribute("href", "#main");
     await expectNoAxeViolations();
@@ -141,13 +154,59 @@ describe("risk dossier", () => {
 
   it("opens outside links in a new tab without the opener, and never as script", async () => {
     const risk = riskDetail();
-    risk.links.push({ kind: "تیکت", ref: "BAD-1", url: "javascript:alert(1)" });
+    risk.links.push({ kind: "تیکت", ref: "BAD-1", url: "javascript:alert(1)", edit_url: null });
     api({ "GET risks/1/": risk });
     renderApp("/risks/1");
-    const external = await screen.findByRole("link", { name: /TEST-1/ });
+    const external = await screen.findByRole("link", { name: /^TEST-1/ });
     expect(external).toHaveAttribute("href", "https://tickets.example.test/TEST-1");
     expect(external).toHaveAttribute("target", "_blank");
     expect(external).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.getByText("BAD-1").closest("a")).toBeNull();
+  });
+
+  it("offers what Django allows on the risk as in-app pages, and comes back after saving", async () => {
+    const calls = api({
+      "GET forms/": riskForm(),
+      "POST forms/": { message: "ریسک ذخیره شد.", redirect: { href: "/risks/1/", route: "/risks/1" } },
+    });
+    const { router, user } = renderApp("/risks/1");
+    const transition = await screen.findByRole("link", { name: "شروع اجرا" });
+    expect(transition).toHaveAttribute("href", "/workflow/risks/1/transition/start_treatment");
+    expect(screen.getByRole("link", { name: "RK-1405-0009" })).toHaveAttribute("href", "/risks/9");
+
+    await user.click(screen.getByRole("button", { name: /کارهای دیگر/ }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "پیشنهاد ادغام" })).toHaveAttribute(
+      "href",
+      "/workflow/risks/1/requests/merge",
+    );
+    expect(within(menu).getByRole("menuitem", { name: "شاهد تازه" })).toHaveAttribute(
+      "href",
+      "/risks/evidence/new?risk=1",
+    );
+    // کاری که جنگو اجازه نمی‌دهد اصلاً پیشنهاد نمی‌شود (و خود جنگو هم دوباره چک می‌کند).
+    expect(within(menu).queryByRole("menuitem", { name: "ارزیابی تازه" })).not.toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "ویرایش ریسک" }));
+
+    expect(await screen.findByRole("heading", { name: "ویرایش ریسک", level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/risks/1/edit");
+    expect(calls.callsTo("GET forms/")[0]!.query.get("path")).toBe("/risks/1/edit/");
+    await user.click(screen.getByRole("button", { name: "ذخیره" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/risks/1"));
+    expect(await screen.findByText("ریسک ذخیره شد.")).toBeInTheDocument();
+  });
+
+  it("opens the comments tab from the page section Django returns to, and posts a comment", async () => {
+    const calls = api({
+      "POST forms/": { message: "نظر ثبت شد.", redirect: { href: "/risks/1/#comments", route: "/risks/1#comments" } },
+    });
+    const { user } = renderApp("/risks/1#comments");
+    const tab = await screen.findByRole("tab", { name: /نظرها/ });
+    expect(tab).toHaveAttribute("aria-selected", "true");
+    await user.type(screen.getByRole("textbox", { name: "نظر تازه" }), "نظر آزمون");
+    await user.click(screen.getByRole("button", { name: "ثبت نظر" }));
+    await waitFor(() => expect(calls.callsTo("POST forms/")).toHaveLength(1));
+    expect(calls.callsTo("POST forms/")[0]!.query.get("path")).toBe("/comments/29/1/new/");
+    await expectNoAxeViolations();
   });
 });
