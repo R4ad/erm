@@ -193,6 +193,14 @@ def test_review_ends_in_reassessment_or_closing_with_a_reason(client, grc, owner
 
     response = client.post(transition_url(risk, "close"), {"reason": ""})
     assert "reason" in response.context["form"].errors
+    response = client.post(transition_url(risk, "close"), {"reason": "سامانه‌ی قدیمی از رده خارج شد."})
+    risk.refresh_from_db()
+    assert risk.status == S.REVIEW  # ادعای حذف مسیر بدون شاهد کافی نیست.
+    risk.evidence.add(Evidence.objects.create(
+        title="صورت‌جلسه خروج از دامنه", summary="حذف معتبر مسیر", source="مالک خدمت", owner=grc,
+        observed_on=datetime.date(2026, 11, 1), kind=Evidence.Kind.TEST,
+        reliability=Evidence.Reliability.HIGH,
+    ))
     client.post(transition_url(risk, "close"), {"reason": "سامانه‌ی قدیمی از رده خارج شد."})
 
     risk.refresh_from_db()

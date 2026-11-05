@@ -149,5 +149,20 @@ def _approve(assessment, user):
         "paths": likelihood_snapshot(computation.likelihood),
         "b": band_list(outcome.b),
     }
+    risk = assessment.risk
+    assessment.scope_snapshot = {
+        "risk_title": risk.title,
+        "service_id": risk.service_id,
+        "service": str(risk.service) if risk.service_id else "",
+        "owner_id": risk.owner_id,
+        "customers": [{"id": customer.pk, "name": customer.name}
+                      for customer in computation.impacts.stakeholders if customer is not None],
+        "description": risk.description,
+        "scope": risk.scope,
+        "initiator": risk.initiator,
+        "count_unit": risk.count_unit,
+        "category": {"id": risk.category_id, "code": risk.category.code, "name": risk.category.name},
+        "horizon_months": assessment.horizon_months,
+    }
     assessment.approved_at = timezone.now()
     _set_status(assessment, S.APPROVED, user)

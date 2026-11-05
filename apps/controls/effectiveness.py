@@ -54,6 +54,7 @@ class TestFacts:
     sustained: bool
     failure_bypass_tested: bool
     monitored: bool
+    limited_effect_proven: bool = False
 
 
 def unmet_conditions(level, facts, thresholds):
@@ -66,6 +67,8 @@ def unmet_conditions(level, facts, thresholds):
             problems.append("کنترل بدون شاهد E1 است (بخش ۱۵ و جواب س۵۸)؛ شاهد اجرا یا آزمون را انتخاب کنید.")
         if facts.test_to is None:
             problems.append("تاریخ پایان آزمون یا مشاهده لازم است تا قدمت شاهد معلوم باشد.")
+        if not (facts.limited_effect_proven or facts.operating_ok):
+            problems.append("E2 و بالاتر شاهد اثر واقعی کنترل می‌خواهد؛ صرف نصب یا وجود شاهد اجرا کافی نیست (بخش ۱۵).")
     if level >= 3:
         if not facts.design_ok:
             problems.append("برای E3 و بالاتر طراحی کنترل باید کافی باشد.")

@@ -770,8 +770,15 @@ function Facts({ data }: { data: AssessmentDetail }) {
             <AppLink href={assessment.method_version.href}>{faText(assessment.method_version.label)}</AppLink>
           </Fact>
           <Fact label="افق">{fa(assessment.horizon_months)} ماه</Fact>
+          {assessment.horizon_rationale && <Fact label="دلیل افق">{assessment.horizon_rationale}</Fact>}
+          {assessment.target_due && <Fact label="موعد تحقق هدف">{longDate(assessment.target_due)}</Fact>}
+          {assessment.scope_snapshot?.service && (
+            <Fact label="دامنه هنگام تأیید">
+              {assessment.scope_snapshot.service}؛ {assessment.scope_snapshot.customers.map((c) => c.name).join("، ")}
+            </Fact>
+          )}
           <Fact label="جلسه‌ی کارگروه">
-            {assessment.meeting_date ? longDate(assessment.meeting_date) : "هنوز ثبت نشده"}
+            {assessment.meeting_date ? longDate(assessment.meeting_date) : "بدون جلسه (ارزیابی عادی)"}
           </Fact>
           <Fact label="فرض‌ها">
             <span className="whitespace-pre-line">{assessment.assumptions || "-"}</span>

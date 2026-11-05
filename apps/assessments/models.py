@@ -56,8 +56,12 @@ class Assessment(TimeStampedModel):
         editable=False,
     )
     horizon_months = models.PositiveSmallIntegerField("افق (ماه)", help_text="پیش‌فرض از نسخه‌ی روش می‌آید.")
+    horizon_rationale = models.TextField("دلیل افق متفاوت", blank=True)
+    target_due = models.DateField("موعد تحقق هدف", null=True, blank=True)
+    scope_snapshot = models.JSONField("دامنه هنگام تأیید", default=dict, editable=False)
     meeting_date = models.DateField(
-        "تاریخ جلسه‌ی کارگروه", null=True, blank=True, help_text="پیش‌نویس پیش از جلسه هم ذخیره می‌شود."
+        "تاریخ جلسه‌ی کارگروه", null=True, blank=True,
+        help_text="اختیاری؛ ارزیابی عادی با نماینده مجاز تأیید می‌شود. اختلاف به کارگروه ارجاع می‌شود.",
     )
     assumptions = models.TextField(
         "فرض‌ها",

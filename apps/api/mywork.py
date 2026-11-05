@@ -59,6 +59,16 @@ def sections(user):
     work = my_work(user)
     rows = [
         (
+            "monitoring_reviews", "بازبینی‌های ریسک", "بررسی شواهد، کنترل و دامنه و ثبت اقدام بعدی.",
+            [item(f"monitor-review-{row.pk}", row.get_trigger_display(), row.get_absolute_url(),
+                  risk=row.risk, due=row.due) for row in work["monitoring_reviews"]],
+        ),
+        (
+            "monitoring_notices", "اعلان‌های پایش", "یادآوری سررسید و تصعید به مقام مجاز.",
+            [item(f"notice-{row.pk}", row.message, reverse("actions:notices"), risk=row.risk)
+             for row in work["monitoring_notices"]],
+        ),
+        (
             "my_actions",
             "اقدام‌های من",
             "اقدام‌هایی که مالک یا مجری آن‌ها هستید و هنوز تأیید نهایی نگرفته‌اند.",

@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from apps.catalog.models import ServiceCustomer
+from apps.catalog.models import Customer, ServiceCustomer
 from apps.controls.models import Control as ControlRecord
 from apps.controls.models import ControlAssessment
 from apps.methodology.engine import (
@@ -112,6 +112,12 @@ def create_assessment(risk, user, kind, **fields):
 def stakeholders(assessment):
     """ستون‌های پروفایل پیامد: داتین و هر بانک متأثر ریسک (جواب س۵۵)، به‌اضافه‌ی بانکی که قبلاً برایش سطح ثبت شده و
     بعداً از بانک‌های ریسک برداشته شده، تا سطحش گم نشود."""
+    if assessment.is_approved and assessment.scope_snapshot.get("customers") is not None:
+        saved = {item["id"]: item["name"] for item in assessment.scope_snapshot["customers"]}
+        banks = {customer.pk: customer for customer in Customer.objects.filter(pk__in=saved)}
+        for key, customer in banks.items():
+            customer.name = saved[key]
+        return [None] + sorted(banks.values(), key=lambda customer: customer.name)
     banks = {customer.pk: customer for customer in assessment.risk.customers.all()}
     for impact in assessment.impacts.select_related("customer"):
         if impact.customer_id:

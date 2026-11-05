@@ -98,3 +98,16 @@
     {% for item in questions %}<li class="list-group-item d-flex justify-content-between"><a href="{% url 'workflow:question_answer' item.pk %}">{{ item.risk.code }}: {{ item.text|truncatechars:80 }}</a><span class="small text-nowrap">مهلت {{ item.due|jformat:"%Y/%m/%d" }}</span></li>{% endfor %}
   </ul>
 {% endif %}
+
+{% if monitoring_reviews %}
+<h2 class="h5 mt-4 mb-3">بازبینی‌های ریسک</h2>
+<ul class="list-group">
+{% for review in monitoring_reviews %}<li class="list-group-item"><a href="{{ review.get_absolute_url }}">{{ review.risk.code }}: {{ review.get_trigger_display }}</a>؛ مهلت {{ review.due|jformat:"%Y/%m/%d" }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if monitoring_notices %}
+<h2 class="h5 mt-4 mb-3"><a href="{% url 'actions:notices' %}">اعلان‌های پایش</a></h2>
+<ul class="list-group">
+{% for notice in monitoring_notices %}<li class="list-group-item"><a href="{{ notice.href }}">{{ notice.risk.code }}: {{ notice.message }}</a></li>{% endfor %}
+</ul>
+{% endif %}

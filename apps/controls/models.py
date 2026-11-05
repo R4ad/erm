@@ -219,6 +219,10 @@ class ControlAssessment(TimeStampedModel):
         help_text="شکست یا شکافی در دامنه‌ی مورد اتکا که عملکرد کنترل را در سناریو نقض می‌کند؛ E3 و بالاتر را می‌بندد.",
     )
     operating_ok = models.BooleanField("آزمون فعلی اثربخشی عملیاتی را نشان می‌دهد", default=False)
+    limited_effect_proven = models.BooleanField(
+        "اثر محدود کنترل با آزمون اثبات شده است", default=False,
+        help_text="برای E2؛ نصب یا اجرای کنترل به‌تنهایی اثبات جلوگیری از تحقق مسیر نیست.",
+    )
     # آزمون
     test_method = models.CharField(
         "روش آزمون", max_length=300, blank=True, help_text="مثلاً بازبینی سوابق، اجرای دوباره یا آزمون فنی."
@@ -312,6 +316,15 @@ class ControlAssessment(TimeStampedModel):
         on = on or timezone.localdate()
         if self.valid_until and self.valid_until < on:
             return f"شاهدش از {to_jalali(self.valid_until)} کهنه شده است"
+        if not self.control.is_active:
+            return "کنترل غیرفعال است"
+        if not self.test_to or self.test_to > on:
+            return "تاریخ آزمون معتبر نیست"
+        from .effectiveness import unmet_conditions
+
+        problems = unmet_conditions(self.e, self.test_facts(), Thresholds.of(self.method_version))
+        if problems:
+            return "؛ ".join(problems)
         return None
 
     def test_facts(self):
@@ -330,6 +343,7 @@ class ControlAssessment(TimeStampedModel):
             sustained=self.sustained,
             failure_bypass_tested=self.failure_bypass_tested,
             monitored=self.monitored,
+            limited_effect_proven=self.limited_effect_proven,
         )
 
     def effective_e(self, on=None):

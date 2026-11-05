@@ -64,11 +64,12 @@
             </a>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item" href="{% url 'actions:my_work' %}">کارهای من</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:notices' %}">اعلان‌های پایش</a></li>
               <li><a class="dropdown-item" href="{% url 'actions:action_list' %}">اقدام‌ها</a></li>
               <li><a class="dropdown-item" href="{% url 'actions:acceptance_list' %}">پذیرش‌های ریسک</a></li>
             </ul>
           </li>
-          <li class="nav-item"><a class="nav-link" href="#">گزارش‌ها</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'reports:management' %}">گزارش‌ها</a></li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               خدمات و دارایی‌ها

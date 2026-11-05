@@ -169,6 +169,7 @@ function Actions({ risk }: { risk: RiskDetail }) {
     { href: risk.actions.propose_split, label: "پیشنهاد تفکیک", icon: Split },
     { href: risk.actions.add_assessment, label: "ارزیابی تازه", icon: ClipboardCheck },
     { href: risk.actions.add_plan, label: "طرح مواجهه‌ی تازه", icon: GitBranch },
+    { href: risk.actions.add_review ?? null, label: "ثبت محرک بازبینی", icon: CalendarDays },
   ];
   const available = extra.filter((action): action is { href: string; label: string; icon: LucideIcon } =>
     Boolean(action.href),

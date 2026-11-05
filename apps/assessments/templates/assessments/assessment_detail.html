@@ -27,9 +27,12 @@
 
   <dt class="col-sm-3">افق</dt>
   <dd class="col-sm-9">{{ assessment.horizon_months }} ماه</dd>
+  {% if assessment.horizon_rationale %}<dt class="col-sm-3">دلیل افق</dt><dd class="col-sm-9">{{ assessment.horizon_rationale }}</dd>{% endif %}
+  {% if assessment.target_due %}<dt class="col-sm-3">موعد تحقق هدف</dt><dd class="col-sm-9">{{ assessment.target_due|jformat:"%Y/%m/%d" }}</dd>{% endif %}
+  {% if assessment.scope_snapshot %}<dt class="col-sm-3">دامنه هنگام تأیید</dt><dd class="col-sm-9">{{ assessment.scope_snapshot.service }}؛ {% for customer in assessment.scope_snapshot.customers %}{{ customer.name }}{% if not forloop.last %}، {% endif %}{% endfor %}</dd>{% endif %}
 
   <dt class="col-sm-3">تاریخ جلسه‌ی کارگروه</dt>
-  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}هنوز ثبت نشده{% endif %}</dd>
+  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}بدون جلسه (ارزیابی عادی){% endif %}</dd>
 
   <dt class="col-sm-3">فرض‌ها</dt>
   <dd class="col-sm-9">{{ assessment.assumptions|linebreaksbr|default:"-" }}</dd>

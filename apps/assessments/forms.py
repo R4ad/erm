@@ -32,6 +32,8 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
         fields = [
             "kind",
             "horizon_months",
+            "horizon_rationale",
+            "target_due",
             "meeting_date",
             "assumptions",
             "ongoing_incident",
@@ -40,7 +42,10 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
             "escalation_rationale",
             "escalation_evidence",
         ]
-        field_classes = {"meeting_date": JalaliDateField, "escalation_evidence": EvidenceChoiceField}
+        field_classes = {
+            "meeting_date": JalaliDateField, "target_due": JalaliDateField,
+            "escalation_evidence": EvidenceChoiceField,
+        }
         widgets = {
             "assumptions": forms.Textarea(attrs={"rows": 3}),
             "escalation_rationale": forms.Textarea(attrs={"rows": 2}),
@@ -69,6 +74,8 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
     def clean(self):
         data = super().clean()
         kind = data.get("kind", self.instance.kind)
+        if kind == Assessment.Kind.TARGET and not data.get("target_due"):
+            self.add_error("target_due", "ارزیابی هدف موعد تحقق می‌خواهد (بخش ۱۷).")
         if kind in Assessment.KINDS_NEEDING_ASSUMPTIONS and not data.get("assumptions", "").strip():
             label = "کنترل‌های کنارگذاشته" if kind == Assessment.Kind.INHERENT else "اقدام و معیار آزمون آن"
             self.add_error("assumptions", f"برای ارزیابی {Assessment.Kind(kind).label}، {label} را بنویسید.")

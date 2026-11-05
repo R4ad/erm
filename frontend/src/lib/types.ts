@@ -282,6 +282,7 @@ export interface RiskDetail extends RecordParts {
     add_evidence: string | null;
     add_assessment: string | null;
     add_plan: string | null;
+    add_review?: string | null;
   };
 }
 
@@ -663,6 +664,14 @@ export interface AssessmentHeader {
   risk: { id: number; code: string; title: string; href: string };
   method_version: { label: string; number: number; href: string };
   horizon_months: number;
+  horizon_rationale?: string;
+  target_due?: Day | null;
+  scope_snapshot?: {
+    service: string;
+    customers: { id: number; name: string }[];
+    description: string;
+    initiator?: string;
+  };
   meeting_date: Day | null;
   assumptions: string;
   created_by: Person | null;

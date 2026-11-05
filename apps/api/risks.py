@@ -313,6 +313,7 @@ class RiskDetailView(ApiView):
                 },
                 **record_parts(risk, user, extras),
                 "actions": {
+                    "add_review": reverse("actions:review_create", args=[risk.pk]) if can_edit else None,
                     "classic": risk.get_absolute_url(),
                     "edit": reverse("risks:risk_update", args=[risk.pk]) if can_edit else None,
                     "add_link": reverse("risks:link_create", args=[risk.pk]) if can_edit else None,

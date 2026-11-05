@@ -11,6 +11,7 @@ from apps.assessments.services import assessment_rate_check, create_assessment, 
 from apps.catalog.models import Responsibility
 from apps.catalog.tests.factories import make_service, make_user
 from apps.controls.models import Control, ControlAssessment
+from apps.controls.tests.factories import valid_control_assessment
 from apps.methodology.models import MethodVersion
 from apps.risks.models import Evidence, Risk, RiskCategory
 
@@ -73,15 +74,8 @@ def make_control(risk, code_title, kind=Control.Kind.PREVENTIVE, link=True):
 
 
 def assessed(control, grc, e, test_to=None, **fields):
-    return ControlAssessment.objects.create(
-        control=control,
-        method_version=MethodVersion.objects.get(number=1),
-        scope="مسیر انتشار رسمی",
-        e=e,
-        rationale="آزمون",
-        test_to=test_to or timezone.localdate() - timedelta(days=10),
-        created_by=grc,
-        **fields,
+    return valid_control_assessment(
+        control, grc, e=e, test_to=test_to or timezone.localdate() - timedelta(days=10), **fields
     )
 
 

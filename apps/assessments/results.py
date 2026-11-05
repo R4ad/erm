@@ -7,6 +7,7 @@ from apps.core.choices import Confidence
 from apps.methodology.engine import Inputs, InvalidInput, calculate
 from apps.methodology.services import MethodTables
 
+from .models import Assessment
 from .services import band_or_none, impact_summary, likelihood_summary
 
 ORDER = [Confidence.LOW, Confidence.MEDIUM, Confidence.HIGH]
@@ -137,10 +138,16 @@ def submission_problems(assessment, computation=None):
         problems.append("خدمت ریسک تعیین نشده است.")
     if not risk.customers.exists():
         problems.append("هیچ بانکی برای ریسک تعیین نشده است.")
-    if not assessment.meeting_date:
-        problems.append("تاریخ جلسه‌ی کارگروه ثبت نشده است.")
     if assessment.kind in assessment.KINDS_NEEDING_ASSUMPTIONS and not assessment.assumptions.strip():
         problems.append("فرض‌های ارزیابی نوشته نشده است.")
+    if assessment.kind == Assessment.Kind.TARGET and not assessment.target_due:
+        problems.append("موعد تحقق هدف ثبت نشده است (بخش ۱۷).")
+    from apps.methodology.models import MethodParameter
+    from apps.methodology.services import parameter
+
+    default_horizon = parameter(assessment.method_version, MethodParameter.Key.HORIZON)
+    if assessment.horizon_months != default_horizon and not assessment.horizon_rationale.strip():
+        problems.append("افق متفاوت از پیش‌فرض روش باید دلیل داشته باشد (بخش ۱۳).")
 
     likelihood = computation.likelihood
     if not assessment.a_recorded:

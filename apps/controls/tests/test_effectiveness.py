@@ -9,6 +9,7 @@ from apps.accounts.roles import Role
 from apps.catalog.models import Responsibility
 from apps.catalog.tests.factories import make_user
 from apps.controls.models import Control, ControlAssessment
+from apps.controls.tests.factories import valid_control_assessment
 from apps.methodology.models import MethodVersion
 from apps.risks.models import Evidence
 
@@ -124,16 +125,8 @@ def test_e1_needs_nothing_but_a_reason(client, grc, control):
 
 
 def make_assessment(control, grc, verifier, e=3, test_to=date(2026, 10, 20), **fields):
-    assessment = ControlAssessment.objects.create(
-        control=control,
-        method_version=MethodVersion.objects.get(number=1),
-        scope="سرورهای تولید",
-        e=e,
-        rationale="آزمون موفق",
-        test_to=test_to,
-        verified_by=verifier,
-        created_by=grc,
-        **fields,
+    assessment = valid_control_assessment(
+        control, grc, verified_by=verifier, e=e, test_to=test_to, **fields
     )
     return assessment
 
@@ -204,3 +197,26 @@ def test_the_detail_page_warns_when_the_sheet_no_longer_supports_e(client, grc, 
     unmet = client.get(assessment.get_absolute_url()).context["unmet"]
 
     assert any("جز مسئول کنترل" in problem for problem in unmet)
+
+
+def test_e2_requires_proven_limited_effect_not_just_installation(client, grc, control, evidence):
+    client.force_login(grc)
+    url = reverse("controls:control_assessment_create", args=[control.pk])
+    values = sheet(e="2", operating_ok=None, evidence=[evidence.pk])
+    response = client.post(url, values)
+    assert "اثر واقعی" in " ".join(response.context["form"].errors["e"])
+    response = client.post(url, values | {"limited_effect_proven": "on"})
+    assert response.status_code == 302
+    assert ControlAssessment.objects.get().effective_e() == 2
+
+
+def test_unsupported_or_future_control_tests_do_not_reduce_current_risk(control, grc, verifier):
+    sheet = make_assessment(control, grc, verifier)
+    assert sheet.effective_e() == 3
+    sheet.evidence.clear()
+    assert sheet.effective_e() == 1
+    sheet = make_assessment(control, grc, verifier, test_to=date(2099, 1, 1))
+    assert sheet.effective_e() == 1
+    control.is_active = False
+    control.save()
+    assert sheet.effective_e() == 1

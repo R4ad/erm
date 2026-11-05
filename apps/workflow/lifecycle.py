@@ -94,6 +94,12 @@ def approved_treatment_plan(risk, data):
     return []
 
 
+def retirement_evidence(risk, data):
+    if not risk.evidence.exists():
+        return ["بازنشستگی به شاهد حذف مسیر یا خروج قانونی و قراردادی از دامنه نیاز دارد (بخش ۲۰)."]
+    return []
+
+
 TRANSITIONS = [
     Transition(
         name="back_to_register",
@@ -146,7 +152,6 @@ TRANSITIONS = [
         label="تأیید و طراحی برنامه‌ی درمان",
         description="کارگروه امنیت ریسک را تأیید کرده است و برنامه‌ی درمان طراحی می‌شود.",
         roles=WORKGROUP,
-        meeting_date=True,
         checks=(approved_current_assessment,),
     ),
     Transition(
@@ -187,6 +192,7 @@ TRANSITIONS = [
         roles=GRC,
         reason_label="چرا این ریسک دیگر وجود ندارد",
         reason_required=True,
+        checks=(retirement_evidence,),
     ),
 ]
 

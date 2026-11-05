@@ -63,6 +63,7 @@
   <dd class="col-sm-9">
     {{ assessment.test_result|linebreaksbr|default:"-" }}
     <div class="small">اثربخشی عملیاتی: {{ assessment.operating_ok|yesno:"نشان داده شده,نشان داده نشده" }}</div>
+    <div class="small">اثر محدود اثبات‌شده: {{ assessment.limited_effect_proven|yesno:"بله,خیر" }}</div>
   </dd>
 
   <dt class="col-sm-3">شکست‌ها و اقدام اصلاحی</dt>

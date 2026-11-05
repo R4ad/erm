@@ -40,5 +40,13 @@ class AssessmentAdmin(SimpleHistoryAdmin):
     filter_horizontal = ("a_evidence", "escalation_evidence")
     inlines = [ImpactDetailInline, PathInline, AssessmentReviewInline]
 
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and (obj is None or obj.status == Assessment.Status.DRAFT)
+
+    def history_form_view(self, request, object_id, version_id, extra_context=None):
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied("ارزیابی تاریخی بازگردانی نمی‌شود؛ ارزیابی تازه ثبت کنید.")
+
     def has_delete_permission(self, request, obj=None):
         return False  # ارزیابی حذف نمی‌شود

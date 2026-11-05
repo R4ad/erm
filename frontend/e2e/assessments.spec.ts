@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { assessmentDetail } from "../src/test/fixtures";
+
 import { expect, expectAccessible, reply, test, type ApiCall } from "./fixtures";
 
 // ارزیابی‌ها در مرورگر واقعی، زیر CSP و Trusted Types واقعی، در دسکتاپ و موبایل و هر دو تم: پرونده‌ی ارزیابی با
@@ -8,6 +10,24 @@ import { expect, expectAccessible, reply, test, type ApiCall } from "./fixtures"
 const overflows = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
 
 test.describe("assessments", () => {
+  test("shows the approved scope and target deadline without requiring a meeting", async ({ page, api }) => {
+    const data = assessmentDetail();
+    data.assessment.meeting_date = null;
+    data.assessment.target_due = { iso: "2026-12-01", jalali: "1405/09/10" };
+    data.assessment.scope_snapshot = {
+      service: "خدمت در زمان تأیید",
+      customers: [{ id: 7, name: "بانک در زمان تأیید" }],
+      description: "دامنه ثابت",
+    };
+    api.on("GET pages/", () => data);
+    await page.goto("/app/assessments/1");
+    await expect(page.getByText("بدون جلسه (ارزیابی عادی)")).toBeVisible();
+    await expect(page.getByText("موعد تحقق هدف", { exact: true })).toBeVisible();
+    await expect(page.getByText("خدمت در زمان تأیید؛ بانک در زمان تأیید")).toBeVisible();
+    await expectAccessible(page);
+    expect(await overflows(page)).toBe(false);
+  });
+
   test("opens an assessment from its risk and sends it for quality control", async ({ page, api }) => {
     await page.goto("/app/risks/1?tab=assessments");
     await page.getByRole("tabpanel").getByRole("link", { name: "AS-1405-0001" }).click();

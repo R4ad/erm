@@ -23,6 +23,8 @@ def navigation(user):
             "title": "کار روزانه",
             "items": [
                 link("کارهای من", "actions:my_work"),
+                link("اعلان‌های پایش", "actions:notices"),
+                link("گزارش مدیریتی", "reports:management"),
                 link("پاسخ به سؤال‌ها", "questionnaires:answer_home"),
             ],
         },

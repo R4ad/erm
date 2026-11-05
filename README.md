@@ -25,12 +25,13 @@ cp .env.example .env
 docker compose --profile prod up -d --build
 ```
 
-این دستور سه سرویس را بالا می‌آورد:
+این دستور چهار سرویس را بالا می‌آورد:
 
 | سرویس | کار |
 |---|---|
 | `db` | پایگاه داده‌ی PostgreSQL 17 |
 | `web` | برنامه‌ی Django با gunicorn؛ هنگام شروع، migrate و collectstatic را خودکار اجرا می‌کند |
+| `monitoring` | پایش ساعتی ریسک، انقضای پذیرش و شواهد، بازبینی و اعلان داخلی؛ پس از آماده‌شدن وب شروع می‌شود |
 | `nginx` | روی پورت 80 درخواست‌ها را به `web` می‌دهد و فایل‌های static را مستقیم سرو می‌کند |
 
 سامانه روی `http://<نام سرور>/` باز می‌شود. نام سرور باید در `ALLOWED_HOSTS` باشد.
@@ -174,3 +175,23 @@ pipenv run pytest
 - `templates/` و `static/` قالب پایه، فونت وزیرمتن، Bootstrap راست‌چین و htmx
 - `docker/nginx/` تنظیمات nginx
 - `docs/` قواعد کسب‌وکار
+
+
+## انطباق نسخه ۵ و پایش
+
+گزارش مدیریتی در `/reports/`، اعلان‌های پایش در `/actions/notices/` و کارهای بازبینی در «کارهای من» هستند.
+تغییر منطق، مرجع سند، تناقض مثال‌ها، آزمون‌ها و راهنمای مهاجرت در [گزارش تغییرات v5](docs/v5-logic-changes.md) آمده است.
+
+در توسعه، علاوه بر migrate، برای پایش دوره‌ای اجرا کنید:
+
+```bash
+pipenv run python manage.py monitor_risks --watch --interval 3600
+```
+
+در Docker تولید، سرویس `monitoring` این کار را انجام می‌دهد. بدون `--watch` فقط یک بار اجرا می‌شود و برای cron مناسب است.
+در macOS قدیمی که Chromium همراه Playwright پشتیبانی نمی‌شود، اگر Google Chrome نصب است:
+
+```bash
+cd frontend
+PLAYWRIGHT_CHANNEL=chrome npm run test:e2e
+```

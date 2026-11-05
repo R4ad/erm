@@ -11,7 +11,8 @@ from apps.assessments.review import ReviewError, can_decide_referral, can_review
 from apps.assessments.services import create_assessment, likelihood_summary
 from apps.catalog.models import Customer, Responsibility
 from apps.catalog.tests.factories import make_service, make_user
-from apps.controls.models import Control, ControlAssessment
+from apps.controls.models import Control
+from apps.controls.tests.factories import valid_control_assessment
 from apps.methodology.models import MethodVersion
 from apps.risks.models import Evidence, Risk, RiskCategory
 from apps.workflow.lifecycle import get_transition
@@ -173,7 +174,7 @@ def test_submission_lists_what_blocks_quality_control(risk, grc, bank, ready):
     ready.impacts.filter(customer=None, scale__code="R").delete()
 
     problems = submission_problems(ready)
-    assert "تاریخ جلسه‌ی کارگروه ثبت نشده است." in problems
+    assert "تاریخ جلسه‌ی کارگروه ثبت نشده است." not in problems
     assert "اطمینان B0 مسیر «انتشار از مسیر رسمی» ثبت نشده است." in problems
     label = f"{detail.scale.code} برای بانک الف"
     assert f"پیامد {label} شاهد ندارد." in problems and f"پیامد {label} دلیل ندارد." in problems
@@ -190,7 +191,7 @@ def test_an_empty_assessment_cannot_be_submitted(risk, grc):
     problems = submission_problems(assessment)
     assert "A ثبت نشده است." in problems
     assert "دست‌کم یک مسیر تحقق لازم است (بخش ۱۵)." in problems
-    assert "تاریخ جلسه‌ی کارگروه ثبت نشده است." in problems
+    assert "تاریخ جلسه‌ی کارگروه ثبت نشده است." not in problems
 
 
 def test_another_grc_member_approves_and_the_result_is_stored_and_locked(client, grc, checker, ready):
@@ -327,15 +328,14 @@ def test_an_approved_assessment_keeps_its_likelihood_after_a_control_is_suspende
         operated_by=Responsibility.DATIN,
     )
     ready.risk.controls.add(control)
-    control_assessment = ControlAssessment.objects.create(
-        control=control,
+    control_assessment = valid_control_assessment(
+        control, grc,
         method_version=MethodVersion.objects.get(number=1),
         scope="مسیر انتشار رسمی",
         e=3,
         confidence="high",
         rationale="آزمون",
         test_to=timezone.localdate() - timedelta(days=10),
-        created_by=grc,
     )
     path = ready.paths.get()
     path.b0 = 5
@@ -363,3 +363,36 @@ def test_an_approved_assessment_needs_the_engine_to_agree_again(grc, checker, re
         review(ready, checker, A.APPROVE)
     ready.refresh_from_db()
     assert ready.status == S.IN_QC and not ready.reviews.filter(action=A.APPROVE).exists()
+
+
+def test_ordinary_assessment_needs_no_meeting_and_keeps_its_approved_scope(grc, checker, ready, bank):
+    ready.meeting_date = None
+    ready.save()
+    submit(ready, grc)
+    review(ready, checker, A.APPROVE)
+    ready.refresh_from_db()
+    saved = ready.scope_snapshot
+    assert saved["customers"] == [{"id": bank.pk, "name": bank.name}]
+    assert saved["initiator"] == ready.risk.initiator
+    ready.risk.customers.clear()
+    ready.risk.customers.add(Customer.objects.create(name="بانک جدید پس از تأیید"))
+    bank.name = "نام تغییرکرده بانک"
+    bank.save()
+    ready.refresh_from_db()
+    assert ready.scope_snapshot == saved
+    from apps.assessments.services import stakeholders
+
+    assert [customer.name for customer in stakeholders(ready) if customer] == [saved["customers"][0]["name"]]
+
+
+def test_target_needs_a_due_date_and_nondefault_horizon_needs_a_reason(ready):
+    ready.kind = Assessment.Kind.TARGET
+    ready.assumptions = "اقدام و معیار آزمون"
+    ready.horizon_months = 6
+    ready.save()
+    problems = submission_problems(ready)
+    assert any("موعد تحقق" in problem for problem in problems)
+    assert any("افق متفاوت" in problem for problem in problems)
+    ready.target_due = timezone.localdate() + timedelta(days=30)
+    ready.horizon_rationale = "مدت قرارداد باقیمانده"
+    assert submission_problems(ready) == []

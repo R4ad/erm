@@ -15,6 +15,7 @@ services:
 
   web:
     build: .
+    image: erm-web:local
     env_file: .env
     environment:
       # inside Docker the database host is the "db" service, not localhost
@@ -27,6 +28,25 @@ services:
     volumes:
       - static:/app/staticfiles
       - media:/app/media
+    restart: unless-stopped
+    profiles: ["prod"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  monitoring:
+    build: .
+    image: erm-web:local
+    command: ["python", "manage.py", "monitor_risks", "--watch", "--interval", "3600"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      web:
+        condition: service_healthy
     restart: unless-stopped
     profiles: ["prod"]
 
