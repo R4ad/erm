@@ -1,7 +1,16 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import AcceptanceSignature, ActionUpdate, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
+from .models import (
+    AcceptanceSignature,
+    ActionUpdate,
+    MonitoringNotice,
+    Reassessment,
+    RiskAcceptance,
+    RiskReview,
+    TreatmentAction,
+    TreatmentPlan,
+)
 
 
 class ActionUpdateInline(admin.TabularInline):
@@ -89,3 +98,32 @@ class ReassessmentAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # بازسنجی حذف نمی‌شود
+
+
+@admin.register(RiskReview)
+class RiskReviewAdmin(SimpleHistoryAdmin):
+    list_display = ("risk", "trigger", "responsible", "due", "completed_at")
+    list_filter = ("trigger",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MonitoringNotice)
+class MonitoringNoticeAdmin(SimpleHistoryAdmin):
+    list_display = ("recipient", "risk", "created_at", "read_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

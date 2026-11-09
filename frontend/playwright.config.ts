@@ -14,6 +14,7 @@ export default defineConfig<TestOptions>({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
+    channel: process.env.PLAYWRIGHT_CHANNEL,
     baseURL: `http://127.0.0.1:${port}`,
     locale: "fa-IR",
     timezoneId: "Asia/Tehran",

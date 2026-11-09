@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load jformat %}
+{% block title %}گزارش مدیریتی ریسک{% endblock %}
+{% block content %}
+<h1 class="h4">گزارش مدیریتی ریسک</h1>
+<p>وضعیت جاری در {{ today|jformat:"%Y/%m/%d" }}؛ تغییرات دوره {{ start|jformat:"%Y/%m/%d" }} تا {{ end|jformat:"%Y/%m/%d" }}.</p>
+<form method="get" class="mb-4">{% include "includes/form_fields.html" %}<button class="btn btn-primary" type="submit">نمایش</button></form>
+{% if today %}
+<div class="row g-3 mb-4">
+<div class="col-md-4"><div class="border rounded p-3">پوشش خدمات حیاتی: {{ critical.complete }} از {{ critical.total }}{% if critical.percent != None %} ({{ critical.percent }}٪){% endif %}<p class="small mb-0">بررسی همه دسته‌ها و ارزیابی جاری کامل همه ریسک‌های فعال خدمت لازم است.</p></div></div>
+<div class="col-md-4"><div class="border rounded p-3">کنترل کلیدی دارای E3 معتبر: {{ key_controls.valid }} از {{ key_controls.total }}{% if key_controls.percent != None %} ({{ key_controls.percent }}٪){% endif %}</div></div>
+<div class="col-md-4"><div class="border rounded p-3">ارزیابی کم‌اطمینان یا ناقص: {{ low_confidence|length }}؛ پذیرش نامعتبر: {{ invalid_acceptances|length }}</div></div>
+</div>
+<h2 class="h5">تعداد ریسک در سطح تصمیم</h2>
+<ul>{% for name, count in levels.items %}<li>{{ name }}: {{ count }}</li>{% empty %}<li>ریسکی در دامنه نیست.</li>{% endfor %}</ul>
+<p class="small">هر ریسک یک بار با آخرین ارزیابی جاری تأییدشده شمرده می‌شود. امتیازهای ریسک جمع یا میانگین نمی‌شوند؛ هدف محقق‌نشده جای جاری را نمی‌گیرد.</p>
+<h2 class="h5 mt-4">اقدام معوق بالا و بحرانی ({{ overdue|length }})</h2>
+<div class="table-responsive"><table class="table"><thead><tr><th>اقدام</th><th>خدمت</th><th>مالک</th><th>سررسید</th></tr></thead><tbody>
+{% for action in overdue %}<tr><td><a href="{{ action.get_absolute_url }}">{{ action }}</a></td><td>{{ action.plan.risk.service|default:"-" }}</td><td>{{ action.owner }}</td><td>{{ action.due_date|jformat:"%Y/%m/%d" }}</td></tr>{% empty %}<tr><td colspan="4">موردی نیست.</td></tr>{% endfor %}
+</tbody></table></div>
+<h2 class="h5 mt-4">پذیرش‌های نامعتبر</h2>
+<ul>{% for row in invalid_acceptances %}<li><a href="{{ row.acceptance.get_absolute_url }}">{{ row.acceptance.code }}</a>: {{ row.reasons }}</li>{% empty %}<li>موردی نیست.</li>{% endfor %}</ul>
+<h2 class="h5 mt-4">تمرکز وابستگی و نقاط شکست مشترک</h2>
+<ul>{% for row in concentrations %}<li>{{ row.target }}: {% for service in row.services %}{{ service }}{% if not forloop.last %}، {% endif %}{% endfor %}{% if row.common %}؛ نقطه شکست مشترک{% endif %}</li>{% empty %}<li>موردی در دامنه مشاهده نیست.</li>{% endfor %}</ul>
+<h2 class="h5 mt-4">تغییر سطح و روش</h2>
+<ul>{% for row in changes %}<li><a href="{{ row.after.get_absolute_url }}">{{ row.after.risk.code }}</a>: {{ row.before.decision_level|default:"نامعلوم" }} ← {{ row.after.decision_level|default:"نامعلوم" }}{% if row.method_changed %}؛ تغییر روش؛ کاهش امتیاز شاهد بهبود کنترل نیست.{% else %}؛ روش ثابت؛ علت تغییر در فرض‌ها و شواهد ارزیابی بررسی شود.{% endif %}</li>{% empty %}<li>ارزیابی جاری مقایسه‌پذیری در دوره ثبت نشده است.</li>{% endfor %}</ul>
+<h2 class="h5 mt-4">پرونده‌های جاری</h2>
+<div class="table-responsive"><table class="table"><thead><tr><th>ریسک</th><th>خدمت و مشتری</th><th>سطح</th><th>بدترین پیامد</th><th>اطمینان</th><th>مالک</th><th>کنترل نامطمئن</th><th>تصمیم موردنیاز</th><th>مهلت پیگیری</th></tr></thead><tbody>
+{% for base in current %}<tr><td><a href="{{ base.get_absolute_url }}">{{ base.risk.code }} {{ base.risk.title }}</a></td><td>{{ base.risk.service|default:"-" }}؛ {% for customer in base.risk.customers.all %}{{ customer }}{% if not forloop.last %}، {% endif %}{% endfor %}</td><td>{{ base.decision_level|default:"نیازمند تکمیل" }}</td><td>{{ base.impact_high|default_if_none:"نامعلوم" }}</td><td>{{ base.get_confidence_display|default:"نامعلوم" }}</td><td>{{ base.risk.owner|default:"-" }}</td><td>{{ base.report_uncertain_controls|default:"-" }}</td><td>{{ base.decision_level.decision_rule|default:"تکمیل ارزیابی" }} <a href="{{ base.risk.get_absolute_url }}#treatment">پرونده مواجهه</a></td><td>{{ base.report_due|jformat:"%Y/%m/%d"|default:"تعیین نشده" }}</td></tr>{% empty %}<tr><td colspan="9">ارزیابی جاری ثبت نشده است.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endblock %}

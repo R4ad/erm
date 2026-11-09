@@ -6,7 +6,7 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from apps.accounts.roles import Role
@@ -104,6 +104,7 @@ def values_of(described):
 
 
 def test_django_addresses_map_to_their_react_routes():
+    assert spa_route(reverse_lazy("risks:risk_list")) == "/risks"
     assert spa_route("/risks/12/edit/?next=/risks/") == "/risks/12/edit?next=/risks/"
     assert spa_route("/questionnaires/responses/5/answer/") == "/responses/5"
     assert spa_route("/risks/7/#comments") == "/risks/7#comments"
@@ -120,6 +121,24 @@ def test_django_addresses_map_to_their_react_routes():
     assert table["risks:risk_update"]["form"] is True
     assert table["risks:evidence_list"]["form"] is False
     assert table["questionnaires:response_answer"]["route"] == "/responses/:pk"
+
+
+@pytest.mark.parametrize(
+    ("path", "cancel", "route"),
+    [
+        ("/risks/scenarios/new/", "/risks/scenarios/", "/risks/scenarios"),
+    ],
+)
+def test_create_forms_resolve_lazy_cancel_urls(api, grc, path, cancel, route):
+    response = form(api(grc), path)
+    assert response.status_code == 200
+    assert response.json()["cancel"] == {"href": cancel, "route": route}
+
+
+def test_risk_creation_without_scenario_redirects_to_library(api, grc):
+    response = form(api(grc), "/risks/new/")
+    assert response.status_code == 409
+    assert response.json()["redirect"]["route"] == "/risks/scenarios"
 
 
 # فرم‌ها

@@ -53,7 +53,7 @@ class AnswerHomeView(ListView):
     context_object_name = "questionnaires"
 
     def get_queryset(self):
-        return Questionnaire.objects.filter(is_active=True)
+        return Questionnaire.objects.filter(is_active=True, is_structured=True)
 
     def get_context_data(self, **kwargs):
         user = self.request.user
@@ -117,6 +117,12 @@ class QuestionFormMixin(RoleRequiredMixin, FormPageMixin):
     model = Question
     form_class = QuestionForm
     template_name = "questionnaires/question_form.html"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if not self.object:
+            kwargs["instance"] = Question(questionnaire=self.questionnaire)
+        return kwargs
 
     def get_formset(self):
         data = self.request.POST if self.request.method == "POST" else None
@@ -264,6 +270,14 @@ class ResponseAnswerView(UpdateView):
     form_class = ResponseAnswerForm
     template_name = "questionnaires/response_answer.html"
     context_object_name = "response"
+
+    def dispatch(self, request, *args, **kwargs):
+        response = get_object_or_404(visible_responses(request.user), pk=kwargs["pk"])
+        if response.questionnaire.is_structured:
+            if not can_edit_response(request.user, response):
+                raise PermissionDenied
+            return redirect(f"/app/responses/{response.pk}")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         return visible_responses(self.request.user).select_related("questionnaire", "org_unit", "service")

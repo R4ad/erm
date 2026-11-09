@@ -1,8 +1,16 @@
+import copy
+
 from django import forms
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.catalog.forms import OwnerChoiceField, active_or_current, user_choices
+from apps.accounts.roles import Role
+from apps.catalog.forms import (
+    OwnerChoiceField,
+    ServiceForm,
+    active_or_current,
+    user_choices,
+)
 from apps.catalog.models import Customer, Service
 from apps.catalog.permissions import visible_services
 from apps.controls.forms import ControlChoiceField
@@ -12,7 +20,15 @@ from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
-from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario, Tag
+from .models import (
+    Coverage,
+    Evidence,
+    ExternalLink,
+    Risk,
+    RiskCategory,
+    RiskScenario,
+    Tag,
+)
 from .permissions import can_edit_register
 from .services import (
     active_categories,
@@ -113,7 +129,65 @@ class RiskScenarioForm(BootstrapFormMixin, forms.ModelForm):
     def save(self, commit=True):
         if self.cleaned_data.get("major_change"):
             self.instance.version += 1
+        if self.instance.narrative:
+            self.instance.narrative = self.instance.build_narrative()
         return super().save(commit)
+
+
+class ScenarioServiceChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, service):
+        return f"{service.name} ({service.code})"
+
+
+class ScenarioCreateForm(BootstrapFormMixin, forms.ModelForm):
+    service = ScenarioServiceChoiceField(Service.objects.filter(is_active=True), label="خدمت یا فرآیند", required=False)
+    new_service = forms.BooleanField(label="ثبت خدمت جدید", required=False)
+    objective = forms.CharField(label="هدف یا تعهد", widget=forms.Textarea(attrs={"rows": 2}))
+    customer_text = forms.CharField(label="داتین یا مشتری", widget=forms.Textarea(attrs={"rows": 2}))
+
+    class Meta:
+        model = RiskScenario
+        fields = ["service", "new_service", "conditions", "event", "objective", "customer_text", "consequence", "category"]
+        labels = {"conditions": "عامل و وضعیت", "event": "رویداد مشخص", "consequence": "نوع و دامنه پیامد"}
+        widgets = {name: forms.Textarea(attrs={"rows": 2}) for name in ["conditions", "event", "consequence"]}
+
+    NEW_SERVICE_FIELDS = ["code", "name", "kind", "org_unit", "owner", "lifecycle_stage", "environment"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = RiskCategory.objects.filter(is_active=True)
+        service_form = ServiceForm()
+        for name in self.NEW_SERVICE_FIELDS:
+            field = copy.deepcopy(service_form.fields[name])
+            field.required = False
+            field.label = f"خدمت جدید: {field.label}"
+            self.fields[f"new_service_{name}"] = field
+
+    def clean(self):
+        data = super().clean()
+        if data.get("new_service"):
+            values = {name: self.data.get(f"new_service_{name}", "") for name in self.NEW_SERVICE_FIELDS}
+            values["is_active"] = "on"
+            self.service_form = ServiceForm(values)
+            if not self.service_form.is_valid():
+                for name, errors in self.service_form.errors.items():
+                    target = f"new_service_{name}" if name != "__all__" else None
+                    for error in errors:
+                        self.add_error(target, error)
+        elif not data.get("service"):
+            self.add_error("service", "خدمت را انتخاب کنید یا خدمت جدید ثبت کنید.")
+        return data
+
+    def save(self, commit=True):
+        scenario = super().save(commit=False)
+        scenario.service = self.service_form.save() if self.cleaned_data.get("new_service") else self.cleaned_data["service"]
+        scenario.service_name_snapshot = scenario.service.name
+        scenario.title = scenario.event[:300]
+        scenario.is_active = True
+        scenario.narrative = scenario.build_narrative()
+        if commit:
+            scenario.save()
+        return scenario
 
 
 class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
@@ -252,6 +326,55 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         set_tags(self.instance, self.cleaned_data["tag_names"])
 
 
+class ScenarioRiskCreateForm(RiskForm):
+    class Meta(RiskForm.Meta):
+        fields = [
+            "scenario", "service", "initiator", "realization_path", "channel", "org_unit", "customers",
+            "owner", "category", "tag_names", "controls", "additional_notes",
+        ]
+        widgets = {
+            **RiskForm.Meta.widgets,
+            "realization_path": forms.Textarea(attrs={"rows": 3}),
+            "additional_notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, scenario, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scenario = scenario
+        self.fields["scenario"].disabled = True
+        self.fields["service"].disabled = True
+        self.fields["scenario"].initial = scenario.pk
+        self.fields["service"].initial = self.instance.service_id if self.instance.pk else scenario.service_id
+        self.fields["initiator"].required = True
+        self.fields["realization_path"].required = True
+        self.fields["initiator"].help_text = ""
+
+    def save(self, commit=True):
+        risk = super().save(commit=False)
+        if risk.pk:
+            if commit:
+                risk.save()
+                self.save_m2m()
+            return risk
+        scenario = self.scenario
+        risk.scenario = scenario
+        risk.service = scenario.service
+        risk.title = scenario.title
+        risk.description = scenario.narrative or f"{scenario.conditions}\n{scenario.event}\n{scenario.consequence}"
+        risk.status = Risk.Status.SUBMITTED
+        risk.scenario_snapshot = {
+            "code": scenario.code, "version": scenario.version, "title": scenario.title,
+            "service": scenario.service_name_snapshot or scenario.service.name, "service_code": scenario.service.code,
+            "conditions": scenario.conditions, "event": scenario.event, "objective": scenario.objective,
+            "customer": scenario.customer_text, "consequence": scenario.consequence,
+            "narrative": scenario.narrative, "category": str(scenario.category), "status": "active",
+        }
+        if commit:
+            risk.save()
+            self.save_m2m()
+        return risk
+
+
 class RiskFilterForm(BootstrapFormMixin, forms.Form):
     q = forms.CharField(label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا عنوان"}))
     status = forms.ChoiceField(label="وضعیت", required=False, choices=[("", "همه")] + Risk.Status.choices)
@@ -354,7 +477,10 @@ class EvidenceForm(BootstrapFormMixin, forms.ModelForm):
         # ریسک‌هایی که کاربر می‌تواند به آن‌ها شاهد وصل کند: عضو GRC همه‌ی ریسک‌های فعال، مالک ریسک‌های خودش.
         choosable = active_risks(Risk.objects.all())
         if not can_edit_register(user):
-            choosable = choosable.filter(owner=user)
+            condition = Q(owner=user)
+            if user.has_role(Role.SECURITY_WORKGROUP):
+                condition |= Q(status=Risk.Status.ASSESSMENT)
+            choosable = choosable.filter(condition)
         self.choosable = choosable
         self.fields["risks"].queryset = choosable.order_by("code")
         if can_edit_register(user):
@@ -372,7 +498,8 @@ class EvidenceForm(BootstrapFormMixin, forms.ModelForm):
         if observed and valid_until and valid_until < observed:
             self.add_error("valid_until", "«معتبر تا» نباید پیش از تاریخ خود شاهد باشد.")
         if not can_edit_register(self.user) and not data.get("risks") and not self.hidden_risks():
-            self.add_error("risks", "دست‌کم یکی از ریسک‌های خودتان را انتخاب کنید.")
+            text = "دست‌کم یکی از ریسک‌های مجاز را انتخاب کنید." if self.user.has_role(Role.SECURITY_WORKGROUP) else "دست‌کم یکی از ریسک‌های خودتان را انتخاب کنید."
+            self.add_error("risks", text)
         return data
 
     def hidden_risks(self):

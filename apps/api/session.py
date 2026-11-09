@@ -23,6 +23,8 @@ def navigation(user):
             "title": "کار روزانه",
             "items": [
                 link("کارهای من", "actions:my_work"),
+                link("اعلان‌های پایش", "actions:notices"),
+                link("گزارش مدیریتی", "reports:management"),
                 link("پاسخ به سؤال‌ها", "questionnaires:answer_home"),
             ],
         },
@@ -30,6 +32,7 @@ def navigation(user):
             "title": "ریسک‌ها",
             "items": [
                 link("رجیستر ریسک", "risks:risk_list"),
+                link("ارزیابی ریسک", "assessments:assessment_list"),
                 link("کتابخانه‌ی سناریو", "risks:scenario_list"),
                 link("شواهد", "risks:evidence_list"),
                 link("ادغام و تفکیک", "workflow:change_request_list"),

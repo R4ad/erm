@@ -52,6 +52,31 @@
   {% endif %}
 </dl>
 
+{% if response.questionnaire.is_structured %}
+<h2 class="h5 mt-4 mb-3">خدمات و شاخه‌های اختلال</h2>
+{% for service in response.structured_data %}
+  <section class="border rounded p-3 mb-3">
+    <h3 class="h6">خدمت {{ forloop.counter }}</h3>
+    {% include "questionnaires/includes/structured_answers.html" with node=service %}
+    {% for objective in service.objectives %}{% include "questionnaires/includes/structured_answers.html" with node=objective %}{% endfor %}
+    {% for event in service.events %}
+      <div class="border rounded p-3 mb-3"><h4 class="h6">اتفاق {{ forloop.counter }}</h4>
+        {% include "questionnaires/includes/structured_answers.html" with node=event %}
+        {% for path in event.paths %}<div class="border rounded p-2 mb-2"><strong>راه {{ forloop.counter }}</strong>{% include "questionnaires/includes/structured_answers.html" with node=path %}</div>{% endfor %}
+        {% for control in event.controls %}<div class="border rounded p-2 mb-2"><strong>تمهید</strong>{% include "questionnaires/includes/structured_answers.html" with node=control %}
+          <div>راه‌های تحت پوشش: {% for related_event in service.events %}{% for path in related_event.paths %}{% if path.key in control.paths %}{% for answer in related_event.answers.values %}{{ answer }} {% endfor %}: {% for answer in path.answers.values %}{{ answer }} {% endfor %}؛ {% endif %}{% endfor %}{% endfor %}</div></div>{% endfor %}
+        {% for consequence in event.consequences %}<div class="border rounded p-2 mb-2"><strong>پیامد</strong>{% include "questionnaires/includes/structured_answers.html" with node=consequence %}{% for path in event.paths %}{% if path.key == consequence.path %}<div>راه مرتبط: {% for answer in path.answers.values %}{{ answer }} {% endfor %}</div>{% endif %}{% endfor %}</div>{% endfor %}
+        {% for evidence in event.evidence %}<div class="border rounded p-2 mb-2"><strong>شاهد</strong>{% include "questionnaires/includes/structured_answers.html" with node=evidence %}<div>مربوط به:
+          {% if evidence.target == 'event' %}اتفاق{% endif %}
+          {% for path in event.paths %}{% with target='path:'|add:path.key %}{% if target == evidence.target %}راه: {% for answer in path.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+          {% for control in event.controls %}{% with target='control:'|add:control.key %}{% if target == evidence.target %}تمهید: {% for answer in control.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+          {% for consequence in event.consequences %}{% with target='consequence:'|add:consequence.key %}{% if target == evidence.target %}پیامد: {% for answer in consequence.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+        </div></div>{% endfor %}
+      </div>
+    {% endfor %}
+  </section>
+{% empty %}<p>خدمتی ثبت نشده است.</p>{% endfor %}
+{% else %}
 <h2 class="h5 mt-4 mb-3">کارکردها و پرسش‌های جلسه</h2>
 <dl class="row">
   {% for label, value in response.fixed_items %}
@@ -80,6 +105,7 @@
 
 <h2 class="h5 mt-4 mb-3">مورد جدید</h2>
 <p>{{ response.new_item|linebreaksbr|default:"-" }}</p>
+{% endif %}
 
 <h2 class="h5 mt-4 mb-3">ریسک‌های در انتظار</h2>
 <div class="table-responsive">

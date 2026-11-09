@@ -10,10 +10,11 @@ from apps.assessments.models import Assessment
 from apps.assessments.review import can_decide_referral, can_review
 from apps.assessments.services import decision_assessment
 from apps.risks.models import Risk
+from apps.risks.permissions import visible_risks
 from apps.workflow.models import ChangeRequest, RiskQuestion
 
 from .acceptance import acceptances_to_sign
-from .models import RiskAcceptance, TreatmentAction, TreatmentPlan
+from .models import MonitoringNotice, RiskAcceptance, RiskReview, TreatmentAction, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_edit_plans
 from .services import current_plan, decision_due, pending_reassessment
 
@@ -37,7 +38,11 @@ class WaitingRisk:
     @property
     def sort_key(self):
         # به ترتیب اولویت و سطح ریسک: اول سطح تصمیم بالاتر، بعد امتیاز بیشتر، بعد مهلت نزدیک‌تر (مرحله‌ی ۴ گردش کار).
-        return (-self.level.rank, -(self.assessment.score_high or 0), self.due)
+        return (
+            -self.level.rank, -(self.assessment.score_high or 0),
+            -(self.assessment.impact_high or 0), -self.risk.customers.count(), self.due,
+            0 if self.assessment.confidence == "low" else 1,
+        )
 
 
 def waiting_risks():
@@ -76,7 +81,9 @@ def expiring_acceptances(user):
     """پذیرش‌های معتبری که تا ۳۰ روز دیگر تمام می‌شوند یا تمام شده‌اند: برای مسئول پیگیری، و برای عضو GRC همه.
     یادآوری و تصعید خودکار با قدم ۲۳ می‌آید."""
     soon = timezone.localdate() + timedelta(days=30)
-    acceptances = RiskAcceptance.objects.filter(status=RiskAcceptance.Status.ACTIVE, end_date__lte=soon)
+    acceptances = RiskAcceptance.objects.filter(
+        status__in=[RiskAcceptance.Status.ACTIVE, RiskAcceptance.Status.EXPIRED], end_date__lte=soon
+    )
     if not can_edit_plans(user):
         acceptances = acceptances.filter(follow_up_by=user)
     return acceptances.select_related("risk", "assessment__decision_level", "follow_up_by").order_by("end_date")
@@ -89,6 +96,13 @@ def my_work(user):
         risk__owner=user, risk__status__in=[Risk.Status.TREATMENT_PLAN, *EXECUTION_STATUSES]
     ).filter(Q(owner_approved_at__isnull=True) | Q(actions__status=ST.PLANNED))
     work = {
+        "monitoring_reviews": RiskReview.objects.filter(
+            responsible=user, completed_at__isnull=True, risk__in=visible_risks(user)
+        ).exclude(risk__status__in=Risk.CLOSED_STATUSES).select_related("risk"),
+        "monitoring_notices": MonitoringNotice.objects.filter(
+            recipient=user, read_at__isnull=True,
+            risk__in=visible_risks(user),
+        ).select_related("risk")[:30],
         "my_actions": TreatmentAction.objects.filter(people)
         .exclude(status=ST.VERIFIED)
         .select_related("plan__risk", "owner", "assignee"),

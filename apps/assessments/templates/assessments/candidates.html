@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}ریسک‌های نیازمند ارزیابی{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">ریسک‌های نیازمند ارزیابی</h1>
+<div class="table-responsive"><table class="table"><thead><tr><th>ریسک</th><th>خدمت</th><th>واحد</th><th></th></tr></thead><tbody>
+{% for risk in risks %}<tr><td>{{ risk }}</td><td>{{ risk.service|default:'-' }}</td><td>{{ risk.org_unit }}</td><td><form method="post" action="{% url 'assessments:start_submitted' risk.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm">شروع ارزیابی</button></form></td></tr>
+{% empty %}<tr><td colspan="4">ریسک ارسالی منتظر ارزیابی وجود ندارد.</td></tr>{% endfor %}
+</tbody></table></div>
+<a href="{% url 'assessments:assessment_list' %}">بازگشت</a>
+{% endblock %}

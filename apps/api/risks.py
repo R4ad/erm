@@ -13,7 +13,12 @@ from apps.controls.permissions import visible_controls
 from apps.core.records import record_extras
 from apps.methodology.models import RiskLevel
 from apps.risks.forms import RiskFilterForm
-from apps.risks.permissions import can_add_evidence, can_edit_register, visible_evidence, visible_risks
+from apps.risks.permissions import (
+    can_add_evidence,
+    can_edit_register,
+    visible_evidence,
+    visible_risks,
+)
 from apps.workflow.context import risk_workflow
 
 from . import formatting as fmt
@@ -92,7 +97,7 @@ class RiskListView(ApiView):
                 "ordering": ordering,
                 "results": [risk_row(risk, levels.get(risk.pk)) for risk in page_risks],
                 "can_create": can_edit_register(user),
-                "create_url": reverse("risks:risk_create"),
+                "create_url": reverse("risks:scenario_list"),
             }
         )
 
@@ -198,6 +203,9 @@ class RiskDetailView(ApiView):
                 "tags": [tag.name for tag in risk.tags.all()],
                 "scope": risk.scope,
                 "initiator": risk.initiator,
+                "realization_path": risk.realization_path,
+                "additional_notes": risk.additional_notes,
+                "scenario_snapshot": risk.scenario_snapshot,
                 "count_unit": risk.count_unit,
                 "count_exclusions": risk.count_exclusions,
                 "data_class": fmt.choice(risk, "data_class"),
@@ -313,6 +321,7 @@ class RiskDetailView(ApiView):
                 },
                 **record_parts(risk, user, extras),
                 "actions": {
+                    "add_review": reverse("actions:review_create", args=[risk.pk]) if can_edit else None,
                     "classic": risk.get_absolute_url(),
                     "edit": reverse("risks:risk_update", args=[risk.pk]) if can_edit else None,
                     "add_link": reverse("risks:link_create", args=[risk.pk]) if can_edit else None,

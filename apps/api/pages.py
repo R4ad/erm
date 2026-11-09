@@ -12,6 +12,7 @@ from django.urls import reverse
 from apps.workflow.models import ChangeRequest
 
 from . import formatting as fmt
+from .assessments import ASSESSMENT_PAGES
 from .forms import describe_field, describe_form
 from .records import record_parts
 
@@ -127,6 +128,7 @@ def scenario_detail(context, request):
             "event": scenario.event,
             "conditions": scenario.conditions,
             "consequence": scenario.consequence,
+            "narrative": scenario.narrative,
         },
         "risks": [risk_brief(risk) for risk in context["risks"]],
         "edit_url": reverse("risks:scenario_update", args=[scenario.pk]) if can_edit else None,
@@ -271,4 +273,5 @@ READ_PAGES = {
     "risks:coverage": coverage,
     "workflow:change_request_list": change_request_list,
     "workflow:change_request_detail": change_request_detail,
+    **ASSESSMENT_PAGES,
 }

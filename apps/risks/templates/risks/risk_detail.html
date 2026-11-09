@@ -8,6 +8,7 @@
   <h1 class="h4 mb-0">{{ risk }} {% include "risks/includes/risk_status.html" %}</h1>
   <div>
     {% if can_edit %}
+      <a href="{% url 'actions:review_create' risk.pk %}" class="btn btn-outline-secondary btn-sm">ثبت محرک بازبینی</a>
       <a href="{% url 'risks:risk_update' risk.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
     {% endif %}
     <a href="{% url 'risks:risk_list' %}" class="btn btn-outline-secondary btn-sm">رجیستر ریسک</a>
@@ -33,7 +34,7 @@
     {% endif %}
   </dd>
 
-  <dt class="col-sm-3">شرح</dt>
+  <dt class="col-sm-3">{% if risk.scenario_snapshot %}سناریوی ثبت‌شده{% else %}شرح{% endif %}</dt>
   <dd class="col-sm-9">{{ risk.description|linebreaksbr }}</dd>
 
   <dt class="col-sm-3">کانال ورود</dt>
@@ -61,7 +62,7 @@
     {% for tag in tags %}<a href="{% url 'risks:risk_list' %}?tag={{ tag.pk }}" class="badge text-bg-light border text-decoration-none ms-1">{{ tag }}</a>{% empty %}-{% endfor %}
   </dd>
 
-  <dt class="col-sm-3">دامنه</dt>
+  {% if not risk.scenario_snapshot %}<dt class="col-sm-3">دامنه</dt>
   <dd class="col-sm-9">{{ risk.scope|linebreaksbr|default:"-" }}</dd>
 
   <dt class="col-sm-3">طبقه‌ی اطلاعات</dt>
@@ -69,15 +70,22 @@
 
   <dt class="col-sm-3">برچسب CIA</dt>
   <dd class="col-sm-9">{{ risk.cia_labels|default:"-" }}</dd>
+  {% endif %}
 
   <dt class="col-sm-3">عامل آغازگر</dt>
   <dd class="col-sm-9">{{ risk.initiator|linebreaksbr|default:"-" }}</dd>
 
-  <dt class="col-sm-3">واحد شمارش</dt>
+  {% if risk.scenario_snapshot %}
+    <dt class="col-sm-3">مسیر مشخص تحقق</dt><dd class="col-sm-9">{{ risk.realization_path|linebreaksbr|default:"-" }}</dd>
+    <dt class="col-sm-3">توضیحات اضافه</dt><dd class="col-sm-9">{{ risk.additional_notes|linebreaksbr|default:"-" }}</dd>
+  {% endif %}
+
+  {% if not risk.scenario_snapshot %}<dt class="col-sm-3">واحد شمارش</dt>
   <dd class="col-sm-9">{{ risk.count_unit|default:"-" }}</dd>
 
   <dt class="col-sm-3">موارد خارج از شمارش</dt>
   <dd class="col-sm-9">{{ risk.count_exclusions|linebreaksbr|default:"-" }}</dd>
+  {% endif %}
 
   <dt class="col-sm-3">ثبت</dt>
   <dd class="col-sm-9">{{ risk.created_at|jformat:"%Y/%m/%d" }}</dd>

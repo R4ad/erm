@@ -2,6 +2,7 @@
 ریسک. همه‌چیز از همان فرم‌ها و services صفحه‌های جنگوی پرسشنامه می‌گذرد."""
 
 from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.http import QueryDict
@@ -13,6 +14,7 @@ from apps.questionnaires.forms import ResponseAnswerForm, ResponseStartForm
 from apps.questionnaires.models import PendingRisk, Question, Questionnaire, Response
 from apps.questionnaires.permissions import answerable_units, can_edit_response, visible_responses
 from apps.questionnaires.services import missing_required, save_answer, submit_response
+from apps.questionnaires.structured import save_structured
 from apps.workflow.forms import AnswerForm
 from apps.workflow.permissions import answerable_questions
 from apps.workflow.services import answer_question
@@ -53,7 +55,7 @@ class AnswerHomeView(ApiView):
                         "description": questionnaire.description,
                         "question_count": questionnaire.questions.filter(is_active=True).count(),
                     }
-                    for questionnaire in Questionnaire.objects.filter(is_active=True)
+                    for questionnaire in Questionnaire.objects.filter(is_active=True, is_structured=True)
                 ],
                 "can_answer": answerable_units(user).exists(),
                 "my_responses": [response_row(response) for response in mine],
@@ -181,6 +183,12 @@ def response_detail(response, user):
             for item in response.pending_risks.all()
         ],
         "classic_url": response.get_absolute_url(),
+        "is_structured": response.questionnaire.is_structured,
+        "structured_data": response.structured_data,
+        "structured_questions": [
+            {"id": q.pk, "text": q.text, "stage": q.stage, "required": q.is_required, "help": q.help_text}
+            for q in (response.questionnaire.active_questions() if can_edit else response.questionnaire.questions.all())
+        ] if response.questionnaire.is_structured else [],
     }
 
 
@@ -220,6 +228,14 @@ class ResponseDetailView(ApiView):
         response = self.get_response(request, pk)
         if not can_edit_response(request.user, response):
             raise PermissionDenied
+        if response.questionnaire.is_structured:
+            try:
+                save_structured(response, request.data.get("structured_data"), bool(request.data.get("submit")))
+            except ValidationError as exc:
+                return ApiResponse({"message": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get("submit"):
+                submit_response(response)
+            return ApiResponse({"message": "پاسخ ذخیره شد.", "response": response_detail(response, request.user)})
         questions = list(response.questionnaire.active_questions())
         form = ResponseAnswerForm(form_data(request.data, questions), instance=response)
         if not form.is_valid():

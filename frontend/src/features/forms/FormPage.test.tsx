@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiCall } from "@/test/api";
 import { mockApi, reply } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
-import { riskForm, transitionForm, uploadForm } from "@/test/fixtures";
+import { initiatorForm, riskForm, transitionForm, uploadForm } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 
 import { FormPage } from "./FormPage";
@@ -157,6 +157,31 @@ describe("FormPage", () => {
     expect(screen.getByText("مالک ریسک هنوز طرح مواجهه را تأیید نکرده است.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /RK-1405-0001/ })).toHaveAttribute("href", "/risks/1");
     expect(screen.getByRole("button", { name: "شروع اجرا" })).toHaveAttribute("type", "submit");
+    await expectNoAxeViolations();
+  });
+
+  it("puts the method's guide tables beside the form, with the facts and warnings Django adds", async () => {
+    setup("/assessments/1/initiator", initiatorForm());
+    expect(
+      await screen.findByRole("heading", { name: "عامل آغازگر (A) در ارزیابی جاری AS-1405-0001", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "برگشت" })).toHaveAttribute("href", "/assessments/1#likelihood");
+    expect(screen.getByText(/تعریف آغازگر، واحد شمارش یا دامنه‌ی ریسک کامل نیست/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "تکمیل ریسک" })).toHaveAttribute("href", "/risks/1/edit");
+
+    const facts = screen.getByRole("heading", { name: "مرز آغازگر از ریسک RK-1405-0001" }).closest("div.rounded-2xl")!;
+    expect(within(facts as HTMLElement).getByText("عامل آغازگر").nextSibling).toHaveTextContent("عامل آزمون");
+    expect(within(facts as HTMLElement).getByText("خارج از شمارش").nextSibling).toHaveTextContent("-");
+
+    const guide = screen.getByRole("complementary", { name: "راهنمای روش" });
+    expect(within(guide).getByRole("heading", { name: "جدول A (بخش ۱۴)" })).toBeInTheDocument();
+    const levels = within(guide)
+      .getAllByRole("term")
+      .map((term) => term.textContent);
+    expect(levels).toEqual(["۱", "۲"]);
+    expect(guide).toHaveTextContent("کمتر از ۰.۱ بار در سال");
+    expect(guide).toHaveTextContent("یادداشت آزمونی جدول A.");
+    expect(screen.getByRole("combobox", { name: /مسیر A/ })).toHaveValue("forward");
     await expectNoAxeViolations();
   });
 

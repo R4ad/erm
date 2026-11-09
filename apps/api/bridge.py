@@ -26,7 +26,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .base import ApiView
-from .bridge_pages import FORM_PAGES, POST_ONLY_PAGES
+from .bridge_pages import FORM_PAGES, FORM_SETS, POST_ONLY_PAGES
 from .forms import describe_form, form_data
 from .pages import READ_PAGES
 from .routes import spa_route
@@ -47,7 +47,10 @@ class CollectedMessages(BaseStorage):
 
 
 def link(url):
-    return {"href": url, "route": spa_route(url)} if url else None
+    if not url:
+        return None
+    url = str(url)
+    return {"href": url, "route": spa_route(url)}
 
 
 def page_request(request, path, query, method, data=None, files=None):
@@ -123,14 +126,16 @@ class FormBridgeView(ApiView):
             return blocked(notes, response)
         context = rendered(response)
         extras = FORM_PAGES.get(name)
+        extra = extras(context, page) if extras else {}
+        cancel_url = extra.pop("cancel_url", None) or context.get("cancel_url")
         return Response(
             {
                 "view": name,
-                "title": str(context.get("title") or ""),
+                "title": str(extra.pop("title", None) or context.get("title") or ""),
                 "form": describe_form(context.get("form")),
-                "cancel": link(context.get("cancel_url")),
+                "cancel": link(cancel_url),
                 "messages": notes,
-                **(extras(context, page) if extras else {}),
+                **extra,
             }
         )
 
@@ -141,7 +146,7 @@ class FormBridgeView(ApiView):
         else:
             body = request.data if isinstance(request.data, dict) else {}
             data, files = form_data(body.get("values")), None
-        _, page, response = run(request, path, query, "POST", FORM_PAGES.keys() | POST_ONLY_PAGES, data, files)
+        name, page, response = run(request, path, query, "POST", FORM_PAGES.keys() | POST_ONLY_PAGES, data, files)
         notes = page._messages.collected()
         if isinstance(response, HttpResponseRedirect):
             failed = [note["text"] for note in notes if note["level"] == "error"]
@@ -151,13 +156,21 @@ class FormBridgeView(ApiView):
             text = " ".join(note["text"] for note in notes) or "ذخیره شد."
             return Response({"message": text, "redirect": link(response.url)})
         if isinstance(response, TemplateResponse):
-            form = (response.context_data or {}).get("form")
-            if form is not None and form.is_bound and not form.is_valid():
-                described = describe_form(form)
-                errors = {field["name"]: field["errors"] for field in described["fields"] if field["errors"]}
-                if described["errors"]:
-                    errors["__all__"] = described["errors"]
-                message = " ".join(described["errors"]) or "چند مورد فرم درست نیست؛ کنار هر فیلد آمده است."
-                body = {"message": message, "errors": errors, "form": described}
+            context = response.context_data or {}
+            forms = FORM_SETS[name](context) if name in FORM_SETS else [context.get("form")]
+            invalid = [form for form in forms if form is not None and form.is_bound and not form.is_valid()]
+            if invalid:
+                errors, general = {}, []
+                for form in invalid:
+                    described = describe_form(form)
+                    errors.update({field["name"]: field["errors"] for field in described["fields"] if field["errors"]})
+                    general += described["errors"]
+                if general:
+                    errors["__all__"] = general
+                failed = [note["text"] for note in notes if note["level"] == "error"]
+                message = " ".join(general or failed) or "چند مورد فرم درست نیست؛ کنار هر فیلد آمده است."
+                body = {"message": message, "errors": errors}
+                if len(forms) == 1:
+                    body["form"] = describe_form(forms[0])
                 return Response(body, status=status.HTTP_400_BAD_REQUEST)
         raise Http404

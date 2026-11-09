@@ -21,6 +21,7 @@
 </div>
 
 <dl class="row">
+  {% if scenario.narrative %}<dt class="col-sm-3">متن سناریو</dt><dd class="col-sm-9">{{ scenario.narrative|linebreaksbr }}</dd>{% endif %}
   <dt class="col-sm-3">دسته‌ی اصلی</dt>
   <dd class="col-sm-9">{{ scenario.category }}</dd>
 

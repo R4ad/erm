@@ -183,6 +183,7 @@ CONTROL_ASSESSMENT_FIELDSETS = [
             "test_result",
             "failures",
             "operating_ok",
+            "limited_effect_proven",
         ],
     ),
     ("شرط‌های E4 و E5", ["sustained", "failure_bypass_tested", "monitored"]),
@@ -250,6 +251,10 @@ class ControlAssessmentForm(BootstrapFormMixin, forms.ModelForm):
         start, end = data.get("test_from"), data.get("test_to")
         if start and end and end < start:
             self.add_error("test_to", "پایان بازه‌ی آزمون پیش از آغاز آن است.")
+        from django.utils import timezone
+
+        if end and end > timezone.localdate():
+            self.add_error("test_to", "آزمون آینده شاهد اثربخشی جاری نیست.")
         e = data.get("e")
         if e is None:
             return data
@@ -269,10 +274,15 @@ class ControlAssessmentForm(BootstrapFormMixin, forms.ModelForm):
             sustained=data.get("sustained", False),
             failure_bypass_tested=data.get("failure_bypass_tested", False),
             monitored=data.get("monitored", False),
+            limited_effect_proven=data.get("limited_effect_proven", False),
         )
         if e >= 2 and not data.get("confidence"):
             # E1 اعتباری نمی‌دهد و در اطمینان کل نمی‌آید؛ از E2 به بالا اطمینان لازم است (جواب س۶۱).
             self.add_error("confidence", "برای E2 و بالاتر اطمینان E را انتخاب کنید.")
+        if e >= 2:
+            for name in ["test_method", "test_result", "sample_rationale"]:
+                if not data.get(name, "").strip():
+                    self.add_error(name, "روش، نتیجه و دلیل تعداد و تنوع نمونه آزمون باید قابل بازسازی باشد (بخش ۱۶).")
         problems = unmet_conditions(e, facts, self.thresholds)
         if problems:
             supported = supported_level(facts, self.thresholds)

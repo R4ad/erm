@@ -4,9 +4,19 @@ import { createMemoryRouter, matchRoutes, RouterProvider } from "react-router-do
 import { describe, expect, it } from "vitest";
 
 import { leaveTo } from "@/lib/navigation";
-import { mockApi, reply } from "@/test/api";
+import { mockApi, reply, type ApiCall } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
-import { myWork, riskDetail, riskFilters, riskForm, riskPage, routeTable, session } from "@/test/fixtures";
+import {
+  assessmentDetail,
+  compareAssessments,
+  myWork,
+  riskDetail,
+  riskFilters,
+  riskForm,
+  riskPage,
+  routeTable,
+  session,
+} from "@/test/fixtures";
 
 import { Providers } from "./providers";
 import { createQueryClient } from "./query-client";
@@ -208,5 +218,37 @@ describe("risk dossier", () => {
     await waitFor(() => expect(calls.callsTo("POST forms/")).toHaveLength(1));
     expect(calls.callsTo("POST forms/")[0]!.query.get("path")).toBe("/comments/29/1/new/");
     await expectNoAxeViolations();
+  });
+
+  it("compares the picked assessments on their own page and opens each one from there", async () => {
+    const risk = riskDetail();
+    const [first] = risk.assessments;
+    risk.assessments.push({
+      ...first!,
+      id: 2,
+      code: "AS-1405-0002",
+      kind: { value: "target", label: "هدف" },
+      status: { value: "draft", label: "پیش‌نویس" },
+      approved_at: null,
+      href: "/assessments/2/",
+    });
+    api({
+      "GET risks/1/": risk,
+      "GET pages/": (call: ApiCall) =>
+        call.query.get("path") === "/assessments/compare/?id=2&id=1" ? compareAssessments() : assessmentDetail(),
+    });
+    const { router, user } = renderApp("/risks/1?tab=assessments");
+    const compare = await screen.findByRole("button", { name: "مقایسه‌ی انتخاب‌شده‌ها" });
+    expect(compare).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "مقایسه‌ی AS-1405-0002" }));
+    expect(compare).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "مقایسه‌ی AS-1405-0001" }));
+    await user.click(compare);
+
+    expect(await screen.findByRole("heading", { name: "مقایسه‌ی ارزیابی‌ها", level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname + router.state.location.search).toBe("/assessments/compare?id=2&id=1");
+    await user.click(screen.getByRole("link", { name: "AS-1405-0001" }));
+    expect(await screen.findByRole("heading", { name: "ارزیابی جاری AS-1405-0001", level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/assessments/1");
   });
 });

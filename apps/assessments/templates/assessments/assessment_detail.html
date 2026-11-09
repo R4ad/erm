@@ -27,9 +27,12 @@
 
   <dt class="col-sm-3">افق</dt>
   <dd class="col-sm-9">{{ assessment.horizon_months }} ماه</dd>
+  {% if assessment.horizon_rationale %}<dt class="col-sm-3">دلیل افق</dt><dd class="col-sm-9">{{ assessment.horizon_rationale }}</dd>{% endif %}
+  {% if assessment.target_due %}<dt class="col-sm-3">موعد تحقق هدف</dt><dd class="col-sm-9">{{ assessment.target_due|jformat:"%Y/%m/%d" }}</dd>{% endif %}
+  {% if assessment.scope_snapshot %}<dt class="col-sm-3">دامنه هنگام تأیید</dt><dd class="col-sm-9">{{ assessment.scope_snapshot.service }}؛ {% for customer in assessment.scope_snapshot.customers %}{{ customer.name }}{% if not forloop.last %}، {% endif %}{% endfor %}</dd>{% endif %}
 
   <dt class="col-sm-3">تاریخ جلسه‌ی کارگروه</dt>
-  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}هنوز ثبت نشده{% endif %}</dd>
+  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}بدون جلسه (ارزیابی عادی){% endif %}</dd>
 
   <dt class="col-sm-3">فرض‌ها</dt>
   <dd class="col-sm-9">{{ assessment.assumptions|linebreaksbr|default:"-" }}</dd>
@@ -47,6 +50,36 @@
       <div class="small">{% for item in assessment.escalation_evidence.all %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</div>
     </dd>
   {% endif %}
+</dl>
+
+<h2 class="h5 mt-4">اطلاعات ریسک</h2>
+<dl class="row">
+  <dt class="col-sm-3">سناریو</dt><dd class="col-sm-9">{{ assessment.risk.description|linebreaksbr }}</dd>
+  {% if assessment.risk.scenario_snapshot %}
+  <dt class="col-sm-3">کد و نسخه سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.code }} / {{ assessment.risk.scenario_snapshot.version }}</dd>
+  <dt class="col-sm-3">عامل و وضعیت سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.conditions|default:"-" }}</dd>
+  <dt class="col-sm-3">رویداد سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.event|default:"-" }}</dd>
+  <dt class="col-sm-3">هدف یا تعهد</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.objective|default:"-" }}</dd>
+  <dt class="col-sm-3">مشتری سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.customer|default:"-" }}</dd>
+  <dt class="col-sm-3">نوع و دامنه پیامد</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.consequence|default:"-" }}</dd>
+  {% endif %}
+  <dt class="col-sm-3">خدمت</dt><dd class="col-sm-9">{{ assessment.risk.service|default:"-" }}</dd>
+  <dt class="col-sm-3">واحد و دسته</dt><dd class="col-sm-9">{{ assessment.risk.org_unit }}، {{ assessment.risk.category }}</dd>
+  <dt class="col-sm-3">کانال ورود</dt><dd class="col-sm-9">{{ assessment.risk.get_channel_display }}</dd>
+  <dt class="col-sm-3">مالک</dt><dd class="col-sm-9">{{ assessment.risk.owner|default:"-" }}</dd>
+  <dt class="col-sm-3">بانک‌های متأثر</dt><dd class="col-sm-9">{% for item in assessment.risk.customers.all %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">عامل آغازگر</dt><dd class="col-sm-9">{{ assessment.risk.initiator|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">مسیر ثبت‌شده</dt><dd class="col-sm-9">{{ assessment.risk.realization_path|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">کنترل‌های فعلی</dt><dd class="col-sm-9">{% for item in risk_controls %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">برچسب‌ها</dt><dd class="col-sm-9">{% for item in assessment.risk.tags.all %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">شواهد</dt><dd class="col-sm-9">{% for item in risk_evidence %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">پیوندهای بیرونی</dt><dd class="col-sm-9">{% for item in assessment.risk.links.all %}{{ item.get_kind_display }}: {{ item.ref }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">توضیحات اضافه</dt><dd class="col-sm-9">{{ assessment.risk.additional_notes|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">وضعیت ریسک</dt><dd class="col-sm-9">{{ assessment.risk.get_status_display }}</dd>
+  <dt class="col-sm-3">دامنه</dt><dd class="col-sm-9">{{ assessment.risk.scope|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">واحد شمارش</dt><dd class="col-sm-9">{{ assessment.risk.count_unit|default:"-" }}</dd>
+  <dt class="col-sm-3">موارد خارج از شمارش</dt><dd class="col-sm-9">{{ assessment.risk.count_exclusions|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">طبقه اطلاعات و CIA</dt><dd class="col-sm-9">{{ assessment.risk.get_data_class_display|default:"-" }}، {{ assessment.risk.cia_labels|default:"-" }}</dd>
 </dl>
 
 <h2 class="h5 mt-4 mb-3" id="result">نتیجه{% if not assessment.is_approved %} <span class="small text-body-secondary fw-normal">(محاسبه‌ی همین حالا؛ هنگام تأیید ثابت می‌شود)</span>{% endif %}</h2>

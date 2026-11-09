@@ -31,9 +31,7 @@ export function ScenarioListPage() {
       <PageHeader
         title="کتابخانه‌ی سناریوهای مرجع"
         description={
-          page.data
-            ? `${count(page.data.count, "سناریو")}. سناریوی مرجع الگوی عمومی یک ریسک است و به خدمت یا بانک خاصی بسته نیست.`
-            : "سناریوی مرجع الگوی عمومی یک ریسک است و به خدمت یا بانک خاصی بسته نیست."
+          page.data ? `${count(page.data.count, "سناریو")} در کتابخانه سناریو.` : "سناریوهای ثبت‌شده را مرور کنید."
         }
         actions={
           page.data?.create_url && (
@@ -156,6 +154,7 @@ export function ScenarioDetailPage() {
           description={`دسته‌ی اصلی ${scenario.category.code} ${scenario.category.name}`}
         />
         <CardContent className="flex flex-col gap-5">
+          {scenario.narrative && <Section title="متن سناریو">{scenario.narrative}</Section>}
           <Section title="رویداد اصلی">{scenario.event}</Section>
           <Section title="شرایط">{scenario.conditions}</Section>
           <Section title="پیامد">{scenario.consequence}</Section>

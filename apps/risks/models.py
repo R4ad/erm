@@ -125,14 +125,21 @@ class Tag(TimeStampedModel):
 
 
 class RiskScenario(TimeStampedModel):
-    """سناریوی مرجع (بخش ۶ سند v5)، همان «ریسک اولیه‌ی GRC» سند قبلی: یک الگوی عمومی که به خدمت، دارایی یا بانک
-    خاصی بسته نیست و هر نمونه‌ی ریسک می‌تواند از آن ساخته شود. سناریوی قدیمی غیرفعال می‌شود، نه حذف."""
+    """سناریوی مرجع؛ نمونه‌های تازه به خدمت وصل‌اند و سناریوهای قدیمی بدون خدمت باقی می‌مانند."""
 
     code = models.CharField("کد", max_length=20, unique=True, editable=False)
     version = models.PositiveSmallIntegerField(
         "نسخه", default=1, editable=False, help_text="با هر تغییر اساسی یکی بالا می‌رود."
     )
     title = models.CharField("عنوان", max_length=300)
+    service = models.ForeignKey(
+        "catalog.Service", verbose_name="خدمت یا فرایند", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="scenarios",
+    )
+    service_name_snapshot = models.CharField("نام خدمت در زمان ثبت", max_length=200, blank=True)
+    objective = models.TextField("هدف یا تعهد", blank=True)
+    customer_text = models.TextField("داتین یا مشتری", blank=True)
+    narrative = models.TextField("متن سناریو", blank=True)
     event = models.TextField("رویداد اصلی")
     conditions = models.TextField("شرایط", help_text="علت یا شرط تحقق رویداد.")
     consequence = models.TextField("پیامد")
@@ -153,6 +160,13 @@ class RiskScenario(TimeStampedModel):
     def __str__(self):
         return f"{self.code} {self.title}"
 
+    def build_narrative(self):
+        return (
+            f"در خدمت یا فرآیند {self.service_name_snapshot}، به علت یا در شرایط {self.conditions}، "
+            f"ممکن است {self.event} رخ دهد و انجام {self.objective} برای {self.customer_text} را مختل کند. "
+            f"پیامد قابل مشاهده آن {self.consequence} است."
+        )
+
     def get_absolute_url(self):
         return reverse("risks:scenario_detail", args=[self.pk])
 
@@ -172,6 +186,7 @@ class Risk(TimeStampedModel):
         # ریسک با «ثبت‌شده در رجیستر» به دنیا می‌آید؛ «در پاسخ به پرسش‌ها» وقتی است که برای ارزیابی پرسش تازه‌ای لازم شود.
         QUESTIONS = "questions", "در پاسخ به پرسش‌ها"
         REGISTERED = "registered", "ثبت‌شده در رجیستر"
+        SUBMITTED = "submitted", "ارسال‌شده"
         ASSESSMENT = "assessment", "در ارزیابی"
         REJECTED = "rejected", "ردشده"
         TREATMENT_PLAN = "treatment_plan", "برنامه‌ی درمان"
@@ -241,6 +256,9 @@ class Risk(TimeStampedModel):
     cia_i = models.BooleanField("صحت (I)", default=False)
     cia_a = models.BooleanField("دسترس‌پذیری (A)", default=False)
     initiator = models.TextField("عامل آغازگر", blank=True, help_text="چه اتفاقی شروع سناریوست (بخش ۱۳).")
+    realization_path = models.TextField("مسیر مشخص تحقق", blank=True)
+    additional_notes = models.TextField("توضیحات اضافه", blank=True)
+    scenario_snapshot = models.JSONField("جزئیات سناریو هنگام ثبت", default=dict, blank=True)
     count_unit = models.CharField(
         "واحد شمارش", max_length=200, blank=True, help_text="معیار هر وقوع مستقل، مثلاً «هر تلاش ورود ناموفق»."
     )
@@ -336,7 +354,10 @@ class Risk(TimeStampedModel):
             self.code = next_code(f"RK-{jalali_year(timezone.localdate())}")
         if self.scenario_id and self.scenario_version is None:
             self.scenario_version = self.scenario.version  # نسخه‌ای از سناریو که ریسک از رویش ساخته شد
-        self.needs_completion = not (self.initiator.strip() and self.count_unit.strip() and self.scope.strip())
+        if self.scenario_snapshot:
+            self.needs_completion = not (self.initiator.strip() and self.realization_path.strip())
+        else:
+            self.needs_completion = not (self.initiator.strip() and self.count_unit.strip() and self.scope.strip())
         super().save(*args, **kwargs)
 
 

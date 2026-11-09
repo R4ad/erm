@@ -32,6 +32,8 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
         fields = [
             "kind",
             "horizon_months",
+            "horizon_rationale",
+            "target_due",
             "meeting_date",
             "assumptions",
             "ongoing_incident",
@@ -40,7 +42,10 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
             "escalation_rationale",
             "escalation_evidence",
         ]
-        field_classes = {"meeting_date": JalaliDateField, "escalation_evidence": EvidenceChoiceField}
+        field_classes = {
+            "meeting_date": JalaliDateField, "target_due": JalaliDateField,
+            "escalation_evidence": EvidenceChoiceField,
+        }
         widgets = {
             "assumptions": forms.Textarea(attrs={"rows": 3}),
             "escalation_rationale": forms.Textarea(attrs={"rows": 2}),
@@ -69,6 +74,8 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
     def clean(self):
         data = super().clean()
         kind = data.get("kind", self.instance.kind)
+        if kind == Assessment.Kind.TARGET and not data.get("target_due"):
+            self.add_error("target_due", "ارزیابی هدف موعد تحقق می‌خواهد (بخش ۱۷).")
         if kind in Assessment.KINDS_NEEDING_ASSUMPTIONS and not data.get("assumptions", "").strip():
             label = "کنترل‌های کنارگذاشته" if kind == Assessment.Kind.INHERENT else "اقدام و معیار آزمون آن"
             self.add_error("assumptions", f"برای ارزیابی {Assessment.Kind(kind).label}، {label} را بنویسید.")
@@ -250,9 +257,16 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
 
     RATE_FIELDS = ["a_count", "a_period_months", "a_denominator", "a_coverage"]
 
-    def __init__(self, *args, evidence, **kwargs):
+    def __init__(self, *args, evidence, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.user = user
         assessment = self.instance
+        risk = assessment.risk
+        self.fields["risk_scope"] = forms.CharField(label="دامنه بررسی", required=False, initial=risk.scope, widget=forms.Textarea(attrs={"rows": 2}))
+        self.fields["risk_count_unit"] = forms.CharField(label="واحد شمارش آغازگر", required=False, max_length=200, initial=risk.count_unit)
+        self.fields["risk_count_exclusions"] = forms.CharField(label="موارد خارج از شمارش", required=False, initial=risk.count_exclusions, widget=forms.Textarea(attrs={"rows": 2}))
+        for name in ("risk_scope", "risk_count_unit", "risk_count_exclusions"):
+            self.fields[name].widget.attrs["class"] = "form-control"
         self.scale = initiator_scale(assessment.method_version)
         self.fields["a_basis"].choices = [("", "ثبت‌نشده")] + ABasis.choices
         self.fields["a_level"].choices = level_choices(self.scale, empty="-")
@@ -262,7 +276,7 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["a_confidence"].choices = [("", "-")] + Confidence.choices
         if assessment.a_recorded:
             self.initial["a_level"] = UNKNOWN if assessment.a is None else str(assessment.a)
-        self.order_fields(["a_basis", *self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"])
+        self.order_fields(["risk_scope", "risk_count_unit", "risk_count_exclusions", "a_basis", *self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"])
         self.rate = assessment_rate_check(assessment) if assessment.a_basis == ABasis.RATE else None
 
     def clean(self):
@@ -318,6 +332,15 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         if commit:
             assessment.save()
             self.save_m2m()
+            mapping = {"risk_scope": "scope", "risk_count_unit": "count_unit", "risk_count_exclusions": "count_exclusions"}
+            if any(self.add_prefix(name) in self.data for name in mapping):
+                risk = assessment.risk
+                for name, attribute in mapping.items():
+                    if self.add_prefix(name) in self.data:
+                        setattr(risk, attribute, data[name])
+                if self.user:
+                    risk._history_user = self.user
+                risk.save()
         return assessment
 
 

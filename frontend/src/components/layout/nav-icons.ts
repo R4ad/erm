@@ -35,6 +35,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "actions:my_work": Inbox,
   "questionnaires:answer_home": ClipboardPen,
   "risks:risk_list": ShieldAlert,
+  "assessments:assessment_list": Gauge,
   "risks:scenario_list": BookOpen,
   "risks:evidence_list": FileSearch,
   "workflow:change_request_list": GitMerge,

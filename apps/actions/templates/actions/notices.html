@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load jformat %}
+{% block title %}اعلان‌های پایش{% endblock %}
+{% block content %}
+<h1 class="h4">اعلان‌های پایش</h1>
+<ul class="list-group">
+{% for notice in notices %}
+<li class="list-group-item">
+<a href="{{ notice.href }}">{{ notice.risk.code }}: {{ notice.message }}</a>
+<span class="small">{{ notice.created_at|jformat:"%Y/%m/%d %H:%M" }}</span>
+{% if not notice.read_at %}
+<form method="post" action="{% url 'actions:notice_read' notice.pk %}" class="mt-2">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-secondary">خواندم</button></form>
+{% endif %}
+</li>
+{% empty %}<li class="list-group-item">اعلانی ثبت نشده است.</li>{% endfor %}
+</ul>
+{% endblock %}

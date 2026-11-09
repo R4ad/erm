@@ -4,6 +4,8 @@
 
 import type {
   AnswerHome,
+  AssessmentDetail,
+  ComparePage,
   ChangeDetail,
   CoverageCell,
   CoveragePage,
@@ -14,6 +16,7 @@ import type {
   FormField,
   FormPageData,
   FormSchema,
+  ImpactRow,
   Level,
   MyWork,
   ResponseDetail,
@@ -85,6 +88,25 @@ export const routeTable: RouteEntry[] = [
     route: "/workflow/requests/:pk",
     form: false,
   },
+  {
+    name: "assessments:assessment_list",
+    pattern: "^/assessments/$",
+    route: "/assessments",
+    form: false,
+  },
+  {
+    name: "assessments:candidates",
+    pattern: "^/assessments/new/$",
+    route: "/assessments/new",
+    form: false,
+  },
+  {
+    name: "assessments:assessment_detail",
+    pattern: "^/assessments/(?<pk>[0-9]+)/$",
+    route: "/assessments/:pk",
+    form: false,
+  },
+  { name: "assessments:compare", pattern: "^/assessments/compare/$", route: "/assessments/compare", form: false },
   { name: "risks:risk_create", pattern: "^/risks/new/$", route: "/risks/new", form: true },
   { name: "risks:risk_update", pattern: "^/risks/(?<pk>[0-9]+)/edit/$", route: "/risks/:pk/edit", form: true },
   {
@@ -145,6 +167,42 @@ export const routeTable: RouteEntry[] = [
     form: true,
   },
   { name: "core:comment_update", pattern: "^/comments/(?<pk>[0-9]+)/edit/$", route: "/comments/:pk/edit", form: true },
+  {
+    name: "assessments:assessment_create",
+    pattern: "^/assessments/risks/(?<risk_pk>[0-9]+)/new/$",
+    route: "/assessments/risks/:risk_pk/new",
+    form: true,
+  },
+  {
+    name: "assessments:assessment_update",
+    pattern: "^/assessments/(?<pk>[0-9]+)/edit/$",
+    route: "/assessments/:pk/edit",
+    form: true,
+  },
+  {
+    name: "assessments:initiator",
+    pattern: "^/assessments/(?<pk>[0-9]+)/initiator/$",
+    route: "/assessments/:pk/initiator",
+    form: true,
+  },
+  {
+    name: "assessments:path_create",
+    pattern: "^/assessments/(?<pk>[0-9]+)/paths/new/$",
+    route: "/assessments/:pk/paths/new",
+    form: true,
+  },
+  {
+    name: "assessments:path_update",
+    pattern: "^/assessments/paths/(?<pk>[0-9]+)/edit/$",
+    route: "/assessments/paths/:pk/edit",
+    form: true,
+  },
+  {
+    name: "assessments:impact_profile",
+    pattern: "^/assessments/(?<pk>[0-9]+)/impacts/$",
+    route: "/assessments/:pk/impacts",
+    form: true,
+  },
 ];
 
 export function csrf(authenticated = false): CsrfState {
@@ -172,6 +230,7 @@ export function session(): Session {
         title: "ریسک‌ها",
         items: [
           { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
+          { key: "assessments:assessment_list", label: "ارزیابی ریسک", href: "/assessments/", route: "/assessments" },
           { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
           { key: "controls:control_list", label: "کنترل‌ها", href: "/controls/", route: null },
         ],
@@ -272,7 +331,7 @@ export function riskPage(overrides: Partial<RiskPage> = {}): RiskPage {
       riskRow(1, { level: levels.high, status: { value: "treatment_plan", label: "برنامه‌ی درمان" } }),
     ],
     can_create: false,
-    create_url: "/risks/new/",
+    create_url: "/risks/scenarios/",
     ...overrides,
   };
 }
@@ -469,6 +528,9 @@ export function response(overrides: Partial<ResponseDetail> = {}): ResponseDetai
   return {
     id: 1,
     questionnaire: { id: 1, title: "پرسشنامه‌ی آزمون", description: "شرح پرسشنامه‌ی آزمون." },
+    is_structured: false,
+    structured_data: [],
+    structured_questions: [],
     org_unit: "واحد آزمون",
     service: "IPG",
     respondent: tester,
@@ -826,5 +888,363 @@ export function changeDetail(decision = true): ChangeDetail {
         }
       : null,
     list_url: "/workflow/requests/",
+  };
+}
+
+// ارزیابی‌ها (apps/api/assessments.py)؛ شکل‌ها از جواب واقعی پل برای داده‌ی آزمون‌های ارزیابی جنگو برداشته شده‌اند.
+
+const assessmentAt = { iso: "2026-11-04T08:30:00+00:00", jalali: "1405/08/13 12:00" };
+
+/** ارزیابی جاری پیش‌نویس و کامل که ارزیاب می‌تواند برای کنترل کیفیت بفرستد: A برابر ۲، یک مسیر با B برابر ۳. */
+export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): AssessmentDetail {
+  const notes = field({
+    name: "notes",
+    label: "توضیح",
+    kind: "textarea",
+    help: "برای برگشت و ارجاع اجباری است.",
+    rows: 2,
+  });
+  const cell = (level: string, confidence = "زیاد") => ({
+    level,
+    unknown: false,
+    value: null,
+    unit: "",
+    confidence,
+    rationale: "دلیل آزمونی",
+  });
+  return {
+    view: "assessments:assessment_detail",
+    title: "ارزیابی جاری AS-1405-0001",
+    messages: [],
+    assessment: {
+      id: 1,
+      code: "AS-1405-0001",
+      kind: { value: "current", label: "جاری" },
+      status: { value: "draft", label: "پیش‌نویس" },
+      is_approved: false,
+      risk: { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" },
+      method_version: { label: "نسخه‌ی 1: روش آزمون", number: 1, href: "/method/1/" },
+      horizon_months: 12,
+      meeting_date: { iso: "2026-10-20", jalali: "1405/07/28" },
+      assumptions: "",
+      created_by: tester,
+      created_at: assessmentAt,
+      approved_at: null,
+      escalation: null,
+      href: "/assessments/1/",
+    },
+    outcome: {
+      provisional: true,
+      problems: [],
+      likelihood: [2, 2],
+      impact: [3, 3],
+      score: [6, 6],
+      decision_score: 6,
+      base_level: levels.medium,
+      decision_level: levels.medium,
+      confidence: "متوسط",
+      incomplete_reasons: [],
+      escalation_reasons: [],
+      out_of_acceptance_authority: false,
+      acceptance_restricted: false,
+    },
+    review: {
+      can_submit: true,
+      submission_problems: [],
+      submit_url: "/assessments/1/submit/",
+      can_review: false,
+      review_url: null,
+      review_notes: notes,
+      can_decide_referral: false,
+      referral_url: null,
+      referral_form: {
+        fields: [
+          field({ name: "meeting_date", label: "تاریخ جلسه‌ی کارگروه", kind: "date" }),
+          field({ name: "notes", label: "تصمیم کارگروه", kind: "textarea", rows: 2 }),
+        ],
+        errors: [],
+        multipart: false,
+      },
+      history: [],
+    },
+    likelihood: {
+      a: "2",
+      b: [3, 3],
+      likelihood: [2, 2],
+      problems: [],
+      incomplete: [],
+      blockers: [],
+      initiator: {
+        basis: { value: "forward", label: "شواهد آینده‌نگر" },
+        rate: null,
+        confidence: "زیاد",
+        rationale: "دلیل آزمونی A",
+        evidence: [{ code: "EV-1405-0001", href: "/risks/evidence/1/" }],
+      },
+      paths: [
+        {
+          id: 1,
+          name: "مسیر آزمون",
+          description: "مراحل مسیر آزمون",
+          independent: false,
+          independence_rationale: "",
+          exceptions: "",
+          notes: [],
+          b0: "3",
+          b0_confidence: "زیاد",
+          b0_rationale: "دلیل آزمونی B0",
+          controls: [],
+          bc: [5, 5],
+          b: [3, 3],
+          edit_url: "/assessments/paths/1/edit/",
+          delete_url: "/assessments/paths/1/delete/",
+        },
+      ],
+    },
+    impacts: {
+      impact: [3, 3],
+      problems: [],
+      incomplete: [],
+      unknown: [],
+      missing: [],
+      stakeholders: ["داتین", "بانک آزمون"],
+      rows: [
+        { code: "S", name: "خدمت و تداوم", cells: [cell("0"), cell("3", "متوسط")] },
+        { code: "F", name: "مالی", cells: [cell("0"), null] },
+      ],
+    },
+    actions: {
+      edit: "/assessments/1/edit/",
+      impact_profile: "/assessments/1/impacts/",
+      initiator: "/assessments/1/initiator/",
+      add_path: "/assessments/1/paths/new/",
+    },
+    ...overrides,
+  };
+}
+
+/** همان ارزیابی در کنترل کیفیت، از چشم کنترل‌کننده‌ای که ارزیاب آن نیست. */
+export function assessmentInReview(): AssessmentDetail {
+  const data = assessmentDetail();
+  return {
+    ...data,
+    assessment: { ...data.assessment, status: { value: "in_qc", label: "در کنترل کیفیت" } },
+    review: {
+      ...data.review,
+      can_submit: false,
+      submit_url: null,
+      can_review: true,
+      review_url: "/assessments/1/review/",
+      history: [
+        {
+          id: 1,
+          action: { value: "submit", label: "ارسال برای کنترل کیفیت" },
+          by: tester,
+          at: assessmentAt,
+          meeting_date: null,
+          notes: "توضیح آزمونی ارسال",
+        },
+      ],
+    },
+    likelihood: {
+      ...data.likelihood,
+      paths: data.likelihood.paths.map((path) => ({ ...path, edit_url: null, delete_url: null })),
+    },
+    actions: { edit: null, impact_profile: null, initiator: null, add_path: null },
+  };
+}
+
+function impactRow(prefix: string, code: string, name: string, extra: Partial<ImpactRow> = {}): ImpactRow {
+  const levelChoices = [
+    { value: "unknown", label: "نامعلوم" },
+    ...["0", "1", "2", "3", "4", "5"].map((value) => ({ value, label: `${value}: سطح آزمونی ${value}` })),
+  ];
+  const fields = [
+    field({ name: `${prefix}-level`, label: "سطح", kind: "select", empty_label: "ثبت‌نشده", choices: levelChoices }),
+    field({
+      name: `${prefix}-level_high`,
+      label: "تا",
+      kind: "select",
+      empty_label: "-",
+      choices: ["1", "2", "3", "4", "5"].map((value) => ({ value, label: value })),
+    }),
+    field({ name: `${prefix}-actual_value`, label: "مقدار واقعی", kind: "number" }),
+    ...(code === "F" ? [field({ name: `${prefix}-basis`, label: "مبنای مالی (ریال)", kind: "number" })] : []),
+    field({
+      name: `${prefix}-confidence`,
+      label: "اطمینان",
+      kind: "select",
+      empty_label: "-",
+      choices: [
+        { value: "low", label: "کم" },
+        { value: "medium", label: "متوسط" },
+        { value: "high", label: "زیاد" },
+      ],
+    }),
+    field({ name: `${prefix}-rationale`, label: "دلیل", kind: "textarea", rows: 2 }),
+    field({
+      name: `${prefix}-evidence`,
+      label: "شواهد",
+      kind: "multiselect",
+      value: [],
+      choices: [{ value: "1", label: "EV-1405-0001 شاهد آزمون" }],
+    }),
+  ];
+  return {
+    prefix,
+    scale: { code, name },
+    suggestion: null,
+    provisional_note: "",
+    fields,
+    errors: [],
+    multipart: false,
+    ...extra,
+  };
+}
+
+/** پروفایل پیامد با داتین و یک بانک: هر کدام دو بُعد S و F. */
+export function impactProfileForm(): FormPageData {
+  const datinS = impactRow("datin-S", "S", "خدمت و تداوم");
+  datinS.fields = datinS.fields.map((item) =>
+    item.name === "datin-S-level"
+      ? { ...item, value: "0" }
+      : item.name === "datin-S-confidence"
+        ? { ...item, value: "high" }
+        : item,
+  );
+  return {
+    view: "assessments:impact_profile",
+    title: "پروفایل پیامد ارزیابی جاری AS-1405-0001",
+    form: null,
+    cancel: { href: "/assessments/1/", route: "/assessments/1" },
+    messages: [],
+    intro: "برای داتین و هر بانک متأثر، سطح هر بُعد را با دلیل و شاهد ثبت کنید.",
+    groups: [
+      {
+        name: "داتین",
+        is_datin: true,
+        facts: { critical: false, rto: null, mtpd: null, basis: null },
+        rows: [datinS, impactRow("datin-F", "F", "مالی")],
+      },
+      {
+        name: "بانک آزمون",
+        is_datin: false,
+        facts: { critical: true, rto: 240, mtpd: null, basis: 5000000000 },
+        rows: [
+          impactRow("7-S", "S", "خدمت و تداوم", {
+            suggestion: { level: 3, note: "مدت اختلال بیش از یک‌چهارم RTO است." },
+            provisional_note: "بدون RTO یا MTPD مصوب، سطح موقت کمتر از 3 ثبت نشود مگر با دلیل و تأیید متولی روش.",
+          }),
+          impactRow("7-F", "F", "مالی"),
+        ],
+      },
+    ],
+  };
+}
+
+/** فرم عامل آغازگر با مرز آغازگر از ریسک، هشدار و جدول راهنمای A کنار فرم. */
+export function initiatorForm(): FormPageData {
+  return {
+    view: "assessments:initiator",
+    title: "عامل آغازگر (A) در ارزیابی جاری AS-1405-0001",
+    cancel: { href: "/assessments/1/#likelihood", route: "/assessments/1#likelihood" },
+    messages: [],
+    alerts: [
+      {
+        tone: "warning",
+        text: "تعریف آغازگر، واحد شمارش یا دامنه‌ی ریسک کامل نیست؛ A ذخیره می‌شود ولی نهایی تأیید نمی‌شود (بخش ۱۳).",
+        link: { label: "تکمیل ریسک", href: "/risks/1/edit/" },
+      },
+    ],
+    facts: {
+      title: "مرز آغازگر از ریسک RK-1405-0001",
+      rows: [
+        { label: "عامل آغازگر", value: "عامل آزمون" },
+        { label: "واحد شمارش", value: "واحد شمارش آزمون" },
+        { label: "خارج از شمارش", value: "" },
+      ],
+    },
+    guides: [
+      {
+        title: "جدول A (بخش ۱۴)",
+        items: [
+          { term: "1", label: "کمتر از 0.1 بار در سال", text: "شرح آزمونی سطح ۱." },
+          { term: "2", label: "از 0.1 تا کمتر از 1 بار در سال", text: "شرح آزمونی سطح ۲." },
+        ],
+        notes: ["یادداشت آزمونی جدول A."],
+      },
+    ],
+    form: {
+      fields: [
+        field({
+          name: "a_basis",
+          label: "مسیر A",
+          kind: "select",
+          value: "forward",
+          choices: [
+            { value: "rate", label: "نرخ" },
+            { value: "forward", label: "شواهد آینده‌نگر" },
+          ],
+        }),
+        field({
+          name: "a_level",
+          label: "A",
+          kind: "select",
+          value: "2",
+          empty_label: "---------",
+          choices: [
+            { value: "1", label: "1" },
+            { value: "2", label: "2" },
+          ],
+        }),
+        field({ name: "a_rationale", label: "دلیل A", kind: "textarea", value: "دلیل آزمونی A", rows: 3 }),
+      ],
+      errors: [],
+      multipart: false,
+    },
+  };
+}
+
+/** مقایسه‌ی ارزیابی جاری و هدف یک ریسک، با جهت تغییر نسبت به ستون اول. */
+export function compareAssessments(overrides: Partial<ComparePage> = {}): ComparePage {
+  const text = (value: string, trend: "" | "up" | "down" = "") => ({ text: value, level: null, trend });
+  return {
+    view: "assessments:compare",
+    title: "مقایسه‌ی ارزیابی‌ها",
+    messages: [],
+    risk: { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" },
+    error: null,
+    profiles: [
+      {
+        id: 1,
+        code: "AS-1405-0001",
+        kind: { value: "current", label: "جاری" },
+        method_version: 1,
+        incomplete: false,
+        href: "/assessments/1/",
+      },
+      {
+        id: 2,
+        code: "AS-1405-0002",
+        kind: { value: "target", label: "هدف" },
+        method_version: 2,
+        incomplete: true,
+        href: "/assessments/2/",
+      },
+    ],
+    rows: [
+      { label: "A", cells: [text("3"), text("2", "down")] },
+      { label: "پیامد S: خدمت و تداوم", cells: [text("3"), text("؟")] },
+      { label: "امتیاز L × I", cells: [text("12"), text("15", "up")] },
+      {
+        label: "سطح تصمیم",
+        cells: [
+          { text: "بالا", level: levels.high, trend: "" },
+          { text: "متوسط", level: levels.medium, trend: "down" },
+        ],
+      },
+    ],
+    method_changed: true,
+    ...overrides,
   };
 }

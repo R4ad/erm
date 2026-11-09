@@ -16,6 +16,7 @@ class Questionnaire(TimeStampedModel):
         "عنوان", max_length=200, unique=True, error_messages={"unique": "پرسشنامه‌ای با همین عنوان ثبت شده است."}
     )
     description = models.TextField("راهنمای پاسخ‌دهنده", blank=True)
+    is_structured = models.BooleanField(default=False, editable=False)
     is_active = models.BooleanField(
         "فعال",
         default=False,
@@ -55,6 +56,11 @@ class Question(TimeStampedModel):
     text = models.TextField("متن سؤال")
     help_text = models.CharField("راهنما", max_length=300, blank=True)
     kind = models.CharField("نوع", max_length=20, choices=Kind.choices)
+    stage = models.CharField("بخش پرسشنامه", max_length=20, blank=True, choices=[
+        ("service", "خدمت و محدوده"), ("purpose", "کارکرد خدمت"), ("objective", "انتظار خدمت"), ("event", "اتفاق"),
+        ("path", "مسیر تحقق"), ("control", "تمهید"), ("recovery", "بازیابی"),
+        ("consequence", "پیامد"), ("evidence", "شاهد"),
+    ])
     is_required = models.BooleanField("اجباری", default=False, help_text="پاسخ بدون جواب این سؤال ارسال نمی‌شود.")
     is_active = models.BooleanField("فعال", default=True)
 
@@ -165,6 +171,7 @@ class Response(TimeStampedModel):
     )
     channel = models.CharField("کانال", max_length=20, choices=Channel.choices)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    structured_data = models.JSONField(default=list, blank=True)
 
     # قلم‌های ثابت پرسشنامه: کارکردهای واحد و هشت پرسش جلسه‌ی شناسایی بخش ۴ سند v5 (جواب س۴۸). برچسب هر قلم همان
     # پرسش جلسه است و راهنمایش خروجی مورد انتظار آن. فهرست دارایی و نام تهدید شرط جواب دادن نیست.
@@ -290,6 +297,78 @@ class Answer(TimeStampedModel):
 
     def __str__(self):
         return f"{self.response}: {self.question}"
+
+
+class ServiceRecord(TimeStampedModel):
+    """خدمتی که پاسخ‌دهنده در یک پاسخ توصیف کرده است، مستقل از فهرست خدمات."""
+
+    response = models.ForeignKey(Response, on_delete=models.CASCADE, related_name="service_records")
+    source_key = models.CharField(max_length=80, blank=True)
+    name_and_scope = models.TextField("خدمت و محدوده", blank=True)
+    purpose = models.TextField("کارکرد خدمت", blank=True)
+
+
+class ServiceObjective(TimeStampedModel):
+    service = models.ForeignKey(ServiceRecord, on_delete=models.CASCADE, related_name="objectives")
+    source_key = models.CharField(max_length=80, blank=True)
+    description = models.TextField("انتظار زمانی یا کیفی")
+
+
+class RiskInstance(TimeStampedModel):
+    service = models.ForeignKey(ServiceRecord, on_delete=models.CASCADE, related_name="risk_instances")
+    source_key = models.CharField(max_length=80, blank=True)
+    scope = models.TextField("دامنه", blank=True)
+    trigger = models.TextField("آغازگر", blank=True)
+    event = models.TextField("رویداد اصلی", blank=True)
+
+
+class RiskPath(TimeStampedModel):
+    risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="paths")
+    source_key = models.CharField(max_length=80, blank=True)
+    description = models.TextField("نحوه پیشروی", blank=True)
+    recovery = models.TextField("بازیابی", blank=True)
+
+
+class PathControl(TimeStampedModel):
+    """تمهید ثبت‌شده در پاسخ؛ می‌تواند چند مسیر از همان نمونه را پوشش دهد."""
+
+    risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="controls")
+    source_key = models.CharField(max_length=80, blank=True)
+    description = models.TextField("تمهید", blank=True)
+    paths = models.ManyToManyField(RiskPath, related_name="controls", blank=True)
+
+
+class PathConsequence(TimeStampedModel):
+    risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="consequences")
+    source_key = models.CharField(max_length=80, blank=True)
+    path = models.ForeignKey(RiskPath, on_delete=models.CASCADE, related_name="consequences", null=True, blank=True)
+    description = models.TextField("پیامد", blank=True)
+
+
+class InitialEvidence(TimeStampedModel):
+    """شاهد اولیه به یک اتفاق، مسیر، تمهید یا پیامد مشخص وصل می‌شود."""
+
+    risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="evidence")
+    source_key = models.CharField(max_length=80, blank=True)
+    path = models.ForeignKey(RiskPath, on_delete=models.CASCADE, null=True, blank=True, related_name="evidence")
+    control = models.ForeignKey(PathControl, on_delete=models.CASCADE, null=True, blank=True, related_name="evidence")
+    consequence = models.ForeignKey(
+        PathConsequence, on_delete=models.CASCADE, null=True, blank=True, related_name="evidence"
+    )
+    description = models.TextField("شاهد", blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(path__isnull=True, control__isnull=True, consequence__isnull=True)
+                    | Q(path__isnull=False, control__isnull=True, consequence__isnull=True)
+                    | Q(path__isnull=True, control__isnull=False, consequence__isnull=True)
+                    | Q(path__isnull=True, control__isnull=True, consequence__isnull=False)
+                ),
+                name="questionnaire_evidence_one_target",
+            ),
+        ]
 
 
 class PendingRisk(TimeStampedModel):

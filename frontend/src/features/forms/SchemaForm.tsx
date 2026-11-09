@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useController, useForm, useFormState, type Control } from "react-hook-form";
+import { useController, useForm, useFormState, useWatch, type Control } from "react-hook-form";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { useGoTo } from "@/features/session/links";
 import { ApiError, bridge, errorMessage, post } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { faText, formatNumber } from "@/lib/format";
 import type { JalaliDate } from "@/lib/jalali";
 import type { AppHref, FormChoice, FormField, FormResult, FormSchema } from "@/lib/types";
@@ -226,6 +227,58 @@ interface SchemaFormProps {
   today?: JalaliDate;
   /** چیزی میان فیلدها و دکمه‌ها، مثل توضیح پیامد. */
   footer?: ReactNode;
+  /**
+   * چیدمان دلخواه فیلدها برای فرم‌هایی مثل پروفایل پیامد؛ field(name) کنترل همان فیلد را می‌دهد. بی آن، فیلدها
+   * پشت سر هم می‌آیند.
+   */
+  layout?: (field: (name: string) => ReactNode) => ReactNode;
+  /** نام فیلد در خلاصه‌ی خطاها، وقتی برچسب خودش تنها کافی نیست (مثل «سطح» در چند ردیف). */
+  summaryLabel?: (field: FormField) => string;
+  /** دکمه‌ها در فرم بلند پایین صفحه می‌مانند تا ذخیره بی‌رفتن به ته فرم در دسترس باشد. */
+  stickyActions?: boolean;
+  scenarioCreate?: boolean;
+}
+
+function ScenarioFields({
+  field,
+  fields,
+  control,
+}: {
+  field: (name: string) => ReactNode;
+  fields: FormField[];
+  control: Control<FormValues>;
+}) {
+  const values = useWatch({ control });
+  const newService = Boolean(values.new_service);
+  const service = newService
+    ? values.new_service_name
+    : fields
+        .find((item) => item.name === "service")
+        ?.choices?.find((choice) => choice.value === values.service)
+        ?.label.replace(/ \([^()]*\)$/, "");
+  const part = (value: unknown, placeholder: string) =>
+    typeof value === "string" && value.trim() ? value.trim() : `[${placeholder}]`;
+  const preview = `در خدمت یا فرآیند ${part(service, "نام")}، به علت یا در شرایط ${part(values.conditions, "عامل و وضعیت")}، ممکن است ${part(values.event, "رویداد مشخص")} رخ دهد و انجام ${part(values.objective, "هدف یا تعهد")} برای ${part(values.customer_text, "داتین یا مشتری")} را مختل کند. پیامد قابل مشاهده آن ${part(values.consequence, "نوع و دامنه پیامد")} است.`;
+  return (
+    <div className="flex flex-col gap-5">
+      {field("new_service")}
+      {newService ? (
+        <div className="flex flex-col gap-5 rounded-xl border border-line p-4">
+          <p className="text-sm text-muted">برای ثبت خدمت جدید، مشخصات ضروری آن را وارد کنید.</p>
+          {["code", "name", "kind", "org_unit", "owner", "lifecycle_stage", "environment"].map((name) =>
+            field(`new_service_${name}`),
+          )}
+        </div>
+      ) : (
+        field("service")
+      )}
+      {["conditions", "event", "objective", "customer_text", "consequence", "category"].map(field)}
+      <section aria-label="پیش‌نمایش سناریو" className="rounded-xl border border-line bg-surface p-4">
+        <h2 className="font-semibold">پیش‌نمایش سناریو</h2>
+        <p className="mt-2 text-sm leading-8 whitespace-pre-line">{preview}</p>
+      </section>
+    </div>
+  );
 }
 
 export function SchemaForm({
@@ -237,8 +290,13 @@ export function SchemaForm({
   onSaved,
   today,
   footer,
+  layout,
+  summaryLabel = (field) => field.label,
+  stickyActions = false,
+  scenarioCreate = false,
 }: SchemaFormProps) {
   const fields = schema.fields;
+  const byName = new Map(fields.map((field) => [field.name, field]));
   const form = useForm<FormValues>({
     defaultValues: initialValues(fields),
     resolver: zodResolver(formSchema(fields)),
@@ -273,7 +331,6 @@ export function SchemaForm({
     onError: (error) => {
       const messages: string[] = [];
       if (error instanceof ApiError && error.status === 400) {
-        const byName = new Map(fields.map((field) => [field.name, field]));
         for (const [name, list] of Object.entries(error.errors)) {
           const field = byName.get(name);
           if (field && editable(field)) form.setError(name, { type: "server", message: list.join(" ") });
@@ -357,7 +414,7 @@ export function SchemaForm({
                       focusField(field.name);
                     }}
                   >
-                    {field.label}: {form.getFieldState(field.name, formState).error?.message}
+                    {summaryLabel(field)}: {form.getFieldState(field.name, formState).error?.message}
                   </a>
                 </li>
               ))}
@@ -365,15 +422,37 @@ export function SchemaForm({
           </Alert>
         )}
 
-        <div className="flex flex-col gap-5">
-          {fields.map((field) => (
-            <SchemaField key={field.name} field={field} control={form.control} today={today} />
-          ))}
-        </div>
+        {scenarioCreate ? (
+          <ScenarioFields
+            fields={fields}
+            control={form.control}
+            field={(name) => {
+              const field = byName.get(name);
+              return field ? <SchemaField key={name} field={field} control={form.control} today={today} /> : null;
+            }}
+          />
+        ) : layout ? (
+          layout((name) => {
+            const field = byName.get(name);
+            return field ? <SchemaField key={name} field={field} control={form.control} today={today} /> : null;
+          })
+        ) : (
+          <div className="flex flex-col gap-5">
+            {fields.map((field) => (
+              <SchemaField key={field.name} field={field} control={form.control} today={today} />
+            ))}
+          </div>
+        )}
 
         {footer}
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-5">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 border-t border-line pt-5",
+            stickyActions &&
+              "sticky bottom-0 z-10 -mx-1 bg-canvas/90 px-1 pb-4 backdrop-blur supports-[backdrop-filter]:bg-canvas/75",
+          )}
+        >
           <Button type="submit" variant="primary" loading={save.isPending}>
             {!save.isPending && submitIcon}
             {submitLabel}

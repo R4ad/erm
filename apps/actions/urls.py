@@ -1,10 +1,14 @@
 from django.urls import path
 
-from . import views
+from . import views, monitoring_views
 
 app_name = "actions"
 
 urlpatterns = [
+    path("notices/", monitoring_views.notice_list, name="notices"),
+    path("notices/<int:pk>/read/", monitoring_views.notice_read, name="notice_read"),
+    path("risks/<int:risk_pk>/review/new/", monitoring_views.review_create, name="review_create"),
+    path("reviews/<int:pk>/", monitoring_views.review_detail, name="review_detail"),
     path("", views.ActionListView.as_view(), name="action_list"),
     path("mine/", views.my_work_view, name="my_work"),
     path("risks/<int:risk_pk>/plan/new/", views.PlanCreateView.as_view(), name="plan_create"),

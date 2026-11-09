@@ -72,6 +72,12 @@ export function fileSize(bytes: number): string {
   return `${fa((bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")).replace(".", "٫")} مگابایت`;
 }
 
+/** بازه‌ی سطح یا امتیاز: «۶» یا «۳ تا ۴». */
+export function band(value: readonly [number, number] | null | undefined): string {
+  if (!value) return "";
+  return value[0] === value[1] ? fa(value[0]) : `${fa(value[0])} تا ${fa(value[1])}`;
+}
+
 /** شمار با نام چیز: «۳ ریسک»، و برای صفر «هیچ ریسکی». */
 export function count(value: number, noun: string): string {
   return value === 0 ? `هیچ ${noun}ی` : `${formatNumber(value)} ${noun}`;

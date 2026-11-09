@@ -128,7 +128,7 @@ export function ResponseStartPage() {
       <PageHeader
         breadcrumb={[{ label: "پاسخ به سؤال‌ها", to: "/questionnaires" }, { label: "شروع پاسخ" }]}
         title={form.data.questionnaire.title}
-        description="اول بگویید پاسخ برای کدام واحد و خدمت است. بعد سؤال‌ها باز می‌شود."
+        description="واحد را انتخاب کنید؛ مشخصات خدمت را در مرحله بعد ثبت می‌کنید."
       />
       <StartFormCard id={id} data={form.data} />
     </div>

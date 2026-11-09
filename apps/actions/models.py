@@ -259,6 +259,7 @@ class RiskAcceptance(TimeStampedModel):
         DRAFT = "draft", "پیش‌نویس"
         PENDING = "pending", "منتظر امضا"
         ACTIVE = "active", "معتبر"
+        EXPIRED = "expired", "منقضی"
         REJECTED = "rejected", "ردشده"
         REVOKED = "revoked", "لغوشده"
 
@@ -380,8 +381,9 @@ class RiskAcceptance(TimeStampedModel):
 
     @property
     def is_expired(self):
-        """«منقضی» از تاریخ پایان حساب می‌شود؛ ثبت وضعیت و تصعید با یادآوری‌های قدم ۲۳ می‌آید."""
-        return self.status == self.Status.ACTIVE and self.end_date < timezone.localdate()
+        return self.status == self.Status.EXPIRED or (
+            self.status == self.Status.ACTIVE and self.end_date < timezone.localdate()
+        )
 
     @property
     def is_in_force(self):
@@ -496,3 +498,62 @@ class Reassessment(TimeStampedModel):
 
     def __str__(self):
         return f"بازسنجی {self.plan}"
+
+
+class RiskReview(TimeStampedModel):
+    """کار بازبینی بخش ۲۱؛ ثبت نتیجه ارزیابی تاریخی را بازنویسی نمی‌کند."""
+
+    class Trigger(models.TextChoices):
+        PERIODIC = "periodic", "بازبینی دوره‌ای"
+        ANNUAL = "annual", "ارزیابی کامل سالانه"
+        INCIDENT = "incident", "رخداد مهم یا بهره‌برداری فعال"
+        CONTROL = "control", "شکست یا حذف کنترل کلیدی"
+        EVIDENCE = "evidence", "انقضای شاهد کنترل"
+        ACCEPTANCE = "acceptance", "انقضای پذیرش"
+        CHANGE = "change", "تغییر مهم معماری یا خدمت"
+        DEPENDENCY = "dependency", "تغییر تأمین‌کننده یا وابستگی"
+        CUSTOMER = "customer", "تغییر مشتری، SLA یا طبقه داده"
+        REQUIREMENT = "requirement", "الزام جدید یا تهدید تازه"
+
+    risk = models.ForeignKey("risks.Risk", on_delete=models.PROTECT, related_name="monitoring_reviews")
+    assessment = models.ForeignKey(
+        "assessments.Assessment", on_delete=models.PROTECT, null=True, blank=True, related_name="monitoring_reviews"
+    )
+    trigger = models.CharField("محرک", max_length=20, choices=Trigger.choices)
+    reason = models.TextField("منبع، دامنه و دلیل بازبینی")
+    due = models.DateField("مهلت آغاز بررسی")
+    responsible = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="risk_reviews")
+    event_key = models.CharField(max_length=160, unique=True, null=True, editable=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+    result = models.TextField("نتیجه بررسی و اقدام بعدی", blank=True)
+    completed_at = models.DateTimeField("زمان ثبت نتیجه", null=True, editable=False)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, editable=False, related_name="+"
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "بازبینی ریسک"
+        verbose_name_plural = "بازبینی‌های ریسک"
+        ordering = ["due", "pk"]
+
+    def get_absolute_url(self):
+        return reverse("actions:review_detail", args=[self.pk])
+
+
+class MonitoringNotice(TimeStampedModel):
+    """اعلان داخلی پایدار؛ کلید یکتا مانع تکرار در اجرای زمان‌بند است."""
+
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="risk_notices")
+    risk = models.ForeignKey("risks.Risk", on_delete=models.PROTECT, related_name="monitoring_notices")
+    event_key = models.CharField(max_length=180)
+    message = models.TextField("پیام")
+    href = models.CharField("پیوند", max_length=250)
+    read_at = models.DateTimeField("زمان مشاهده", null=True, editable=False)
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "اعلان پایش"
+        verbose_name_plural = "اعلان‌های پایش"
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["recipient", "event_key"], name="monitor_notice_once")]

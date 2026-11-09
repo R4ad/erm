@@ -1,0 +1,1 @@
+{% for key, source in node.items %}{% if key == '_sources' %}{% for id, item in source.items %}<div class="my-2"><div class="text-body-secondary small">{{ item.question }}</div><div>{{ item.answer|linebreaksbr|default:"-" }}</div></div>{% endfor %}{% endif %}{% endfor %}

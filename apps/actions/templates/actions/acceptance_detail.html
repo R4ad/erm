@@ -12,7 +12,7 @@
   </div>
 </div>
 
-{% if acceptance.status == "active" %}
+{% if acceptance.status == "active" or acceptance.status == "expired" %}
   <div class="alert {% if acceptance.is_expired %}alert-danger{% else %}alert-success{% endif %}">
     <div class="fw-semibold mb-1">متن تصمیم</div>
     {{ acceptance.decision_text }}

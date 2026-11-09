@@ -232,7 +232,7 @@
 <div class="d-flex align-items-center justify-content-between mt-4 mb-3">
   <h2 class="h5 mb-0">ریسک‌ها</h2>
   {% if can_edit_risks and service.is_active %}
-    <a href="{% url 'risks:risk_create' %}?service={{ service.pk }}" class="btn btn-primary btn-sm">ثبت ریسک برای این خدمت</a>
+    <a href="{% url 'risks:scenario_list' %}" class="btn btn-primary btn-sm">انتخاب سناریو برای ثبت ریسک</a>
   {% endif %}
 </div>
 {% include "risks/includes/risk_table.html" with hide_service=True empty_text="ریسکی برای این خدمت که شما ببینید ثبت نشده است." %}

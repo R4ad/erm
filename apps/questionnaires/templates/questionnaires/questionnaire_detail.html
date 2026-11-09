@@ -19,10 +19,13 @@
 
 {% if questionnaire.description %}<p>{{ questionnaire.description|linebreaksbr }}</p>{% endif %}
 
-<p class="small text-body-secondary">
+{% if questionnaire.is_structured %}
+<p class="small text-body-secondary">بخش هر سؤال محل تکرار آن را در خدمت، اتفاق، راه، تمهید، پیامد یا شاهد مشخص می‌کند. پرسش‌های غیرفعال در پاسخ‌های تازه نمایش داده نمی‌شوند.</p>
+{% else %}<p class="small text-body-secondary">
   هر پاسخ با کارکردهای اصلی واحد و هشت پرسش جلسه‌ی شناسایی بخش ۴ سند v5 شروع می‌شود (نتیجه، تعهد، رویداد مخل، شرایط، پیامد، وابستگی، شاهد و کنترل فعلی)، بعد این سؤال‌ها می‌آیند و در آخر «مورد جدید» با شرح آزاد.
   گزینه‌ای که «نشانه‌ی ریسک» است، با انتخاب شدن یک «ریسک در انتظار» برای بررسی GRC می‌سازد.
 </p>
+{% endif %}
 
 <div class="table-responsive">
   <table class="table align-middle">
