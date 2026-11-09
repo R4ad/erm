@@ -55,6 +55,11 @@ const FORM_ROUTES = [
   "questionnaires/responses/:pk/return",
   "questionnaires/responses/:pk/pending/new",
   "questionnaires/pending/:pk/dismiss",
+  "controls/new",
+  "controls/:pk/edit",
+  "controls/:pk/effectiveness/new",
+  "controls/effectiveness/:pk/edit",
+  "controls/soa/:pk/edit",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -190,6 +195,32 @@ export const routes: RouteObject[] = [
             path: "actions/acceptances/:pk",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/actions/AcceptanceDetailPage")).AcceptanceDetailPage),
+            }),
+          },
+          {
+            path: "controls",
+            lazy: async () => ({ Component: (await import("@/features/controls/ControlPages")).ControlListPage }),
+          },
+          {
+            path: "controls/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/controls/ControlPages")).ControlDetailPage),
+            }),
+          },
+          {
+            path: "controls/effectiveness/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/controls/ControlPages")).ControlAssessmentDetailPage),
+            }),
+          },
+          {
+            path: "controls/soa",
+            lazy: async () => ({ Component: (await import("@/features/controls/SoaPages")).SoaListPage }),
+          },
+          {
+            path: "controls/soa/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/controls/SoaPages")).SoaDetailPage),
             }),
           },
           {

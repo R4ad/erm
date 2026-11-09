@@ -14,50 +14,13 @@ from apps.workflow.models import ChangeRequest
 from . import formatting as fmt
 from .actions import ACTION_PAGES
 from .assessments import ASSESSMENT_PAGES
+from .controls import CONTROL_PAGES
 from .forms import describe_field
 from .listing import listing
 from .monitoring import MONITORING_PAGES
 from .questionnaire_pages import QUESTIONNAIRE_PAGES
 from .records import record_parts
-
-
-def risk_brief(risk):
-    """یک ردیف جدول ریسک‌های صفحه‌های شاهد و سناریو (risks/includes/risk_table.html)."""
-    return {
-        "id": risk.pk,
-        "code": risk.code,
-        "title": risk.title,
-        "status": fmt.choice(risk, "status"),
-        "is_active": risk.is_active,
-        "service": risk.service.code if risk.service_id else None,
-        "category": {"code": risk.category.code, "name": risk.category.name},
-        "owner": fmt.person(risk.owner),
-        "href": risk.get_absolute_url(),
-    }
-
-
-def risk_ref(risk):
-    return {
-        "id": risk.pk,
-        "code": risk.code,
-        "title": risk.title,
-        "status": fmt.choice(risk, "status"),
-        "href": risk.get_absolute_url(),
-    }
-
-
-def evidence_row(item):
-    return {
-        "id": item.pk,
-        "code": item.code,
-        "title": item.title,
-        "kind": fmt.choice(item, "kind"),
-        "observed_on": fmt.day(item.observed_on),
-        "reliability": fmt.choice(item, "reliability"),
-        "expired": item.is_expired,
-        "confidential": item.access_class == item.AccessClass.CONFIDENTIAL,
-        "href": item.get_absolute_url(),
-    }
+from .rows import evidence_row, risk_brief, risk_ref
 
 
 def evidence_list(context, request):
@@ -269,4 +232,5 @@ READ_PAGES = {
     **ACTION_PAGES,
     **MONITORING_PAGES,
     **QUESTIONNAIRE_PAGES,
+    **CONTROL_PAGES,
 }

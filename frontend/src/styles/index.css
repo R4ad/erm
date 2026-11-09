@@ -460,6 +460,12 @@
       display: block;
     }
 
+    /* خانه‌ای که متن بلند دارد (مثل دلیل نداشتن اعتبار) در کارت موبایل یک ردیف کامل می‌گیرد تا با خانه‌ی کناری
+       روی هم نیفتد. */
+    .data-table:not(.data-matrix) td[data-wide] {
+      grid-column: 1 / -1;
+    }
+
     .data-table:not(.data-matrix) td[data-empty] {
       display: none;
     }

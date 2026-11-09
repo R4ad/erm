@@ -61,6 +61,7 @@ function defaults(): Record<string, Handler | unknown> {
       "/questionnaires/questions/1/edit/": data.questionForm(),
       "/questionnaires/pending/1/convert/": (call: ApiCall) =>
         djangoQuery(call).get("scenario") ? data.pendingConvertForm() : data.pendingPicker(),
+      "/controls/1/effectiveness/new/": data.controlAssessmentForm(),
     }),
     "POST forms/": (call: ApiCall) => saved(call),
     "GET pages/": byPath({
@@ -99,6 +100,20 @@ function defaults(): Record<string, Handler | unknown> {
         return page;
       },
       "/questionnaires/responses/1/": data.responseReview(),
+      "/controls/": data.controlList(),
+      "/controls/1/": data.controlDetail(),
+      "/controls/effectiveness/3/": data.controlAssessmentDetail(),
+      "/controls/soa/": (call: ApiCall) => {
+        const page = data.soaList();
+        const state = djangoQuery(call).get("state");
+        page.results = page.results.filter(
+          (row) => !state || (state === "gap" ? row.gap : row.applicability.value === state),
+        );
+        page.count = page.results.length;
+        return page;
+      },
+      "/controls/soa/1/": data.soaGapDetail(),
+      "/controls/soa/15/": data.soaDetail(),
     }),
   };
 }
@@ -168,6 +183,12 @@ function saved(call: ApiCall) {
   }
   if (path.startsWith("/actions/reviews/")) {
     return { message: "نتیجه بازبینی ثبت شد.", redirect: { href: "/actions/reviews/1/", route: "/actions/reviews/1" } };
+  }
+  if (path.startsWith("/controls/1/effectiveness/new/")) {
+    return {
+      message: "ارزیابی اثربخشی CA-1405-0003 با E3 ثبت شد.",
+      redirect: { href: "/controls/effectiveness/3/", route: "/controls/effectiveness/3" },
+    };
   }
   if (path.startsWith("/workflow/requests/")) {
     return { message: "پیشنهاد تأیید شد.", redirect: { href: "/workflow/requests/7/", route: "/workflow/requests/7" } };

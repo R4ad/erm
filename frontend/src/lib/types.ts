@@ -467,6 +467,8 @@ export interface FormPageData {
   // ثبت ریسک در انتظار: اول انتخاب سناریو، بعد فرم ثبت ریسک
   pending?: { description: string; source: string };
   scenarios?: { id: number; code: string; title: string; service: string }[];
+  /** بخش‌های فرم بلند (برگه‌ی آزمون کنترل): هر بخش یک fieldset با همین فیلدها به همین ترتیب. */
+  fieldsets?: { title: string; fields: string[] }[];
 }
 
 export interface OptionFormset {
@@ -1252,4 +1254,180 @@ export interface ReviewDetail {
     result: string;
   };
   complete: { url: string; result: FormField } | null;
+}
+
+// کتابخانه‌ی کنترل، ارزیابی اثربخشی و بیانیه‌ی کاربردپذیری (apps/api/controls.py)
+
+export interface ControlRow {
+  id: number;
+  code: string;
+  title: string;
+  kind: Choice;
+  owner: Person;
+  operated_by: Choice;
+  is_key: boolean;
+  is_active: boolean;
+  /** شماره‌ی کنترل‌های پیوست A، مثل 5.15. */
+  iso_controls: string[];
+  href: string;
+}
+
+export interface ControlList extends Listing<ControlRow> {
+  create_url: string | null;
+  soa_url: string | null;
+}
+
+export interface Applicability {
+  value: "undetermined" | "applicable" | "not_applicable";
+  label: string;
+  implementation: Choice | null;
+}
+
+/** E ثبت‌شده‌ی یک ارزیابی اثربخشی، و اگر الان اعتبار کاهش ندارد، چرا (در Bc فقط E1 حساب می‌شود). */
+export interface Effectiveness {
+  e: number;
+  problem: string | null;
+  suspended: boolean;
+}
+
+export interface EffectivenessRow extends Effectiveness {
+  id: number;
+  code: string;
+  scope: string;
+  test_to: Day | null;
+  valid_until: Day | null;
+  verified_by: Person | null;
+  href: string;
+}
+
+export interface ControlDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  control: ControlRow & { objective: string };
+  effectiveness: EffectivenessRow[];
+  iso_controls: { id: number; code: string; title: string; applicability: Applicability; href: string | null }[];
+  risks: RiskBrief[];
+  edit_url: string | null;
+  add_assessment_url: string | null;
+  list_url: string;
+}
+
+export interface ControlAssessmentDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  assessment: Effectiveness & {
+    id: number;
+    code: string;
+    level_name: string | null;
+    control: {
+      id: number;
+      code: string;
+      title: string;
+      kind: Choice;
+      is_key: boolean;
+      owner: Person;
+      href: string;
+    };
+    scope: string;
+    exists: boolean;
+    design_ok: boolean;
+    population: string;
+    coverage_pct: string | null;
+    critical_points: string;
+    critical_points_covered: boolean;
+    exceptions: string;
+    known_gap: boolean;
+    test_method: string;
+    test_from: Day | null;
+    test_to: Day | null;
+    sample_size: number | null;
+    sample_rationale: string;
+    test_result: string;
+    operating_ok: boolean;
+    limited_effect_proven: boolean;
+    failures: string;
+    conditions: { label: string; value: string }[];
+    rationale: string;
+    confidence: Choice | null;
+    verified_by: Person | null;
+    valid_until: Deadline | null;
+    evidence_age: number;
+    method_version: { name: string; href: string };
+    created_by: Person;
+    created_at: Day;
+  };
+  /** شرط‌هایی از E ثبت‌شده که داده‌های فعلی برگه دیگر برقرار نمی‌کنند. */
+  unmet: string[];
+  evidence: {
+    id: number;
+    code: string;
+    title: string;
+    kind: Choice;
+    observed_on: Day;
+    expired: boolean;
+    href: string;
+  }[];
+  paths: {
+    id: number;
+    name: string;
+    assessment: { code: string; href: string };
+    risk: { code: string; title: string };
+    href: string;
+  }[];
+  edit_url: string | null;
+}
+
+export interface IsoTheme {
+  value: number;
+  label: string;
+}
+
+export interface SoaRow {
+  id: number;
+  code: string;
+  title: string;
+  title_en: string;
+  theme: IsoTheme;
+  applicability: Applicability;
+  control_count: number;
+  risk_count: number;
+  /** کاربرد دارد ولی هیچ کنترل فعال سازمان به آن نگاشت نشده است. */
+  gap: boolean;
+  href: string;
+}
+
+export interface SoaList extends Listing<SoaRow> {
+  summary: {
+    total: number;
+    applicable: number;
+    not_applicable: number;
+    undetermined: number;
+    implemented: number;
+    gaps: number;
+  };
+  controls_url: string;
+}
+
+export interface SoaDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  iso_control: {
+    id: number;
+    code: string;
+    title: string;
+    title_en: string;
+    theme: IsoTheme;
+    applicability: Applicability;
+    justification: string | null;
+    updated_at: Day | null;
+  };
+  warning: string | null;
+  controls: ControlRow[];
+  risks: RiskBrief[];
+  edit_url: string | null;
+  edit_label: string;
+  list_url: string;
 }
