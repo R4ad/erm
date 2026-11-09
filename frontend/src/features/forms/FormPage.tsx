@@ -269,9 +269,11 @@ interface FormPageProps {
    * خطای ۴۰۹ و برگشت، همین صفحه است.
    */
   body?: (data: FormPageData, options: { path: string; today?: JalaliDate }) => ReactNode;
+  /** فرم دلخواهی که پهنای فرم ساده را دارد (ورود کارکنان)، نه پهنای فرم‌های چندستونی. */
+  narrow?: boolean;
 }
 
-export function FormPage({ body }: FormPageProps) {
+export function FormPage({ body, narrow = false }: FormPageProps) {
   const location = useLocation();
   const { today } = useSession();
   const path = djangoPath(location);
@@ -366,7 +368,7 @@ export function FormPage({ body }: FormPageProps) {
   );
   const guided = Boolean(data.guides?.length);
   return (
-    <div className={cn("flex flex-col gap-6", guided || body ? "max-w-6xl" : "max-w-3xl")}>
+    <div className={cn("flex flex-col gap-6", guided || (body && !narrow) ? "max-w-6xl" : "max-w-3xl")}>
       <div className="flex flex-col gap-3">
         <Back cancel={data.cancel} />
         <PageHeader title={faText(data.title)} />

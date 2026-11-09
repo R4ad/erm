@@ -7,7 +7,8 @@
 /api/forms/ (FormBridgeView):
 - GET: فرم (از context پاسخ قالب، پیش از رندر) به شکل JSON، با عنوان، نشانی انصراف و چیزهای بیشتر همان صفحه.
 - POST: اگر view به صفحه‌ی دیگر هدایت کرد، ذخیره انجام شده و پیام و مقصد برمی‌گردد. اگر همان صفحه را با فرم
-  دوباره نشان داد، خطاهای فرم برمی‌گردد.
+  دوباره نشان داد، خطاهای فرم برمی‌گردد. صفحه‌های POST_RESULTS نتیجه را در همان صفحه نشان می‌دهند (مثل گزارش ورود
+  کارکنان) و آن نتیجه از context همان پاسخ برمی‌گردد.
 - اگر view بی‌ذخیره با پیام خطا هدایت کرد (مثلاً ریسک بسته‌شده ویرایش نمی‌شود)، همان پیام با کد ۴۰۹ برمی‌گردد.
 
 /api/pages/ (PageBridgeView): فهرست یا پرونده‌ی یک صفحه‌ی خواندنی، از context همان صفحه با تبدیل pages.py.
@@ -26,7 +27,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .base import ApiView
-from .bridge_pages import FORM_PAGES, FORM_SETS, POST_ONLY_PAGES
+from .bridge_pages import FORM_PAGES, FORM_SETS, POST_ONLY_PAGES, POST_RESULTS
 from .forms import describe_form, form_data
 from .pages import READ_PAGES
 from .routes import spa_route
@@ -173,4 +174,10 @@ class FormBridgeView(ApiView):
                 if len(forms) == 1:
                     body["form"] = describe_form(forms[0])
                 return Response(body, status=status.HTTP_400_BAD_REQUEST)
+            if name in POST_RESULTS:
+                # کاری که نتیجه‌اش را در همان صفحه نشان می‌دهد، نه با رفتن به صفحه‌ی دیگر (گزارش ورود کارکنان).
+                result = POST_RESULTS[name](context, page)
+                default = result.pop("default_message", "انجام شد.")
+                text = " ".join(note["text"] for note in notes) or default
+                return Response({"message": text, "redirect": None, **result})
         raise Http404

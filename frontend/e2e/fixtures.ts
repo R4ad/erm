@@ -63,6 +63,8 @@ function defaults(): Record<string, Handler | unknown> {
         djangoQuery(call).get("scenario") ? data.pendingConvertForm() : data.pendingPicker(),
       "/controls/1/effectiveness/new/": data.controlAssessmentForm(),
       "/catalog/services/1/dependencies/new/supplier/": data.dependencyForm(),
+      "/holidays/new/": data.holidayForm(),
+      "/accounts/staff-import/": data.staffImportForm(),
     }),
     "POST forms/": (call: ApiCall) => saved(call),
     "GET pages/": byPath({
@@ -125,6 +127,13 @@ function defaults(): Record<string, Handler | unknown> {
       "/catalog/customers/": data.customerList(),
       "/units/": data.unitList(),
       "/method/": data.methodPage(),
+      "/accounts/users/": data.userList(),
+      "/holidays/": data.holidayList(),
+      "/audit/": (call: ApiCall) => {
+        const query = djangoQuery(call).toString();
+        return data.auditEventList({ export_url: `/audit/export/${query ? `?${query}` : ""}` });
+      },
+      "/audit/changes/": data.auditChangeList(),
     }),
   };
 }
@@ -206,6 +215,11 @@ function saved(call: ApiCall) {
       message: "وابستگی خدمت «درگاه پرداخت اینترنتی» به «شرکت پشتیبانی سخت‌افزار» ذخیره شد.",
       redirect: { href: "/catalog/services/1/", route: "/catalog/services/1" },
     };
+  }
+  if (path === "/accounts/staff-import/") return data.staffImportDryRun();
+  if (path === "/accounts/staff-import/confirm/") return data.staffImportDone();
+  if (path.startsWith("/holidays/")) {
+    return { message: "تعطیلی «تعطیلی آزمون یکم» حذف شد.", redirect: { href: "/holidays/", route: "/holidays" } };
   }
   if (path.startsWith("/workflow/requests/")) {
     return { message: "پیشنهاد تأیید شد.", redirect: { href: "/workflow/requests/7/", route: "/workflow/requests/7" } };

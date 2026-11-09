@@ -13,6 +13,7 @@ from apps.workflow.models import ChangeRequest
 
 from . import formatting as fmt
 from .actions import ACTION_PAGES
+from .admin_pages import ADMIN_PAGES
 from .assessments import ASSESSMENT_PAGES
 from .catalog import CATALOG_PAGES
 from .controls import CONTROL_PAGES
@@ -223,4 +224,5 @@ READ_PAGES = {
     **CONTROL_PAGES,
     **CATALOG_PAGES,
     **METHODOLOGY_PAGES,
+    **ADMIN_PAGES,
 }
