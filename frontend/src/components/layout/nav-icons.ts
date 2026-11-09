@@ -1,7 +1,9 @@
 import {
+  Bell,
   BookOpen,
   Boxes,
   CalendarDays,
+  ChartColumn,
   Circle,
   ClipboardCheck,
   ClipboardList,
@@ -33,6 +35,8 @@ import {
 // نباشد دایره‌ی ساده می‌گیرد و منو نمی‌شکند.
 export const NAV_ICONS: Record<string, LucideIcon> = {
   "actions:my_work": Inbox,
+  "actions:notices": Bell,
+  "reports:management": ChartColumn,
   "questionnaires:answer_home": ClipboardPen,
   "risks:risk_list": ShieldAlert,
   "assessments:assessment_list": Gauge,

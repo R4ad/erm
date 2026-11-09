@@ -2,7 +2,8 @@ from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.functional import cached_property
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -301,7 +302,9 @@ class RiskCreateView(RiskFormMixin, CreateView):
                         messages.error(request, "تکلیف این ریسک در انتظار پیش‌تر تعیین شده است.")
                         return redirect(pending.response.get_absolute_url())
                     scenarios = RiskScenario.objects.filter(is_active=True, service__is_active=True).select_related("service")
-                    return render(request, "risks/pending_scenario_select.html", {"pending": pending, "scenarios": scenarios})
+                    # TemplateResponse تا رابط React همین فهرست را از context بخواند (apps/api/bridge.py).
+                    context = {"pending": pending, "scenarios": scenarios}
+                    return TemplateResponse(request, "risks/pending_scenario_select.html", context)
                 messages.error(request, "برای ثبت ریسک، ابتدا یک سناریوی فعال انتخاب کنید.")
                 return redirect("risks:scenario_list")
             if not scenario.service_id or not scenario.service.is_active:

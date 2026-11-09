@@ -461,6 +461,18 @@ export interface FormPageData {
   // بازسنجی طرح مواجهه: مقایسه‌ی مبنا، ارزیابی تازه و هدف، و اقدام‌هایی که هنوز تأیید نشده‌اند
   comparison?: Comparison;
   open_actions?: { code: string; href: string; status: ActionStatus }[];
+  // سؤال پرسشنامه: فیلدهای مدیریت formset و فرم هر گزینه با پیشوند options-<شماره>
+  structured?: boolean;
+  options?: OptionFormset;
+  // ثبت ریسک در انتظار: اول انتخاب سناریو، بعد فرم ثبت ریسک
+  pending?: { description: string; source: string };
+  scenarios?: { id: number; code: string; title: string; service: string }[];
+}
+
+export interface OptionFormset {
+  management: FormField[];
+  errors: string[];
+  rows: (FormSchema & { prefix: string })[];
 }
 
 export interface FormAlert {
@@ -1051,4 +1063,193 @@ export interface AcceptanceDetail extends RecordParts {
   sign_forms: SignForm[];
   revoke: (FormSchema & { url: string }) | null;
   edit_url: string | null;
+}
+
+// تعریف پرسشنامه‌ها و بررسی پاسخ‌ها (apps/api/questionnaire_pages.py)
+
+export interface QuestionnaireRow {
+  id: number;
+  title: string;
+  question_count: number;
+  response_count: number;
+  is_active: boolean;
+  is_structured: boolean;
+  href: string;
+}
+
+export interface QuestionnaireList extends Listing<QuestionnaireRow> {
+  create_url: string | null;
+}
+
+/** سناریو (کد و عنوان) یا دسته (کد و نام). */
+export interface CodeName {
+  code: string;
+  name: string;
+}
+
+export interface QuestionnaireOption {
+  id: number;
+  text: string;
+  is_active: boolean;
+  indicates_risk: boolean;
+  scenario: CodeName | null;
+  category: CodeName | null;
+}
+
+export interface QuestionnaireQuestion {
+  id: number;
+  order: number;
+  text: string;
+  help: string;
+  kind: Choice;
+  stage: Choice | null;
+  required: boolean;
+  is_active: boolean;
+  options: QuestionnaireOption[];
+  edit_url: string | null;
+}
+
+export interface QuestionnaireDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  questionnaire: {
+    id: number;
+    title: string;
+    description: string;
+    is_active: boolean;
+    is_structured: boolean;
+  };
+  questions: QuestionnaireQuestion[];
+  add_question_url: string | null;
+  edit_url: string | null;
+  list_url: string;
+}
+
+export interface ReviewRow {
+  id: number;
+  questionnaire: string;
+  org_unit: string;
+  service: string | null;
+  respondent: Person | null;
+  interview: boolean;
+  submitted_at: Day | null;
+  pending_count: number;
+  status: Choice;
+  is_overdue: boolean;
+  href: string;
+}
+
+export interface ReviewList extends Listing<ReviewRow> {
+  queue_url: string;
+}
+
+export interface PendingRiskRow {
+  id: number;
+  description: string;
+  source: string;
+  scenario: CodeName | null;
+  category: CodeName | null;
+  status: Choice;
+  risk: CodeRef | null;
+  dismiss_reason: string;
+  duplicate_of: CodeRef | null;
+  convert_url: string | null;
+  dismiss_url: string | null;
+}
+
+export interface ReviewAnswer {
+  id: number;
+  question: string;
+  has_options: boolean;
+  text: string;
+  options: { text: string; indicates_risk: boolean }[];
+}
+
+export type StructuredQuestion = ResponseDetail["structured_questions"][number];
+
+export interface ResponseReview {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  response: {
+    id: number;
+    questionnaire: { id: number; title: string; href: string };
+    org_unit: string;
+    service: CodeName | null;
+    respondent: Person | null;
+    recorded_by: Person | null;
+    interview: boolean;
+    status: Choice;
+    is_overdue: boolean;
+    is_structured: boolean;
+    submitted_at: Moment | null;
+    return_question: string;
+    returned_at: Day | null;
+    return_due: Deadline | null;
+    reviewed_by: Person | null;
+    reviewed_at: Day | null;
+  };
+  // پاسخ عادی
+  fixed?: { label: string; value: string }[];
+  answers?: ReviewAnswer[];
+  new_item?: string;
+  // پاسخ شاخه‌ای
+  structured?: { data: unknown[]; questions: StructuredQuestion[] };
+  pending_risks: PendingRiskRow[];
+  answer_url: string | null;
+  review: {
+    pending_create_url: string;
+    return_url: string;
+    reviewed_url: string;
+    undecided: boolean;
+  } | null;
+  list_url: string;
+}
+
+// اعلان‌ها و بازبینی‌های پایش (apps/api/monitoring.py)
+
+export interface MonitoringRisk {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+}
+
+export interface MonitoringNotice {
+  id: number;
+  risk: MonitoringRisk;
+  message: string;
+  href: string;
+  created_at: Moment;
+  read: boolean;
+  read_url: string | null;
+}
+
+export interface NoticeList {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  notices: MonitoringNotice[];
+}
+
+export interface ReviewDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  review: {
+    id: number;
+    trigger: Choice;
+    risk: MonitoringRisk;
+    assessment: CodeRef | null;
+    reason: string;
+    due: Deadline | Day;
+    responsible: Person | null;
+    created_by: Person | null;
+    created_at: Moment;
+    completed_at: Moment | null;
+    completed_by: Person | null;
+    result: string;
+  };
+  complete: { url: string; result: FormField } | null;
 }

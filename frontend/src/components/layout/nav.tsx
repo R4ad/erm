@@ -11,17 +11,27 @@ import { FALLBACK_ICON, NAV_ICONS } from "./nav-icons";
 // راهنمای منوی جمع‌شده رو به محتوا باز می‌شود: منو در رابط راست‌به‌چپ سمت راست است.
 const TIP_SIDE = locale.dir === "rtl" ? "left" : "right";
 
+/**
+ * صفحه‌هایی که نشانی‌شان زیر پیوند منوی خودشان نیست: پر کردن پاسخ زیر «پاسخ به سؤال‌ها»، ویرایش سؤال زیر «تعریف
+ * پرسشنامه‌ها»، ثبت یا کنار گذاشتن ریسک در انتظار زیر «پاسخ‌ها و بررسی» و کار بازبینی پایش زیر «کارهای من».
+ */
+const NAV_ALIASES: [prefix: string, route: string][] = [
+  ["/responses/", "/questionnaires"],
+  ["/questionnaires/questions/", "/questionnaires/manage"],
+  ["/questionnaires/pending/", "/questionnaires/responses"],
+  ["/actions/reviews/", "/"],
+];
+
 /** کدام پیوند منو صفحه‌ی فعلی است: طولانی‌ترین route که مسیر با آن شروع می‌شود. */
 export function activeRoute(pathname: string, groups: NavGroup[]): string | null {
+  const path = NAV_ALIASES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? pathname;
   const routes = groups
     .flatMap((group) => group.items)
     .map((link) => link.route)
     .filter((route): route is string => route !== null);
   const matches = routes.filter((route) =>
-    route === "/" ? pathname === "/" : pathname === route || pathname.startsWith(`${route}/`),
+    route === "/" ? path === "/" : path === route || path.startsWith(`${route}/`),
   );
-  // پاسخ‌ها زیر «پاسخ به سؤال‌ها» هستند، هرچند نشانی‌شان /responses/ است.
-  if (pathname.startsWith("/responses/")) matches.push("/questionnaires");
   return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
