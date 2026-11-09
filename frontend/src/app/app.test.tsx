@@ -65,8 +65,9 @@ describe("app shell", () => {
     expect(within(nav!).getByRole("link", { name: "کارهای من" })).toHaveAttribute("aria-current", "page");
     // صفحه‌ای که در رابط تازه هست با مسیر خود رابط باز می‌شود و بقیه هنوز با صفحه‌ی کلاسیک جنگو.
     expect(within(nav!).getByRole("link", { name: "شواهد" })).toHaveAttribute("href", "/risks/evidence");
-    const classic = within(nav!).getByRole("link", { name: /خدمات/ });
-    expect(classic).toHaveAttribute("href", "/catalog/services/");
+    expect(within(nav!).getByRole("link", { name: "خدمات" })).toHaveAttribute("href", "/catalog/services");
+    const classic = within(nav!).getByRole("link", { name: /گزارش مدیریتی/ });
+    expect(classic).toHaveAttribute("href", "/reports/");
     expect(classic).toHaveAccessibleName(/در صفحه‌های فعلی سامانه باز می‌شود/);
     expect(screen.getByRole("link", { name: "رفتن به محتوای صفحه" })).toHaveAttribute("href", "#main");
     await expectNoAxeViolations();

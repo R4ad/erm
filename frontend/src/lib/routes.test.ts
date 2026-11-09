@@ -27,7 +27,7 @@ describe("toRoute", () => {
   });
 
   it("leaves pages that only Django has to Django", () => {
-    expect(toRoute("/catalog/services/", routeTable)).toBeNull();
+    expect(toRoute("/reports/", routeTable)).toBeNull();
     expect(toRoute("/risks/1/extra/", routeTable)).toBeNull();
     expect(toRoute(null, routeTable)).toBeNull();
     expect(toRoute("", routeTable)).toBeNull();

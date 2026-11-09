@@ -60,6 +60,22 @@ const FORM_ROUTES = [
   "controls/:pk/effectiveness/new",
   "controls/effectiveness/:pk/edit",
   "controls/soa/:pk/edit",
+  "catalog/customers/new",
+  "catalog/customers/:pk/edit",
+  "catalog/services/new",
+  "catalog/services/:pk/edit",
+  "catalog/services/:service_pk/customers/new",
+  "catalog/services/customers/:pk/edit",
+  "catalog/services/:service_pk/dependencies/new/:kind",
+  "catalog/services/dependencies/:pk/edit",
+  "catalog/commitments/new",
+  "catalog/commitments/:pk/edit",
+  "catalog/suppliers/new",
+  "catalog/suppliers/:pk/edit",
+  "catalog/assets/new",
+  "catalog/assets/:pk/edit",
+  "units/new",
+  "units/:pk/edit",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -221,6 +237,60 @@ export const routes: RouteObject[] = [
             path: "controls/soa/:pk",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/controls/SoaPages")).SoaDetailPage),
+            }),
+          },
+          {
+            path: "catalog/services",
+            lazy: async () => ({ Component: (await import("@/features/catalog/ListPages")).ServiceListPage }),
+          },
+          {
+            path: "catalog/services/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/catalog/ServiceDetailPage")).ServiceDetailPage),
+            }),
+          },
+          {
+            path: "catalog/commitments",
+            lazy: async () => ({ Component: (await import("@/features/catalog/ListPages")).CommitmentListPage }),
+          },
+          {
+            path: "catalog/assets",
+            lazy: async () => ({ Component: (await import("@/features/catalog/ListPages")).AssetListPage }),
+          },
+          {
+            path: "catalog/assets/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/catalog/RecordPages")).AssetDetailPage),
+            }),
+          },
+          {
+            path: "catalog/suppliers",
+            lazy: async () => ({ Component: (await import("@/features/catalog/ListPages")).SupplierListPage }),
+          },
+          {
+            path: "catalog/suppliers/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/catalog/RecordPages")).SupplierDetailPage),
+            }),
+          },
+          {
+            path: "catalog/customers",
+            lazy: async () => ({ Component: (await import("@/features/catalog/ListPages")).CustomerListPage }),
+          },
+          {
+            path: "units",
+            lazy: async () => ({ Component: (await import("@/features/organization/UnitListPage")).UnitListPage }),
+          },
+          {
+            path: "method",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
+            }),
+          },
+          {
+            path: "method/:number",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
             }),
           },
           {

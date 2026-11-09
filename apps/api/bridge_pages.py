@@ -122,6 +122,22 @@ FORM_PAGES = {
     "controls:control_assessment_create": control_assessment_form,
     "controls:control_assessment_update": control_assessment_form,
     "controls:soa_update": None,
+    "catalog:customer_create": None,
+    "catalog:customer_update": None,
+    "catalog:service_create": None,
+    "catalog:service_update": None,
+    "catalog:service_customer_create": None,
+    "catalog:service_customer_update": None,
+    "catalog:dependency_create": None,
+    "catalog:dependency_update": None,
+    "catalog:commitment_create": None,
+    "catalog:commitment_update": None,
+    "catalog:supplier_create": None,
+    "catalog:supplier_update": None,
+    "catalog:asset_create": None,
+    "catalog:asset_update": None,
+    "organization:unit_create": None,
+    "organization:unit_update": None,
 }
 
 # صفحه‌هایی که به‌جای یک form چند فرم با پیشوند دارند؛ خطاهای فرستادن ناموفق از همه‌ی این فرم‌ها خوانده می‌شود.

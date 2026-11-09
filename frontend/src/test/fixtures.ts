@@ -11,11 +11,18 @@ import type {
   ActionRow,
   AnswerHome,
   AssessmentDetail,
-  ComparePage,
+  AssetDetail,
+  AssetList,
   ChangeDetail,
+  CommitmentList,
+  ComparePage,
+  ControlAssessmentDetail,
+  ControlDetail,
+  ControlList,
   CoverageCell,
   CoveragePage,
   CsrfState,
+  CustomerList,
   EvidenceDetail,
   EvidenceList,
   EvidenceRow,
@@ -24,29 +31,32 @@ import type {
   FormSchema,
   ImpactRow,
   Level,
+  MethodPage,
   MyWork,
   NoticeList,
   PlanDetail,
   QuestionnaireDetail,
   QuestionnaireList,
+  ResponseDetail,
   ResponseReview,
   ReviewDetail,
   ReviewList,
-  ResponseDetail,
+  RiskBrief,
   RiskDetail,
   RiskFilters,
   RiskPage,
   RiskQuestion,
-  RiskBrief,
   RiskRow,
   RouteEntry,
+  ServiceDetail,
+  ServiceList,
   Session,
-  StartForm,
-  ControlAssessmentDetail,
-  ControlDetail,
-  ControlList,
   SoaDetail,
   SoaList,
+  StartForm,
+  SupplierDetail,
+  SupplierList,
+  UnitList,
 } from "../lib/types";
 
 export const levels = {
@@ -166,6 +176,37 @@ export const routeTable: RouteEntry[] = [
   },
   { name: "controls:soa_list", pattern: "^/controls/soa/$", route: "/controls/soa", form: false },
   { name: "controls:soa_detail", pattern: "^/controls/soa/(?<pk>[0-9]+)/$", route: "/controls/soa/:pk", form: false },
+  { name: "catalog:customer_list", pattern: "^/catalog/customers/$", route: "/catalog/customers", form: false },
+  { name: "catalog:service_list", pattern: "^/catalog/services/$", route: "/catalog/services", form: false },
+  {
+    name: "catalog:service_detail",
+    pattern: "^/catalog/services/(?<pk>[0-9]+)/$",
+    route: "/catalog/services/:pk",
+    form: false,
+  },
+  { name: "catalog:supplier_list", pattern: "^/catalog/suppliers/$", route: "/catalog/suppliers", form: false },
+  {
+    name: "catalog:supplier_detail",
+    pattern: "^/catalog/suppliers/(?<pk>[0-9]+)/$",
+    route: "/catalog/suppliers/:pk",
+    form: false,
+  },
+  { name: "catalog:asset_list", pattern: "^/catalog/assets/$", route: "/catalog/assets", form: false },
+  {
+    name: "catalog:asset_detail",
+    pattern: "^/catalog/assets/(?<pk>[0-9]+)/$",
+    route: "/catalog/assets/:pk",
+    form: false,
+  },
+  { name: "catalog:commitment_list", pattern: "^/catalog/commitments/$", route: "/catalog/commitments", form: false },
+  { name: "organization:unit_list", pattern: "^/units/$", route: "/units", form: false },
+  { name: "methodology:active", pattern: "^/method/$", route: "/method", form: false },
+  {
+    name: "methodology:version_detail",
+    pattern: "^/method/(?<number>[0-9]+)/$",
+    route: "/method/:number",
+    form: false,
+  },
   { name: "risks:risk_create", pattern: "^/risks/new/$", route: "/risks/new", form: true },
   { name: "risks:risk_update", pattern: "^/risks/(?<pk>[0-9]+)/edit/$", route: "/risks/:pk/edit", form: true },
   {
@@ -378,6 +419,82 @@ export const routeTable: RouteEntry[] = [
     route: "/controls/soa/:pk/edit",
     form: true,
   },
+  {
+    name: "catalog:customer_create",
+    pattern: "^/catalog/customers/new/$",
+    route: "/catalog/customers/new",
+    form: true,
+  },
+  {
+    name: "catalog:customer_update",
+    pattern: "^/catalog/customers/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/customers/:pk/edit",
+    form: true,
+  },
+  { name: "catalog:service_create", pattern: "^/catalog/services/new/$", route: "/catalog/services/new", form: true },
+  {
+    name: "catalog:service_update",
+    pattern: "^/catalog/services/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/services/:pk/edit",
+    form: true,
+  },
+  {
+    name: "catalog:service_customer_create",
+    pattern: "^/catalog/services/(?<service_pk>[0-9]+)/customers/new/$",
+    route: "/catalog/services/:service_pk/customers/new",
+    form: true,
+  },
+  {
+    name: "catalog:service_customer_update",
+    pattern: "^/catalog/services/customers/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/services/customers/:pk/edit",
+    form: true,
+  },
+  {
+    name: "catalog:dependency_create",
+    pattern: "^/catalog/services/(?<service_pk>[0-9]+)/dependencies/new/(?<kind>[^/]+)/$",
+    route: "/catalog/services/:service_pk/dependencies/new/:kind",
+    form: true,
+  },
+  {
+    name: "catalog:dependency_update",
+    pattern: "^/catalog/services/dependencies/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/services/dependencies/:pk/edit",
+    form: true,
+  },
+  {
+    name: "catalog:commitment_create",
+    pattern: "^/catalog/commitments/new/$",
+    route: "/catalog/commitments/new",
+    form: true,
+  },
+  {
+    name: "catalog:commitment_update",
+    pattern: "^/catalog/commitments/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/commitments/:pk/edit",
+    form: true,
+  },
+  {
+    name: "catalog:supplier_create",
+    pattern: "^/catalog/suppliers/new/$",
+    route: "/catalog/suppliers/new",
+    form: true,
+  },
+  {
+    name: "catalog:supplier_update",
+    pattern: "^/catalog/suppliers/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/suppliers/:pk/edit",
+    form: true,
+  },
+  { name: "catalog:asset_create", pattern: "^/catalog/assets/new/$", route: "/catalog/assets/new", form: true },
+  {
+    name: "catalog:asset_update",
+    pattern: "^/catalog/assets/(?<pk>[0-9]+)/edit/$",
+    route: "/catalog/assets/:pk/edit",
+    form: true,
+  },
+  { name: "organization:unit_create", pattern: "^/units/new/$", route: "/units/new", form: true },
+  { name: "organization:unit_update", pattern: "^/units/(?<pk>[0-9]+)/edit/$", route: "/units/:pk/edit", form: true },
 ];
 
 export function csrf(authenticated = false): CsrfState {
@@ -394,6 +511,7 @@ export function session(): Session {
         items: [
           { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/" },
           { key: "actions:notices", label: "اعلان‌های پایش", href: "/actions/notices/", route: "/actions/notices" },
+          { key: "reports:management", label: "گزارش مدیریتی", href: "/reports/", route: null },
           {
             key: "questionnaires:answer_home",
             label: "پاسخ به سؤال‌ها",
@@ -427,7 +545,14 @@ export function session(): Session {
           { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
           { key: "controls:control_list", label: "کتابخانه‌ی کنترل", href: "/controls/", route: "/controls" },
           { key: "controls:soa_list", label: "بیانیه‌ی کاربردپذیری", href: "/controls/soa/", route: "/controls/soa" },
-          { key: "catalog:service_list", label: "خدمات", href: "/catalog/services/", route: null },
+        ],
+      },
+      {
+        title: "خدمات و سازمان",
+        items: [
+          { key: "catalog:service_list", label: "خدمات", href: "/catalog/services/", route: "/catalog/services" },
+          { key: "methodology:active", label: "روش ارزیابی", href: "/method/", route: "/method" },
+          { key: "organization:unit_list", label: "ساختار سازمانی", href: "/units/", route: "/units" },
         ],
       },
     ],
@@ -3310,6 +3435,2289 @@ export function controlAssessmentForm(overrides: Partial<FormPageData> = {}): Fo
           ],
         },
       ],
+    } satisfies FormPageData),
+    ...overrides,
+  };
+}
+
+// --- کاتالوگ، ساختار سازمانی و روش ارزیابی (جواب واقعی پل جنگو؛ متن‌های بلند روش کوتاه شده‌اند) ---
+
+export function customerList(overrides: Partial<CustomerList> = {}): CustomerList {
+  return {
+    ...({
+      view: "catalog:customer_list",
+      messages: [],
+      title: "بانک‌ها",
+      results: [
+        {
+          id: 2,
+          name: "بانک تجارت",
+          is_key: false,
+          financial_basis: 80000000000,
+          is_active: true,
+          edit_url: "/catalog/customers/2/edit/",
+        },
+        {
+          id: 3,
+          name: "بانک سینا",
+          is_key: false,
+          financial_basis: null,
+          is_active: false,
+          edit_url: "/catalog/customers/3/edit/",
+        },
+        {
+          id: 1,
+          name: "بانک ملی",
+          is_key: true,
+          financial_basis: 120000000000,
+          is_active: true,
+          edit_url: "/catalog/customers/1/edit/",
+        },
+      ],
+      count: 3,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "نام",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+          },
+          {
+            name: "is_key",
+            label: "مشتری کلیدی",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "yes",
+                label: "کلیدی",
+              },
+              {
+                value: "no",
+                label: "غیرکلیدی",
+              },
+            ],
+          },
+          {
+            name: "status",
+            label: "وضعیت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "active",
+                label: "فعال",
+              },
+              {
+                value: "inactive",
+                label: "غیرفعال",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      create_url: "/catalog/customers/new/",
+    } satisfies CustomerList),
+    ...overrides,
+  };
+}
+
+export function serviceList(overrides: Partial<ServiceList> = {}): ServiceList {
+  return {
+    ...({
+      view: "catalog:service_list",
+      messages: [],
+      title: "خدمات و فرایندها",
+      results: [
+        {
+          id: 2,
+          code: "SRV-CORE",
+          name: "هسته‌ی بانکی",
+          kind: {
+            value: "service",
+            label: "خدمت",
+          },
+          org_unit: "مدیریت عملیات",
+          owner: {
+            id: 2,
+            name: "سارا احمدی",
+          },
+          lifecycle_stage: {
+            value: "operation",
+            label: "بهره‌برداری",
+          },
+          is_critical: false,
+          is_active: true,
+          href: "/catalog/services/2/",
+        },
+        {
+          id: 1,
+          code: "SRV-PAY",
+          name: "درگاه پرداخت اینترنتی",
+          kind: {
+            value: "service",
+            label: "خدمت",
+          },
+          org_unit: "مدیریت عملیات",
+          owner: {
+            id: 3,
+            name: "مینا خدمتی",
+          },
+          lifecycle_stage: {
+            value: "operation",
+            label: "بهره‌برداری",
+          },
+          is_critical: true,
+          is_active: true,
+          href: "/catalog/services/1/",
+        },
+        {
+          id: 3,
+          code: "SRV-SMS",
+          name: "پیامک بانکی",
+          kind: {
+            value: "process",
+            label: "فرایند",
+          },
+          org_unit: "مدیریت عملیات",
+          owner: {
+            id: 2,
+            name: "سارا احمدی",
+          },
+          lifecycle_stage: {
+            value: "operation",
+            label: "بهره‌برداری",
+          },
+          is_critical: false,
+          is_active: false,
+          href: "/catalog/services/3/",
+        },
+      ],
+      count: 3,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "جست‌وجو",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "کد یا نام خدمت",
+          },
+          {
+            name: "unit",
+            label: "واحد مالک",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه‌ی واحدها",
+            choices: [
+              {
+                value: "1",
+                label: "معاونت فناوری",
+              },
+              {
+                value: "4",
+                label: "— امنیت اطلاعات",
+              },
+              {
+                value: "2",
+                label: "— مدیریت عملیات",
+              },
+              {
+                value: "3",
+                label: "— — مرکز داده",
+              },
+            ],
+          },
+          {
+            name: "kind",
+            label: "نوع",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "service",
+                label: "خدمت",
+              },
+              {
+                value: "process",
+                label: "فرایند",
+              },
+            ],
+          },
+          {
+            name: "is_critical",
+            label: "حیاتی",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "yes",
+                label: "حیاتی",
+              },
+              {
+                value: "no",
+                label: "غیرحیاتی",
+              },
+            ],
+          },
+          {
+            name: "status",
+            label: "وضعیت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "active",
+                label: "فعال",
+              },
+              {
+                value: "inactive",
+                label: "غیرفعال",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      create_url: "/catalog/services/new/",
+    } satisfies ServiceList),
+    ...overrides,
+  };
+}
+
+export function serviceDetail(overrides: Partial<ServiceDetail> = {}): ServiceDetail {
+  return {
+    ...({
+      view: "catalog:service_detail",
+      messages: [],
+      title: "SRV-PAY - درگاه پرداخت اینترنتی",
+      service: {
+        id: 1,
+        code: "SRV-PAY",
+        name: "درگاه پرداخت اینترنتی",
+        kind: {
+          value: "service",
+          label: "خدمت",
+        },
+        org_unit: "مدیریت عملیات",
+        owner: {
+          id: 3,
+          name: "مینا خدمتی",
+        },
+        lifecycle_stage: {
+          value: "operation",
+          label: "بهره‌برداری",
+        },
+        is_critical: true,
+        is_active: true,
+        href: "/catalog/services/1/",
+        description: "پرداخت آنلاین کارت‌های بانکی برای پذیرندگان اینترنتی.",
+        environment: {
+          value: "datin",
+          label: "داتین",
+        },
+      },
+      commitments: [
+        {
+          id: 1,
+          title: "دسترس‌پذیری ۹۹٫۹ درصد ماهانه",
+          description: "محاسبه‌ی ماهانه بدون پنجره‌ی نگهداری.",
+          kind: {
+            value: "sla",
+            label: "SLA",
+          },
+          clause_ref: "بند ۷-۲",
+          customer: "بانک ملی",
+          owner: {
+            id: 3,
+            name: "مینا خدمتی",
+          },
+          validity: {
+            from: {
+              iso: "2025-03-21",
+              jalali: "1404/01/01",
+            },
+            until: {
+              iso: "2026-03-20",
+              jalali: "1404/12/29",
+            },
+            expired: true,
+          },
+          edit_url: "/catalog/commitments/1/edit/?service=1",
+        },
+      ],
+      add_commitment_url: "/catalog/commitments/new/?service=1",
+      dependencies: [
+        {
+          id: 2,
+          target_kind: "خدمت بالادستی",
+          target: "SRV-CORE - هسته‌ی بانکی",
+          target_url: "/catalog/services/2/",
+          is_shared_point: false,
+          description: "تأیید تراکنش",
+          alternative: "",
+          boundary: null,
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: "/catalog/services/dependencies/2/edit/",
+        },
+        {
+          id: 1,
+          target_kind: "تأمین‌کننده",
+          target: "شرکت ارتباطات زیرساخت",
+          target_url: "/catalog/suppliers/1/",
+          is_shared_point: true,
+          description: "لینک اصلی اینترنت درگاه",
+          alternative: "لینک پشتیبان از تأمین‌کننده‌ی دوم",
+          boundary: [
+            {
+              label: "مالک زیرساخت",
+              value: "تأمین‌کننده",
+            },
+            {
+              label: "اجراکننده‌ی کنترل",
+              value: "داتین",
+            },
+            {
+              label: "ارائه‌دهنده‌ی شاهد",
+              value: "-",
+            },
+            {
+              label: "تصمیم‌گیر تغییر",
+              value: "-",
+            },
+            {
+              label: "مخاطب اعلام رخداد",
+              value: "مرکز عملیات شبکه‌ی تأمین‌کننده",
+            },
+          ],
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: "/catalog/services/dependencies/1/edit/",
+        },
+        {
+          id: 3,
+          target_kind: "دارایی",
+          target: "AST-DB - پایگاه داده‌ی پرداخت",
+          target_url: "/catalog/assets/1/",
+          is_shared_point: false,
+          description: "نگهداری تراکنش‌ها",
+          alternative: "",
+          boundary: null,
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: "/catalog/services/dependencies/3/edit/",
+        },
+      ],
+      add_dependency: [
+        {
+          label: "به خدمت دیگر",
+          href: "/catalog/services/1/dependencies/new/service/",
+        },
+        {
+          label: "به تأمین‌کننده",
+          href: "/catalog/services/1/dependencies/new/supplier/",
+        },
+        {
+          label: "به دارایی",
+          href: "/catalog/services/1/dependencies/new/asset/",
+        },
+      ],
+      dependents: [],
+      customer_links: [
+        {
+          id: 1,
+          customer: "بانک ملی",
+          is_key: true,
+          tolerance_notes: "قطع بیش از ۴ ساعت جریمه‌ی قراردادی دارد.",
+          rto: "4 ساعت",
+          mtpd: "1 روز",
+          rpo: "15 دقیقه",
+          bia_reference: "BIA-1404-07",
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: "/catalog/services/customers/1/edit/",
+        },
+      ],
+      add_customer_url: "/catalog/services/1/customers/new/",
+      coverage: {
+        cells: [
+          {
+            category: "T1",
+            category_name: "امنیت اطلاعات و سایبری",
+            status: {
+              value: "reviewed",
+              label: "بررسی‌شده",
+            },
+            summary: "T1 امنیت اطلاعات و سایبری",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/1/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T2",
+            category_name: "نرم‌افزار و توسعه",
+            status: {
+              value: "not_relevant",
+              label: "نامرتبط",
+            },
+            summary: "T2 نرم‌افزار و توسعه: خدمت داده‌ی شخصی پردازش نمی‌کند",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/2/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T3",
+            category_name: "زیرساخت و فناوری",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T3 زیرساخت و فناوری",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/3/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T4",
+            category_name: "عملیات و ارائه خدمت",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T4 عملیات و ارائه خدمت",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/4/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T5",
+            category_name: "اشخاص ثالث و زنجیره تأمین",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T5 اشخاص ثالث و زنجیره تأمین",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/5/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T6",
+            category_name: "افراد و سازمان",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T6 افراد و سازمان",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/6/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T7",
+            category_name: "تداوم و محیط",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T7 تداوم و محیط",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/7/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+          {
+            category: "T8",
+            category_name: "انطباق و حاکمیت داده",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T8 انطباق و حاکمیت داده",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: "/risks/coverage/1/8/?next=%2Fcatalog%2Fservices%2F1%2F",
+          },
+        ],
+        table_url: "/risks/coverage/?q=SRV-PAY",
+      },
+      risks: [],
+      create_risk_url: "/risks/scenarios/",
+      edit_url: "/catalog/services/1/edit/",
+      list_url: "/catalog/services/",
+    } satisfies ServiceDetail),
+    ...overrides,
+  };
+}
+
+export function serviceDetailForOwner(overrides: Partial<ServiceDetail> = {}): ServiceDetail {
+  return {
+    ...({
+      view: "catalog:service_detail",
+      messages: [],
+      title: "SRV-PAY - درگاه پرداخت اینترنتی",
+      service: {
+        id: 1,
+        code: "SRV-PAY",
+        name: "درگاه پرداخت اینترنتی",
+        kind: {
+          value: "service",
+          label: "خدمت",
+        },
+        org_unit: "مدیریت عملیات",
+        owner: {
+          id: 3,
+          name: "مینا خدمتی",
+        },
+        lifecycle_stage: {
+          value: "operation",
+          label: "بهره‌برداری",
+        },
+        is_critical: true,
+        is_active: true,
+        href: "/catalog/services/1/",
+        description: "پرداخت آنلاین کارت‌های بانکی برای پذیرندگان اینترنتی.",
+        environment: {
+          value: "datin",
+          label: "داتین",
+        },
+      },
+      commitments: [
+        {
+          id: 1,
+          title: "دسترس‌پذیری ۹۹٫۹ درصد ماهانه",
+          description: "محاسبه‌ی ماهانه بدون پنجره‌ی نگهداری.",
+          kind: {
+            value: "sla",
+            label: "SLA",
+          },
+          clause_ref: "بند ۷-۲",
+          customer: "بانک ملی",
+          owner: {
+            id: 3,
+            name: "مینا خدمتی",
+          },
+          validity: {
+            from: {
+              iso: "2025-03-21",
+              jalali: "1404/01/01",
+            },
+            until: {
+              iso: "2026-03-20",
+              jalali: "1404/12/29",
+            },
+            expired: true,
+          },
+          edit_url: null,
+        },
+      ],
+      add_commitment_url: null,
+      dependencies: [
+        {
+          id: 2,
+          target_kind: "خدمت بالادستی",
+          target: "SRV-CORE - هسته‌ی بانکی",
+          target_url: null,
+          is_shared_point: false,
+          description: "تأیید تراکنش",
+          alternative: "",
+          boundary: null,
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: null,
+        },
+        {
+          id: 1,
+          target_kind: "تأمین‌کننده",
+          target: "شرکت ارتباطات زیرساخت",
+          target_url: "/catalog/suppliers/1/",
+          is_shared_point: true,
+          description: "لینک اصلی اینترنت درگاه",
+          alternative: "لینک پشتیبان از تأمین‌کننده‌ی دوم",
+          boundary: [
+            {
+              label: "مالک زیرساخت",
+              value: "تأمین‌کننده",
+            },
+            {
+              label: "اجراکننده‌ی کنترل",
+              value: "داتین",
+            },
+            {
+              label: "ارائه‌دهنده‌ی شاهد",
+              value: "-",
+            },
+            {
+              label: "تصمیم‌گیر تغییر",
+              value: "-",
+            },
+            {
+              label: "مخاطب اعلام رخداد",
+              value: "مرکز عملیات شبکه‌ی تأمین‌کننده",
+            },
+          ],
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: null,
+        },
+        {
+          id: 3,
+          target_kind: "دارایی",
+          target: "AST-DB - پایگاه داده‌ی پرداخت",
+          target_url: "/catalog/assets/1/",
+          is_shared_point: false,
+          description: "نگهداری تراکنش‌ها",
+          alternative: "",
+          boundary: null,
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: null,
+        },
+      ],
+      add_dependency: [],
+      dependents: [],
+      customer_links: [
+        {
+          id: 1,
+          customer: "بانک ملی",
+          is_key: true,
+          tolerance_notes: "قطع بیش از ۴ ساعت جریمه‌ی قراردادی دارد.",
+          rto: "4 ساعت",
+          mtpd: "1 روز",
+          rpo: "15 دقیقه",
+          bia_reference: "BIA-1404-07",
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+          edit_url: null,
+        },
+      ],
+      add_customer_url: null,
+      coverage: {
+        cells: [
+          {
+            category: "T1",
+            category_name: "امنیت اطلاعات و سایبری",
+            status: {
+              value: "reviewed",
+              label: "بررسی‌شده",
+            },
+            summary: "T1 امنیت اطلاعات و سایبری",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T2",
+            category_name: "نرم‌افزار و توسعه",
+            status: {
+              value: "not_relevant",
+              label: "نامرتبط",
+            },
+            summary: "T2 نرم‌افزار و توسعه: خدمت داده‌ی شخصی پردازش نمی‌کند",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T3",
+            category_name: "زیرساخت و فناوری",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T3 زیرساخت و فناوری",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T4",
+            category_name: "عملیات و ارائه خدمت",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T4 عملیات و ارائه خدمت",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T5",
+            category_name: "اشخاص ثالث و زنجیره تأمین",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T5 اشخاص ثالث و زنجیره تأمین",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T6",
+            category_name: "افراد و سازمان",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T6 افراد و سازمان",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T7",
+            category_name: "تداوم و محیط",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T7 تداوم و محیط",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+          {
+            category: "T8",
+            category_name: "انطباق و حاکمیت داده",
+            status: {
+              value: "pending",
+              label: "در انتظار بررسی",
+            },
+            summary: "T8 انطباق و حاکمیت داده",
+            risk_count: 0,
+            risks_url: null,
+            edit_url: null,
+          },
+        ],
+        table_url: "/risks/coverage/?q=SRV-PAY",
+      },
+      risks: [],
+      create_risk_url: null,
+      edit_url: null,
+      list_url: "/catalog/services/",
+    } satisfies ServiceDetail),
+    ...overrides,
+  };
+}
+
+export function supplierList(overrides: Partial<SupplierList> = {}): SupplierList {
+  return {
+    ...({
+      view: "catalog:supplier_list",
+      messages: [],
+      title: "تأمین‌کنندگان",
+      results: [
+        {
+          id: 1,
+          name: "شرکت ارتباطات زیرساخت",
+          description: "لینک اینترنت و انتقال داده",
+          is_critical: true,
+          contract_owner: {
+            id: 2,
+            name: "سارا احمدی",
+          },
+          is_active: true,
+          href: "/catalog/suppliers/1/",
+        },
+        {
+          id: 2,
+          name: "شرکت پشتیبانی سخت‌افزار",
+          description: "",
+          is_critical: false,
+          contract_owner: null,
+          is_active: true,
+          href: "/catalog/suppliers/2/",
+        },
+      ],
+      count: 2,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "جست‌وجو",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "نام یا خدمت و کالا",
+          },
+          {
+            name: "is_critical",
+            label: "حیاتی",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "yes",
+                label: "حیاتی",
+              },
+              {
+                value: "no",
+                label: "غیرحیاتی",
+              },
+            ],
+          },
+          {
+            name: "status",
+            label: "وضعیت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "active",
+                label: "فعال",
+              },
+              {
+                value: "inactive",
+                label: "غیرفعال",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      create_url: "/catalog/suppliers/new/",
+    } satisfies SupplierList),
+    ...overrides,
+  };
+}
+
+export function supplierDetail(overrides: Partial<SupplierDetail> = {}): SupplierDetail {
+  return {
+    ...({
+      view: "catalog:supplier_detail",
+      messages: [],
+      title: "شرکت ارتباطات زیرساخت",
+      supplier: {
+        id: 1,
+        name: "شرکت ارتباطات زیرساخت",
+        description: "لینک اینترنت و انتقال داده",
+        is_critical: true,
+        contract_owner: {
+          id: 2,
+          name: "سارا احمدی",
+        },
+        is_active: true,
+        href: "/catalog/suppliers/1/",
+      },
+      dependents: [
+        {
+          id: 1,
+          service: {
+            code: "SRV-PAY",
+            name: "درگاه پرداخت اینترنتی",
+            is_critical: true,
+            href: "/catalog/services/1/",
+          },
+          is_shared_point: true,
+          description: "لینک اصلی اینترنت درگاه",
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+        },
+      ],
+      edit_url: "/catalog/suppliers/1/edit/",
+      list_url: "/catalog/suppliers/",
+    } satisfies SupplierDetail),
+    ...overrides,
+  };
+}
+
+export function assetList(overrides: Partial<AssetList> = {}): AssetList {
+  return {
+    ...({
+      view: "catalog:asset_list",
+      messages: [],
+      title: "دارایی‌ها",
+      results: [
+        {
+          id: 1,
+          code: "AST-DB",
+          name: "پایگاه داده‌ی پرداخت",
+          kind: {
+            value: "system",
+            label: "سامانه و نرم‌افزار",
+          },
+          org_unit: "مدیریت عملیات",
+          owner: {
+            id: 3,
+            name: "مینا خدمتی",
+          },
+          data_class: {
+            value: "confidential",
+            label: "محرمانه",
+          },
+          cia: ["C", "I", "A"],
+          is_active: true,
+          href: "/catalog/assets/1/",
+        },
+        {
+          id: 2,
+          code: "AST-HSM",
+          name: "ماژول امنیت سخت‌افزاری",
+          kind: {
+            value: "hardware",
+            label: "سخت‌افزار و شبکه",
+          },
+          org_unit: "مدیریت عملیات",
+          owner: {
+            id: 2,
+            name: "سارا احمدی",
+          },
+          data_class: null,
+          cia: [],
+          is_active: true,
+          href: "/catalog/assets/2/",
+        },
+      ],
+      count: 2,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "جست‌وجو",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "کد یا نام دارایی",
+          },
+          {
+            name: "unit",
+            label: "واحد مالک",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه‌ی واحدها",
+            choices: [
+              {
+                value: "1",
+                label: "معاونت فناوری",
+              },
+              {
+                value: "4",
+                label: "— امنیت اطلاعات",
+              },
+              {
+                value: "2",
+                label: "— مدیریت عملیات",
+              },
+              {
+                value: "3",
+                label: "— — مرکز داده",
+              },
+            ],
+          },
+          {
+            name: "kind",
+            label: "نوع",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "system",
+                label: "سامانه و نرم‌افزار",
+              },
+              {
+                value: "hardware",
+                label: "سخت‌افزار و شبکه",
+              },
+              {
+                value: "information",
+                label: "اطلاعات",
+              },
+              {
+                value: "site",
+                label: "مکان",
+              },
+              {
+                value: "people",
+                label: "نیروی انسانی",
+              },
+            ],
+          },
+          {
+            name: "data_class",
+            label: "طبقه‌ی اطلاعات",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "public",
+                label: "عمومی",
+              },
+              {
+                value: "internal",
+                label: "درون‌سازمانی",
+              },
+              {
+                value: "confidential",
+                label: "محرمانه",
+              },
+            ],
+          },
+          {
+            name: "status",
+            label: "وضعیت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "active",
+                label: "فعال",
+              },
+              {
+                value: "inactive",
+                label: "غیرفعال",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      create_url: "/catalog/assets/new/",
+    } satisfies AssetList),
+    ...overrides,
+  };
+}
+
+export function assetDetail(overrides: Partial<AssetDetail> = {}): AssetDetail {
+  return {
+    ...({
+      view: "catalog:asset_detail",
+      messages: [],
+      title: "AST-DB - پایگاه داده‌ی پرداخت",
+      asset: {
+        id: 1,
+        code: "AST-DB",
+        name: "پایگاه داده‌ی پرداخت",
+        kind: {
+          value: "system",
+          label: "سامانه و نرم‌افزار",
+        },
+        org_unit: "مدیریت عملیات",
+        owner: {
+          id: 3,
+          name: "مینا خدمتی",
+        },
+        data_class: {
+          value: "confidential",
+          label: "محرمانه",
+        },
+        cia: ["C", "I", "A"],
+        is_active: true,
+        href: "/catalog/assets/1/",
+      },
+      dependents: [
+        {
+          id: 4,
+          service: {
+            code: "SRV-CORE",
+            name: "هسته‌ی بانکی",
+            is_critical: false,
+            href: "/catalog/services/2/",
+          },
+          is_shared_point: false,
+          description: "",
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+        },
+        {
+          id: 3,
+          service: {
+            code: "SRV-PAY",
+            name: "درگاه پرداخت اینترنتی",
+            is_critical: true,
+            href: "/catalog/services/1/",
+          },
+          is_shared_point: false,
+          description: "نگهداری تراکنش‌ها",
+          validity: {
+            from: null,
+            until: null,
+            expired: false,
+          },
+        },
+      ],
+      edit_url: "/catalog/assets/1/edit/",
+      list_url: "/catalog/assets/",
+    } satisfies AssetDetail),
+    ...overrides,
+  };
+}
+
+export function commitmentList(overrides: Partial<CommitmentList> = {}): CommitmentList {
+  return {
+    ...({
+      view: "catalog:commitment_list",
+      messages: [],
+      title: "تعهدها",
+      results: [
+        {
+          id: 1,
+          title: "دسترس‌پذیری ۹۹٫۹ درصد ماهانه",
+          description: "محاسبه‌ی ماهانه بدون پنجره‌ی نگهداری.",
+          kind: {
+            value: "sla",
+            label: "SLA",
+          },
+          clause_ref: "بند ۷-۲",
+          services: [
+            {
+              code: "SRV-CORE",
+              href: "/catalog/services/2/",
+            },
+            {
+              code: "SRV-PAY",
+              href: "/catalog/services/1/",
+            },
+          ],
+          customer: "بانک ملی",
+          owner: {
+            id: 3,
+            name: "مینا خدمتی",
+          },
+          validity: {
+            from: {
+              iso: "2025-03-21",
+              jalali: "1404/01/01",
+            },
+            until: {
+              iso: "2026-03-20",
+              jalali: "1404/12/29",
+            },
+            expired: true,
+          },
+          edit_url: "/catalog/commitments/1/edit/",
+        },
+      ],
+      count: 1,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "جست‌وجو",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "عنوان یا مرجع بند",
+          },
+          {
+            name: "kind",
+            label: "نوع",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "sla",
+                label: "SLA",
+              },
+              {
+                value: "contract",
+                label: "قرارداد",
+              },
+              {
+                value: "regulatory",
+                label: "الزام قانونی یا نظارتی",
+              },
+              {
+                value: "internal",
+                label: "الزام داخلی",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      create_url: "/catalog/commitments/new/",
+    } satisfies CommitmentList),
+    ...overrides,
+  };
+}
+
+export function unitList(overrides: Partial<UnitList> = {}): UnitList {
+  return {
+    ...({
+      view: "organization:unit_list",
+      messages: [],
+      title: "ساختار سازمانی",
+      results: [
+        {
+          id: 1,
+          name: "معاونت فناوری",
+          code: "IT",
+          depth: 0,
+          managers: [],
+          is_active: true,
+          edit_url: "/units/1/edit/",
+        },
+        {
+          id: 4,
+          name: "امنیت اطلاعات",
+          code: "SEC",
+          depth: 1,
+          managers: [],
+          is_active: true,
+          edit_url: "/units/4/edit/",
+        },
+        {
+          id: 2,
+          name: "مدیریت عملیات",
+          code: "OPS",
+          depth: 1,
+          managers: [
+            {
+              id: 3,
+              name: "مینا خدمتی",
+            },
+          ],
+          is_active: true,
+          edit_url: "/units/2/edit/",
+        },
+        {
+          id: 3,
+          name: "مرکز داده",
+          code: "DC",
+          depth: 2,
+          managers: [],
+          is_active: true,
+          edit_url: "/units/3/edit/",
+        },
+      ],
+      count: 4,
+      page: 1,
+      pages: 1,
+      filters: null,
+      create_url: "/units/new/",
+    } satisfies UnitList),
+    ...overrides,
+  };
+}
+
+export function methodPage(overrides: Partial<MethodPage> = {}): MethodPage {
+  return {
+    ...({
+      view: "methodology:active",
+      messages: [],
+      title: "روش ارزیابی، نسخه‌ی 1: روش v5",
+      version: {
+        number: 1,
+        name: "نسخه‌ی 1: روش v5",
+        status: {
+          value: "active",
+          label: "فعال",
+        },
+        is_trial: true,
+        source: "متدولوژی مدیریت و ارزیابی ریسک داتین، نسخه ۵ (تاریخ تدوین ۱۲ مهر ۱۴۰۵)",
+        based_on: null,
+        approval_ref: "",
+        approved_on: null,
+        approval_recorded_by: null,
+        activated_at: {
+          iso: "2026-11-09T15:58:19.592187+00:00",
+          jalali: "1405/08/18 19:28",
+        },
+        change_notes:
+          "نسخه‌ی اول، با همه‌ی مقدارهای سند v5. پارامترهای بخش ۳۲ سند هنوز تصویب نشده‌اند و این نسخه تا تصویب «آزمایشی» است (س۱۲، ۱۱ آبان ۱۴۰۵).\n\nقاعده‌های Bc از جدول بخش ۱۵ آمده‌اند: یک کنترل E2 یعنی Bc برابر ۴، یک کنترل E3 یعنی ۳، یک کنترل E4 یا E5 یعنی ۲ و دو کنترل E4 یا E5 مستقل یعنی ۱. مثال‌هایی از سند که کنترل E3 را Bc برابر ۲ گرفته‌اند با این جدول نمی‌خوانند و باید اصلاح شوند (س۱۱، ۱۱ آبان ۱۴۰۵).",
+        likelihood_strategy: {
+          value: "paths_v5",
+          label: "مسیرمحور v5",
+        },
+        impact_strategy: {
+          value: "max",
+          label: "بیشترین سطح",
+        },
+        impact_guidance:
+          "پیامد، نتیجه قابل دفاع وقوع رویداد تعریف‌شده است. ارزیاب یک وضعیت شدید اما باورپذیر با زنجیره علّی روشن انتخاب می‌کند؛ کنار هم گذاشتن بدترین پیامدهای ناسازگار مجاز نیست. اگر پیامد شدید فقط با یک شرط اضافی مستقل رخ می‌دهد، آن شرط در مسیر احتمال وارد یا سناریوی تشدید جداگانه ثبت شود.\n\n## داتین و بانک و انتشار بین مشتریان\n\nابتدا پیامد برای داتین و هر بانک مهم جدا ارزیابی و سپس بیشترین سطح انتخاب می‌شود. پیامد هم‌زمان چند مشتری فقط وقتی ثبت می‌شود که وابستگی یا علت مشترک مستند باشد. داشتن دو مشتری به‌خودی‌خود امتیاز اضافه ندارد؛ عبور مشترک خدمات حیاتی از حدود تحمل در معیار S لحاظ می‌شود.",
+        decision_guidance:
+          "L و I اعداد صحیح ۱ تا ۵ هستند. خروجی ۱ تا ۲۵ و فاقد اعشار است. از گرد کردن، میانگین نمره ارزیاب‌ها یا تغییر عدد برای رسیدن به سطح دلخواه استفاده نشود. آستانه پایه: پایین ۱ تا ۴؛ متوسط ۵ تا ۹؛ بالا ۱۰ تا ۱۵؛ بحرانی ۱۶ تا ۲۵.\n\n## قواعد تقدم بر امتیاز\n\n• پیامد ۵ حتی با احتمال ۱ حداقل سطح «بالا» دارد؛ پیامد ۴ حداقل «متوسط» است. عدد خام تغییر نمی‌کند و علت ارتقای سطح ثبت می‌شود.",
+        acceptance_guidance:
+          "جهت‌گیری پیشنهادی داتین، پذیرش ریسک پایین در حدود تعهدات، مدیریت فعال ریسک متوسط و کاهش یا اجتناب از ریسک بالا و بحرانی است. این بیان و جدول زیر پس از تصویب مرجع مجاز نافذ می‌شوند. حدود تحمل خدمت، قرارداد و مقررات بر اختیار عمومی جدول مقدم‌اند.",
+      },
+      versions: [
+        {
+          number: 1,
+          name: "نسخه‌ی 1: روش v5",
+          status: {
+            value: "active",
+            label: "فعال",
+          },
+          current: true,
+          href: "/method/1/",
+        },
+        {
+          number: 2,
+          name: "نسخه‌ی 2: بازنگری پارامترها",
+          status: {
+            value: "draft",
+            label: "پیش‌نویس",
+          },
+          current: false,
+          href: "/method/2/",
+        },
+      ],
+      likelihood_scales: [
+        {
+          code: "A",
+          name: "عامل آغازگر",
+          scope: "عامل آغازکننده سناریو با چه فراوانی یا چه میزان شواهدی ممکن است رخ دهد؟",
+          description:
+            "برای آغازگرهای غیرعمدی یا تکرارشونده با داده قابل مقایسه، نرخ سالانه برآورد می‌شود. برای حمله هدفمند یا نبود داده معتبر، ستون شواهد آینده‌نگر به کار می‌رود. مسیر انتخابی و دلیل آن الزامی است؛ ستون‌ها با هم جمع یا میانگین نمی‌شوند.",
+          guidance:
+            "نرخ از تعداد آغازگر یکتا تقسیم بر سال‌های مشاهده، با تعدیل موجه دامنه به دست می‌آید. مرزهای عددی متعلق به روش سازمانی‌اند. نرخ سالانه یک نوع آغازگر، درصد احتمال تحقق سناریوی نهایی نیست.",
+          has_level_names: false,
+          has_bounds: true,
+          levels: [
+            {
+              value: 1,
+              name: "",
+              bounds: "کمتر از 0.1 بار در سال",
+              criteria:
+                "شواهد مثبت درباره محدودیت شدید هدف‌گیری و نبود فعالیت مرتبط در منابع پوشش‌دهنده؛ صرف نبود لاگ کافی نیست.",
+            },
+            {
+              value: 2,
+              name: "",
+              bounds: "از 0.1 تا کمتر از 1 بار در سال",
+              criteria:
+                "تلاش مرتبط فقط در موارد نادر و محیط متفاوت مشاهده شده؛ قرینه معتبر هدف‌گیری داتین یا فناوری مشابه در دوره اخیر وجود ندارد.",
+            },
+            {
+              value: 3,
+              name: "",
+              bounds: "از 1 تا کمتر از 10 بار در سال",
+              criteria:
+                "فعالیت مرتبط در فناوری یا خدمت مشابه طی ۱۲ ماه؛ هدف‌گیری مستقیم یا فعالیت جاری تأیید نشده است.",
+            },
+            {
+              value: 4,
+              name: "",
+              bounds: "از 10 تا کمتر از 100 بار در سال",
+              criteria:
+                "هدف‌گیری معتبر سازمان یا مشتری یا بخش بانکی با روش مرتبط طی ۹۰ روز؛ یا تلاش مرتبط مستقیم تأییدشده.",
+            },
+            {
+              value: 5,
+              name: "",
+              bounds: "100 بار در سال یا بیشتر",
+              criteria:
+                "حمله یا کارزار فعال مرتبط با دامنه در ۳۰ روز اخیر؛ یا تلاش‌های مرتبط مستمر و تأییدشده در محیط.",
+            },
+          ],
+        },
+        {
+          code: "Bc",
+          name: "اعتبار موانع پیشگیرانه",
+          scope: "",
+          description:
+            "پس از تعیین قابلیت پایه هر مسیر (B0)، کنترل‌هایی بررسی می‌شوند که می‌توانند از رسیدن عامل آغازگر به رویداد اصلی جلوگیری کنند. اثربخشی هر کنترل با شاخص E ارزیابی و سپس بر اساس وضعیت مجموعه کنترل‌های همان مسیر، امتیاز Bc تعیین می‌شود.",
+          guidance: "## قواعد انتخاب سطح",
+          has_level_names: true,
+          has_bounds: false,
+          levels: [
+            {
+              value: 1,
+              name: "حداقل دو مانع مؤثر و مستقل",
+              bounds: null,
+              criteria:
+                "حداقل دو کنترل با سطح E4 یا E5 وجود دارد که هرکدام به‌تنهایی قادر به جلوگیری از تحقق همان مسیر هستند. شکست یا دورزدن یکی، دیگری را بی‌اثر نمی‌کند. وابستگی‌های مشترک و حالت‌های شکست هم‌زمان بررسی شده و برای موارد مرتبط، استقلال یا کنترل شکست مشترک با شواهد آزمون تأیید شده است. صرف وجود دو ابزار، دو تأیید یا دو نام کنترل کافی نیست.",
+            },
+            {
+              value: 2,
+              name: "مانع با اثربخشی پایدار",
+              bounds: null,
+              criteria:
+                "حداقل یک کنترل E4 یا E5 شرایط پوشش و آزمون رتبه ۳ را دارد؛ علاوه بر آن، سوابق معتبر نشان می‌دهد کنترل در دوره بررسی به‌طور مستمر عمل کرده و نتیجه توسط ارزیاب مستقل از مجری تأیید شده است. تغییرات مهم و استثناهای مرتبط بررسی شده‌اند و راه دورزدن شناخته‌شده‌ای که همه موانع معتبر را بی‌اثر کند، باز نیست.",
+            },
+            {
+              value: 3,
+              name: "مانع مؤثر در ارزیابی فعلی",
+              bounds: null,
+              criteria:
+                "حداقل یک کنترل E3 وجود دارد که در تمام موارد مرتبط با مسیر اعمال می‌شود و آزمون عملی نشان می‌دهد می‌تواند از تحقق رویداد اصلی جلوگیری کند. راه دورزدن شناخته‌شده‌ای که این مانع را بی‌اثر کند، باز نیست؛ اما شواهد عملکرد در طول زمان یا تأیید مستقل لازم برای E4 هنوز کامل نشده است.",
+            },
+            {
+              value: 4,
+              name: "مانع با اثر محدود و اثبات‌شده",
+              bounds: null,
+              criteria:
+                "حداقل یک کنترل E2 وجود دارد که شواهد مشخص نشان می‌دهد واقعاً تحقق مسیر را محدود می‌کند؛ اما پوشش، قابلیت جلوگیری یا دامنه آزمون آن برای احراز E3 کافی نیست. صرف وجود کنترل ناقص یا آزمون‌نشده برای این رتبه کافی نیست. اگر نقص کنترل یک راه عبور کامل از همه موانع ایجاد کرده باشد، آن راه لازم است جداگانه بررسی و در نبود مانع معتبر، Bc=5 دریافت کند.",
+            },
+            {
+              value: 5,
+              name: "فاقد مانع با اثر اثبات‌شده",
+              bounds: null,
+              criteria:
+                "کنترل پیشگیرانه مرتبط وجود ندارد؛ یا صرفاً مستند، طراحی یا نصب شده و اثر آن اثبات نشده است؛ یا مسیر شناخته‌شده‌ای وجود دارد که همه موانع معتبر را دور می‌زند و به رویداد اصلی می‌رسد. کنترل E1 اعتبار کاهش ایجاد نمی‌کند. نبود شواهد کافی نیز به‌تنهایی مجوز کاهش این امتیاز نیست.",
+            },
+          ],
+        },
+      ],
+      bc_rules: [
+        {
+          condition: "دست‌کم یک کنترل با E2 یا بالاتر",
+          bc: 4,
+        },
+        {
+          condition: "دست‌کم یک کنترل با E3 یا بالاتر",
+          bc: 3,
+        },
+        {
+          condition: "دست‌کم یک کنترل با E4 یا بالاتر",
+          bc: 2,
+        },
+        {
+          condition: "دست‌کم 2 کنترل با E4 یا بالاتر، مستقل از هم",
+          bc: 1,
+        },
+      ],
+      bc_default: 5,
+      l_scale: {
+        code: "L",
+        name: "احتمال نهایی",
+        scope: "ترکیب A و B چه رتبه‌ای برای امکان تحقق سناریو ایجاد می‌کند؟",
+        description:
+          "پس از تعیین A و B، فقط از جدول زیر برای L استفاده شود. ترکیب کیفی جدول G-5 راهنمای NIST SP 800-30 به برچسب‌های ۱ تا ۵ نگاشت شده است. آستانه‌های شواهد A و B در این سند بومی‌سازی شده‌اند. این جدول، رابطه احتمال آماری دو متغیر نیست. [۴]",
+        guidance:
+          "L1 بسیار کم، L2 کم، L3 متوسط، L4 زیاد و L5 بسیار زیاد است. این برچسب‌ها فقط رتبه احتمال تحقق سناریو را نشان می‌دهند؛ از آن‌ها درصد احتمال یا فراوانی نهایی استنتاج نشود.",
+        has_level_names: true,
+        has_bounds: false,
+        levels: [
+          {
+            value: 1,
+            name: "بسیار کم",
+            bounds: null,
+            criteria: "",
+          },
+          {
+            value: 2,
+            name: "کم",
+            bounds: null,
+            criteria: "",
+          },
+          {
+            value: 3,
+            name: "متوسط",
+            bounds: null,
+            criteria: "",
+          },
+          {
+            value: 4,
+            name: "زیاد",
+            bounds: null,
+            criteria: "",
+          },
+          {
+            value: 5,
+            name: "بسیار زیاد",
+            bounds: null,
+            criteria: "",
+          },
+        ],
+        grid: [
+          {
+            a: 1,
+            values: [1, 1, 2, 2, 2],
+          },
+          {
+            a: 2,
+            values: [1, 2, 2, 3, 3],
+          },
+          {
+            a: 3,
+            values: [2, 2, 3, 3, 4],
+          },
+          {
+            a: 4,
+            values: [2, 3, 3, 4, 5],
+          },
+          {
+            a: 5,
+            values: [2, 3, 4, 5, 5],
+          },
+        ],
+      },
+      levels_range: [1, 2, 3, 4, 5],
+      impact_scales: [
+        {
+          code: "S",
+          name: "خدمت و تداوم",
+          scope: "توقف، افت کیفیت، زمان بازیابی، گستره مشتری و انتشار اختلال",
+          description:
+            "RTO زمان هدف بازیابی و MTPD حداکثر دوره قابل تحمل اختلال است. برای هر خدمت حیاتی لازم است مقادیر مصوب و واحد زمانی یکسان وجود داشته باشد. زمان اختلال d، مدت از دست رفتن خدمت یا تأخیر معادلِ قابل توجیه در سناریو است. نقض RTO لزوماً نقض SLA نیست و هر یک جدا بررسی می‌شود.",
+          guidance: "## قواعد تکمیلی",
+          has_level_names: false,
+          has_bounds: false,
+          levels: [
+            {
+              value: 0,
+              name: "",
+              bounds: null,
+              criteria: "هیچ اثر قابل مشاهده‌ای بر ارائه خدمت وجود ندارد.",
+            },
+            {
+              value: 1,
+              name: "",
+              bounds: null,
+              criteria:
+                "اختلال صرفاً داخلی و غیرحیاتی؛ زمان d حداکثر یک‌چهارم RTO همان فعالیت است و تعهد مشتری متأثر نیست.",
+            },
+            {
+              value: 2,
+              name: "",
+              bounds: null,
+              criteria:
+                "اختلال خدمت حیاتی با d حداکثر یک‌چهارم RTO؛ یا اختلال غیرحیاتی بیش از یک‌چهارم RTO تا خود RTO.",
+            },
+            {
+              value: 3,
+              name: "",
+              bounds: null,
+              criteria:
+                "اختلال خدمت حیاتی با d بیش از یک‌چهارم RTO و حداکثر RTO؛ یا عبور فعالیت غیرحیاتی از RTO بدون معیار شدیدتر.",
+            },
+            {
+              value: 4,
+              name: "",
+              bounds: null,
+              criteria:
+                "اختلال یک خدمت حیاتی با d بیش از RTO و کمتر از MTPD؛ یا از دست رفتن ظرفیت لازم که نقض مشابهی ایجاد کند.",
+            },
+            {
+              value: 5,
+              name: "",
+              bounds: null,
+              criteria:
+                "d برابر یا بیشتر از MTPD خدمت حیاتی؛ یا اختلال با علت مشترک در خدمات حیاتی حداقل دو بانک، که در هر دو از RTO عبور کند؛ یا توقف زنجیره‌ای حیاتی با پیامد هم‌ارز مستند.",
+            },
+          ],
+        },
+        {
+          code: "F",
+          name: "مالی",
+          scope: "هزینه بازیابی، جبران، خسارت و درآمد از دست‌رفته بدون تکرار",
+          description:
+            "مبنای مالی، درآمد عملیاتی تأییدشده ۱۲ ماه اخیر داتین است. زیان ناخالص باورپذیر یک تحقق سناریو به این درآمد تقسیم و طبق جدول امتیازدهی می‌شود. برای بانک، از مبنای مالی مورد تأیید همان بانک استفاده شود؛ مبلغ خسارت بانک با درآمد داتین نرمال‌سازی نمی‌شود.",
+          guidance:
+            "واحد پول، تاریخ مبنا، هزینه مستقیم، بازیابی، جبران مشتری و درآمد از دست‌رفته ثبت شود. هزینه مشترک فقط یک بار محاسبه شود. بیمه و تضمین، زیان خالص را جدا نشان می‌دهند؛ تا تأیید پوشش و قابلیت وصول، امتیاز مالی ناخالص مبنای تصمیم است. نبود داده مالی، امتیاز صفر ایجاد نمی‌کند.",
+          has_level_names: false,
+          has_bounds: true,
+          levels: [
+            {
+              value: 0,
+              name: "",
+              bounds: null,
+              criteria: "زیان قابل انتساب ندارد",
+            },
+            {
+              value: 1,
+              name: "",
+              bounds: "بیش از 0 تا 0.01 درصد",
+              criteria: "بیش از صفر تا ۰٫۰۱ درصد",
+            },
+            {
+              value: 2,
+              name: "",
+              bounds: "بیش از 0.01 تا 0.1 درصد",
+              criteria: "بیش از ۰٫۰۱ تا ۰٫۱ درصد",
+            },
+            {
+              value: 3,
+              name: "",
+              bounds: "بیش از 0.1 تا 0.5 درصد",
+              criteria: "بیش از ۰٫۱ تا ۰٫۵ درصد",
+            },
+            {
+              value: 4,
+              name: "",
+              bounds: "بیش از 0.5 تا 2 درصد",
+              criteria: "بیش از ۰٫۵ تا ۲ درصد",
+            },
+            {
+              value: 5,
+              name: "",
+              bounds: "بیش از 2 درصد",
+              criteria: "بیش از ۲ درصد یا تهدید مستند نقدینگی و ادامه فعالیت",
+            },
+          ],
+        },
+      ],
+      risk_levels: [
+        {
+          name: "پایین",
+          color: "#198754",
+          text_color: "#fff",
+          min_score: 1,
+          max_score: 4,
+          decision_rule: "مالک ریسک؛ پذیرش مستند با پایش کافی است.",
+          co_approver: "هیچ‌کس؛ فقط مالک ریسک",
+          containment: null,
+          plan: "30 روز تقویمی",
+          acceptance: "12 ماه",
+          review: "6 ماه",
+        },
+        {
+          name: "متوسط",
+          color: "#ffc107",
+          text_color: "#000",
+          min_score: 5,
+          max_score: 9,
+          decision_rule: "مالک ریسک و مجوز مدیر بالادست طبق تفویض؛ کاهش یا پذیرش مستدل با تأیید روش‌شناختی امنیت.",
+          co_approver: "مدیر بالادست",
+          containment: null,
+          plan: "30 روز تقویمی",
+          acceptance: "6 ماه",
+          review: "3 ماه",
+        },
+        {
+          name: "بالا",
+          color: "#fd7e14",
+          text_color: "#000",
+          min_score: 10,
+          max_score: 15,
+          decision_rule:
+            "طرح مواجهه الزامی؛ مالک ریسک همراه مجوز کمیته امنیت با امکان تفویض. پذیرش صرفاً موقت و استثنایی.",
+          co_approver: "کمیته امنیت",
+          containment: null,
+          plan: "10 روز کاری",
+          acceptance: "90 روز تقویمی",
+          review: "1 ماه",
+        },
+        {
+          name: "بحرانی",
+          color: "#dc3545",
+          text_color: "#fff",
+          min_score: 16,
+          max_score: 25,
+          decision_rule: "ارجاع فوری به کمیته امنیت؛ اقدام مهار بی‌درنگ. ادامه موقت فقط با ضرورت مستند و اختیار رسمی.",
+          co_approver: "کمیته امنیت",
+          containment: "24 ساعت",
+          plan: "3 روز کاری",
+          acceptance: "30 روز تقویمی",
+          review: "1 هفته",
+        },
+      ],
+      floors: [
+        {
+          min_impact: 4,
+          min_level: "متوسط",
+        },
+        {
+          min_impact: 5,
+          min_level: "بالا",
+        },
+      ],
+      decision_matrix: [
+        {
+          likelihood: 1,
+          cells: [
+            {
+              score: 1,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 2,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 3,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 4,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: true,
+            },
+            {
+              score: 5,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: true,
+            },
+          ],
+        },
+        {
+          likelihood: 2,
+          cells: [
+            {
+              score: 2,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 4,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 6,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 8,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 10,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+          ],
+        },
+        {
+          likelihood: 3,
+          cells: [
+            {
+              score: 3,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 6,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 9,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 12,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 15,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+          ],
+        },
+        {
+          likelihood: 4,
+          cells: [
+            {
+              score: 4,
+              level: {
+                name: "پایین",
+                color: "#198754",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 8,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 12,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 16,
+              level: {
+                name: "بحرانی",
+                color: "#dc3545",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 20,
+              level: {
+                name: "بحرانی",
+                color: "#dc3545",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+          ],
+        },
+        {
+          likelihood: 5,
+          cells: [
+            {
+              score: 5,
+              level: {
+                name: "متوسط",
+                color: "#ffc107",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 10,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 15,
+              level: {
+                name: "بالا",
+                color: "#fd7e14",
+                text_color: "#000",
+              },
+              raised: false,
+            },
+            {
+              score: 20,
+              level: {
+                name: "بحرانی",
+                color: "#dc3545",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+            {
+              score: 25,
+              level: {
+                name: "بحرانی",
+                color: "#dc3545",
+                text_color: "#fff",
+              },
+              raised: false,
+            },
+          ],
+        },
+      ],
+      parameters: [
+        {
+          key: "horizon",
+          label: "افق پیش‌فرض ارزیابی",
+          value: "12",
+          unit: "ماه",
+          note: "بخش ۱۳ سند v5",
+        },
+        {
+          key: "input_return",
+          label: "مهلت پیشنهادی جواب ورودی مبهم",
+          value: "5",
+          unit: "روز کاری",
+          note: "بخش ۴ سند v5",
+        },
+        {
+          key: "a_data_period",
+          label: "کمترین دوره‌ی داده برای نرخ A",
+          value: "12",
+          unit: "ماه",
+          note: "بخش ۱۴ سند v5",
+        },
+        {
+          key: "a_data_coverage",
+          label: "کمترین پوشش ثبت دامنه‌ی آغازگر",
+          value: "95",
+          unit: "درصد",
+          note: "بخش ۱۴ سند v5",
+        },
+      ],
+      active_url: "/method/",
+    } satisfies MethodPage),
+    ...overrides,
+  };
+}
+
+export function dependencyForm(overrides: Partial<FormPageData> = {}): FormPageData {
+  return {
+    ...({
+      view: "catalog:dependency_create",
+      title: "وابستگی خدمت SRV-PAY - درگاه پرداخت اینترنتی به تأمین‌کننده",
+      form: {
+        fields: [
+          {
+            name: "supplier",
+            label: "تأمین‌کننده",
+            help: "",
+            required: true,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "- انتخاب کنید -",
+            choices: [
+              {
+                value: "2",
+                label: "شرکت پشتیبانی سخت‌افزار",
+              },
+            ],
+          },
+          {
+            name: "description",
+            label: "شرح",
+            help: "خدمت برای چه کاری به آن وابسته است.",
+            required: false,
+            disabled: false,
+            kind: "textarea",
+            value: "",
+            errors: [],
+            rows: 2,
+          },
+          {
+            name: "alternative",
+            label: "جایگزین",
+            help: "اگر از کار بیفتد، مسیر جایگزین چیست.",
+            required: false,
+            disabled: false,
+            kind: "textarea",
+            value: "",
+            errors: [],
+            rows: 2,
+          },
+          {
+            name: "is_shared_point",
+            label: "نقطه‌ی شکست مشترک",
+            help: "از کار افتادنش چند خدمت را با هم مختل می‌کند.",
+            required: false,
+            disabled: false,
+            kind: "checkbox",
+            value: false,
+            errors: [],
+          },
+          {
+            name: "infra_owner",
+            label: "مالک زیرساخت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "- انتخاب کنید -",
+            choices: [
+              {
+                value: "datin",
+                label: "داتین",
+              },
+              {
+                value: "bank",
+                label: "بانک",
+              },
+              {
+                value: "supplier",
+                label: "تأمین‌کننده",
+              },
+            ],
+          },
+          {
+            name: "control_operator",
+            label: "اجراکننده‌ی کنترل",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "- انتخاب کنید -",
+            choices: [
+              {
+                value: "datin",
+                label: "داتین",
+              },
+              {
+                value: "bank",
+                label: "بانک",
+              },
+              {
+                value: "supplier",
+                label: "تأمین‌کننده",
+              },
+            ],
+          },
+          {
+            name: "evidence_provider",
+            label: "ارائه‌دهنده‌ی شاهد",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "- انتخاب کنید -",
+            choices: [
+              {
+                value: "datin",
+                label: "داتین",
+              },
+              {
+                value: "bank",
+                label: "بانک",
+              },
+              {
+                value: "supplier",
+                label: "تأمین‌کننده",
+              },
+            ],
+          },
+          {
+            name: "change_authority",
+            label: "تصمیم‌گیر تغییر",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "- انتخاب کنید -",
+            choices: [
+              {
+                value: "datin",
+                label: "داتین",
+              },
+              {
+                value: "bank",
+                label: "بانک",
+              },
+              {
+                value: "supplier",
+                label: "تأمین‌کننده",
+              },
+            ],
+          },
+          {
+            name: "incident_contact",
+            label: "مخاطب اعلام رخداد",
+            help: "نام یا نقش؛ ممکن است بیرون از داتین باشد.",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            max_length: 200,
+          },
+          {
+            name: "valid_from",
+            label: "اعتبار از",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+          {
+            name: "valid_until",
+            label: "اعتبار تا",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      cancel: {
+        href: "/catalog/services/1/",
+        route: "/catalog/services/1",
+      },
+      messages: [],
     } satisfies FormPageData),
     ...overrides,
   };
