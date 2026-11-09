@@ -257,9 +257,16 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
 
     RATE_FIELDS = ["a_count", "a_period_months", "a_denominator", "a_coverage"]
 
-    def __init__(self, *args, evidence, **kwargs):
+    def __init__(self, *args, evidence, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.user = user
         assessment = self.instance
+        risk = assessment.risk
+        self.fields["risk_scope"] = forms.CharField(label="دامنه بررسی", required=False, initial=risk.scope, widget=forms.Textarea(attrs={"rows": 2}))
+        self.fields["risk_count_unit"] = forms.CharField(label="واحد شمارش آغازگر", required=False, max_length=200, initial=risk.count_unit)
+        self.fields["risk_count_exclusions"] = forms.CharField(label="موارد خارج از شمارش", required=False, initial=risk.count_exclusions, widget=forms.Textarea(attrs={"rows": 2}))
+        for name in ("risk_scope", "risk_count_unit", "risk_count_exclusions"):
+            self.fields[name].widget.attrs["class"] = "form-control"
         self.scale = initiator_scale(assessment.method_version)
         self.fields["a_basis"].choices = [("", "ثبت‌نشده")] + ABasis.choices
         self.fields["a_level"].choices = level_choices(self.scale, empty="-")
@@ -269,7 +276,7 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["a_confidence"].choices = [("", "-")] + Confidence.choices
         if assessment.a_recorded:
             self.initial["a_level"] = UNKNOWN if assessment.a is None else str(assessment.a)
-        self.order_fields(["a_basis", *self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"])
+        self.order_fields(["risk_scope", "risk_count_unit", "risk_count_exclusions", "a_basis", *self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"])
         self.rate = assessment_rate_check(assessment) if assessment.a_basis == ABasis.RATE else None
 
     def clean(self):
@@ -325,6 +332,15 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         if commit:
             assessment.save()
             self.save_m2m()
+            mapping = {"risk_scope": "scope", "risk_count_unit": "count_unit", "risk_count_exclusions": "count_exclusions"}
+            if any(self.add_prefix(name) in self.data for name in mapping):
+                risk = assessment.risk
+                for name, attribute in mapping.items():
+                    if self.add_prefix(name) in self.data:
+                        setattr(risk, attribute, data[name])
+                if self.user:
+                    risk._history_user = self.user
+                risk.save()
         return assessment
 
 

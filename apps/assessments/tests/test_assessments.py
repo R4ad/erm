@@ -88,8 +88,11 @@ def test_the_financial_suggestion_uses_the_bounds_of_the_method_version(v1):
 
 def test_grc_creates_assessments_only_while_the_risk_is_being_assessed(client, grc, risk, v1):
     url = reverse("assessments:assessment_create", args=[risk.pk])
-    client.force_login(make_user("viewer", Role.SECURITY_WORKGROUP))
+    client.force_login(make_user("viewer", Role.VIEWER))
     assert client.get(url).status_code == 403
+
+    client.force_login(make_user("workgroup", Role.SECURITY_WORKGROUP))
+    assert client.get(url).status_code == 200
 
     client.force_login(grc)
     form = client.get(url).context["form"]

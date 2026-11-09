@@ -122,6 +122,18 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "assessments",
+            lazy: async () => ({
+              Component: (await import("@/features/assessments/AssessmentWorkspacePage")).AssessmentWorkspacePage,
+            }),
+          },
+          {
+            path: "assessments/new",
+            lazy: async () => ({
+              Component: (await import("@/features/assessments/AssessmentWorkspacePage")).AssessmentCandidatesPage,
+            }),
+          },
+          {
             path: "assessments/compare",
             lazy: async () => ({ Component: (await import("@/features/assessments/ComparePage")).ComparePage }),
           },

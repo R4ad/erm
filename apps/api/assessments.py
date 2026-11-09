@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from apps.assessments.forms import ReferralForm, ReviewForm
 from apps.assessments.services import band_list
+from apps.risks.permissions import can_add_evidence, visible_evidence
 
 from . import formatting as fmt
 from .forms import describe_field, describe_form
@@ -229,9 +230,41 @@ def assessment_detail(context, request):
     assessment = context["assessment"]
     can_edit = context["can_edit"]
     pk = assessment.pk
+    risk = assessment.risk
+    from apps.controls.permissions import visible_controls
+
+    controls = visible_controls(request.user).filter(risks=risk).order_by("code")
+    risk_rows = [
+        ("کد ریسک", risk.code), ("عنوان", risk.title), ("سناریو", risk.description),
+        ("خدمت", str(risk.service) if risk.service_id else ""), ("واحد", str(risk.org_unit)),
+        ("کانال ورود", risk.get_channel_display()), ("دسته", str(risk.category)),
+        ("مالک", (risk.owner.get_full_name() or risk.owner.username) if risk.owner_id else ""),
+        ("بانک‌های متأثر", "، ".join(risk.customers.values_list("name", flat=True))),
+        ("عامل آغازگر", risk.initiator), ("مسیر ثبت‌شده", risk.realization_path),
+        ("کنترل‌های فعلی", "، ".join(f"{item.code} {item.title}" for item in controls)),
+        ("برچسب‌ها", "، ".join(risk.tags.values_list("name", flat=True))),
+        ("توضیحات اضافه", risk.additional_notes),
+        ("شواهد", "، ".join(f"{item.code} {item.title}" for item in visible_evidence(request.user).filter(risks=risk))),
+        ("پیوندهای بیرونی", "، ".join(f"{item.get_kind_display()}: {item.ref}" for item in risk.links.all())),
+        ("وضعیت ریسک", risk.get_status_display()),
+        ("دامنه", risk.scope), ("واحد شمارش", risk.count_unit), ("موارد خارج از شمارش", risk.count_exclusions),
+        ("طبقه اطلاعات", risk.get_data_class_display()), ("برچسب CIA", risk.cia_labels),
+    ]
+    snapshot = risk.scenario_snapshot or {}
+    if snapshot:
+        risk_rows.extend([
+            ("کد سناریو", str(snapshot.get("code", ""))),
+            ("نسخه سناریو", str(snapshot.get("version", ""))),
+            ("عامل و وضعیت سناریو", str(snapshot.get("conditions", ""))),
+            ("رویداد سناریو", str(snapshot.get("event", ""))),
+            ("هدف یا تعهد", str(snapshot.get("objective", ""))),
+            ("مشتری سناریو", str(snapshot.get("customer", ""))),
+            ("نوع و دامنه پیامد", str(snapshot.get("consequence", ""))),
+        ])
     return {
         "title": _title(assessment),
         "assessment": _header(assessment),
+        "risk_details": [{"label": label, "value": value} for label, value in risk_rows],
         "outcome": _outcome(context["outcome"], assessment),
         "review": _review(context, assessment),
         "likelihood": _likelihood(assessment, context["likelihood"], can_edit),
@@ -241,6 +274,7 @@ def assessment_detail(context, request):
             "impact_profile": reverse("assessments:impact_profile", args=[pk]) if can_edit else None,
             "initiator": reverse("assessments:initiator", args=[pk]) if can_edit else None,
             "add_path": reverse("assessments:path_create", args=[pk]) if can_edit else None,
+            "add_evidence": f"{reverse('risks:evidence_create')}?risk={risk.pk}" if can_add_evidence(request.user, risk) else None,
         },
     }
 

@@ -48,6 +48,19 @@ def _intro(context, request):
     return {"intro": str(context["intro"])} if context.get("intro") else {}
 
 
+def _scenario_for_risk(context, request):
+    scenario = context["scenario"]
+    rows = [
+        ("کد", scenario.code), ("نسخه", str(scenario.version)), ("عنوان", scenario.title),
+        ("خدمت یا فرآیند", f"{scenario.service.code} - {scenario.service_name_snapshot or scenario.service.name}"),
+        ("عامل و وضعیت", scenario.conditions), ("رویداد مشخص", scenario.event),
+        ("هدف یا تعهد", scenario.objective), ("داتین یا مشتری", scenario.customer_text),
+        ("نوع و دامنه پیامد", scenario.consequence), ("دسته", str(scenario.category)), ("وضعیت", "فعال"),
+        ("متن سناریو", scenario.narrative),
+    ]
+    return {"facts": {"title": "جزئیات سناریو", "rows": [{"label": label, "value": value} for label, value in rows]}}
+
+
 def _submit(label):
     """فقط دکمه‌ی فرستادن برچسب دیگری از «ذخیره» دارد."""
     return lambda context, request: {"submit": label}
@@ -56,7 +69,7 @@ def _submit(label):
 # نام صفحه‌ی جنگو → تابعی که چیزهای بیشتر صفحه را از context می‌خواند (یا None). title و cancel_url آن تابع، اگر
 # باشد، جای title و cancel_url خود context را می‌گیرد؛ برای صفحه‌هایی که قالب اختصاصی دارند و آن دو را ندارند.
 FORM_PAGES = {
-    "risks:risk_create": None,
+    "risks:risk_create": _scenario_for_risk,
     "risks:risk_update": None,
     "risks:link_create": None,
     "risks:link_update": None,

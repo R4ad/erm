@@ -20,6 +20,8 @@ SPA_PAGES = {
     "questionnaires:answer_home": "/questionnaires",
     "questionnaires:response_start": "/questionnaires/{questionnaire_pk}/start",
     "questionnaires:response_answer": "/responses/{pk}",
+    "assessments:assessment_list": "/assessments",
+    "assessments:candidates": "/assessments/new",
     "workflow:question_list": "/questionnaires/risk-questions",
     "risks:risk_list": None,
     "risks:risk_detail": None,
@@ -91,7 +93,7 @@ def spa_route(url):
     """مسیر React یک نشانی جنگو با همان query و #بخش، یا None اگر آن صفحه هنوز فقط در جنگو است."""
     if not url:
         return None
-    parts = urlsplit(url)
+    parts = urlsplit(str(url))
     try:
         match = resolve(parts.path)
     except Resolver404:

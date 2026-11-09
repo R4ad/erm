@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}ثبت ریسک از سناریو{% endblock %}
+{% block content %}
+<div class="row"><div class="col-lg-8">
+  <h1 class="h4 mb-4">ثبت ریسک از سناریو</h1>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">جزئیات سناریو {{ scenario.code }}</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">عنوان</dt><dd class="col-sm-8">{{ scenario.title }}</dd>
+      <dt class="col-sm-4">نسخه</dt><dd class="col-sm-8">{{ scenario.version }}</dd>
+      <dt class="col-sm-4">خدمت</dt><dd class="col-sm-8">{{ scenario.service.code }} - {{ scenario.service_name_snapshot|default:scenario.service.name }}</dd>
+      <dt class="col-sm-4">عامل و وضعیت</dt><dd class="col-sm-8">{{ scenario.conditions|linebreaksbr }}</dd>
+      <dt class="col-sm-4">رویداد مشخص</dt><dd class="col-sm-8">{{ scenario.event|linebreaksbr }}</dd>
+      <dt class="col-sm-4">هدف یا تعهد</dt><dd class="col-sm-8">{{ scenario.objective|linebreaksbr|default:"-" }}</dd>
+      <dt class="col-sm-4">داتین یا مشتری</dt><dd class="col-sm-8">{{ scenario.customer_text|linebreaksbr|default:"-" }}</dd>
+      <dt class="col-sm-4">نوع و دامنه پیامد</dt><dd class="col-sm-8">{{ scenario.consequence|linebreaksbr }}</dd>
+      <dt class="col-sm-4">دسته</dt><dd class="col-sm-8">{{ scenario.category }}</dd>
+      <dt class="col-sm-4">وضعیت</dt><dd class="col-sm-8">فعال</dd>
+      <dt class="col-sm-4">متن سناریو</dt><dd class="col-sm-8">{{ scenario.narrative|linebreaksbr|default:"-" }}</dd>
+    </dl>
+  </div></section>
+  <form method="post" novalidate>{% csrf_token %}
+    {% include "includes/form_fields.html" %}
+    <button type="submit" class="btn btn-primary">ثبت و ارسال ریسک</button>
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+  </form>
+</div></div>
+{% endblock %}

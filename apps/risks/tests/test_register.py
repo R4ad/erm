@@ -44,6 +44,14 @@ def risk_data(**fields):
     return {"title": "قطع درگاه پرداخت", "description": "شرح", "channel": "interview", **fields}
 
 
+def submitted_data(**fields):
+    return {"channel": "interview", "initiator": "عامل", "realization_path": "مسیر تحقق", **fields}
+
+
+def scenario_risk_url(scenario):
+    return f"{reverse('risks:risk_create')}?scenario={scenario.pk}"
+
+
 def test_scenario_codes_are_automatic_and_start_at_version_one():
     first, second = make_scenario(), make_scenario("سناریوی دوم")
 
@@ -113,12 +121,12 @@ def test_needs_completion_follows_initiator_count_unit_and_scope():
 
 def test_a_risk_from_the_form_takes_unit_from_its_service_and_category_from_its_scenario(client, grc):
     service = make_service("SRV-1")
-    scenario = make_scenario(category=category("T4"))
+    scenario = make_scenario(service=service, category=category("T4"))
     client.force_login(grc)
 
     response = client.post(
-        reverse("risks:risk_create"),
-        risk_data(service=service.pk, scenario=scenario.pk, tag_names="پرداخت، ابری ,پرداخت"),
+        scenario_risk_url(scenario),
+        submitted_data(tag_names="پرداخت، ابری ,پرداخت"),
     )
 
     risk = Risk.objects.get()
@@ -131,23 +139,23 @@ def test_a_risk_from_the_form_takes_unit_from_its_service_and_category_from_its_
     assert risk.history.first().history_user == grc
 
 
-def test_a_risk_needs_a_unit_or_a_service_and_a_category_or_a_scenario(client, grc):
+def test_a_risk_must_be_created_from_a_scenario(client, grc):
     client.force_login(grc)
 
     response = client.post(reverse("risks:risk_create"), risk_data())
 
-    errors = response.context["form"].errors
-    assert "واحد را انتخاب کنید" in errors["org_unit"][0]
-    assert "دسته را انتخاب کنید" in errors["category"][0]
+    assert response.status_code == 302
+    assert response.url == reverse("risks:scenario_list")
     assert not Risk.objects.exists()
 
 
 def test_the_unit_can_differ_from_the_service_unit(client, grc):
     service = make_service("SRV-1")
     other = OrgUnit.objects.create(name="امنیت")
+    scenario = make_scenario(service=service)
     client.force_login(grc)
 
-    client.post(reverse("risks:risk_create"), risk_data(service=service.pk, org_unit=other.pk, category=category().pk))
+    client.post(scenario_risk_url(scenario), submitted_data(org_unit=other.pk, category=category().pk))
 
     assert Risk.objects.get().org_unit == other
 
@@ -189,23 +197,26 @@ def test_parse_tag_names_splits_on_both_commas_and_drops_repeats():
 def test_customers_are_chosen_from_active_banks(client, grc):
     mellat = Customer.objects.create(name="بانک ملت")
     Customer.objects.create(name="بانک قدیمی", is_active=False)
+    service = make_service("SRV-CUSTOMER")
+    scenario = make_scenario(service=service)
     client.force_login(grc)
 
-    response = client.get(reverse("risks:risk_create"))
+    response = client.get(scenario_risk_url(scenario))
     assert list(response.context["form"].fields["customers"].queryset) == [mellat]
 
     client.post(
-        reverse("risks:risk_create"),
-        risk_data(org_unit=OrgUnit.objects.create(name="و").pk, category=category().pk, customers=[mellat.pk]),
+        scenario_risk_url(scenario),
+        submitted_data(customers=[mellat.pk]),
     )
     assert list(Risk.objects.get().customers.all()) == [mellat]
 
 
 def test_only_grc_and_system_admin_register_risks(client, grc, system_admin):
     manager = make_user("manager", Role.UNIT_MANAGER)
+    scenario = make_scenario(service=make_service("SRV-PERM"))
     for user, status in [(manager, 403), (make_user("viewer", Role.VIEWER), 403), (grc, 200), (system_admin, 200)]:
         client.force_login(user)
-        assert client.get(reverse("risks:risk_create")).status_code == status
+        assert client.get(scenario_risk_url(scenario)).status_code == status
 
 
 def test_unit_managers_see_risks_of_their_units_and_owners_see_their_own(client):
@@ -258,20 +269,18 @@ def test_the_register_filters_by_service_category_and_completeness(client, grc):
     assert list(client.get(url, {"needs_completion": "no"}).context["risks"]) == [complete]
 
 
-def test_registering_a_risk_marks_its_pending_coverage_cell_reviewed(client, grc):
+def test_submitting_a_risk_does_not_change_coverage(client, grc):
     service = make_service("SRV-1")
+    scenario = make_scenario(service=service, category=category("T2"))
     client.force_login(grc)
 
     response = client.post(
-        reverse("risks:risk_create"), risk_data(service=service.pk, category=category("T2").pk), follow=True
+        scenario_risk_url(scenario), submitted_data(), follow=True
     )
 
-    cell = Coverage.objects.get(service=service, category=category("T2"))
-    risk = Risk.objects.get()
-    assert cell.status == Coverage.Status.REVIEWED
-    assert cell.reviewed_by == grc
-    assert risk.code in cell.reason
-    assert "«بررسی‌شده» شد" in response.content.decode()
+    assert not Coverage.objects.filter(service=service, category=category("T2")).exists()
+    assert Risk.objects.get().status == Risk.Status.SUBMITTED
+    assert response.status_code == 200
 
 
 def test_a_reviewed_cell_keeps_its_reviewer_and_reason():
@@ -292,9 +301,10 @@ def test_a_risk_cannot_go_into_a_not_relevant_cell(client, grc):
     Coverage.objects.create(
         service=service, category=category(), status=Coverage.Status.NOT_RELEVANT, reason="نرم‌افزار ندارد"
     )
+    scenario = make_scenario(service=service)
     client.force_login(grc)
 
-    response = client.post(reverse("risks:risk_create"), risk_data(service=service.pk, category=category().pk))
+    response = client.post(scenario_risk_url(scenario), submitted_data(category=category().pk))
 
     assert "«نامرتبط» ثبت شده است" in response.context["form"].errors["category"][0]
     assert not Risk.objects.exists()
@@ -334,23 +344,18 @@ def test_the_service_page_lists_its_risks(client, grc):
     response = client.get(service.get_absolute_url())
 
     assert list(response.context["risks"]) == [risk]
-    assert f"{reverse('risks:risk_create')}?service={service.pk}" in response.content.decode()
+    assert reverse("risks:scenario_list") in response.content.decode()
 
 
 def test_the_create_form_is_prefilled_from_scenario_service_and_category(client, grc):
     service = make_service("SRV-1")
-    scenario = make_scenario(category=category("T5"))
+    scenario = make_scenario(service=service, category=category("T5"))
     client.force_login(grc)
 
     initial = client.get(reverse("risks:risk_create"), {"scenario": scenario.pk}).context["form"].initial
     assert (initial["scenario"], initial["title"], initial["category"]) == (scenario, scenario.title, category("T5"))
 
-    initial = (
-        client.get(reverse("risks:risk_create"), {"service": service.pk, "category": category("T2").pk})
-        .context["form"]
-        .initial
-    )
-    assert (initial["service"], initial["org_unit"], initial["category"]) == (service, service.org_unit, category("T2"))
+    assert (initial["service"], initial["org_unit"]) == (service, service.org_unit)
 
 
 def test_external_links_are_added_by_grc_and_duplicates_are_refused(client, grc):

@@ -584,10 +584,17 @@ function Facts({ risk }: { risk: RiskDetail }) {
             )}
           </Fact>
           <Fact label="عامل آغازگر">{risk.initiator && <Prose>{risk.initiator}</Prose>}</Fact>
-          <Fact label="دامنه">{risk.scope && <Prose>{risk.scope}</Prose>}</Fact>
-          <Fact label="واحد شمارش">{risk.count_unit}</Fact>
-          <Fact label="طبقه‌ی اطلاعات">{risk.data_class?.label}</Fact>
-          <Fact label="برچسب CIA">{risk.cia && <bdi className="code">{risk.cia}</bdi>}</Fact>
+          {risk.scenario_snapshot && Object.keys(risk.scenario_snapshot).length > 0 && (
+            <Fact label="مسیر مشخص تحقق">{risk.realization_path && <Prose>{risk.realization_path}</Prose>}</Fact>
+          )}
+          {(!risk.scenario_snapshot || Object.keys(risk.scenario_snapshot).length === 0) && (
+            <>
+              <Fact label="دامنه">{risk.scope && <Prose>{risk.scope}</Prose>}</Fact>
+              <Fact label="واحد شمارش">{risk.count_unit}</Fact>
+              <Fact label="طبقه‌ی اطلاعات">{risk.data_class?.label}</Fact>
+              <Fact label="برچسب CIA">{risk.cia && <bdi className="code">{risk.cia}</bdi>}</Fact>
+            </>
+          )}
           <Fact label="بانک‌ها">{risk.customers.length > 0 && risk.customers.join("، ")}</Fact>
           <Fact label="برچسب‌ها">
             {risk.tags.length > 0 && (
@@ -737,9 +744,21 @@ export function RiskDetailPage() {
               </Alert>
             )}
             <Card>
-              <CardHeader icon={<FileText />} title="شرح ریسک" as="h2" />
+              <CardHeader
+                icon={<FileText />}
+                title={
+                  data.scenario_snapshot && Object.keys(data.scenario_snapshot).length ? "سناریوی ثبت‌شده" : "شرح ریسک"
+                }
+                as="h2"
+              />
               <CardContent className="flex flex-col gap-3">
                 <Prose>{data.description}</Prose>
+                {data.additional_notes && (
+                  <>
+                    <h3 className="text-sm font-semibold">توضیحات اضافه</h3>
+                    <Prose>{data.additional_notes}</Prose>
+                  </>
+                )}
                 {data.count_exclusions && (
                   <p className="rounded-lg bg-surface px-3 py-2 text-xs text-muted">
                     موارد خارج از شمارش: {data.count_exclusions}

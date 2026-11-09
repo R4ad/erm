@@ -1,21 +1,35 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
 from django.db import transaction
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
+from apps.controls.permissions import visible_controls
 from apps.methodology.models import MethodParameter
-from apps.risks.models import Evidence
-from apps.risks.permissions import visible_risks
+from apps.risks.models import Evidence, Risk
+from apps.risks.permissions import visible_evidence, visible_risks
 
 from .comparison import compare
-from .forms import AssessmentForm, ImpactDetailForm, InitiatorForm, PathForm, ReferralForm, ReviewForm
+from .forms import (
+    AssessmentForm,
+    ImpactDetailForm,
+    InitiatorForm,
+    PathForm,
+    ReferralForm,
+    ReviewForm,
+)
 from .models import AssessmentReview, Path
+from .permissions import (
+    ASSESSMENT_EDIT_ROLES,
+    can_edit_assessment,
+    can_start_submitted_assessment,
+    visible_assessments,
+)
 from .results import outcome, submission_problems
 from .review import (
     ReviewError,
@@ -26,7 +40,6 @@ from .review import (
     review,
     submit,
 )
-from .permissions import ASSESSMENT_EDIT_ROLES, can_edit_assessment, visible_assessments
 from .services import (
     AssessmentError,
     create_assessment,
@@ -40,6 +53,43 @@ from .services import (
     stakeholder_facts,
     stakeholders,
 )
+from .workspace import start_submitted_assessment
+
+
+class AssessmentWorkspaceView(TemplateView):
+    template_name = "assessments/workspace.html"
+
+    def get_context_data(self, **kwargs):
+        assessments = visible_assessments(self.request.user).select_related("risk", "risk__service", "method_version", "decision_level", "base_level")
+        return super().get_context_data(
+            rows=[(assessment, outcome(assessment)) for assessment in assessments],
+            can_start=can_start_submitted_assessment(self.request.user), **kwargs,
+        )
+
+
+class AssessmentCandidatesView(TemplateView):
+    template_name = "assessments/candidates.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not can_start_submitted_assessment(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        risks = visible_risks(self.request.user).filter(status=Risk.Status.SUBMITTED).select_related("service", "org_unit", "category")
+        return super().get_context_data(risks=risks, **kwargs)
+
+
+class StartSubmittedAssessmentView(View):
+    def post(self, request, risk_pk):
+        risk = get_object_or_404(visible_risks(request.user), pk=risk_pk)
+        try:
+            assessment = start_submitted_assessment(risk, request.user)
+        except AssessmentError as error:
+            for problem in error.problems:
+                messages.error(request, problem)
+            return redirect("assessments:candidates")
+        return redirect(assessment.get_absolute_url())
 
 
 class AssessmentCreateView(RoleRequiredMixin, CreateView):
@@ -116,6 +166,8 @@ class AssessmentDetailView(DetailView):
             can_review=can_review(user, assessment),
             can_decide_referral=can_decide_referral(user, assessment),
             reviews=assessment.reviews.select_related("created_by"),
+            risk_controls=visible_controls(user).filter(risks=assessment.risk),
+            risk_evidence=visible_evidence(user).filter(risks=assessment.risk),
             review_form=ReviewForm(),
             referral_form=ReferralForm(),
             **kwargs,
@@ -282,8 +334,9 @@ class InitiatorView(EditableAssessmentMixin, UpdateView):
 
     def get_form_kwargs(self):
         current = list(self.object.a_evidence.all()) if self.object.pk else []
-        return {**super().get_form_kwargs(), "evidence": evidence_choices(self.object.risk, current)}
+        return {**super().get_form_kwargs(), "evidence": evidence_choices(self.object.risk, current), "user": self.request.user}
 
+    @transaction.atomic
     def form_valid(self, form):
         form.save()
         messages.success(self.request, f"عامل آغازگر ارزیابی {self.object.code} ذخیره شد.")
@@ -331,6 +384,13 @@ class PathCreateView(PathFormMixin, CreateView):
     def dispatch(self, request, *args, **kwargs):
         self.assessment  # دسترسی پیش از هر کاری بررسی می‌شود
         return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        risk = self.assessment.risk
+        if risk.realization_path and not self.assessment.paths.exists():
+            initial.update(name=risk.realization_path[:200], description=risk.realization_path)
+        return initial
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(title=f"مسیر تازه برای {self.assessment}", **kwargs)

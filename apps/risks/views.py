@@ -1,13 +1,15 @@
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.functional import cached_property
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
+from apps.accounts.roles import Role
 from apps.actions.context import risk_treatment
 from apps.assessments.context import risk_assessments
 from apps.catalog.permissions import visible_services
@@ -27,13 +29,15 @@ from .forms import (
     RiskFilterForm,
     RiskForm,
     RiskScenarioForm,
+    ScenarioCreateForm,
     ScenarioFilterForm,
+    ScenarioRiskCreateForm,
 )
 from .models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario
 from .permissions import (
-    REGISTER_EDIT_ROLES,
     CATEGORY_EDIT_ROLES,
     COVERAGE_EDIT_ROLES,
+    REGISTER_EDIT_ROLES,
     can_add_evidence,
     can_edit_categories,
     can_edit_coverage,
@@ -186,6 +190,9 @@ class ScenarioFormMixin(RoleRequiredMixin, BackToRecordMixin, FormPageMixin):
 
 
 class ScenarioCreateView(ScenarioFormMixin, CreateView):
+    form_class = ScenarioCreateForm
+
+    @transaction.atomic
     def form_valid(self, form):
         response = super().form_valid(form)
         messages.success(self.request, f"سناریوی «{self.object}» ثبت شد.")
@@ -274,12 +281,66 @@ class RiskFormMixin(RoleRequiredMixin, BackToRecordMixin, FormPageMixin):
 
 
 class RiskCreateView(RiskFormMixin, CreateView):
+    @property
+    def scenario_flow(self):
+        return self.request.resolver_match.view_name in {"risks:risk_create", "questionnaires:pending_convert"}
+
+    @cached_property
+    def selected_scenario(self):
+        return self.from_param("scenario", RiskScenario.objects.select_related("service", "category").filter(is_active=True))
+
+    def dispatch(self, request, *args, **kwargs):
+        if self.scenario_flow:
+            if not can_edit_register(request.user):
+                raise PermissionDenied
+            scenario = self.selected_scenario
+            if not scenario:
+                if request.resolver_match.view_name == "questionnaires:pending_convert":
+                    pending = self.pending
+                    if not pending.is_pending:
+                        messages.error(request, "تکلیف این ریسک در انتظار پیش‌تر تعیین شده است.")
+                        return redirect(pending.response.get_absolute_url())
+                    scenarios = RiskScenario.objects.filter(is_active=True, service__is_active=True).select_related("service")
+                    return render(request, "risks/pending_scenario_select.html", {"pending": pending, "scenarios": scenarios})
+                messages.error(request, "برای ثبت ریسک، ابتدا یک سناریوی فعال انتخاب کنید.")
+                return redirect("risks:scenario_list")
+            if not scenario.service_id or not scenario.service.is_active:
+                messages.error(request, "این سناریو خدمت فعال ندارد و نمی‌توان از آن ریسک ثبت کرد.")
+                return redirect(scenario.get_absolute_url())
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_class(self):
+        return ScenarioRiskCreateForm if self.scenario_flow else super().get_form_class()
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.scenario_flow:
+            kwargs["scenario"] = self.selected_scenario
+            kwargs["initial"]["scenario"] = self.selected_scenario
+            kwargs["initial"]["service"] = self.selected_scenario.service
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.scenario_flow:
+            context["scenario"] = self.selected_scenario
+            context["cancel_url"] = self.selected_scenario.get_absolute_url()
+        return context
+
+    def get_template_names(self):
+        if self.scenario_flow:
+            return ["risks/scenario_risk_create.html"]
+        return super().get_template_names()
+
     def get_initial(self):
         """ثبت ریسک از صفحه‌ی سناریو، خدمت یا خانه‌ی جهان ریسک، همان‌ها را از پیش انتخاب می‌کند."""
         initial = {"channel": Risk.Channel.INTERVIEW}
         scenario = self.from_param("scenario", RiskScenario.objects.filter(is_active=True))
         if scenario:
             initial.update(scenario=scenario, title=scenario.title, category=scenario.category)
+        if self.scenario_flow:
+            initial.update(service=scenario.service, org_unit=scenario.service.org_unit)
+            return initial
         service = self.from_param("service", visible_services(self.request.user).filter(is_active=True))
         if service:
             initial.update(service=service, org_unit=service.org_unit)
@@ -295,8 +356,25 @@ class RiskCreateView(RiskFormMixin, CreateView):
     def success_text(self):
         return f"ریسک «{self.object}» ثبت شد."
 
+    @transaction.atomic
+    def form_valid(self, form):
+        if self.scenario_flow:
+            self.object = form.save()
+            messages.success(self.request, f"ریسک «{self.object}» ثبت و ارسال شد.")
+            return redirect(self.get_success_url())
+        return super().form_valid(form)
+
 
 class RiskUpdateView(RiskFormMixin, UpdateView):
+    def get_form_class(self):
+        return ScenarioRiskCreateForm if self.object.scenario_snapshot else super().get_form_class()
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.object.scenario_snapshot:
+            kwargs["scenario"] = self.object.scenario
+        return kwargs
+
     def get_queryset(self):
         return visible_risks(self.request.user)
 
@@ -409,7 +487,8 @@ class EvidenceCreateView(EvidenceFormMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         user = request.user
-        if not (can_edit_register(user) or active_risks(Risk.objects.filter(owner=user)).exists()):
+        can_workgroup = user.has_role(Role.SECURITY_WORKGROUP) and Risk.objects.filter(status=Risk.Status.ASSESSMENT).exists()
+        if not (can_edit_register(user) or active_risks(Risk.objects.filter(owner=user)).exists() or can_workgroup):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 

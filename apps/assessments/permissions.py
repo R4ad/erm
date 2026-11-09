@@ -3,8 +3,12 @@ from apps.risks.permissions import visible_risks
 
 from .models import Assessment
 
-# ارزیابی را کارشناس ریسک (عضو GRC) با تاریخ جلسه‌ی کارگروه ثبت می‌کند (جواب س۳۳ و س۵۲). مدیر سامانه همیشه می‌تواند.
-ASSESSMENT_EDIT_ROLES = [Role.GRC_MEMBER]
+# ثبت و تکمیل ارزیابی برای کارگروه، عضو GRC و مدیر سامانه در دسترس است.
+ASSESSMENT_EDIT_ROLES = [Role.GRC_MEMBER, Role.SECURITY_WORKGROUP]
+
+
+def can_start_submitted_assessment(user):
+    return user.is_system_admin or user.has_role(Role.SECURITY_WORKGROUP)
 
 
 def can_record_assessments(user):

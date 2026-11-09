@@ -47,7 +47,10 @@ class CollectedMessages(BaseStorage):
 
 
 def link(url):
-    return {"href": url, "route": spa_route(url)} if url else None
+    if not url:
+        return None
+    url = str(url)
+    return {"href": url, "route": spa_route(url)}
 
 
 def page_request(request, path, query, method, data=None, files=None):

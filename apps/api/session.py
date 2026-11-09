@@ -32,6 +32,7 @@ def navigation(user):
             "title": "ریسک‌ها",
             "items": [
                 link("رجیستر ریسک", "risks:risk_list"),
+                link("ارزیابی ریسک", "assessments:assessment_list"),
                 link("کتابخانه‌ی سناریو", "risks:scenario_list"),
                 link("شواهد", "risks:evidence_list"),
                 link("ادغام و تفکیک", "workflow:change_request_list"),

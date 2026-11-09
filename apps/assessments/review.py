@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.accounts.roles import Role
 
 from .models import Assessment, AssessmentReview
-from .permissions import can_edit_assessment, can_record_assessments
+from .permissions import can_edit_assessment
 from .results import compute, submission_problems
 from .services import band_list, likelihood_snapshot
 
@@ -49,7 +49,7 @@ def can_review(user, assessment):
     return (
         assessment.status == S.IN_QC
         and assessment.risk.is_active
-        and can_record_assessments(user)
+        and (user.is_system_admin or user.has_role(Role.GRC_MEMBER))
         and user.pk not in assessor_ids(assessment)
     )
 

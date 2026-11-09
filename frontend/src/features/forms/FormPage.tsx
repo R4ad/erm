@@ -305,6 +305,7 @@ export function FormPage({ body }: FormPageProps) {
             submitIcon={submitIcon(data.view)}
             cancel={data.cancel}
             today={todayDate}
+            scenarioCreate={data.view === "risks:scenario_create"}
           />
         </Card>
       ) : (

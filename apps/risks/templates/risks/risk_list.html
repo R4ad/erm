@@ -7,7 +7,7 @@
   <h1 class="h4 mb-0">رجیستر ریسک</h1>
   <div>
     {% if can_edit %}
-      <a href="{% url 'risks:risk_create' %}" class="btn btn-primary btn-sm">ریسک جدید</a>
+      <a href="{% url 'risks:scenario_list' %}" class="btn btn-primary btn-sm">ریسک جدید</a>
     {% endif %}
     <a href="{% url 'risks:scenario_list' %}" class="btn btn-outline-secondary btn-sm">کتابخانه‌ی سناریو</a>
   </div>

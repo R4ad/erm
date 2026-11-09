@@ -115,7 +115,7 @@ def test_a_choice_question_needs_two_active_options(client, grc, questionnaire):
     )
 
     assert "دست‌کم دو گزینه‌ی فعال" in response.context["form"].non_field_errors()[0]
-    assert not Question.objects.exists()
+    assert not Question.objects.filter(questionnaire=questionnaire).exists()
 
 
 def test_a_yes_no_question_gets_yes_and_no(client, grc, questionnaire):
@@ -124,7 +124,7 @@ def test_a_yes_no_question_gets_yes_and_no(client, grc, questionnaire):
 
     client.post(reverse("questionnaires:question_create", args=[questionnaire.pk]), {**data, **option_formset()})
 
-    assert list(Question.objects.get().options.values_list("text", flat=True)) == ["بله", "خیر"]
+    assert list(Question.objects.get(questionnaire=questionnaire).options.values_list("text", flat=True)) == ["بله", "خیر"]
 
 
 def test_scenario_and_category_are_only_for_risk_options(client, grc, questionnaire):
@@ -168,7 +168,7 @@ def test_unit_managers_answer_for_their_units_only(client, questionnaire, unit, 
     client.force_login(manager)
 
     home = client.get(reverse("questionnaires:answer_home"))
-    assert list(home.context["questionnaires"]) == [questionnaire]
+    assert list(home.context["questionnaires"]) == [Questionnaire.objects.get(is_structured=True)]
     assert home.context["can_answer"] is True
 
     url = reverse("questionnaires:response_start", args=[questionnaire.pk])
@@ -364,18 +364,24 @@ def test_converting_a_pending_risk_prefills_and_registers_the_risk(client, grc, 
     pending = response.pending_risks.get()
     pending.category = category
     pending.save()
+    scenario = RiskScenario.objects.create(
+        title="سناریوی تسویه", service=service, category=category,
+        conditions="خرابی", event="قطع تسویه", consequence="وقفه",
+    )
     client.force_login(grc)
     url = reverse("questionnaires:pending_convert", args=[pending.pk])
 
+    assert scenario.title in client.get(url).content.decode()
+    url = f"{url}?scenario={scenario.pk}"
     initial = client.get(url).context["form"].initial
-    assert (initial["title"], initial["service"], initial["org_unit"]) == ("خطای ورود دستی در تسویه", service, unit)
+    assert (initial["scenario"], initial["service"], initial["org_unit"]) == (scenario, service, unit)
     assert (initial["category"], initial["channel"]) == (category, "questionnaire")
 
     page = client.post(
         url,
         {
-            "title": "خطای ورود دستی",
-            "description": "شرح",
+            "initiator": "خرابی",
+            "realization_path": "وقفه در اتصال",
             "channel": "questionnaire",
             "service": service.pk,
             "category": category.pk,
@@ -386,8 +392,8 @@ def test_converting_a_pending_risk_prefills_and_registers_the_risk(client, grc, 
     pending.refresh_from_db()
     assert page.url == risk.get_absolute_url()
     assert (pending.status, pending.risk, pending.decided_by) == ("converted", risk, grc)
-    assert (risk.org_unit, risk.channel, risk.status) == (unit, "questionnaire", Risk.Status.REGISTERED)
-    assert Coverage.objects.get(service=service, category=category).status == Coverage.Status.REVIEWED
+    assert (risk.org_unit, risk.channel, risk.status) == (unit, "questionnaire", Risk.Status.SUBMITTED)
+    assert not Coverage.objects.filter(service=service, category=category).exists()
     assert client.get(url).status_code == 302  # تکلیفش تعیین شده و دوباره ثبت نمی‌شود
 
 

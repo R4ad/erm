@@ -193,6 +193,9 @@ export interface RecordParts {
 }
 
 export interface RiskDetail extends RecordParts {
+  realization_path?: string;
+  additional_notes?: string;
+  scenario_snapshot?: Record<string, string | number>;
   id: number;
   code: string;
   title: string;
@@ -339,6 +342,9 @@ export interface QuestionItem {
 }
 
 export interface ResponseDetail extends Omit<ResponseRow, "questionnaire"> {
+  is_structured: boolean;
+  structured_data: unknown[];
+  structured_questions: { id: number; text: string; stage: string; required: boolean; help: string }[];
   questionnaire: { id: number; title: string; description: string };
   recorded_by: Person | null;
   can_edit: boolean;
@@ -565,7 +571,7 @@ export interface ScenarioDetail {
   view: string;
   title: string;
   messages: PageMessage[];
-  scenario: ScenarioRow & { event: string; conditions: string; consequence: string };
+  scenario: ScenarioRow & { event: string; conditions: string; consequence: string; narrative?: string };
   risks: RiskBrief[];
   edit_url: string | null;
   create_risk_url: string | null;
@@ -785,6 +791,7 @@ export interface AssessmentImpacts {
 }
 
 export interface AssessmentDetail {
+  risk_details?: { label: string; value: string }[];
   view: string;
   title: string;
   messages: PageMessage[];
@@ -793,7 +800,13 @@ export interface AssessmentDetail {
   review: AssessmentReview;
   likelihood: AssessmentLikelihood;
   impacts: AssessmentImpacts;
-  actions: { edit: string | null; impact_profile: string | null; initiator: string | null; add_path: string | null };
+  actions: {
+    edit: string | null;
+    impact_profile: string | null;
+    initiator: string | null;
+    add_path: string | null;
+    add_evidence?: string | null;
+  };
 }
 
 export interface ComparePage {

@@ -89,6 +89,18 @@ export const routeTable: RouteEntry[] = [
     form: false,
   },
   {
+    name: "assessments:assessment_list",
+    pattern: "^/assessments/$",
+    route: "/assessments",
+    form: false,
+  },
+  {
+    name: "assessments:candidates",
+    pattern: "^/assessments/new/$",
+    route: "/assessments/new",
+    form: false,
+  },
+  {
     name: "assessments:assessment_detail",
     pattern: "^/assessments/(?<pk>[0-9]+)/$",
     route: "/assessments/:pk",
@@ -218,6 +230,7 @@ export function session(): Session {
         title: "ریسک‌ها",
         items: [
           { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
+          { key: "assessments:assessment_list", label: "ارزیابی ریسک", href: "/assessments/", route: "/assessments" },
           { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
           { key: "controls:control_list", label: "کنترل‌ها", href: "/controls/", route: null },
         ],
@@ -318,7 +331,7 @@ export function riskPage(overrides: Partial<RiskPage> = {}): RiskPage {
       riskRow(1, { level: levels.high, status: { value: "treatment_plan", label: "برنامه‌ی درمان" } }),
     ],
     can_create: false,
-    create_url: "/risks/new/",
+    create_url: "/risks/scenarios/",
     ...overrides,
   };
 }
@@ -515,6 +528,9 @@ export function response(overrides: Partial<ResponseDetail> = {}): ResponseDetai
   return {
     id: 1,
     questionnaire: { id: 1, title: "پرسشنامه‌ی آزمون", description: "شرح پرسشنامه‌ی آزمون." },
+    is_structured: false,
+    structured_data: [],
+    structured_questions: [],
     org_unit: "واحد آزمون",
     service: "IPG",
     respondent: tester,

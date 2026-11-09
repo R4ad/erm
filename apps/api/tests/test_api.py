@@ -233,7 +233,7 @@ def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
 
     home = client.get(reverse("api:answer_home")).json()
     assert home["can_answer"] is True
-    assert home["questionnaires"][0]["question_count"] == 2
+    assert next(item for item in home["questionnaires"] if item["id"] != questionnaire.pk)["question_count"] == 9
 
     start = client.get(reverse("api:response_start", args=[questionnaire.pk])).json()
     assert "respondent" not in start["fields"]  # مدیر واحد فقط به نام خودش جواب می‌دهد

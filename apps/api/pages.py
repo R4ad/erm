@@ -128,6 +128,7 @@ def scenario_detail(context, request):
             "event": scenario.event,
             "conditions": scenario.conditions,
             "consequence": scenario.consequence,
+            "narrative": scenario.narrative,
         },
         "risks": [risk_brief(risk) for risk in context["risks"]],
         "edit_url": reverse("risks:scenario_update", args=[scenario.pk]) if can_edit else None,

@@ -736,6 +736,12 @@ function Header({ data }: { data: AssessmentDetail }) {
       }
       actions={
         <>
+          {actions.add_evidence && (
+            <AppLink href={actions.add_evidence} button={{ variant: "secondary" }}>
+              <Plus aria-hidden />
+              ثبت شاهد
+            </AppLink>
+          )}
           {actions.impact_profile && (
             <AppLink href={actions.impact_profile} button={{ variant: "primary" }}>
               <Layers aria-hidden />
@@ -807,6 +813,56 @@ function Facts({ data }: { data: AssessmentDetail }) {
   );
 }
 
+function RiskInformation({ data }: { data: AssessmentDetail }) {
+  if (!data.risk_details?.length) return null;
+  return (
+    <Card>
+      <CardHeader icon={<ClipboardCheck />} title="اطلاعات ریسک" as="h2" />
+      <CardContent>
+        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
+          {data.risk_details.map((row) => (
+            <Fact key={row.label} label={row.label}>
+              <span className="whitespace-pre-line">{row.value || "—"}</span>
+            </Fact>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AssessmentInputs({ data }: { data: AssessmentDetail }) {
+  const { actions } = data;
+  if (!actions.initiator && !actions.add_path && !actions.impact_profile) return null;
+  return (
+    <Card>
+      <CardHeader
+        icon={<ClipboardCheck />}
+        title="ثبت پارامترهای ارزیابی"
+        description="عامل آغازگر، مسیر تحقق و پیامد را تکمیل کنید؛ نتیجه پس از ثبت اطلاعات محاسبه می‌شود."
+        as="h2"
+      />
+      <CardContent className="flex flex-wrap gap-2">
+        {actions.initiator && (
+          <AppLink href={actions.initiator} button={{ variant: "secondary" }}>
+            ۱. عامل آغازگر (A)
+          </AppLink>
+        )}
+        {actions.add_path && (
+          <AppLink href={actions.add_path} button={{ variant: "secondary" }}>
+            ۲. مسیر تحقق (B0)
+          </AppLink>
+        )}
+        {actions.impact_profile && (
+          <AppLink href={actions.impact_profile} button={{ variant: "secondary" }}>
+            ۳. پروفایل پیامد (I)
+          </AppLink>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AssessmentDetailPage() {
   const page = usePageData<AssessmentDetail>();
   useTitle(page.data?.title ?? "ارزیابی");
@@ -839,6 +895,8 @@ export function AssessmentDetailPage() {
         </nav>
       </div>
       <Facts data={data} />
+      <RiskInformation data={data} />
+      <AssessmentInputs data={data} />
       <Outcome data={data} />
       <Review data={data} />
       <Likelihood data={data} />

@@ -32,7 +32,7 @@ class QuestionnaireForm(BootstrapFormMixin, forms.ModelForm):
 class QuestionForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Question
-        fields = ["order", "text", "help_text", "kind", "is_required", "is_active"]
+        fields = ["order", "text", "help_text", "kind", "stage", "is_required", "is_active"]
         widgets = {"text": forms.Textarea(attrs={"rows": 2})}
         help_texts = {
             "kind": "برای «بله و خیر» دو گزینه‌ی بله و خیر خودکار ساخته می‌شود؛ فقط مشخص کنید کدام نشانه‌ی ریسک است."
@@ -44,6 +44,18 @@ class QuestionForm(BootstrapFormMixin, forms.ModelForm):
         if question.pk and kind != question.kind and question.answers.exists():
             raise forms.ValidationError("این سؤال جواب گرفته است و نوعش عوض نمی‌شود؛ سؤال تازه‌ای بسازید.")
         return kind
+
+    def clean(self):
+        data = super().clean()
+        questionnaire = getattr(self.instance, "questionnaire", None)
+        if questionnaire and questionnaire.is_structured:
+            if not data.get("stage"):
+                self.add_error("stage", "بخش سؤال را انتخاب کنید.")
+            if data.get("kind") != Question.Kind.TEXT:
+                self.add_error("kind", "پرسش‌های این پرسشنامه باید متنی باشند.")
+            if self.instance.pk and "stage" in self.changed_data and questionnaire.responses.exists():
+                self.add_error("stage", "این پرسشنامه پاسخ گرفته است؛ برای بخش دیگر سؤال تازه بسازید.")
+        return data
 
 
 class OptionForm(BootstrapFormMixin, forms.ModelForm):
@@ -101,6 +113,11 @@ class ResponseStartForm(BootstrapFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
         self.fields["org_unit"].queryset = answerable_units(user)
+        if self.instance.questionnaire_id and self.instance.questionnaire.is_structured:
+            del self.fields["service"]
+            del self.fields["respondent"]
+            self.instance.respondent = user
+            return
         self.fields["service"].queryset = visible_services(user).filter(is_active=True)
         if can_manage_questionnaires(user):
             self.fields["respondent"].queryset = respondents()
@@ -114,7 +131,7 @@ class ResponseStartForm(BootstrapFormMixin, forms.ModelForm):
         data = super().clean()
         unit, service = data.get("org_unit"), data.get("service")
         respondent = data.get("respondent", self.instance.respondent if self.instance.respondent_id else None)
-        if unit and respondent and unit.pk not in respondent.managed_unit_ids():
+        if "respondent" in self.fields and unit and respondent and unit.pk not in respondent.managed_unit_ids():
             self.add_error("respondent", f"این کاربر مدیر واحد «{unit}» یا بالادست آن نیست.")
         if unit and service and service.org_unit_id not in get_subtree_ids(unit):
             self.add_error("service", f"این خدمت مال واحد «{unit}» یا زیرمجموعه‌های آن نیست.")

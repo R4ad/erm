@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useController, useForm, useFormState, type Control } from "react-hook-form";
+import { useController, useForm, useFormState, useWatch, type Control } from "react-hook-form";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Button } from "@/components/ui/button";
@@ -236,6 +236,49 @@ interface SchemaFormProps {
   summaryLabel?: (field: FormField) => string;
   /** دکمه‌ها در فرم بلند پایین صفحه می‌مانند تا ذخیره بی‌رفتن به ته فرم در دسترس باشد. */
   stickyActions?: boolean;
+  scenarioCreate?: boolean;
+}
+
+function ScenarioFields({
+  field,
+  fields,
+  control,
+}: {
+  field: (name: string) => ReactNode;
+  fields: FormField[];
+  control: Control<FormValues>;
+}) {
+  const values = useWatch({ control });
+  const newService = Boolean(values.new_service);
+  const service = newService
+    ? values.new_service_name
+    : fields
+        .find((item) => item.name === "service")
+        ?.choices?.find((choice) => choice.value === values.service)
+        ?.label.replace(/ \([^()]*\)$/, "");
+  const part = (value: unknown, placeholder: string) =>
+    typeof value === "string" && value.trim() ? value.trim() : `[${placeholder}]`;
+  const preview = `در خدمت یا فرآیند ${part(service, "نام")}، به علت یا در شرایط ${part(values.conditions, "عامل و وضعیت")}، ممکن است ${part(values.event, "رویداد مشخص")} رخ دهد و انجام ${part(values.objective, "هدف یا تعهد")} برای ${part(values.customer_text, "داتین یا مشتری")} را مختل کند. پیامد قابل مشاهده آن ${part(values.consequence, "نوع و دامنه پیامد")} است.`;
+  return (
+    <div className="flex flex-col gap-5">
+      {field("new_service")}
+      {newService ? (
+        <div className="flex flex-col gap-5 rounded-xl border border-line p-4">
+          <p className="text-sm text-muted">برای ثبت خدمت جدید، مشخصات ضروری آن را وارد کنید.</p>
+          {["code", "name", "kind", "org_unit", "owner", "lifecycle_stage", "environment"].map((name) =>
+            field(`new_service_${name}`),
+          )}
+        </div>
+      ) : (
+        field("service")
+      )}
+      {["conditions", "event", "objective", "customer_text", "consequence", "category"].map(field)}
+      <section aria-label="پیش‌نمایش سناریو" className="rounded-xl border border-line bg-surface p-4">
+        <h2 className="font-semibold">پیش‌نمایش سناریو</h2>
+        <p className="mt-2 text-sm leading-8 whitespace-pre-line">{preview}</p>
+      </section>
+    </div>
+  );
 }
 
 export function SchemaForm({
@@ -250,6 +293,7 @@ export function SchemaForm({
   layout,
   summaryLabel = (field) => field.label,
   stickyActions = false,
+  scenarioCreate = false,
 }: SchemaFormProps) {
   const fields = schema.fields;
   const byName = new Map(fields.map((field) => [field.name, field]));
@@ -378,7 +422,16 @@ export function SchemaForm({
           </Alert>
         )}
 
-        {layout ? (
+        {scenarioCreate ? (
+          <ScenarioFields
+            fields={fields}
+            control={form.control}
+            field={(name) => {
+              const field = byName.get(name);
+              return field ? <SchemaField key={name} field={field} control={form.control} today={today} /> : null;
+            }}
+          />
+        ) : layout ? (
           layout((name) => {
             const field = byName.get(name);
             return field ? <SchemaField key={name} field={field} control={form.control} today={today} /> : null;

@@ -32,6 +32,7 @@ import {
   type ResponseValues,
 } from "./response-form";
 import { ResponseStatus } from "./status";
+import { StructuredResponse } from "./StructuredResponse";
 
 interface SaveResult {
   message: string;
@@ -157,7 +158,12 @@ function TextItemField({ item, form, rows = 3, label }: { item: TextItem; form: 
 function Meta({ response }: { response: ResponseDetail }) {
   const items: [string, ReactNode][] = [
     ["واحد", response.org_unit],
-    ["خدمت", response.service ? <bdi className="code">{response.service}</bdi> : "کل واحد"],
+    ...(!response.is_structured
+      ? ([["خدمت", response.service ? <bdi className="code">{response.service}</bdi> : "کل واحد"]] as [
+          string,
+          ReactNode,
+        ][])
+      : []),
     [
       "پاسخ‌دهنده",
       <span className="flex flex-col" key="respondent">
@@ -599,7 +605,9 @@ export function ResponseFormPage() {
       <Meta response={response} />
 
       {/* با هر بار ذخیره یا ارسال، پاسخ تازه‌ی سرور جای قبلی را می‌گیرد؛ کلید فرم را با وضعیت ویرایش نگه می‌داریم. */}
-      {response.can_edit ? (
+      {response.is_structured ? (
+        <StructuredResponse key={`structured-${response.id}-${response.can_edit}`} response={response} id={id} />
+      ) : response.can_edit ? (
         <EditableResponse key={`edit-${response.id}`} response={response} id={id} />
       ) : (
         <ReadonlyResponse response={response} />
