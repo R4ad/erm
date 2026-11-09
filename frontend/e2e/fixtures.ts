@@ -57,6 +57,7 @@ function defaults(): Record<string, Handler | unknown> {
       "/workflow/risks/1/transition/start_treatment/": data.transitionForm(),
       "/assessments/1/initiator/": data.initiatorForm(),
       "/assessments/1/impacts/": data.impactProfileForm(),
+      "/actions/plans/1/reassess/": data.reassessmentForm(),
     }),
     "POST forms/": (call: ApiCall) => saved(call),
     "GET pages/": byPath({
@@ -72,6 +73,17 @@ function defaults(): Record<string, Handler | unknown> {
       "/workflow/requests/7/": data.changeDetail(),
       "/assessments/1/": data.assessmentDetail(),
       "/assessments/compare/": data.compareAssessments(),
+      "/actions/": (call: ApiCall) => {
+        const page = data.actionList();
+        const overdue = djangoQuery(call).get("overdue");
+        page.results = page.results.filter((row) => !overdue || row.status.overdue);
+        page.count = page.results.length;
+        return page;
+      },
+      "/actions/acceptances/": data.acceptanceList(),
+      "/actions/plans/1/": data.planDetail(),
+      "/actions/1/": data.actionDetail(),
+      "/actions/acceptances/2/": data.acceptanceDetail(),
     }),
   };
 }
@@ -110,6 +122,18 @@ function saved(call: ApiCall) {
     return {
       message: "پروفایل پیامد ارزیابی AS-1405-0001 ذخیره شد.",
       redirect: { href: "/assessments/1/", route: "/assessments/1" },
+    };
+  }
+  if (path.startsWith("/actions/plans/1/approve/")) {
+    return { message: "طرح تأیید شد.", redirect: { href: "/actions/plans/1/", route: "/actions/plans/1" } };
+  }
+  if (path.startsWith("/actions/1/move/")) {
+    return { message: "وضعیت اقدام ثبت شد.", redirect: { href: "/actions/1/#progress", route: "/actions/1#progress" } };
+  }
+  if (path.startsWith("/actions/acceptances/2/")) {
+    return {
+      message: "امضای شما ثبت شد.",
+      redirect: { href: "/actions/acceptances/2/#signatures", route: "/actions/acceptances/2#signatures" },
     };
   }
   if (path.startsWith("/workflow/requests/")) {

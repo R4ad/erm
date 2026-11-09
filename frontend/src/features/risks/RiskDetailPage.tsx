@@ -29,7 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ClassicLink } from "@/components/ui/classic-link";
 import { Deadline } from "@/components/ui/deadline";
 import { Checkbox } from "@/components/ui/field";
 import {
@@ -454,9 +453,9 @@ function Treatment({ risk }: { risk: RiskDetail }) {
             icon={<GitBranch />}
             as="h3"
             title={
-              <ClassicLink href={plan.href} className="text-fg">
+              <AppLink href={plan.href} className="text-fg">
                 {plan.label}
-              </ClassicLink>
+              </AppLink>
             }
             description={`گزینه‌ی ${plan.option}`}
             actions={
@@ -470,9 +469,9 @@ function Treatment({ risk }: { risk: RiskDetail }) {
               {plan.actions.map((action) => (
                 <li key={action.code} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="flex min-w-0 flex-col gap-0.5">
-                    <ClassicLink href={action.href} className="text-fg">
+                    <AppLink href={action.href} className="text-fg">
                       <bdi className="code text-accent-text">{action.code}</bdi> {action.title}
-                    </ClassicLink>
+                    </AppLink>
                     <span className="text-xs text-muted">{action.status}</span>
                   </div>
                   <Deadline value={action.due} />
@@ -489,9 +488,9 @@ function Treatment({ risk }: { risk: RiskDetail }) {
             {acceptances.map((acceptance) => (
               <li key={acceptance.code} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                 <div className="flex flex-col gap-0.5">
-                  <ClassicLink href={acceptance.href} className="text-fg">
+                  <AppLink href={acceptance.href} className="text-fg">
                     پذیرش <bdi className="code">{acceptance.code}</bdi>
-                  </ClassicLink>
+                  </AppLink>
                   <span className="text-xs text-muted">
                     {acceptance.status}
                     {acceptance.start &&
@@ -613,7 +612,7 @@ function Facts({ risk }: { risk: RiskDetail }) {
                 {risk.controls.map((control) => (
                   <li key={control.code} className="flex items-baseline gap-2">
                     <bdi className="code text-xs text-muted">{control.code}</bdi>
-                    {control.href ? <ClassicLink href={control.href}>{control.title}</ClassicLink> : control.title}
+                    {control.href ? <AppLink href={control.href}>{control.title}</AppLink> : control.title}
                   </li>
                 ))}
               </ul>

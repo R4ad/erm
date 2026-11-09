@@ -12,21 +12,11 @@ from django.urls import reverse
 from apps.workflow.models import ChangeRequest
 
 from . import formatting as fmt
+from .actions import ACTION_PAGES
 from .assessments import ASSESSMENT_PAGES
-from .forms import describe_field, describe_form
+from .forms import describe_field
+from .listing import listing
 from .records import record_parts
-
-
-def listing(context, rows):
-    """ردیف‌های یک فهرست با صفحه‌بندی ListView و فرم فیلتر FilteredListView، اگر صفحه آن‌ها را دارد."""
-    page = context.get("page_obj")
-    return {
-        "results": rows,
-        "count": page.paginator.count if page else len(rows),
-        "page": page.number if page else 1,
-        "pages": page.paginator.num_pages if page else 1,
-        "filters": describe_form(context.get("filter_form")),
-    }
 
 
 def risk_brief(risk):
@@ -274,4 +264,5 @@ READ_PAGES = {
     "workflow:change_request_list": change_request_list,
     "workflow:change_request_detail": change_request_detail,
     **ASSESSMENT_PAGES,
+    **ACTION_PAGES,
 }

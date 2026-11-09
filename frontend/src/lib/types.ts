@@ -440,7 +440,7 @@ export interface FormPageData {
   submit?: string;
   intro?: string;
   // انتقال گردش کار
-  risk?: { id: number; code: string; title: string; status: Choice };
+  risk?: { id: number; code: string; title: string; status?: Choice; href?: string };
   transition?: { label: string; description: string; source: string; target: string };
   problems?: string[];
   // خانه‌ی جهان ریسک
@@ -458,6 +458,9 @@ export interface FormPageData {
   guides?: FormGuide[];
   // پروفایل پیامد: چند فرم با پیشوند، یک گروه برای هر ذی‌نفع
   groups?: ImpactGroup[];
+  // بازسنجی طرح مواجهه: مقایسه‌ی مبنا، ارزیابی تازه و هدف، و اقدام‌هایی که هنوز تأیید نشده‌اند
+  comparison?: Comparison;
+  open_actions?: { code: string; href: string; status: ActionStatus }[];
 }
 
 export interface FormAlert {
@@ -809,13 +812,243 @@ export interface AssessmentDetail {
   };
 }
 
-export interface ComparePage {
+/** جدول مقایسه‌ی ارزیابی‌ها (apps/api/assessments.comparison)؛ ستون اول مبنای جهت تغییر خانه‌هاست. */
+export interface Comparison {
+  profiles: { id: number; code: string; kind: Choice; method_version: number; incomplete: boolean; href: string }[];
+  rows: { label: string; cells: { text: string; level: Level | null; trend: "" | "up" | "down" }[] }[];
+  method_changed: boolean;
+}
+
+export interface ComparePage extends Comparison {
   view: string;
   title: string;
   messages: PageMessage[];
   risk: { id: number; code: string; title: string; href: string };
   error: string | null;
-  profiles: { id: number; code: string; kind: Choice; method_version: number; incomplete: boolean; href: string }[];
-  rows: { label: string; cells: { text: string; level: Level | null; trend: "" | "up" | "down" }[] }[];
-  method_changed: boolean;
+}
+
+// طرح مواجهه، اقدام و پذیرش (apps/api/actions.py)
+
+export interface CodeRef {
+  code: string;
+  href: string;
+}
+
+export interface ActionStatus extends Choice {
+  overdue: boolean;
+}
+
+export interface ActionRow {
+  id: number;
+  code: string;
+  title: string;
+  mechanism: string;
+  dimension: string | null;
+  owner: Person | null;
+  assignee: Person | null;
+  /** برای اقدام باز با روزهای مانده؛ برای اقدام بسته فقط تاریخ. */
+  due: Deadline | Day;
+  status: ActionStatus;
+  href: string;
+  /** فقط در فهرست همه‌ی اقدام‌ها. */
+  risk?: string;
+}
+
+export interface AcceptanceState {
+  value: "draft" | "pending" | "active" | "expired" | "rejected" | "revoked";
+  label: string;
+}
+
+export interface AcceptanceRow {
+  id: number;
+  code: string;
+  assessment: string;
+  level: Level | null;
+  start: Day;
+  end: Day;
+  follow_up_by: Person | null;
+  state: AcceptanceState;
+  href: string;
+  risk?: { code: string; href: string };
+}
+
+export type ActionList = Listing<ActionRow>;
+export type AcceptanceList = Listing<AcceptanceRow>;
+
+/** ریسک طرح یا اقدام؛ پیوند فقط برای کسی که آن ریسک را می‌بیند. */
+export interface PlanRisk {
+  id: number;
+  code: string;
+  title: string;
+  href: string | null;
+}
+
+export interface PlanDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  plan: {
+    id: number;
+    option: Choice;
+    state: { value: "pending" | "approved" | "closed"; label: string };
+    risk: PlanRisk;
+    risk_owner: Person | null;
+    assessment: CodeRef & { score: number | null };
+    level: Level | null;
+    plan_required: boolean;
+    decision_due: Day | null;
+    overdue: boolean;
+    containment_due: Moment | null;
+    rationale: string;
+    option_details: string;
+    target: (CodeRef & { status: string; level: Level | null }) | null;
+    approved_by: Person | null;
+    approved_at: Moment | null;
+  };
+  approval: { problems: string[]; approve_url: string | null; message: string; waiting_for_owner: boolean };
+  actions: ActionRow[];
+  add_action_url: string | null;
+  reassessment: {
+    performed_on: Day;
+    responsible: Person | null;
+    assessment: CodeRef;
+    target_met: boolean | null;
+    method_changed: boolean;
+    decision: Choice;
+    note: string;
+  } | null;
+  reassess_url: string | null;
+  comparison: Comparison | null;
+  acceptances: AcceptanceRow[];
+  acceptance_note: string;
+  add_acceptance_url: string | null;
+  edit_url: string | null;
+}
+
+export interface ActionMove {
+  name: string;
+  label: string;
+  /** کلاس دکمه در قالب جنگو (primary، success، outline-danger و...). */
+  style: string;
+  note_required: boolean;
+}
+
+export type ActionProgress =
+  | { state: "planned" | "verified" | "waiting" | "closed" }
+  | {
+      state: "open";
+      url: string;
+      moves: ActionMove[];
+      can_note: boolean;
+      note: FormField;
+      evidence: FormField | null;
+    };
+
+export interface ActionDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  action: {
+    id: number;
+    code: string;
+    title: string;
+    status: ActionStatus;
+    is_open: boolean;
+    deliverable: string;
+    mechanism: string;
+    dimension: string | null;
+    owner: Person | null;
+    assignee: Person | null;
+    verifier: Person | null;
+    start: Day | null;
+    due: Deadline | Day;
+    cost: number | null;
+    person_hours: number | null;
+    description: string;
+    acceptance_criteria: string;
+  };
+  risk: PlanRisk;
+  plan: { option: string; href: string | null };
+  depends_on: (CodeRef & { status: ActionStatus })[];
+  waiting_for_dependencies: boolean;
+  controls: (CodeRef & { title: string })[];
+  evidence: CodeRef[];
+  progress: ActionProgress;
+  updates: { id: number; label: string; changes_status: boolean; by: Person | null; at: Moment; note: string }[];
+  edit_url: string | null;
+}
+
+export interface SignForm extends FormSchema {
+  authority: string;
+  label: string;
+  intro: string;
+}
+
+export interface AcceptanceSignature {
+  authority: string;
+  label: string;
+  reason: string;
+  signature: {
+    approved: boolean;
+    by: Person | null;
+    at: Moment;
+    reference_kind: string;
+    reference: string;
+    reference_date: Day | null;
+    letter: string | null;
+    note: string;
+  } | null;
+  waiting: boolean;
+  candidates?: { unit: string; names: string[] };
+}
+
+export interface AcceptanceDetail extends RecordParts {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  acceptance: {
+    id: number;
+    code: string;
+    state: AcceptanceState;
+    days_left: number | null;
+    decision_text: string;
+    closed: { label: string; by: Person | null; at: Moment | null; reason: string } | null;
+    start: Day;
+    end: Day;
+    evidence_due: Day | null;
+    scope: string;
+    reason: string;
+    alternatives: string;
+    compensating_controls: string;
+    controls: CodeRef[];
+    conditions: string;
+    customer_constraints: string;
+    monitoring: string;
+    revocation_triggers: string;
+    follow_up_by: Person | null;
+  };
+  risk: PlanRisk & { owner: Person | null };
+  assessment: CodeRef & {
+    method_version: number;
+    score: number | null;
+    confidence: string | null;
+    tolerance_exceeded: boolean;
+  };
+  level: Level | null;
+  temporary: boolean;
+  non_normal: boolean;
+  plan: { option: string; href: string } | null;
+  renews: CodeRef | null;
+  renewals: (CodeRef & { state: AcceptanceState })[];
+  cap: { value: number | null; unit: string; until: Day | null };
+  decision_due: Day | null;
+  decision_due_passed: boolean;
+  problems: string[];
+  problems_title: string;
+  submit_url: string | null;
+  signatures: AcceptanceSignature[];
+  sign_url: string;
+  sign_forms: SignForm[];
+  revoke: (FormSchema & { url: string }) | null;
+  edit_url: string | null;
 }

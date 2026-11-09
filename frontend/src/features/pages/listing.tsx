@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, Input, Select } from "@/components/ui/field";
+import { Checkbox, Field, Input, Select } from "@/components/ui/field";
 import { Pagination } from "@/components/ui/pagination";
 import { PageSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
@@ -54,6 +54,38 @@ function SearchBox({ field, value, onSearch }: { field: FormField; value: string
   );
 }
 
+/**
+ * تیک فیلتر. تغییر نشانی با transition مسیریاب انجام می‌شود و تا آن تمام شود مقدار نشانی هنوز قبلی است؛ پس تیک
+ * همان لحظه از دست کاربر عوض می‌شود و اگر نشانی از بیرون عوض شد (برگشت، پاک کردن فیلترها) دوباره با آن یکی می‌شود.
+ */
+function FilterCheckbox({
+  field,
+  value,
+  onChange,
+}: {
+  field: FormField;
+  value: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const [checked, setChecked] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setChecked(value);
+  }
+  return (
+    <Checkbox
+      name={field.name}
+      label={field.label}
+      checked={checked}
+      onChange={(event) => {
+        setChecked(event.target.checked);
+        onChange(event.target.checked);
+      }}
+    />
+  );
+}
+
 interface FilterBarProps {
   schema: FormSchema | null | undefined;
   label: string;
@@ -79,6 +111,7 @@ export function FilterBar({ schema, label }: FilterBarProps) {
     const data = new FormData(event.currentTarget);
     const next = new URLSearchParams(params);
     for (const field of fields) {
+      // تیک‌خورده همان «on» فرم جنگوست و تیک‌نخورده یعنی نبودن پارامتر.
       const value = String(data.get(field.name) ?? "").trim();
       if (value) next.set(field.name, value);
       else next.delete(field.name);
@@ -90,6 +123,7 @@ export function FilterBar({ schema, label }: FilterBarProps) {
   const chips = active
     .filter((field) => field.kind !== "text")
     .map((field) => {
+      if (field.kind === "checkbox") return { name: field.name, label: field.label };
       const value = params.get(field.name) ?? "";
       const choice = field.choices?.find((option) => option.value === value);
       return { name: field.name, label: `${field.label}: ${choice?.label ?? value}` };
@@ -125,6 +159,15 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                   ))}
                 </Select>
               </Field>
+            ) : field.kind === "checkbox" ? (
+              // هم‌تراز با پایین کادرهای کنارش، که برچسبشان بالای کادر است.
+              <div key={field.name} className="flex items-end pb-2">
+                <FilterCheckbox
+                  field={field}
+                  value={Boolean(params.get(field.name))}
+                  onChange={(checked) => update(field.name, checked ? "on" : "")}
+                />
+              </div>
             ) : null,
           )}
         </div>

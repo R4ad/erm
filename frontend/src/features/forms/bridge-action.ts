@@ -7,10 +7,39 @@ import { bridge, post } from "@/lib/api";
 import { faText } from "@/lib/format";
 import type { FormResult } from "@/lib/types";
 
+export type ActionValue = string | boolean | string[] | File | null;
+
 export interface BridgeAction {
   /** نشانی جنگوی کار، مثل /assessments/12/submit/ */
   url: string;
-  values: Record<string, string | boolean | string[]>;
+  values: Record<string, ActionValue>;
+}
+
+/**
+ * داده‌ی کار برای /api/forms/: با فایل (مثل نامه‌ی مدیریت ارشد) همان multipart فرم HTML جنگو، وگرنه JSON. تیک‌خورده
+ * «on» است و تیک‌نخورده و فایل انتخاب‌نشده فرستاده نمی‌شوند.
+ */
+export function actionBody(values: BridgeAction["values"]) {
+  const entries = Object.entries(values);
+  if (!entries.some(([, value]) => value instanceof File)) {
+    return {
+      values: Object.fromEntries(
+        entries.filter((entry): entry is [string, string | boolean | string[]] => {
+          const value = entry[1];
+          return value !== null && !(value instanceof File);
+        }),
+      ),
+    };
+  }
+  const data = new FormData();
+  for (const [name, value] of entries) {
+    if (value instanceof File) data.append(name, value);
+    else if (Array.isArray(value)) value.forEach((item) => data.append(name, item));
+    else if (typeof value === "boolean") {
+      if (value) data.append(name, "on");
+    } else if (typeof value === "string") data.append(name, value);
+  }
+  return data;
 }
 
 /**
@@ -24,7 +53,7 @@ export function useBridgeAction() {
   const goTo = useGoTo();
   const { pathname } = useLocation();
   return useMutation({
-    mutationFn: ({ url, values }: BridgeAction) => post<FormResult>(bridge("forms", url), { values }),
+    mutationFn: ({ url, values }: BridgeAction) => post<FormResult>(bridge("forms", url), actionBody(values)),
     onSuccess: (result) => {
       toast({ title: faText(result.message) });
       void queryClient.invalidateQueries();
