@@ -208,6 +208,45 @@ function Guides({ data }: { data: FormPageData }) {
   );
 }
 
+/**
+ * فرم بلندی که جنگو بخش‌بندی کرده است (برگه‌ی آزمون کنترل): هر بخش یک fieldset با عنوان و شماره. فیلدی که در هیچ
+ * بخشی نیست، اگر باشد، آخر فرم می‌آید تا چیزی از فرم جنگو جا نماند.
+ */
+function Fieldsets({
+  sections,
+  names,
+  field,
+}: {
+  sections: NonNullable<FormPageData["fieldsets"]>;
+  names: string[];
+  field: (name: string) => ReactNode;
+}) {
+  const placed = new Set(sections.flatMap((section) => section.fields));
+  const rest = names.filter((name) => !placed.has(name));
+  return (
+    <div className="flex flex-col gap-8">
+      {sections.map((section, index) => (
+        <fieldset
+          key={section.title}
+          className="flex min-w-0 flex-col gap-5 border-t border-line pt-6 first:border-t-0 first:pt-0"
+        >
+          <legend className="float-start flex items-center gap-2.5 text-base font-semibold text-fg">
+            <span
+              aria-hidden
+              className="grid size-7 place-items-center rounded-lg border border-accent-line/60 bg-accent-soft text-xs text-accent-text tabular"
+            >
+              {fa(index + 1)}
+            </span>
+            {faText(section.title)}
+          </legend>
+          {section.fields.map(field)}
+        </fieldset>
+      ))}
+      {rest.length > 0 && <div className="flex flex-col gap-5">{rest.map(field)}</div>}
+    </div>
+  );
+}
+
 function submitIcon(view: string) {
   if (view === "core:attachment_upload") return <Upload aria-hidden />;
   if (view.startsWith("workflow:")) return <Send aria-hidden className="rtl:-scale-x-100" />;
@@ -306,6 +345,18 @@ export function FormPage({ body }: FormPageProps) {
             cancel={data.cancel}
             today={todayDate}
             scenarioCreate={data.view === "risks:scenario_create"}
+            layout={
+              data.fieldsets
+                ? (field) => (
+                    <Fieldsets
+                      sections={data.fieldsets ?? []}
+                      names={data.form?.fields.map((item) => item.name) ?? []}
+                      field={field}
+                    />
+                  )
+                : undefined
+            }
+            stickyActions={Boolean(data.fieldsets)}
           />
         </Card>
       ) : (

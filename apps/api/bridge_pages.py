@@ -4,6 +4,7 @@
 from . import formatting as fmt
 from .actions import reassessment_form
 from .assessments import impact_forms, impact_profile, initiator_form, path_form
+from .controls import control_assessment_form
 from .questionnaire_pages import pending_convert, pending_dismiss, question_form, question_forms
 
 
@@ -116,6 +117,11 @@ FORM_PAGES = {
     "questionnaires:pending_create": _submit("ساختن ریسک در انتظار"),
     "questionnaires:pending_convert": _pending_convert,
     "questionnaires:pending_dismiss": pending_dismiss,
+    "controls:control_create": None,
+    "controls:control_update": None,
+    "controls:control_assessment_create": control_assessment_form,
+    "controls:control_assessment_update": control_assessment_form,
+    "controls:soa_update": None,
 }
 
 # صفحه‌هایی که به‌جای یک form چند فرم با پیشوند دارند؛ خطاهای فرستادن ناموفق از همه‌ی این فرم‌ها خوانده می‌شود.
