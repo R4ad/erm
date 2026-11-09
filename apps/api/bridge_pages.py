@@ -2,6 +2,7 @@
 صفحه که کنار فرم لازم است. فقط صفحه‌های این فهرست از راه API در دسترس‌اند."""
 
 from . import formatting as fmt
+from .actions import reassessment_form
 from .assessments import impact_forms, impact_profile, initiator_form, path_form
 
 
@@ -90,6 +91,13 @@ FORM_PAGES = {
     "assessments:path_create": path_form,
     "assessments:path_update": path_form,
     "assessments:impact_profile": impact_profile,
+    "actions:plan_create": None,
+    "actions:plan_update": None,
+    "actions:action_create": None,
+    "actions:action_update": None,
+    "actions:acceptance_create": None,
+    "actions:acceptance_update": None,
+    "actions:reassessment_create": reassessment_form,
 }
 
 # صفحه‌هایی که به‌جای یک form چند فرم با پیشوند دارند؛ خطاهای فرستادن ناموفق از همه‌ی این فرم‌ها خوانده می‌شود.
@@ -103,4 +111,9 @@ POST_ONLY_PAGES = {
     "assessments:review",
     "assessments:referral",
     "assessments:path_delete",
+    "actions:plan_approve",
+    "actions:action_move",
+    "actions:acceptance_submit",
+    "actions:acceptance_sign",
+    "actions:acceptance_revoke",
 }

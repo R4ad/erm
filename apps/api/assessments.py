@@ -286,13 +286,9 @@ def _compare_cell(cell):
     return {"text": "-" if value is None or value == "" else str(value), "level": None, "trend": cell["trend"]}
 
 
-def compare(context, request):
-    risk = context["risk"]
-    profiles = context.get("profiles", [])
+def comparison(data):
+    """جدول مقایسه‌ی assessments.comparison.compare (ستون‌ها، سطرها و جهت تغییر نسبت به ستون اول) به شکل JSON."""
     return {
-        "title": "مقایسه‌ی ارزیابی‌ها",
-        "risk": _risk(risk),
-        "error": context.get("error"),
         "profiles": [
             {
                 "id": item.assessment.pk,
@@ -302,13 +298,22 @@ def compare(context, request):
                 "incomplete": item.incomplete,
                 "href": item.assessment.get_absolute_url(),
             }
-            for item in profiles
+            for item in data.get("profiles", [])
         ],
         "rows": [
             {"label": row["label"], "cells": [_compare_cell(cell) for cell in row["cells"]]}
-            for row in context.get("rows", [])
+            for row in data.get("rows", [])
         ],
-        "method_changed": context.get("method_changed", False),
+        "method_changed": data.get("method_changed", False),
+    }
+
+
+def compare(context, request):
+    return {
+        "title": "مقایسه‌ی ارزیابی‌ها",
+        "risk": _risk(context["risk"]),
+        "error": context.get("error"),
+        **comparison(context),
     }
 
 

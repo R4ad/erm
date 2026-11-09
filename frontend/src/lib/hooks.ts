@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useLocation } from "react-router-dom";
 
 import { t } from "./i18n";
 
@@ -45,4 +46,13 @@ export function useMediaQuery(query: string) {
     () => window.matchMedia(query).matches,
     () => false,
   );
+}
+
+/** بعد از بارگذاری، صفحه به #بخشی می‌رود که جنگو بعد از هر کار به آن برمی‌گرداند (#review، #progress، #path-12). */
+export function useSectionFromHash(ready: boolean) {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!ready || !hash) return;
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({ block: "start" });
+  }, [ready, hash]);
 }

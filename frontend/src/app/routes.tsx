@@ -43,6 +43,12 @@ const FORM_ROUTES = [
   "assessments/:pk/initiator",
   "assessments/:pk/paths/new",
   "assessments/paths/:pk/edit",
+  "actions/risks/:risk_pk/plan/new",
+  "actions/plans/:pk/edit",
+  "actions/plans/:plan_pk/actions/new",
+  "actions/:pk/edit",
+  "actions/risks/:risk_pk/acceptance/new",
+  "actions/acceptances/:pk/edit",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -149,6 +155,38 @@ export const routes: RouteObject[] = [
             path: "assessments/:pk/impacts",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/assessments/ImpactProfilePage")).ImpactProfilePage),
+            }),
+          },
+          {
+            path: "actions",
+            lazy: async () => ({ Component: (await import("@/features/actions/ListPages")).ActionListPage }),
+          },
+          {
+            path: "actions/acceptances",
+            lazy: async () => ({ Component: (await import("@/features/actions/ListPages")).AcceptanceListPage }),
+          },
+          {
+            path: "actions/plans/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/actions/PlanDetailPage")).PlanDetailPage),
+            }),
+          },
+          {
+            path: "actions/plans/:plan_pk/reassess",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/actions/ReassessmentPage")).ReassessmentPage),
+            }),
+          },
+          {
+            path: "actions/acceptances/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/actions/AcceptanceDetailPage")).AcceptanceDetailPage),
+            }),
+          },
+          {
+            path: "actions/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/actions/ActionDetailPage")).ActionDetailPage),
             }),
           },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),

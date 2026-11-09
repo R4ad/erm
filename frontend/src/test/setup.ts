@@ -1,7 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+
+// صفحه‌ها بخش جدای کدند و با import() باز می‌شوند. وقتی همه‌ی فایل‌های آزمون هم‌زمان اجرا می‌شوند، بار کردن
+// اولین صفحه‌ی یک فایل گاهی از یک ثانیه‌ی پیش‌فرض findBy* بیشتر طول می‌کشد؛ سه ثانیه برای همان بارِ اول است.
+configure({ asyncUtilTimeout: 3000 });
 
 // jsdom این APIهای مرورگر را ندارد و Radix و هوک‌های رابط از آن‌ها استفاده می‌کنند.
 Object.defineProperty(window, "matchMedia", {

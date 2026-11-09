@@ -164,6 +164,8 @@ def test_the_edit_form_comes_with_the_django_fields_values_and_cancel_address(ap
     ]
     assert fields["customers"]["kind"] == "multiselect"
     assert fields["customers"]["value"] == [str(customer.pk) for customer in risk.customers.all()]
+    # فهرست چندتایی React تیک دارد؛ راهنمای Ctrl فهرست بومی جنگو به آن نمی‌رسد.
+    assert "Ctrl" not in fields["customers"]["help"]
 
 
 def test_the_values_of_a_form_save_back_unchanged(api, grc, owner):

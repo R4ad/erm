@@ -12,8 +12,7 @@ import {
   Undo2,
   Users,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useState } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
@@ -21,18 +20,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import { Field, Textarea } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/states";
 import { useBridgeAction } from "@/features/forms/bridge-action";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
+import {
+  ActionError,
+  CodeLinks,
+  Fact,
+  NotesField,
+  Reasons,
+  Section,
+  SectionNav,
+  Stat,
+} from "@/features/records/dossier";
 import { useSession } from "@/features/session/session";
-import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { band, dateTime, fa, faText, longDate } from "@/lib/format";
-import { useTitle } from "@/lib/hooks";
+import { useSectionFromHash, useTitle } from "@/lib/hooks";
 import { parseJalali } from "@/lib/jalali";
 import type {
   AssessmentDetail,
@@ -40,8 +48,6 @@ import type {
   AssessmentLikelihood,
   AssessmentPath,
   AssessmentReview,
-  EvidenceRef,
-  FormField,
 } from "@/lib/types";
 
 // پرونده‌ی ارزیابی (assessments/assessment_detail.html): نتیجه‌ی موتور محاسبه، کنترل کیفیت، احتمال و پروفایل پیامد.
@@ -53,88 +59,6 @@ const SECTIONS = [
   { id: "likelihood", label: "احتمال" },
   { id: "impacts", label: "پروفایل پیامد" },
 ];
-
-/** بعد از بارگذاری، صفحه به #بخشی می‌رود که جنگو بعد از هر کار به آن برمی‌گرداند (#review، #likelihood، #path-12). */
-function useSectionFromHash(ready: boolean) {
-  const { hash } = useLocation();
-  useEffect(() => {
-    if (!ready || !hash) return;
-    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({ block: "start" });
-  }, [ready, hash]);
-}
-
-function EvidenceLinks({ items }: { items: EvidenceRef[] }) {
-  if (!items.length) return <span className="text-muted">-</span>;
-  return (
-    <span className="flex flex-wrap gap-x-2 gap-y-1">
-      {items.map((item) => (
-        <AppLink key={item.code} href={item.href} className="code text-xs">
-          {item.code}
-        </AppLink>
-      ))}
-    </span>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="contents">
-      <dt className="text-muted">{label}</dt>
-      <dd className="min-w-0 text-fg">{children}</dd>
-    </div>
-  );
-}
-
-function Section({
-  id,
-  title,
-  icon,
-  actions,
-  children,
-}: {
-  id: string;
-  title: string;
-  icon: ReactNode;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} aria-labelledby={`${id}-title`} className="flex scroll-mt-24 flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id={`${id}-title`} className="flex items-center gap-2 text-lg font-semibold text-fg">
-          <span aria-hidden className="text-accent-text [&>svg]:size-5">
-            {icon}
-          </span>
-          {title}
-        </h2>
-        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Reasons({ tone, title, items }: { tone: "danger" | "warning" | "info"; title?: string; items: string[] }) {
-  if (!items.length) return null;
-  return (
-    <Alert tone={tone} title={title}>
-      <ul className={cn("flex flex-col gap-1", items.length > 1 && "list-disc ps-5")}>
-        {items.map((item) => (
-          <li key={item}>{faText(item)}</li>
-        ))}
-      </ul>
-    </Alert>
-  );
-}
-
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface/50 p-4">
-      <span className="text-xs text-muted">{label}</span>
-      <span className="text-xl font-semibold text-fg tabular">{children}</span>
-    </div>
-  );
-}
 
 function Outcome({ data }: { data: AssessmentDetail }) {
   const outcome = data.outcome;
@@ -178,43 +102,6 @@ function Outcome({ data }: { data: AssessmentDetail }) {
         </>
       )}
     </Section>
-  );
-}
-
-/** کادر توضیح یک کار کنترل کیفیت، از توصیف فیلد همان فرم جنگو. */
-function NotesField({
-  field,
-  value,
-  onChange,
-  disabled,
-  label,
-  error,
-}: {
-  field?: FormField;
-  value: string;
-  onChange: (value: string) => void;
-  disabled: boolean;
-  label?: string;
-  error?: string;
-}) {
-  return (
-    <Field label={label ?? field?.label ?? "توضیح"} hint={field?.help || undefined} error={error}>
-      <Textarea
-        rows={field?.rows ?? 2}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Field>
-  );
-}
-
-function ActionError({ error }: { error: unknown }) {
-  if (!error) return null;
-  return (
-    <Alert tone="danger" role="alert">
-      {faText(errorMessage(error))}
-    </Alert>
   );
 }
 
@@ -448,7 +335,7 @@ function Initiator({ likelihood }: { likelihood: AssessmentLikelihood }) {
         <span className="whitespace-pre-line">{initiator.rationale || "-"}</span>
       </Fact>
       <Fact label="شواهد">
-        <EvidenceLinks items={initiator.evidence} />
+        <CodeLinks items={initiator.evidence} />
       </Fact>
     </dl>
   );
@@ -803,7 +690,7 @@ function Facts({ data }: { data: AssessmentDetail }) {
                   ))}
                 </span>
                 {escalation.rationale && <span className="whitespace-pre-line">{escalation.rationale}</span>}
-                <EvidenceLinks items={escalation.evidence} />
+                <CodeLinks items={escalation.evidence} />
               </span>
             </Fact>
           )}
@@ -882,17 +769,7 @@ export function AssessmentDetailPage() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <Header data={data} />
-        <nav aria-label="بخش‌های ارزیابی" className="flex flex-wrap gap-2">
-          {SECTIONS.map((section) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
-              className="inline-flex h-8 items-center rounded-full border border-line bg-surface px-3.5 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg"
-            >
-              {section.label}
-            </a>
-          ))}
-        </nav>
+        <SectionNav label="بخش‌های ارزیابی" sections={SECTIONS} />
       </div>
       <Facts data={data} />
       <RiskInformation data={data} />

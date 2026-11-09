@@ -4,6 +4,8 @@
 اعتبارسنجی با خود فرم جنگو است؛ پس فرم React و صفحه‌ی جنگو هیچ‌وقت دو قاعده‌ی متفاوت ندارند.
 """
 
+import re
+
 from django import forms
 from django.http import QueryDict
 
@@ -68,6 +70,17 @@ def field_value(bound):
     return _string(field.prepare_value(value))
 
 
+# راهنمای فهرست چندتایی بومی مرورگر در فرم‌های جنگو. فهرست چندتایی رابط React تیک دارد و این راهنما آنجا غلط است.
+NATIVE_MULTI_HINT = re.compile(r"\s*برای انتخاب چند [^،.]+،\s*Ctrl\s*\(در مک Cmd\)\s*را نگه دارید و کلیک کنید\.")
+
+
+def field_help(field, kind):
+    text = str(field.help_text or "")
+    if kind == "multiselect":
+        text = NATIVE_MULTI_HINT.sub("", text).strip()
+    return text
+
+
 def describe_field(bound):
     field = bound.field
     kind = field_kind(field)
@@ -76,7 +89,7 @@ def describe_field(bound):
         # نام با پیشوند فرم، همان نامی که در داده‌ی POST می‌آید؛ صفحه‌ای مثل پروفایل پیامد چند فرم با پیشوند دارد.
         "name": bound.html_name,
         "label": str(bound.label or ""),
-        "help": str(field.help_text or ""),
+        "help": field_help(field, kind),
         "required": field.required,
         "disabled": field.disabled,
         "kind": kind,
