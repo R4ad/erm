@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -66,7 +67,7 @@ def review_create(request, risk_pk):
                 "کار بازبینی ثبت شد. رخداد مهم هم‌زمان باید در مسیر پاسخ رخداد پیگیری شود.",
             )
             return redirect(review)
-    return render(
+    return TemplateResponse(
         request,
         "form_page.html",
         {
@@ -94,8 +95,9 @@ def review_detail(request, pk):
             except PlanError as error:
                 form.add_error(None, error.problems)
             else:
+                messages.success(request, "نتیجه بازبینی ثبت شد.")
                 return redirect(review)
-    return render(
+    return TemplateResponse(
         request,
         "actions/review_detail.html",
         {"review": review, "form": form, "can_complete": allowed},
@@ -106,7 +108,7 @@ def notice_list(request):
     notices = MonitoringNotice.objects.filter(
         recipient=request.user, risk__in=visible_risks(request.user)
     )
-    return render(request, "actions/notices.html", {"notices": notices[:100]})
+    return TemplateResponse(request, "actions/notices.html", {"notices": notices[:100]})
 
 
 @require_POST
@@ -121,4 +123,5 @@ def notice_read(request, pk):
         notice.read_at = timezone.now()
         notice._history_user = request.user
         notice.save()
+        messages.success(request, "اعلان خوانده شد.")
     return redirect("actions:notices")

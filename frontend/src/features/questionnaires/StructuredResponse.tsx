@@ -42,7 +42,14 @@ const eventNode = (): Event => {
 };
 const serviceNode = (): Service => ({ ...node(), objectives: [node()], events: [eventNode()] });
 
-export function StructuredResponse({ response, id }: { response: ResponseDetail; id: string }) {
+/** پاسخ شاخه‌ای؛ با can_edit نادرست فقط خواندنی است، مثل پرونده‌ی بررسی پاسخ. */
+export function StructuredResponse({
+  response,
+  id,
+}: {
+  response: Pick<ResponseDetail, "can_edit" | "structured_data" | "structured_questions">;
+  id: string;
+}) {
   const queryClient = useQueryClient();
   const [data, setData] = useState<Service[]>(() =>
     response.structured_data.length

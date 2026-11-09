@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useForm, useFormState, useWatch, type FieldPath, type UseFormReturn } from "react-hook-form";
 import { useBlocker, useParams } from "react-router-dom";
 
+import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ClassicLink } from "@/components/ui/classic-link";
 import { Deadline } from "@/components/ui/deadline";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Checkbox, Field, FieldError, Radio, RequiredMark, Textarea } from "@/components/ui/field";
@@ -589,9 +589,9 @@ export function ResponseFormPage() {
         title={response.questionnaire.title}
         description={response.questionnaire.description || undefined}
         actions={
-          <ClassicLink href={response.classic_url} button={{ variant: "ghost", size: "sm" }}>
-            این پاسخ در صفحه‌های فعلی
-          </ClassicLink>
+          <AppLink href={response.classic_url} button={{ variant: "ghost", size: "sm" }}>
+            پرونده‌ی پاسخ
+          </AppLink>
         }
       />
 

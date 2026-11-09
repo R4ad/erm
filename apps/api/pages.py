@@ -16,6 +16,8 @@ from .actions import ACTION_PAGES
 from .assessments import ASSESSMENT_PAGES
 from .forms import describe_field
 from .listing import listing
+from .monitoring import MONITORING_PAGES
+from .questionnaire_pages import QUESTIONNAIRE_PAGES
 from .records import record_parts
 
 
@@ -265,4 +267,6 @@ READ_PAGES = {
     "workflow:change_request_detail": change_request_detail,
     **ASSESSMENT_PAGES,
     **ACTION_PAGES,
+    **MONITORING_PAGES,
+    **QUESTIONNAIRE_PAGES,
 }

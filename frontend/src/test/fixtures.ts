@@ -25,7 +25,13 @@ import type {
   ImpactRow,
   Level,
   MyWork,
+  NoticeList,
   PlanDetail,
+  QuestionnaireDetail,
+  QuestionnaireList,
+  ResponseReview,
+  ReviewDetail,
+  ReviewList,
   ResponseDetail,
   RiskDetail,
   RiskFilters,
@@ -112,6 +118,37 @@ export const routeTable: RouteEntry[] = [
     name: "actions:acceptance_detail",
     pattern: "^/actions/acceptances/(?<pk>[0-9]+)/$",
     route: "/actions/acceptances/:pk",
+    form: false,
+  },
+  { name: "actions:notices", pattern: "^/actions/notices/$", route: "/actions/notices", form: false },
+  {
+    name: "actions:review_detail",
+    pattern: "^/actions/reviews/(?<pk>[0-9]+)/$",
+    route: "/actions/reviews/:pk",
+    form: false,
+  },
+  {
+    name: "questionnaires:questionnaire_list",
+    pattern: "^/questionnaires/manage/$",
+    route: "/questionnaires/manage",
+    form: false,
+  },
+  {
+    name: "questionnaires:questionnaire_detail",
+    pattern: "^/questionnaires/manage/(?<pk>[0-9]+)/$",
+    route: "/questionnaires/manage/:pk",
+    form: false,
+  },
+  {
+    name: "questionnaires:response_list",
+    pattern: "^/questionnaires/responses/$",
+    route: "/questionnaires/responses",
+    form: false,
+  },
+  {
+    name: "questionnaires:response_detail",
+    pattern: "^/questionnaires/responses/(?<pk>[0-9]+)/$",
+    route: "/questionnaires/responses/:pk",
     form: false,
   },
   { name: "risks:risk_create", pattern: "^/risks/new/$", route: "/risks/new", form: true },
@@ -247,6 +284,60 @@ export const routeTable: RouteEntry[] = [
     route: "/actions/plans/:plan_pk/reassess",
     form: true,
   },
+  {
+    name: "actions:review_create",
+    pattern: "^/actions/risks/(?<risk_pk>[0-9]+)/review/new/$",
+    route: "/actions/risks/:risk_pk/review/new",
+    form: true,
+  },
+  {
+    name: "questionnaires:questionnaire_create",
+    pattern: "^/questionnaires/manage/new/$",
+    route: "/questionnaires/manage/new",
+    form: true,
+  },
+  {
+    name: "questionnaires:questionnaire_update",
+    pattern: "^/questionnaires/manage/(?<pk>[0-9]+)/edit/$",
+    route: "/questionnaires/manage/:pk/edit",
+    form: true,
+  },
+  {
+    name: "questionnaires:question_create",
+    pattern: "^/questionnaires/manage/(?<questionnaire_pk>[0-9]+)/questions/new/$",
+    route: "/questionnaires/manage/:questionnaire_pk/questions/new",
+    form: true,
+  },
+  {
+    name: "questionnaires:question_update",
+    pattern: "^/questionnaires/questions/(?<pk>[0-9]+)/edit/$",
+    route: "/questionnaires/questions/:pk/edit",
+    form: true,
+  },
+  {
+    name: "questionnaires:response_return",
+    pattern: "^/questionnaires/responses/(?<pk>[0-9]+)/return/$",
+    route: "/questionnaires/responses/:pk/return",
+    form: true,
+  },
+  {
+    name: "questionnaires:pending_create",
+    pattern: "^/questionnaires/responses/(?<pk>[0-9]+)/pending/new/$",
+    route: "/questionnaires/responses/:pk/pending/new",
+    form: true,
+  },
+  {
+    name: "questionnaires:pending_convert",
+    pattern: "^/questionnaires/pending/(?<pk>[0-9]+)/convert/$",
+    route: "/questionnaires/pending/:pk/convert",
+    form: true,
+  },
+  {
+    name: "questionnaires:pending_dismiss",
+    pattern: "^/questionnaires/pending/(?<pk>[0-9]+)/dismiss/$",
+    route: "/questionnaires/pending/:pk/dismiss",
+    form: true,
+  },
 ];
 
 export function csrf(authenticated = false): CsrfState {
@@ -262,11 +353,29 @@ export function session(): Session {
         title: "کار روزانه",
         items: [
           { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/" },
+          { key: "actions:notices", label: "اعلان‌های پایش", href: "/actions/notices/", route: "/actions/notices" },
           {
             key: "questionnaires:answer_home",
             label: "پاسخ به سؤال‌ها",
             href: "/questionnaires/",
             route: "/questionnaires",
+          },
+        ],
+      },
+      {
+        title: "پرسشنامه",
+        items: [
+          {
+            key: "questionnaires:response_list",
+            label: "پاسخ‌ها و بررسی",
+            href: "/questionnaires/responses/",
+            route: "/questionnaires/responses",
+          },
+          {
+            key: "questionnaires:questionnaire_list",
+            label: "تعریف پرسشنامه‌ها",
+            href: "/questionnaires/manage/",
+            route: "/questionnaires/manage",
           },
         ],
       },
@@ -1747,5 +1856,450 @@ export function reassessmentForm(): FormPageData {
         }),
       ],
     },
+  };
+}
+
+// --- تعریف پرسشنامه‌ها، بررسی پاسخ‌ها و پایش ---
+
+const unitManager = { id: 6, name: "مدیر واحد آزمون" };
+
+export function questionnaireList(overrides: Partial<QuestionnaireList> = {}): QuestionnaireList {
+  return {
+    view: "questionnaires:questionnaire_list",
+    title: "تعریف پرسشنامه‌ها",
+    messages: [],
+    results: [
+      {
+        id: 1,
+        title: "پرسشنامه‌ی آزمون",
+        question_count: 3,
+        response_count: 2,
+        is_active: true,
+        is_structured: false,
+        href: "/questionnaires/manage/1/",
+      },
+      {
+        id: 2,
+        title: "پرسشنامه‌ی شاخه‌ای آزمون",
+        question_count: 9,
+        response_count: 0,
+        is_active: false,
+        is_structured: true,
+        href: "/questionnaires/manage/2/",
+      },
+    ],
+    count: 2,
+    page: 1,
+    pages: 1,
+    filters: null,
+    create_url: "/questionnaires/manage/new/",
+    ...overrides,
+  };
+}
+
+export function questionnaireDetail(overrides: Partial<QuestionnaireDetail> = {}): QuestionnaireDetail {
+  return {
+    view: "questionnaires:questionnaire_detail",
+    title: "پرسشنامه‌ی آزمون",
+    messages: [],
+    questionnaire: {
+      id: 1,
+      title: "پرسشنامه‌ی آزمون",
+      description: "راهنمای پاسخ‌دهنده‌ی آزمون.",
+      is_active: true,
+      is_structured: false,
+    },
+    questions: [
+      {
+        id: 1,
+        order: 1,
+        text: "پشتیبان آزمون روزانه آزموده می‌شود؟",
+        help: "آزمون بازیابی واقعی.",
+        kind: { value: "yes_no", label: "بله و خیر" },
+        stage: null,
+        required: true,
+        is_active: true,
+        options: [
+          { id: 1, text: "بله", is_active: true, indicates_risk: false, scenario: null, category: null },
+          {
+            id: 2,
+            text: "خیر",
+            is_active: true,
+            indicates_risk: true,
+            scenario: { code: "SC-0001", name: "سناریوی آزمون" },
+            category: null,
+          },
+        ],
+        edit_url: "/questionnaires/questions/1/edit/",
+      },
+      {
+        id: 2,
+        order: 2,
+        text: "وابستگی‌های آزمون",
+        help: "",
+        kind: { value: "multiple", label: "چندگزینه‌ای" },
+        stage: null,
+        required: false,
+        is_active: true,
+        options: [
+          { id: 3, text: "شبکه", is_active: true, indicates_risk: false, scenario: null, category: null },
+          { id: 4, text: "پیامک", is_active: false, indicates_risk: false, scenario: null, category: null },
+        ],
+        edit_url: "/questionnaires/questions/2/edit/",
+      },
+      {
+        id: 3,
+        order: 3,
+        text: "سؤال کنار گذاشته‌ی آزمون",
+        help: "",
+        kind: { value: "text", label: "متن" },
+        stage: null,
+        required: false,
+        is_active: false,
+        options: [],
+        edit_url: "/questionnaires/questions/3/edit/",
+      },
+    ],
+    add_question_url: "/questionnaires/manage/1/questions/new/",
+    edit_url: "/questionnaires/manage/1/edit/",
+    list_url: "/questionnaires/manage/",
+    ...overrides,
+  };
+}
+
+const scenarioChoices = [{ value: "1", label: "SC-0001 سناریوی آزمون" }];
+const categoryChoices = [{ value: "7", label: "T7 دسته‌ی آزمون" }];
+
+function optionRow(index: number, values: { id?: string; text?: string; risky?: boolean; scenario?: string }) {
+  const prefix = `options-${index}`;
+  return {
+    prefix,
+    multipart: false,
+    errors: [],
+    fields: [
+      field({ name: `${prefix}-order`, label: "ترتیب", kind: "number", value: String(index + 1) }),
+      field({ name: `${prefix}-text`, label: "متن گزینه", kind: "text", value: values.text ?? "", max_length: 300 }),
+      field({
+        name: `${prefix}-indicates_risk`,
+        label: "نشانه‌ی ریسک",
+        kind: "checkbox",
+        value: Boolean(values.risky),
+      }),
+      field({
+        name: `${prefix}-scenario`,
+        label: "سناریوی مرجع",
+        kind: "select",
+        value: values.scenario ?? "",
+        empty_label: "---------",
+        choices: scenarioChoices,
+      }),
+      field({
+        name: `${prefix}-category`,
+        label: "دسته",
+        kind: "select",
+        value: "",
+        empty_label: "---------",
+        choices: categoryChoices,
+      }),
+      field({ name: `${prefix}-is_active`, label: "فعال", kind: "checkbox", value: true }),
+      field({ name: `${prefix}-id`, label: "Id", kind: "hidden", value: values.id ?? "" }),
+      field({ name: `${prefix}-question`, label: "سؤال", kind: "hidden", value: "1" }),
+    ],
+  };
+}
+
+export function questionForm(): FormPageData {
+  return {
+    view: "questionnaires:question_update",
+    title: "ویرایش سؤال در «پرسشنامه‌ی آزمون»",
+    cancel: { href: "/questionnaires/manage/1/", route: "/questionnaires/manage/1" },
+    messages: [],
+    structured: false,
+    form: {
+      multipart: false,
+      errors: [],
+      fields: [
+        field({ name: "order", label: "ترتیب", kind: "number", value: "1", required: true }),
+        field({
+          name: "text",
+          label: "متن سؤال",
+          kind: "textarea",
+          value: "پشتیبان آزمون روزانه آزموده می‌شود؟",
+          required: true,
+          rows: 2,
+        }),
+        field({ name: "help_text", label: "راهنما", kind: "text", value: "" }),
+        field({
+          name: "kind",
+          label: "نوع",
+          kind: "select",
+          value: "yes_no",
+          required: true,
+          empty_label: "---------",
+          choices: [
+            { value: "text", label: "متن" },
+            { value: "yes_no", label: "بله و خیر" },
+            { value: "single", label: "تک‌گزینه‌ای" },
+            { value: "multiple", label: "چندگزینه‌ای" },
+          ],
+        }),
+        field({
+          name: "stage",
+          label: "بخش پرسشنامه",
+          kind: "select",
+          value: "",
+          empty_label: "---------",
+          choices: [{ value: "service", label: "خدمت" }],
+        }),
+        field({ name: "is_required", label: "اجباری", kind: "checkbox", value: true }),
+        field({ name: "is_active", label: "فعال", kind: "checkbox", value: true }),
+      ],
+    },
+    options: {
+      management: [
+        field({ name: "options-TOTAL_FORMS", label: "Total forms", kind: "hidden", value: "3" }),
+        field({ name: "options-INITIAL_FORMS", label: "Initial forms", kind: "hidden", value: "2" }),
+        field({ name: "options-MIN_NUM_FORMS", label: "Min num forms", kind: "hidden", value: "0" }),
+        field({ name: "options-MAX_NUM_FORMS", label: "Max num forms", kind: "hidden", value: "1000" }),
+      ],
+      errors: [],
+      rows: [
+        optionRow(0, { id: "1", text: "بله" }),
+        optionRow(1, { id: "2", text: "خیر", risky: true, scenario: "1" }),
+        optionRow(2, {}),
+      ],
+    },
+  };
+}
+
+export function reviewList(overrides: Partial<ReviewList> = {}): ReviewList {
+  return {
+    view: "questionnaires:response_list",
+    title: "پاسخ‌های پرسشنامه",
+    messages: [],
+    results: [
+      {
+        id: 1,
+        questionnaire: "پرسشنامه‌ی آزمون",
+        org_unit: "واحد آزمون",
+        service: "IPG",
+        respondent: unitManager,
+        interview: true,
+        submitted_at: { iso: "2026-11-04", jalali: "1405/08/13" },
+        pending_count: 2,
+        status: { value: "submitted", label: "ارسال‌شده" },
+        is_overdue: false,
+        href: "/questionnaires/responses/1/",
+      },
+      {
+        id: 2,
+        questionnaire: "پرسشنامه‌ی آزمون",
+        org_unit: "واحد آزمون دوم",
+        service: null,
+        respondent: tester,
+        interview: false,
+        submitted_at: null,
+        pending_count: 0,
+        status: { value: "draft", label: "پیش‌نویس" },
+        is_overdue: false,
+        href: "/questionnaires/responses/2/",
+      },
+    ],
+    count: 2,
+    page: 1,
+    pages: 1,
+    filters: filters([
+      field({
+        name: "status",
+        label: "وضعیت",
+        kind: "select",
+        empty_label: "همه",
+        choices: [
+          { value: "draft", label: "پیش‌نویس" },
+          { value: "submitted", label: "ارسال‌شده" },
+          { value: "returned", label: "برگشت‌خورده" },
+          { value: "reviewed", label: "بررسی‌شده" },
+        ],
+      }),
+      field({
+        name: "pending",
+        label: "ریسک در انتظار",
+        kind: "select",
+        empty_label: "همه",
+        choices: [
+          { value: "yes", label: "دارد" },
+          { value: "no", label: "ندارد" },
+        ],
+      }),
+    ]),
+    queue_url: "/questionnaires/responses/?status=submitted",
+    ...overrides,
+  };
+}
+
+export function responseReview(overrides: Partial<ResponseReview> = {}): ResponseReview {
+  return {
+    view: "questionnaires:response_detail",
+    title: "پرسشنامه‌ی آزمون: IPG",
+    messages: [],
+    response: {
+      id: 1,
+      questionnaire: { id: 1, title: "پرسشنامه‌ی آزمون", href: "/questionnaires/manage/1/" },
+      org_unit: "واحد آزمون",
+      service: { code: "IPG", name: "درگاه آزمون" },
+      respondent: unitManager,
+      recorded_by: reviewer,
+      interview: true,
+      status: { value: "submitted", label: "ارسال‌شده" },
+      is_overdue: false,
+      is_structured: false,
+      submitted_at: { iso: "2026-11-04T08:30:00+00:00", jalali: "1405/08/13 12:00" },
+      return_question: "",
+      returned_at: null,
+      return_due: null,
+      reviewed_by: null,
+      reviewed_at: null,
+    },
+    fixed: [
+      { label: "کارکردهای اصلی و تعهدهای واحد", value: "کارکرد آزمون" },
+      { label: "چه تعهد زمانی یا کیفی داریم؟", value: "" },
+    ],
+    answers: [
+      {
+        id: 1,
+        question: "پشتیبان آزمون روزانه آزموده می‌شود؟",
+        has_options: true,
+        text: "",
+        options: [{ text: "خیر", indicates_risk: true }],
+      },
+      { id: 2, question: "نگرانی آزمون", has_options: false, text: "جواب متنی آزمون", options: [] },
+    ],
+    new_item: "مورد جدید آزمون",
+    pending_risks: [
+      {
+        id: 1,
+        description: "پشتیبان آزمون روزانه آزموده می‌شود؟\nجواب: خیر",
+        source: "گزینه‌ی نشانه‌ی ریسک",
+        scenario: { code: "SC-0001", name: "سناریوی آزمون" },
+        category: null,
+        status: { value: "pending", label: "در انتظار" },
+        risk: null,
+        dismiss_reason: "",
+        duplicate_of: null,
+        convert_url: "/questionnaires/pending/1/convert/",
+        dismiss_url: "/questionnaires/pending/1/dismiss/",
+      },
+      {
+        id: 2,
+        description: "مورد جدید آزمون",
+        source: "مورد جدید",
+        scenario: null,
+        category: null,
+        status: { value: "dismissed", label: "کنار گذاشته" },
+        risk: null,
+        dismiss_reason: "دلیل آزمون",
+        duplicate_of: { code: "RK-1405-0001", href: "/risks/1/" },
+        convert_url: null,
+        dismiss_url: null,
+      },
+    ],
+    answer_url: null,
+    review: {
+      pending_create_url: "/questionnaires/responses/1/pending/new/",
+      return_url: "/questionnaires/responses/1/return/",
+      reviewed_url: "/questionnaires/responses/1/reviewed/",
+      undecided: true,
+    },
+    list_url: "/questionnaires/responses/",
+    ...overrides,
+  };
+}
+
+const pendingBrief = { description: "مورد جدید آزمون", source: "مورد جدید" };
+
+export function pendingPicker(): FormPageData {
+  return {
+    view: "questionnaires:pending_convert",
+    title: "انتخاب سناریو برای ثبت ریسک",
+    form: null,
+    cancel: { href: "/questionnaires/responses/1/", route: "/questionnaires/responses/1" },
+    messages: [],
+    pending: pendingBrief,
+    scenarios: [
+      { id: 1, code: "SC-0001", title: "سناریوی آزمون", service: "IPG - درگاه آزمون" },
+      { id: 2, code: "SC-0002", title: "سناریوی آزمون دوم", service: "SMS - پیامک آزمون" },
+    ],
+  };
+}
+
+export function pendingConvertForm(): FormPageData {
+  return {
+    view: "questionnaires:pending_convert",
+    title: "ثبت ریسک در انتظار در رجیستر",
+    cancel: { href: "/questionnaires/responses/1/", route: "/questionnaires/responses/1" },
+    messages: [],
+    submit: "ثبت در رجیستر",
+    pending: pendingBrief,
+    facts: { title: "جزئیات سناریو", rows: [{ label: "کد", value: "SC-0001" }] },
+    form: filters([
+      field({ name: "initiator", label: "عامل آغازگر", kind: "textarea", required: true }),
+      field({ name: "scenario", label: "سناریو", kind: "hidden", value: "1" }),
+    ]),
+  };
+}
+
+export function notices(): NoticeList {
+  const risk = { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" };
+  return {
+    view: "actions:notices",
+    title: "اعلان‌های پایش",
+    messages: [],
+    notices: [
+      {
+        id: 1,
+        risk,
+        message: "بازبینی آزمون تا ۱۴۰۵/۰۸/۱۴ آغاز شود.",
+        href: "/actions/reviews/1/",
+        created_at: { iso: "2026-11-04T08:30:00+00:00", jalali: "1405/08/13 12:00" },
+        read: false,
+        read_url: "/actions/notices/1/read/",
+      },
+      {
+        id: 2,
+        risk,
+        message: "اعلان خوانده‌شده‌ی آزمون",
+        href: "/risks/1/",
+        created_at: { iso: "2026-11-03T08:30:00+00:00", jalali: "1405/08/12 12:00" },
+        read: true,
+        read_url: null,
+      },
+    ],
+  };
+}
+
+export function reviewDetail(overrides: Partial<ReviewDetail> = {}): ReviewDetail {
+  return {
+    view: "actions:review_detail",
+    title: "بازبینی RK-1405-0001",
+    messages: [],
+    review: {
+      id: 1,
+      trigger: { value: "incident", label: "رخداد مهم یا بهره‌برداری فعال" },
+      risk: { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" },
+      assessment: null,
+      reason: "دلیل آزمون بازبینی",
+      due: { iso: "2026-11-05", jalali: "1405/08/14", days_left: 1, overdue: false },
+      responsible: riskOwner,
+      created_by: reviewer,
+      created_at: { iso: "2026-11-04T08:30:00+00:00", jalali: "1405/08/13 12:00" },
+      completed_at: null,
+      completed_by: null,
+      result: "",
+    },
+    complete: {
+      url: "/actions/reviews/1/",
+      result: field({ name: "result", label: "نتیجه و اقدام بعدی", kind: "textarea", required: true, rows: 4 }),
+    },
+    ...overrides,
   };
 }
