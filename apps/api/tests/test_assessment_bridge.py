@@ -101,7 +101,9 @@ def test_the_initiator_form_brings_the_risk_boundary_and_the_a_table(api, grc, r
     levels = ready.method_version.scales.get(code="A").levels.count()
     assert len(data["guides"][0]["items"]) == levels
     names = [field["name"] for field in data["form"]["fields"]]
-    assert names[:2] == ["a_basis", "a_count"] and "a_evidence" in names
+    # مرز شمارش ریسک (دامنه، واحد شمارش و استثناها) پیش از مسیر A در همین فرم ثبت می‌شود.
+    assert names[:5] == ["risk_scope", "risk_count_unit", "risk_count_exclusions", "a_basis", "a_count"]
+    assert "a_evidence" in names
 
     values = {**values_of(data["form"]), "a_basis": "rate", "a_count": ""}
     response = send(api(grc), url, values)
