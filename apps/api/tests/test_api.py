@@ -92,9 +92,10 @@ def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_ad
     routes = {item["route"] for group in data["navigation"] for item in group["items"] if item["route"]}
     assert {"/", "/risks", "/questionnaires", "/questionnaires/risk-questions", "/risks/evidence"} <= routes
     assert {"/questionnaires/manage", "/questionnaires/responses", "/actions/notices", "/controls"} <= routes
+    assert {"/catalog/services", "/catalog/commitments", "/units", "/method"} <= routes
     # صفحه‌ای که هنوز فقط در جنگو است پیوند جنگو می‌ماند.
     classic = {item["key"] for group in data["navigation"] for item in group["items"] if not item["route"]}
-    assert "catalog:service_list" in classic
+    assert "reports:management" in classic
     keys = [item["key"] for group in data["navigation"] for item in group["items"]]
     assert "risks:risk_list" in keys and len(keys) == len(set(keys))
     assert data["logout_url"] == reverse("api:logout")

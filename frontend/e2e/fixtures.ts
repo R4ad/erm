@@ -62,6 +62,7 @@ function defaults(): Record<string, Handler | unknown> {
       "/questionnaires/pending/1/convert/": (call: ApiCall) =>
         djangoQuery(call).get("scenario") ? data.pendingConvertForm() : data.pendingPicker(),
       "/controls/1/effectiveness/new/": data.controlAssessmentForm(),
+      "/catalog/services/1/dependencies/new/supplier/": data.dependencyForm(),
     }),
     "POST forms/": (call: ApiCall) => saved(call),
     "GET pages/": byPath({
@@ -114,6 +115,16 @@ function defaults(): Record<string, Handler | unknown> {
       },
       "/controls/soa/1/": data.soaGapDetail(),
       "/controls/soa/15/": data.soaDetail(),
+      "/catalog/services/": data.serviceList(),
+      "/catalog/services/1/": data.serviceDetail(),
+      "/catalog/commitments/": data.commitmentList(),
+      "/catalog/assets/": data.assetList(),
+      "/catalog/assets/1/": data.assetDetail(),
+      "/catalog/suppliers/": data.supplierList(),
+      "/catalog/suppliers/1/": data.supplierDetail(),
+      "/catalog/customers/": data.customerList(),
+      "/units/": data.unitList(),
+      "/method/": data.methodPage(),
     }),
   };
 }
@@ -188,6 +199,12 @@ function saved(call: ApiCall) {
     return {
       message: "ارزیابی اثربخشی CA-1405-0003 با E3 ثبت شد.",
       redirect: { href: "/controls/effectiveness/3/", route: "/controls/effectiveness/3" },
+    };
+  }
+  if (path.startsWith("/catalog/services/1/dependencies/")) {
+    return {
+      message: "وابستگی خدمت «درگاه پرداخت اینترنتی» به «شرکت پشتیبانی سخت‌افزار» ذخیره شد.",
+      redirect: { href: "/catalog/services/1/", route: "/catalog/services/1" },
     };
   }
   if (path.startsWith("/workflow/requests/")) {

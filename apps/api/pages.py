@@ -14,13 +14,15 @@ from apps.workflow.models import ChangeRequest
 from . import formatting as fmt
 from .actions import ACTION_PAGES
 from .assessments import ASSESSMENT_PAGES
+from .catalog import CATALOG_PAGES
 from .controls import CONTROL_PAGES
 from .forms import describe_field
 from .listing import listing
+from .methodology import METHODOLOGY_PAGES
 from .monitoring import MONITORING_PAGES
 from .questionnaire_pages import QUESTIONNAIRE_PAGES
 from .records import record_parts
-from .rows import evidence_row, risk_brief, risk_ref
+from .rows import coverage_cell, evidence_row, risk_brief, risk_ref
 
 
 def evidence_list(context, request):
@@ -124,24 +126,10 @@ def coverage(context, request):
     back = urlencode({"next": request.get_full_path()})
     rows = []
     for service, cells in context["rows"]:
-        row_cells = []
-        for category, cell in zip(categories, cells, strict=True):
-            # خانه‌ی ذخیره‌شده دسته و خدمتش را جدا می‌خواند؛ همان شیء‌های جدول جای آن می‌نشیند.
-            cell.service, cell.category = service, category
-            row_cells.append(
-                {
-                    "category": category.code,
-                    "status": fmt.choice(cell, "status"),
-                    "summary": cell.summary,
-                    "risk_count": cell.risk_count,
-                    "risks_url": f"{reverse('risks:risk_list')}?service={service.pk}&category={category.pk}"
-                    if cell.risk_count
-                    else None,
-                    "edit_url": f"{reverse('risks:coverage_update', args=[service.pk, category.pk])}?{back}"
-                    if can_edit
-                    else None,
-                }
-            )
+        row_cells = [
+            coverage_cell(cell, service, category, can_edit, back)
+            for category, cell in zip(categories, cells, strict=True)
+        ]
         rows.append(
             {
                 "service": {
@@ -233,4 +221,6 @@ READ_PAGES = {
     **MONITORING_PAGES,
     **QUESTIONNAIRE_PAGES,
     **CONTROL_PAGES,
+    **CATALOG_PAGES,
+    **METHODOLOGY_PAGES,
 }

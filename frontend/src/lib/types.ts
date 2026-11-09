@@ -610,6 +610,8 @@ export interface CategoryList extends Listing<CategoryRow> {
 
 export interface CoverageCell {
   category: string;
+  /** نام دسته؛ جدول جهان ریسک آن را از سرستون می‌خواند و صفحه‌ی خدمت کنار خانه نشانش می‌دهد. */
+  category_name?: string;
   status: Choice;
   summary: string;
   risk_count: number;
@@ -1430,4 +1432,260 @@ export interface SoaDetail {
   edit_url: string | null;
   edit_label: string;
   list_url: string;
+}
+
+// --- کاتالوگ و ساختار سازمانی ---
+
+/** بازه‌ی اعتبار یک رکورد کاتالوگ (catalog/includes/validity.html). */
+export interface Validity {
+  from: Day | null;
+  until: Day | null;
+  expired: boolean;
+}
+
+export interface CustomerRow {
+  id: number;
+  name: string;
+  is_key: boolean;
+  /** مبنای مالی به ریال؛ خالی یعنی ثبت نشده. */
+  financial_basis: number | null;
+  is_active: boolean;
+  edit_url: string | null;
+}
+
+export interface CustomerList extends Listing<CustomerRow> {
+  create_url: string | null;
+}
+
+export interface ServiceRow {
+  id: number;
+  code: string;
+  name: string;
+  kind: Choice;
+  org_unit: string;
+  owner: Person;
+  lifecycle_stage: Choice;
+  is_critical: boolean;
+  is_active: boolean;
+  href: string;
+}
+
+export interface ServiceList extends Listing<ServiceRow> {
+  create_url: string | null;
+}
+
+/** خدمتی که به این خدمت، تأمین‌کننده یا دارایی وابسته است (dependents_table.html). */
+export interface Dependent {
+  id: number;
+  service: { code: string; name: string; is_critical: boolean; href: string };
+  is_shared_point: boolean;
+  description: string;
+  validity: Validity;
+}
+
+export interface ServiceDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  service: ServiceRow & { description: string; environment: Choice };
+  commitments: {
+    id: number;
+    title: string;
+    description: string;
+    kind: Choice | null;
+    clause_ref: string;
+    /** خالی یعنی همه‌ی بانک‌ها. */
+    customer: string | null;
+    owner: Person | null;
+    validity: Validity;
+    edit_url: string | null;
+  }[];
+  add_commitment_url: string | null;
+  dependencies: {
+    id: number;
+    target_kind: string;
+    target: string;
+    /** نام خدمت بالادستی همیشه هست، ولی پیوندش فقط اگر کاربر آن خدمت را می‌بیند. */
+    target_url: string | null;
+    is_shared_point: boolean;
+    description: string;
+    alternative: string;
+    /** مرز مسئولیت؛ null یعنی هیچ‌کدام از پنج پرسش جواب ندارد. */
+    boundary: { label: string; value: string }[] | null;
+    validity: Validity;
+    edit_url: string | null;
+  }[];
+  add_dependency: { label: string; href: string }[];
+  dependents: Dependent[];
+  customer_links: {
+    id: number;
+    customer: string;
+    is_key: boolean;
+    tolerance_notes: string;
+    rto: string | null;
+    mtpd: string | null;
+    rpo: string | null;
+    bia_reference: string;
+    validity: Validity;
+    edit_url: string | null;
+  }[];
+  add_customer_url: string | null;
+  /** فقط برای خدمت فعال؛ جهان ریسک خدمت غیرفعال ندارد. */
+  coverage: { cells: CoverageCell[]; table_url: string } | null;
+  risks: RiskBrief[];
+  create_risk_url: string | null;
+  edit_url: string | null;
+  list_url: string;
+}
+
+export interface SupplierRow {
+  id: number;
+  name: string;
+  description: string;
+  is_critical: boolean;
+  contract_owner: Person | null;
+  is_active: boolean;
+  href: string;
+}
+
+export interface SupplierList extends Listing<SupplierRow> {
+  create_url: string | null;
+}
+
+export interface SupplierDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  supplier: SupplierRow;
+  dependents: Dependent[];
+  edit_url: string | null;
+  list_url: string;
+}
+
+export interface AssetRow {
+  id: number;
+  code: string;
+  name: string;
+  kind: Choice;
+  org_unit: string;
+  owner: Person;
+  data_class: Choice | null;
+  /** حرف‌های تیک‌خورده‌ی محرمانگی، صحت و دسترس‌پذیری. */
+  cia: ("C" | "I" | "A")[];
+  is_active: boolean;
+  href: string;
+}
+
+export interface AssetList extends Listing<AssetRow> {
+  create_url: string | null;
+}
+
+export interface AssetDetail {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  asset: AssetRow;
+  dependents: Dependent[];
+  edit_url: string | null;
+  list_url: string;
+}
+
+export interface CommitmentRow {
+  id: number;
+  title: string;
+  description: string;
+  kind: Choice | null;
+  clause_ref: string;
+  /** فقط خدمت‌هایی که کاربر می‌بیند. */
+  services: { code: string; href: string }[];
+  customer: string | null;
+  owner: Person | null;
+  validity: Validity;
+  edit_url: string | null;
+}
+
+export interface CommitmentList extends Listing<CommitmentRow> {
+  create_url: string | null;
+}
+
+export interface UnitRow {
+  id: number;
+  name: string;
+  code: string;
+  /** عمق در درخت؛ ردیف‌ها به ترتیب درخت می‌آیند و هر واحد بلافاصله بعد از واحد بالادستش. */
+  depth: number;
+  managers: Person[];
+  is_active: boolean;
+  edit_url: string | null;
+}
+
+export interface UnitList extends Listing<UnitRow> {
+  create_url: string | null;
+}
+
+// --- روش ارزیابی ---
+
+export interface MethodScale {
+  code: string;
+  name: string;
+  scope: string;
+  /** متن خام؛ بندها با خط خالی و عنوان با «## » (فیلتر paragraphs جنگو). */
+  description: string;
+  guidance: string;
+  has_level_names: boolean;
+  has_bounds: boolean;
+  levels: { value: number; name: string; bounds: string | null; criteria: string }[];
+}
+
+/** رنگ و نام یک سطح ریسک در روش ارزیابی. */
+export interface MethodLevel {
+  name: string;
+  color: string;
+  text_color: string;
+}
+
+export interface MethodPage {
+  view: string;
+  title: string;
+  messages: PageMessage[];
+  version: {
+    number: number;
+    name: string;
+    status: Choice;
+    is_trial: boolean;
+    source: string;
+    based_on: string | null;
+    approval_ref: string;
+    approved_on: Day | null;
+    approval_recorded_by: Person | null;
+    activated_at: Moment | null;
+    change_notes: string;
+    likelihood_strategy: Choice;
+    impact_strategy: Choice;
+    impact_guidance: string;
+    decision_guidance: string;
+    acceptance_guidance: string;
+  };
+  versions: { number: number; name: string; status: Choice; current: boolean; href: string }[];
+  likelihood_scales: MethodScale[];
+  bc_rules: { condition: string; bc: number }[];
+  bc_default: number | null;
+  /** جدول A × B؛ برای هر A، مقدار L در B1 تا B5 (خانه‌ی خالی null). */
+  l_scale: (MethodScale & { grid: { a: number; values: (number | null)[] }[] }) | null;
+  levels_range: number[];
+  impact_scales: MethodScale[];
+  risk_levels: (MethodLevel & {
+    min_score: number;
+    max_score: number;
+    decision_rule: string;
+    co_approver: string;
+    containment: string | null;
+    plan: string | null;
+    acceptance: string | null;
+    review: string | null;
+  })[];
+  floors: { min_impact: number; min_level: string }[];
+  decision_matrix: { likelihood: number; cells: { score: number; level: MethodLevel | null; raised: boolean }[] }[];
+  parameters: { key: string; label: string; value: string; unit: string; note: string }[];
+  active_url: string;
 }

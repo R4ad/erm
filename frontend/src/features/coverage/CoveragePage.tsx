@@ -13,7 +13,8 @@ import type { CoverageCell, CoveragePage as CoverageData } from "@/lib/types";
 
 const TONES: Record<string, Tone> = { reviewed: "success", not_relevant: "neutral", pending: "warning" };
 
-function Cell({ cell, service }: { cell: CoverageCell; service: string }) {
+/** یک خانه‌ی جهان ریسک (risks/includes/coverage_cell.html)؛ صفحه‌ی خدمت هم همین را نشان می‌دهد. */
+export function CoverageCellBadge({ cell, service }: { cell: CoverageCell; service: string }) {
   const badge = (
     <Badge tone={TONES[cell.status.value] ?? "neutral"} dot>
       {cell.status.label}
@@ -130,7 +131,7 @@ export function CoveragePage() {
                       </th>
                       {row.cells.map((cell, index) => (
                         <td key={cell.category} data-label={grid.categories[index]?.code}>
-                          <Cell cell={cell} service={row.service.name} />
+                          <CoverageCellBadge cell={cell} service={row.service.name} />
                         </td>
                       ))}
                     </tr>
