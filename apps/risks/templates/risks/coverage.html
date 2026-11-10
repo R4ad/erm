@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}جهان ریسک{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">جهان ریسک: پوشش خدمت × دسته‌ی ریسک</h1>
+  <a href="{% url 'risks:category_list' %}" class="btn btn-outline-secondary btn-sm">دسته‌های ریسک</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-body-secondary small">پوشش خدمات حیاتی</div>
+        {% if critical.percent is None %}
+          <div class="fs-5">خدمت حیاتی فعالی نیست</div>
+        {% else %}
+          <div class="fs-3 fw-bold">{{ critical.percent }}٪</div>
+          <div class="small">{{ critical.complete }} از {{ critical.total }} خدمت حیاتی، بدون خانه‌ی در انتظار</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-body-secondary small mb-2">خانه‌های جدول در همه‌ی خدمت‌های فعالی که می‌بینید</div>
+        <span class="badge text-bg-success">بررسی‌شده {{ counts.reviewed }}</span>
+        <span class="badge text-bg-secondary">نامرتبط {{ counts.not_relevant }}</span>
+        <span class="badge text-bg-warning">در انتظار {{ counts.pending }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  {% if categories %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>خدمت</th>
+          {% for category in categories %}
+            <th class="text-center text-nowrap" title="{{ category.name }}">{{ category.code }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for service, cells in rows %}
+          <tr>
+            <td>
+              <a href="{{ service.get_absolute_url }}">{{ service.code }}</a> {{ service.name }}
+              {% if service.is_critical %}<span class="badge text-bg-danger ms-1">حیاتی</span>{% endif %}
+              <div class="small text-body-secondary">{{ service.org_unit }}</div>
+            </td>
+            {% for cell in cells %}
+              <td class="text-center">{% include "risks/includes/coverage_cell.html" %}</td>
+            {% endfor %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="{{ categories|length|add:1 }}" class="text-center text-body-secondary py-4">خدمتی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+
+  <p class="small text-body-secondary mt-3 mb-0">
+    {% for category in categories %}<span class="text-nowrap ms-3">{{ category.code }}: {{ category.name }}</span>{% endfor %}
+  </p>
+  {% else %}
+    <div class="alert alert-info">هیچ دسته‌ی ریسک فعالی نیست.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -16,6 +16,17 @@ LEVELS = range(1, 6)  # احتمال و پیامد در جدول‌ها از ۱ 
 REQUIRED_SCALES = {MethodVersion.LikelihoodStrategy.PATHS_V5: ["A", "B0", "E", "Bc", "L"]}
 
 
+def active_version():
+    """نسخه‌ی روشی که الان فعال است؛ ارزیابی و ارزیابی کنترل تازه با همین نسخه ثبت می‌شوند."""
+    return MethodVersion.objects.filter(status=MethodVersion.Status.ACTIVE).first()
+
+
+def parameter(version, key):
+    """مقدار یک پارامتر نسخه، یا None اگر نسخه این پارامتر را ندارد."""
+    row = version.parameters.filter(key=key).first() if version else None
+    return row.value if row else None
+
+
 class MethodTables:
     """جدول‌های یک نسخه در حافظه، تا هر خانه‌ی ماتریس یک پرس‌وجوی جدا به پایگاه داده نزند."""
 

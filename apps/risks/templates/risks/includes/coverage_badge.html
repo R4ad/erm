@@ -1,0 +1,8 @@
+{% comment %}نشان وضعیت یک خانه‌ی «خدمت × دسته». cell یک Coverage است، ذخیره‌شده یا نه.{% endcomment %}
+{% if cell.status == "reviewed" %}
+  <span class="badge text-bg-success">بررسی‌شده</span>
+{% elif cell.status == "not_relevant" %}
+  <span class="badge text-bg-secondary">نامرتبط</span>
+{% else %}
+  <span class="badge text-bg-warning">در انتظار</span>
+{% endif %}

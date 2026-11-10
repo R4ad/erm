@@ -42,8 +42,13 @@ INSTALLED_APPS = [
     "apps.audit",
     "apps.catalog",
     "apps.methodology",
+    "apps.questionnaires",
+    "apps.controls",
+    "apps.assessments",
+    "apps.api",
     "django_jalali",
     "simple_history",
+    "rest_framework",
 ]
 
 MIDDLEWARE = [
@@ -122,6 +127,24 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
+# رابط React (frontend/) با npm run build در frontend/dist ساخته می‌شود و زیر /static/spa/ سرو می‌شود. تا ساخته نشده،
+# پوشه را به staticfiles نمی‌دهیم تا هشدار پوشه‌ی ناموجود ندهد؛ /app/ آن موقع راهنمای ساختن را نشان می‌دهد.
+SPA_DIST = BASE_DIR / "frontend" / "dist"
+if SPA_DIST.is_dir():
+    STATICFILES_DIRS.append(("spa", SPA_DIST))
+
+# پیوست‌ها (قدم ۱۳). فایل‌ها نشانی عمومی ندارند (MEDIA_URL تعریف نمی‌شود) و فقط از view دانلود سرو می‌شوند
+# که اول دسترسی به رکورد اصلی را چک می‌کند.
+MEDIA_ROOT = env.path("MEDIA_ROOT", default=BASE_DIR / "media")
+# سقف حجم و پسوندهای مجاز هر پیوست (س۲۴): PDF، تصویر، فایل‌های Office و متن.
+ATTACHMENT_MAX_SIZE = 20 * 1024 * 1024
+ATTACHMENT_EXTENSIONS = [
+    "pdf", "png", "jpg", "jpeg", "gif", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv",
+]  # fmt: skip
+# روی سرور، فرستادن فایل با nginx است: Django فقط سرآیند X-Accel-Redirect را با این پیشوند می‌فرستد و nginx
+# فایل را از مسیر internal همان پیشوند برمی‌دارد. در اجرای محلی خود Django فایل را می‌فرستد.
+ATTACHMENT_X_ACCEL_PREFIX = env("ATTACHMENT_X_ACCEL_PREFIX", default="")
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
@@ -146,3 +169,12 @@ MESSAGE_TAGS = {messages.ERROR: "danger"}
 
 # فایل کارکنان فقط تا تأیید مدیر سامانه این‌جا نگه داشته می‌شود.
 STAFF_IMPORT_DIR = Path(tempfile.gettempdir()) / "erm-staff-import"
+
+# API رابط React (apps/api). فقط JSON، با همان نشست و CSRF صفحه‌های جنگو؛ جواب درخواست بی‌ورود ۴۰۳ است.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "EXCEPTION_HANDLER": "apps.api.base.exception_handler",
+}

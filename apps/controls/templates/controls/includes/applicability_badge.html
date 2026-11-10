@@ -1,0 +1,8 @@
+{% if not applicability %}
+  <span class="badge text-bg-light border">تعیین‌نشده</span>
+{% elif applicability.applicable %}
+  <span class="badge text-bg-success">کاربرد دارد</span>
+  <span class="small text-body-secondary">{{ applicability.get_implementation_display }}</span>
+{% else %}
+  <span class="badge text-bg-secondary">کاربرد ندارد</span>
+{% endif %}

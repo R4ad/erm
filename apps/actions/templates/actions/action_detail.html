@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load formatting jformat %}
+
+{% block title %}{{ action.code }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">اقدام {{ action.code }} {% include "actions/includes/action_status.html" %}</h1>
+  <div>
+    {% if can_edit %}<a href="{% url 'actions:action_update' action.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>{% endif %}
+    {% if risk_visible %}<a href="{{ plan.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">طرح مواجهه</a>{% endif %}
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">عنوان</dt>
+  <dd class="col-sm-9">{{ action.title }}</dd>
+  <dt class="col-sm-3">ریسک</dt>
+  <dd class="col-sm-9">{% if risk_visible %}<a href="{{ risk.get_absolute_url }}">{{ risk }}</a>{% else %}{{ risk }}{% endif %}، گزینه‌ی {{ plan.get_option_display }}</dd>
+  <dt class="col-sm-3">خروجی قابل آزمون</dt>
+  <dd class="col-sm-9">{{ action.deliverable|linebreaksbr }}</dd>
+  <dt class="col-sm-3">سازوکار اثر</dt>
+  <dd class="col-sm-9">{{ action.get_mechanism_display }}{% if action.dimension %}: {{ action.dimension }}{% endif %}</dd>
+  <dt class="col-sm-3">مالک، مجری و تأییدکننده</dt>
+  <dd class="col-sm-9">
+    {{ action.owner.get_full_name|default:action.owner.username }} (مالک)،
+    {{ action.assignee.get_full_name|default:action.assignee.username }} (مجری)،
+    {{ action.verifier.get_full_name|default:action.verifier.username }} (تأییدکننده‌ی نتیجه)
+  </dd>
+  <dt class="col-sm-3">زمان</dt>
+  <dd class="col-sm-9">{{ action.start_date|jformat:"%Y/%m/%d" }} تا {{ action.due_date|jformat:"%Y/%m/%d" }}</dd>
+  <dt class="col-sm-3">منابع</dt>
+  <dd class="col-sm-9">{% if action.cost is not None %}{{ action.cost|thousands }} ریال{% endif %}{% if action.cost is not None and action.person_hours %}، {% endif %}{% if action.person_hours %}{{ action.person_hours }} نفرساعت{% endif %}{% if action.cost is None and not action.person_hours %}-{% endif %}</dd>
+  <dt class="col-sm-3">وابسته به</dt>
+  <dd class="col-sm-9">
+    {% for item in action.depends_on.all %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a> {% include "actions/includes/action_status.html" with action=item %}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}
+    {% if waiting_for and action.is_open %}<div class="small text-warning-emphasis">هنوز همه‌ی وابستگی‌ها تأیید نشده‌اند.</div>{% endif %}
+  </dd>
+  <dt class="col-sm-3">کنترل‌های مرتبط</dt>
+  <dd class="col-sm-9">{% for control in action.controls.all %}{{ control.code }} {{ control.title }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  {% if action.description %}
+    <dt class="col-sm-3">شرح</dt>
+    <dd class="col-sm-9">{{ action.description|linebreaksbr }}</dd>
+  {% endif %}
+  <dt class="col-sm-3">معیار قبولی</dt>
+  <dd class="col-sm-9">{{ action.acceptance_criteria|linebreaksbr }}</dd>
+  <dt class="col-sm-3">شاهد اجرا</dt>
+  <dd class="col-sm-9">{% for item in evidence %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3" id="progress">پیشرفت</h2>
+{% if action.status == "planned" %}
+  <p class="small text-body-secondary">اقدام هنوز مصوب نیست؛ با تأیید طرح به دست مالک ریسک مصوب می‌شود.</p>
+{% elif action.status == "verified" %}
+  <p class="small text-body-secondary">خروجی تأیید شد و اقدام بسته است (بخش ۲۰). اثرش روی ریسک با بازسنجی طرح دیده می‌شود.</p>
+{% elif moves or can_note %}
+  <form method="post" action="{% url 'actions:action_move' action.pk %}" class="mb-3">
+    {% csrf_token %}
+    {% include "includes/field.html" with field=move_form.note %}
+    {% if action.status == "in_progress" %}{% include "includes/field.html" with field=move_form.evidence %}{% endif %}
+    {% for move in moves %}
+      <button type="submit" name="move" value="{{ move.name }}" class="btn btn-{{ move.style }} btn-sm">{{ move.label }}</button>
+    {% endfor %}
+    {% if can_note %}<button type="submit" name="move" value="note" class="btn btn-outline-secondary btn-sm">ثبت یادداشت پیشرفت</button>{% endif %}
+  </form>
+{% elif action.is_open %}
+  <p class="small text-body-secondary">اجرا وقتی ثبت می‌شود که ریسک «در اجرای درمان» باشد. پیشرفت را مالک و مجری اقدام ثبت می‌کنند و نتیجه را تأییدکننده تأیید می‌کند.</p>
+{% endif %}
+{% if updates %}
+  <ul class="list-group mb-3">
+    {% for item in updates %}
+      <li class="list-group-item small">
+        <span class="fw-bold">{% if item.changes_status %}{{ item.get_to_status_display }}{% else %}یادداشت پیشرفت{% endif %}</span>
+        - {{ item.created_by.get_full_name|default:item.created_by.username }}، {{ item.created_at|jformat:"%Y/%m/%d %H:%M" }}
+        {% if item.note %}<div>{{ item.note|linebreaksbr }}</div>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% include "core/includes/attachments.html" with record=action %}
+{% include "core/includes/comments.html" with record=action %}
+{% endblock %}

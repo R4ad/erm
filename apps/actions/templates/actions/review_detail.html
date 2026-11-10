@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load jformat %}
+{% block title %}بازبینی {{ review.risk.code }}{% endblock %}
+{% block content %}
+<h1 class="h4">{{ review.get_trigger_display }}: {{ review.risk.code }}</h1>
+<p>{{ review.reason|linebreaksbr }}</p>
+<p>مهلت آغاز بررسی: {{ review.due|jformat:"%Y/%m/%d" }}؛ مسئول: {{ review.responsible }}</p>
+<p><a href="{{ review.risk.get_absolute_url }}">پرونده ریسک</a></p>
+{% if review.completed_at %}
+<p>نتیجه در {{ review.completed_at|jformat:"%Y/%m/%d %H:%M" }} توسط {{ review.completed_by }} ثبت شده است.</p>
+<p>{{ review.result|linebreaksbr }}</p>
+{% elif can_complete %}
+<form method="post">{% csrf_token %}{% include "includes/form_fields.html" %}
+<button class="btn btn-primary" type="submit">ثبت نتیجه بررسی</button></form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">{{ title }}</h1>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row">
+    <div class="col-lg-6">
+      {% include "includes/form_fields.html" %}
+    </div>
+  </div>
+
+  <h2 class="h5 mt-3">گزینه‌ها</h2>
+  <p class="small text-body-secondary">
+    برای سؤال متنی گزینه لازم نیست. برای «بله و خیر» اگر گزینه‌ای ننویسید، بله و خیر خودکار ساخته می‌شود و بعد می‌توانید مشخص کنید کدام نشانه‌ی ریسک است.
+    گزینه‌ای که جواب گرفته حذف نمی‌شود؛ غیرفعالش کنید.
+  </p>
+  {{ formset.management_form }}
+  {% for error in formset.non_form_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>ترتیب</th>
+          <th>متن گزینه</th>
+          <th>نشانه‌ی ریسک</th>
+          <th>سناریوی مرجع</th>
+          <th>دسته</th>
+          <th>فعال</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for option_form in formset %}
+          <tr>
+            {% for hidden in option_form.hidden_fields %}{{ hidden }}{% endfor %}
+            {% for field in option_form.visible_fields %}
+              <td>
+                {{ field }}
+                {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% if option_form.non_field_errors %}
+            <tr><td colspan="6" class="text-danger small">{% for error in option_form.non_field_errors %}{{ error }} {% endfor %}</td></tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <button type="submit" class="btn btn-primary">ذخیره</button>
+  <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+</form>
+{% endblock %}

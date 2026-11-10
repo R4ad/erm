@@ -210,4 +210,30 @@
     </tbody>
   </table>
 </div>
+
+{% if service.is_active %}
+<div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+  <h2 class="h5 mb-0">پوشش جهان ریسک</h2>
+  <a href="{% url 'risks:coverage' %}?q={{ service.code|urlencode }}" class="btn btn-outline-secondary btn-sm">جدول پوشش</a>
+</div>
+
+<div class="d-flex flex-wrap gap-3 mb-3">
+  {% for cell in coverage %}
+    <div class="text-nowrap">
+      <span class="small">{{ cell.category }}</span>
+      {% include "risks/includes/coverage_cell.html" with can_edit=can_edit_coverage inline_count=True %}
+    </div>
+  {% empty %}
+    <span class="text-body-secondary">هیچ دسته‌ی ریسک فعالی نیست.</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3">
+  <h2 class="h5 mb-0">ریسک‌ها</h2>
+  {% if can_edit_risks and service.is_active %}
+    <a href="{% url 'risks:scenario_list' %}" class="btn btn-primary btn-sm">انتخاب سناریو برای ثبت ریسک</a>
+  {% endif %}
+</div>
+{% include "risks/includes/risk_table.html" with hide_service=True empty_text="ریسکی برای این خدمت که شما ببینید ثبت نشده است." %}
 {% endblock %}

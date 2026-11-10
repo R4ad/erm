@@ -1,0 +1,36 @@
+{% load jformat %}
+{% comment %}
+  جدول پذیرش‌ها. show_risk ستون ریسک را نشان می‌دهد؛ empty_text متن جدول خالی است.
+{% endcomment %}
+{% if acceptance_list %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>کد</th>
+          {% if show_risk %}<th>ریسک</th>{% endif %}
+          <th>ارزیابی</th>
+          <th>سطح</th>
+          <th>اعتبار</th>
+          <th>مسئول پیگیری</th>
+          <th>وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acceptance in acceptance_list %}
+          <tr>
+            <td class="text-nowrap"><a href="{{ acceptance.get_absolute_url }}">{{ acceptance.code }}</a></td>
+            {% if show_risk %}<td><a href="{{ acceptance.risk.get_absolute_url }}">{{ acceptance.risk.code }}</a></td>{% endif %}
+            <td>{{ acceptance.assessment.code }}</td>
+            <td>{% include "assessments/includes/level_badge.html" with level=acceptance.assessment.decision_level %}</td>
+            <td class="text-nowrap">{{ acceptance.start_date|jformat:"%Y/%m/%d" }} تا {{ acceptance.end_date|jformat:"%Y/%m/%d" }}</td>
+            <td>{{ acceptance.follow_up_by.get_full_name|default:acceptance.follow_up_by.username }}</td>
+            <td>{% include "actions/includes/acceptance_status.html" %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-body-secondary">{{ empty_text|default:"پذیرشی ثبت نشده است." }}</p>
+{% endif %}

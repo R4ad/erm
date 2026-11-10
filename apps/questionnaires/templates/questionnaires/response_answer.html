@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}پاسخ به {{ response.questionnaire }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <h1 class="h4 mb-1">{{ response.questionnaire }}</h1>
+    <p class="text-body-secondary mb-3">
+      واحد {{ response.org_unit }}{% if response.service %}، خدمت {{ response.service }}{% endif %}
+      · پاسخ‌دهنده {{ response.respondent.get_full_name|default:response.respondent.username }}
+      {% if response.channel == "interview" %}(مصاحبه، ثبت با {{ response.recorded_by.get_full_name|default:response.recorded_by.username }}){% endif %}
+      · {% include "questionnaires/includes/response_status.html" %}
+    </p>
+
+    {% if response.status == "returned" %}
+      <div class="alert alert-warning">
+        <div class="fw-semibold mb-1">این پاسخ با این سؤال برگشت خورده است:</div>
+        {{ response.return_question|linebreaksbr }}
+        <div class="small mt-2">مهلت جواب: {{ response.return_due|jformat:"%Y/%m/%d" }}</div>
+      </div>
+    {% endif %}
+    {% if response.questionnaire.description %}<p>{{ response.questionnaire.description|linebreaksbr }}</p>{% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+      {% endif %}
+
+      <h2 class="h5 mt-4 mb-1">۱. کارکردها و پرسش‌های جلسه</h2>
+      <p class="form-text mt-0 mb-3">به زبان کار خودتان بنویسید؛ لازم نیست فهرست دارایی یا نام تهدید را بدانید.</p>
+      {% for field in form.fixed_fields %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+
+      {% with questions=form.question_fields %}
+        {% if questions %}
+          <h2 class="h5 mt-4 mb-3">۲. سؤال‌ها</h2>
+          {% for question, field in questions %}
+            <fieldset class="mb-4">
+              <legend class="form-label fs-6 mb-1">
+                {{ forloop.counter }}. {{ question.text|linebreaksbr }}
+                {% if question.is_required %}<span class="text-danger" title="اجباری">*</span>{% endif %}
+              </legend>
+              {% if field.help_text %}<div class="form-text mt-0 mb-2">{{ field.help_text }}</div>{% endif %}
+              {% if question.has_options %}
+                {% for choice in field %}
+                  <div class="form-check">
+                    {{ choice.tag }}
+                    <label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                  </div>
+                {% endfor %}
+              {% else %}
+                {{ field }}
+              {% endif %}
+              {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </fieldset>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <h2 class="h5 mt-4 mb-3">۳. مورد جدید</h2>
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.new_item.id_for_label }}">{{ form.new_item.label }}</label>
+        {{ form.new_item }}
+        <div class="form-text">{{ form.new_item.help_text }}</div>
+        {% for error in form.new_item.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+
+      <div class="d-flex gap-2 mb-5">
+        <button type="submit" name="save" class="btn btn-outline-primary">ذخیره‌ی پیش‌نویس</button>
+        <button type="submit" name="submit" class="btn btn-primary">ارسال برای بررسی</button>
+        <a href="{% url 'questionnaires:answer_home' %}" class="btn btn-outline-secondary">بازگشت</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

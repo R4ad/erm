@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ assessment }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    ارزیابی {{ assessment.get_kind_display }} {{ assessment.code }}
+    <span class="badge text-bg-light border ms-1">{{ assessment.get_status_display }}</span>
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'assessments:impact_profile' assessment.pk %}" class="btn btn-primary btn-sm">پروفایل پیامد</a>
+      <a href="{% url 'assessments:assessment_update' assessment.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{{ assessment.risk.get_absolute_url }}#assessments" class="btn btn-outline-secondary btn-sm">ریسک</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">ریسک</dt>
+  <dd class="col-sm-9"><a href="{{ assessment.risk.get_absolute_url }}">{{ assessment.risk }}</a></dd>
+
+  <dt class="col-sm-3">نسخه‌ی روش</dt>
+  <dd class="col-sm-9"><a href="{{ assessment.method_version.get_absolute_url }}">{{ assessment.method_version }}</a></dd>
+
+  <dt class="col-sm-3">افق</dt>
+  <dd class="col-sm-9">{{ assessment.horizon_months }} ماه</dd>
+  {% if assessment.horizon_rationale %}<dt class="col-sm-3">دلیل افق</dt><dd class="col-sm-9">{{ assessment.horizon_rationale }}</dd>{% endif %}
+  {% if assessment.target_due %}<dt class="col-sm-3">موعد تحقق هدف</dt><dd class="col-sm-9">{{ assessment.target_due|jformat:"%Y/%m/%d" }}</dd>{% endif %}
+  {% if assessment.scope_snapshot %}<dt class="col-sm-3">دامنه هنگام تأیید</dt><dd class="col-sm-9">{{ assessment.scope_snapshot.service }}؛ {% for customer in assessment.scope_snapshot.customers %}{{ customer.name }}{% if not forloop.last %}، {% endif %}{% endfor %}</dd>{% endif %}
+
+  <dt class="col-sm-3">تاریخ جلسه‌ی کارگروه</dt>
+  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}بدون جلسه (ارزیابی عادی){% endif %}</dd>
+
+  <dt class="col-sm-3">فرض‌ها</dt>
+  <dd class="col-sm-9">{{ assessment.assumptions|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">ثبت‌کننده</dt>
+  <dd class="col-sm-9">{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}، {{ assessment.created_at|jformat:"%Y/%m/%d" }}</dd>
+
+  {% if assessment.has_escalation_flag %}
+    <dt class="col-sm-3">قاعده‌ی تقدم</dt>
+    <dd class="col-sm-9">
+      {% if assessment.ongoing_incident %}<span class="badge text-bg-danger">رویداد در حال وقوع</span>{% endif %}
+      {% if assessment.binding_prohibition %}<span class="badge text-bg-danger">منع الزام‌آور</span>{% endif %}
+      {% if assessment.customer_tolerance_exceeded %}<span class="badge text-bg-warning">عبور از حد تحمل مشتری</span>{% endif %}
+      <div class="small">{{ assessment.escalation_rationale|linebreaksbr }}</div>
+      <div class="small">{% for item in assessment.escalation_evidence.all %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</div>
+    </dd>
+  {% endif %}
+</dl>
+
+<h2 class="h5 mt-4">اطلاعات ریسک</h2>
+<dl class="row">
+  <dt class="col-sm-3">سناریو</dt><dd class="col-sm-9">{{ assessment.risk.description|linebreaksbr }}</dd>
+  {% if assessment.risk.scenario_snapshot %}
+  <dt class="col-sm-3">کد و نسخه سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.code }} / {{ assessment.risk.scenario_snapshot.version }}</dd>
+  <dt class="col-sm-3">عامل و وضعیت سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.conditions|default:"-" }}</dd>
+  <dt class="col-sm-3">رویداد سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.event|default:"-" }}</dd>
+  <dt class="col-sm-3">هدف یا تعهد</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.objective|default:"-" }}</dd>
+  <dt class="col-sm-3">مشتری سناریو</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.customer|default:"-" }}</dd>
+  <dt class="col-sm-3">نوع و دامنه پیامد</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.consequence|default:"-" }}</dd>
+  {% endif %}
+  <dt class="col-sm-3">خدمت</dt><dd class="col-sm-9">{{ assessment.risk.service|default:"-" }}</dd>
+  <dt class="col-sm-3">واحد و دسته</dt><dd class="col-sm-9">{{ assessment.risk.org_unit }}، {{ assessment.risk.category }}</dd>
+  <dt class="col-sm-3">کانال ورود</dt><dd class="col-sm-9">{{ assessment.risk.get_channel_display }}</dd>
+  <dt class="col-sm-3">مالک</dt><dd class="col-sm-9">{{ assessment.risk.owner|default:"-" }}</dd>
+  <dt class="col-sm-3">بانک‌های متأثر</dt><dd class="col-sm-9">{% for item in assessment.risk.customers.all %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">عامل آغازگر</dt><dd class="col-sm-9">{{ assessment.risk.initiator|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">مسیر ثبت‌شده</dt><dd class="col-sm-9">{{ assessment.risk.realization_path|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">کنترل‌های فعلی</dt><dd class="col-sm-9">{% for item in risk_controls %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">برچسب‌ها</dt><dd class="col-sm-9">{% for item in assessment.risk.tags.all %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">شواهد</dt><dd class="col-sm-9">{% for item in risk_evidence %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">پیوندهای بیرونی</dt><dd class="col-sm-9">{% for item in assessment.risk.links.all %}{{ item.get_kind_display }}: {{ item.ref }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  <dt class="col-sm-3">توضیحات اضافه</dt><dd class="col-sm-9">{{ assessment.risk.additional_notes|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">وضعیت ریسک</dt><dd class="col-sm-9">{{ assessment.risk.get_status_display }}</dd>
+  <dt class="col-sm-3">دامنه</dt><dd class="col-sm-9">{{ assessment.risk.scope|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">واحد شمارش</dt><dd class="col-sm-9">{{ assessment.risk.count_unit|default:"-" }}</dd>
+  <dt class="col-sm-3">موارد خارج از شمارش</dt><dd class="col-sm-9">{{ assessment.risk.count_exclusions|linebreaksbr|default:"-" }}</dd>
+  <dt class="col-sm-3">طبقه اطلاعات و CIA</dt><dd class="col-sm-9">{{ assessment.risk.get_data_class_display|default:"-" }}، {{ assessment.risk.cia_labels|default:"-" }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3" id="result">نتیجه{% if not assessment.is_approved %} <span class="small text-body-secondary fw-normal">(محاسبه‌ی همین حالا؛ هنگام تأیید ثابت می‌شود)</span>{% endif %}</h2>
+{% if outcome.problems %}
+  <div class="alert alert-light border py-2">
+    نتیجه هنوز حساب نمی‌شود:
+    <ul class="mb-0">{% for problem in outcome.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+  </div>
+{% else %}
+  <div class="row g-3 mb-3 text-center">
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">احتمال (L)</div><div class="fs-4">{{ outcome.likelihood|default:"-" }}</div></div></div>
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">پیامد (I)</div><div class="fs-4">{{ outcome.impact|default:"-" }}</div></div></div>
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">امتیاز (L × I)</div><div class="fs-4">{{ outcome.score|default:"-" }}</div></div></div>
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">سطح پایه</div><div class="fs-5 mt-1">{% include "assessments/includes/level_badge.html" with level=outcome.base_level %}</div></div></div>
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">سطح تصمیم</div><div class="fs-5 mt-1">{% include "assessments/includes/level_badge.html" with level=outcome.decision_level %}</div></div></div>
+    <div class="col-6 col-md"><div class="border rounded p-2"><div class="small text-body-secondary">اطمینان کل</div><div class="fs-5 mt-1">{{ outcome.confidence_label|default:"-" }}</div></div></div>
+  </div>
+  {% if outcome.score and outcome.score.low != outcome.score.high %}
+    <p class="small text-body-secondary">امتیاز بازه است و تصمیم بر کران بالای آن ({{ outcome.decision_score }}) گرفته می‌شود.</p>
+  {% endif %}
+  {% if outcome.incomplete %}
+    <div class="alert alert-warning py-2">
+      <div class="fw-bold">ارزیابی ناقص: پذیرش عادی مسدود است.</div>
+      <ul class="mb-0 small">{% for reason in outcome.incomplete_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% if outcome.escalation_reasons %}
+    <div class="alert alert-danger py-2">
+      <div class="fw-bold">علت تصعید</div>
+      <ul class="mb-0 small">{% for reason in outcome.escalation_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% if outcome.out_of_acceptance_authority %}
+    <div class="alert alert-danger py-2">خارج از اختیار پذیرش.</div>
+  {% elif outcome.acceptance_restricted %}
+    <div class="alert alert-warning py-2">اختیار پذیرش عمومی محدود است.</div>
+  {% endif %}
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="review">
+  <h2 class="h5 mb-0">کنترل کیفیت</h2>
+</div>
+{% if can_submit %}
+  {% if submission_problems %}
+    <div class="alert alert-light border py-2">
+      پیش از ارسال برای کنترل کیفیت لازم است:
+      <ul class="mb-0 small">{% for problem in submission_problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+    </div>
+  {% else %}
+    <form method="post" action="{% url 'assessments:submit' assessment.pk %}" class="mb-3">
+      {% csrf_token %}
+      <div class="mb-2"><textarea name="notes" rows="2" class="form-control" placeholder="توضیح برای کنترل‌کننده (اختیاری)"></textarea></div>
+      <button type="submit" class="btn btn-primary btn-sm">ارسال برای کنترل کیفیت</button>
+    </form>
+  {% endif %}
+{% elif assessment.status == "in_qc" and not can_review %}
+  <p class="small text-body-secondary">کنترل کیفیت با عضو GRC دیگری است که ارزیاب همین پرونده نیست.</p>
+{% endif %}
+{% if can_review %}
+  <form method="post" action="{% url 'assessments:review' assessment.pk %}" class="mb-3">
+    {% csrf_token %}
+    {% include "includes/field.html" with field=review_form.notes %}
+    <button type="submit" name="action" value="approve" class="btn btn-success btn-sm">تأیید ارزیابی</button>
+    <button type="submit" name="action" value="return" class="btn btn-outline-secondary btn-sm">برگشت به ارزیاب</button>
+    <button type="submit" name="action" value="refer" class="btn btn-outline-danger btn-sm">ارجاع به کارگروه امنیت</button>
+  </form>
+{% endif %}
+{% if can_decide_referral %}
+  <form method="post" action="{% url 'assessments:referral' assessment.pk %}" class="mb-3">
+    {% csrf_token %}
+    {% include "includes/field.html" with field=referral_form.meeting_date %}
+    {% include "includes/field.html" with field=referral_form.notes %}
+    <button type="submit" name="action" value="workgroup_approve" class="btn btn-success btn-sm">تأیید ارزیابی با تصمیم کارگروه</button>
+    <button type="submit" name="action" value="workgroup_return" class="btn btn-outline-secondary btn-sm">برگشت به ارزیاب</button>
+  </form>
+{% elif assessment.status == "referred" %}
+  <p class="small text-body-secondary">اختلاف به کارگروه امنیت ارجاع شده است. تصمیم کارگروه را عضو کارگروه امنیت یا عضو GRC دیگری ثبت می‌کند که طرف این اختلاف نیست.</p>
+{% endif %}
+{% if assessment.is_approved %}
+  <p class="small">تأییدشده در {{ assessment.approved_at|jformat:"%Y/%m/%d %H:%M" }}؛ ارزیابی قفل است و ارزیابی بعدی ردیف تازه است.</p>
+{% endif %}
+{% if reviews %}
+  <ul class="list-group mb-3">
+    {% for item in reviews %}
+      <li class="list-group-item small">
+        <span class="fw-bold">{{ item.get_action_display }}</span>
+        - {{ item.created_by.get_full_name|default:item.created_by.username }}، {{ item.created_at|jformat:"%Y/%m/%d %H:%M" }}{% if item.meeting_date %}، جلسه‌ی {{ item.meeting_date|jformat:"%Y/%m/%d" }}{% endif %}
+        {% if item.notes %}<div>{{ item.notes|linebreaksbr }}</div>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% elif not can_submit and assessment.status == "draft" %}
+  <p class="small text-body-secondary">هنوز برای کنترل کیفیت فرستاده نشده است.</p>
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="likelihood">
+  <h2 class="h5 mb-0">احتمال</h2>
+  {% if can_edit %}
+    <div>
+      <a href="{% url 'assessments:initiator' assessment.pk %}" class="btn btn-outline-primary btn-sm">عامل آغازگر (A)</a>
+      <a href="{% url 'assessments:path_create' assessment.pk %}" class="btn btn-outline-primary btn-sm">مسیر تازه</a>
+    </div>
+  {% endif %}
+</div>
+<div class="mb-3">
+  <span class="fs-5 me-3">A: {{ assessment.a_display }}</span>
+  <span class="fs-5 me-3">B: {% if likelihood.b %}{{ likelihood.b }}{% else %}-{% endif %}</span>
+  <span class="fs-5">احتمال (L): {% if likelihood.likelihood %}{{ likelihood.likelihood }}{% else %}هنوز معلوم نیست{% endif %}</span>
+  <div class="small text-body-secondary">B سناریو بزرگ‌ترین B مسیرهاست و L فقط از جدول A × B نسخه‌ی روش می‌آید.</div>
+</div>
+{% for problem in likelihood.problems %}<div class="alert alert-danger py-2">{{ problem }}</div>{% endfor %}
+{% if likelihood.incomplete %}
+  <div class="alert alert-warning py-2">
+    {% for reason in likelihood.incomplete %}<div>{{ reason }}</div>{% endfor %}
+  </div>
+{% endif %}
+{% if likelihood.blockers %}
+  <div class="alert alert-light border py-2 small">
+    برای تأیید نهایی لازم است:
+    <ul class="mb-0">{% for blocker in likelihood.blockers %}<li>{{ blocker }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<h3 class="h6">عامل آغازگر</h3>
+{% if assessment.a_recorded %}
+  <dl class="row small">
+    <dt class="col-sm-3">مسیر</dt>
+    <dd class="col-sm-9">{{ assessment.get_a_basis_display }}</dd>
+    {% if assessment.a_basis == "rate" %}
+      <dt class="col-sm-3">داده</dt>
+      <dd class="col-sm-9">
+        {{ assessment.a_count }} آغازگر یکتا در {{ assessment.a_period_months }} ماه{% if assessment.a_denominator %} از {{ assessment.a_denominator }}{% endif %}{% if assessment.a_coverage is not None %}، پوشش ثبت {{ assessment.a_coverage.normalize }} درصد{% endif %}
+        {% if likelihood.rate %}
+          <div>{{ likelihood.rate.suggestion.note }}{% if likelihood.rate.suggestion.level %} پیشنهاد سامانه: A{{ likelihood.rate.suggestion.level }}.{% endif %}</div>
+          {% for reason in likelihood.rate.insufficient %}<div class="text-warning-emphasis">{{ reason }}</div>{% endfor %}
+        {% endif %}
+      </dd>
+    {% endif %}
+    <dt class="col-sm-3">A</dt>
+    <dd class="col-sm-9">{{ assessment.a_display }}{% if assessment.a_confidence %}، اطمینان {{ assessment.get_a_confidence_display }}{% endif %}</dd>
+    <dt class="col-sm-3">دلیل</dt>
+    <dd class="col-sm-9">{{ assessment.a_rationale|linebreaksbr }}</dd>
+    <dt class="col-sm-3">شواهد</dt>
+    <dd class="col-sm-9">{% for item in assessment.a_evidence.all %}<a href="{{ item.get_absolute_url }}">{{ item.code }}</a>{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>
+  </dl>
+{% else %}
+  <p class="small text-body-secondary">A هنوز ثبت نشده است.</p>
+{% endif %}
+
+<h3 class="h6 mt-3">مسیرهای تحقق</h3>
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead>
+      <tr>
+        <th>مسیر</th>
+        <th class="text-center">B0</th>
+        <th>کنترل‌های پیشگیرانه</th>
+        <th class="text-center">Bc</th>
+        <th class="text-center">B مسیر</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in likelihood.paths %}
+        <tr id="path-{{ row.path.pk }}">
+          <td>
+            <div class="fw-bold">{{ row.path.name }}</div>
+            <div class="small text-body-secondary">{{ row.path.description|truncatechars:160 }}</div>
+            {% if row.path.independent %}<div class="small">موانع مستقل‌اند: {{ row.path.independence_rationale|truncatechars:100 }}</div>{% endif %}
+            {% if row.path.exceptions %}<div class="small">استثناها: {{ row.path.exceptions|truncatechars:100 }}</div>{% endif %}
+            {% for note in row.notes %}<div class="small text-danger">{{ note }}</div>{% endfor %}
+          </td>
+          <td class="text-center" title="{{ row.path.b0_rationale }}">{{ row.path.b0_display }}{% if row.path.b0_confidence %}<div class="small text-body-secondary">اطمینان {{ row.path.get_b0_confidence_display }}</div>{% endif %}</td>
+          <td class="small">
+            {% for item in row.controls %}
+              <div>
+                <a href="{{ item.control_assessment.get_absolute_url }}">{{ item.control_assessment.control.code }}</a>
+                E{{ item.e }}{% if item.note %} <span class="text-danger">(ثبت‌شده E{{ item.control_assessment.e }}، {{ item.note }})</span>{% endif %}
+              </div>
+            {% empty %}
+              <span class="text-body-secondary">بدون کنترل</span>
+            {% endfor %}
+          </td>
+          <td class="text-center">{% if row.result %}{{ row.result.bc }}{% else %}-{% endif %}</td>
+          <td class="text-center fw-bold">{% if row.result.b %}{{ row.result.b }}{% else %}نامعلوم{% endif %}</td>
+          {% if can_edit %}
+            <td class="text-nowrap">
+              <a href="{% url 'assessments:path_update' row.path.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+              <form method="post" action="{% url 'assessments:path_delete' row.path.pk %}" class="d-inline" onsubmit="return confirm('این مسیر حذف شود؟')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+              </form>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="{% if can_edit %}6{% else %}5{% endif %}" class="text-center text-body-secondary py-4">هنوز مسیری ثبت نشده است.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="h5 mt-4 mb-3">پروفایل پیامد</h2>
+<div class="mb-3">
+  {% if summary.impact %}
+    <span class="fs-5">پیامد (I): {{ summary.impact }}</span>
+    <span class="small text-body-secondary ms-2">بیشترین سطح معتبر بین ابعاد و ذی‌نفعان.</span>
+  {% else %}
+    <span class="fs-5">پیامد (I): هنوز معلوم نیست</span>
+  {% endif %}
+</div>
+{% for problem in summary.problems %}<div class="alert alert-danger py-2">{{ problem }}</div>{% endfor %}
+{% if summary.incomplete %}
+  <div class="alert alert-warning py-2">
+    پیامد هنوز کران بالای قابل دفاعی ندارد، چون خانه‌های نامعلوم یا ثبت‌نشده می‌توانند آن را بالاتر ببرند.
+    {% if summary.unknown %}<div class="small mt-1">نامعلوم: {{ summary.unknown|join:"، " }}</div>{% endif %}
+    {% if summary.missing %}<div class="small mt-1">ثبت‌نشده: {{ summary.missing|join:"، " }}</div>{% endif %}
+  </div>
+{% elif summary.missing %}
+  <div class="alert alert-light border py-2 small">ثبت‌نشده: {{ summary.missing|join:"، " }}</div>
+{% endif %}
+
+<div class="table-responsive">
+  <table class="table table-bordered align-middle text-center">
+    <thead>
+      <tr>
+        <th class="text-start">بُعد</th>
+        {% for customer in summary.stakeholders %}
+          <th>{% if customer %}{{ customer.name }}{% else %}داتین{% endif %}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for scale, cells in summary.rows %}
+        <tr>
+          <th class="text-start fw-normal">{{ scale.code }} - {{ scale.name }}</th>
+          {% for detail in cells %}
+            <td{% if detail.rationale %} title="{{ detail.rationale }}"{% endif %}>
+              {% if detail %}
+                <span class="{% if detail.is_unknown %}text-warning-emphasis{% else %}fw-bold{% endif %}">{{ detail.level_display }}</span>
+                {% if detail.actual_value is not None %}<div class="small text-body-secondary">{{ detail.actual_value.normalize }} {{ detail.unit }}</div>{% endif %}
+                {% if detail.confidence %}<div class="small text-body-secondary">اطمینان {{ detail.get_confidence_display }}</div>{% endif %}
+              {% else %}
+                <span class="text-body-secondary">-</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="small text-body-secondary">
+  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود.
+</p>
+{% endblock %}

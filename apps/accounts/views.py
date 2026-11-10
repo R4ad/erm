@@ -1,18 +1,40 @@
 import uuid
 from pathlib import Path
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
-from django.shortcuts import redirect, render
+from django.contrib.auth import views as auth_views
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 from django.views.decorators.http import require_POST
 
+from apps.api.spa import spa_login_url, spa_ready
 from apps.core.views import FilteredListView
 
-from .forms import StaffFileForm, StaffImportConfirmForm, UserFilterForm
+from .forms import LoginForm, StaffFileForm, StaffImportConfirmForm, UserFilterForm
 from .models import User
 from .permissions import RoleRequiredMixin, role_required
 from .roles import Role
 from .staff_import import StaffFileError, run_import
+
+
+class LoginView(auth_views.LoginView):
+    """صفحه‌ی ورود. وقتی رابط React ساخته شده باشد، ورود در همان رابط است و این صفحه کاربر را با همان next به آن‌جا
+    می‌فرستد. با ?classic=1 همین فرم جنگو باز می‌شود تا اگر رابط تازه مشکلی داشت راه ورود بسته نشود."""
+
+    template_name = "accounts/login.html"
+    authentication_form = LoginForm
+    redirect_authenticated_user = True
+
+    def get(self, request, *args, **kwargs):
+        if spa_ready() and "classic" not in request.GET:
+            target = spa_login_url()
+            next_url = request.GET.get(self.redirect_field_name)
+            if next_url:
+                target = f"{target}?{urlencode({'next': next_url})}"
+            return redirect(target)
+        return super().get(request, *args, **kwargs)
 
 
 def pending_file(token):
@@ -46,8 +68,10 @@ def staff_import(request):
             form.add_error("file", str(error))
         else:
             confirm_form = StaffImportConfirmForm(initial={"token": token, "deactivate_missing": deactivate})
-            return render(request, "accounts/staff_import.html", {"report": report, "confirm_form": confirm_form})
-    return render(request, "accounts/staff_import.html", {"form": form})
+            context = {"report": report, "confirm_form": confirm_form}
+            return TemplateResponse(request, "accounts/staff_import.html", context)
+    # TemplateResponse، نه render: رابط React همین view را اجرا می‌کند و فرم و گزارش را از context می‌خواند.
+    return TemplateResponse(request, "accounts/staff_import.html", {"form": form})
 
 
 @require_POST
@@ -68,7 +92,7 @@ def staff_import_confirm(request):
     finally:
         path.unlink()  # بعد از تأیید، فایل در هر حال پاک می‌شود
     messages.success(request, "کارکنان وارد شدند. گزارش آن‌چه انجام شد:")
-    return render(request, "accounts/staff_import.html", {"report": report})
+    return TemplateResponse(request, "accounts/staff_import.html", {"report": report})
 
 
 class UserListView(RoleRequiredMixin, FilteredListView):

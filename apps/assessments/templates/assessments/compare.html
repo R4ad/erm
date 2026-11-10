@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}مقایسه‌ی ارزیابی‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">مقایسه‌ی ارزیابی‌ها</h1>
+  <a href="{{ risk.get_absolute_url }}#assessments" class="btn btn-outline-secondary btn-sm">ریسک</a>
+</div>
+<p><a href="{{ risk.get_absolute_url }}">{{ risk }}</a></p>
+{% if error %}
+  <div class="alert alert-warning">{{ error }}</div>
+{% else %}
+  {% include "assessments/includes/comparison_table.html" %}
+{% endif %}
+{% endblock %}

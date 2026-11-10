@@ -1,4 +1,4 @@
-{% load static %}
+{% load static controls_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -22,9 +22,55 @@
 
       <div class="collapse navbar-collapse" id="main-menu">
         <ul class="navbar-nav">
-          <li class="nav-item"><a class="nav-link" href="#">ریسک‌ها</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">اقدامات</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">گزارش‌ها</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              ریسک‌ها
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'risks:risk_list' %}">رجیستر ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'assessments:assessment_list' %}">ارزیابی ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'risks:scenario_list' %}">کتابخانه‌ی سناریو</a></li>
+              <li><a class="dropdown-item" href="{% url 'risks:evidence_list' %}">شواهد</a></li>
+              <li><a class="dropdown-item" href="{% url 'workflow:change_request_list' %}">ادغام و تفکیک</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'risks:coverage' %}">جهان ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'risks:category_list' %}">دسته‌های ریسک</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              پرسشنامه
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'questionnaires:answer_home' %}">پاسخ به سؤال‌ها</a></li>
+              <li><a class="dropdown-item" href="{% url 'workflow:question_list' %}">پرسش‌های ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'questionnaires:response_list' %}">پاسخ‌ها و بررسی</a></li>
+              <li><a class="dropdown-item" href="{% url 'questionnaires:questionnaire_list' %}">تعریف پرسشنامه‌ها</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              کنترل‌ها
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'controls:control_list' %}">کتابخانه‌ی کنترل</a></li>
+              {% if user|can_view_soa %}
+              <li><a class="dropdown-item" href="{% url 'controls:soa_list' %}">بیانیه‌ی کاربردپذیری</a></li>
+              {% endif %}
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              اقدامات
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'actions:my_work' %}">کارهای من</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:notices' %}">اعلان‌های پایش</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:action_list' %}">اقدام‌ها</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:acceptance_list' %}">پذیرش‌های ریسک</a></li>
+            </ul>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'reports:management' %}">گزارش‌ها</a></li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               خدمات و دارایی‌ها
@@ -50,6 +96,7 @@
         </ul>
 
         <div class="d-flex flex-wrap align-items-center gap-3 ms-lg-auto py-2 py-lg-0">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'spa' %}">رابط تازه</a>
           <span class="navbar-text">
             {{ user.get_full_name|default:user.username }}
             {% for role in user.role_names %}<span class="badge text-bg-secondary ms-1">{{ role }}</span>{% endfor %}

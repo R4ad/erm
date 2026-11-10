@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}بیانیه‌ی کاربردپذیری{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">بیانیه‌ی کاربردپذیری (SoA)</h1>
+  <a href="{% url 'controls:control_list' %}" class="btn btn-outline-secondary btn-sm">کتابخانه‌ی کنترل</a>
+</div>
+
+<p class="text-body-secondary small">
+  برای هر کنترل پیوست A استاندارد ISO/IEC 27001:2022 ثبت می‌شود که کاربرد دارد یا نه و چرا، و اگر دارد تا کجا اجرا شده است.
+  ستون ریسک‌ها ریسک‌هایی را می‌شمارد که به کنترل‌های سازمانِ همان ردیف تکیه دارند و شما می‌بینید.
+</p>
+
+<div class="row row-cols-2 row-cols-md-6 g-2 mb-3 small">
+  <div class="col"><div class="border rounded p-2 h-100">همه<div class="fs-5">{{ summary.total }}</div></div></div>
+  <div class="col"><div class="border rounded p-2 h-100">کاربرد دارد<div class="fs-5">{{ summary.applicable }}</div></div></div>
+  <div class="col"><div class="border rounded p-2 h-100">کاربرد ندارد<div class="fs-5">{{ summary.not_applicable }}</div></div></div>
+  <div class="col"><div class="border rounded p-2 h-100">تعیین‌نشده<div class="fs-5">{{ summary.undetermined }}</div></div></div>
+  <div class="col"><div class="border rounded p-2 h-100">اجراشده<div class="fs-5">{{ summary.implemented }}</div></div></div>
+  <div class="col"><div class="border rounded p-2 h-100{% if summary.gaps %} border-warning{% endif %}">بدون کنترل سازمان<div class="fs-5">{{ summary.gaps }}</div></div></div>
+</div>
+
+{% include "includes/filter_form.html" %}
+
+<div id="results">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>شماره</th>
+          <th>عنوان</th>
+          <th>موضوع</th>
+          <th>کاربرد</th>
+          <th>کنترل‌های سازمان</th>
+          <th>ریسک‌ها</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for iso in iso_controls %}
+          <tr>
+            <td class="text-nowrap"><a href="{{ iso.get_absolute_url }}">{{ iso.code }}</a></td>
+            <td>
+              {{ iso.title }}
+              <div class="small text-body-secondary" dir="ltr" style="text-align: right">{{ iso.title_en }}</div>
+            </td>
+            <td class="text-nowrap">{{ iso.get_theme_display }}</td>
+            <td class="text-nowrap">{% include "controls/includes/applicability_badge.html" with applicability=iso.applicability %}</td>
+            <td>
+              {{ iso.control_count }}
+              {% if iso.applicability.applicable and not iso.control_count %}<span class="badge text-bg-warning ms-1">بدون کنترل</span>{% endif %}
+            </td>
+            <td>{{ iso.risk_count }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-body-secondary py-4">کنترلی با این مشخصات پیدا نشد.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}

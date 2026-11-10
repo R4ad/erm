@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ evidence }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    {{ evidence }}
+    {% if evidence.access_class == "confidential" %}<span class="badge text-bg-danger ms-1">محرمانه</span>{% endif %}
+    {% if evidence.is_expired %}<span class="badge text-bg-secondary ms-1">منقضی</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'risks:evidence_update' evidence.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{% url 'risks:evidence_list' %}" class="btn btn-outline-secondary btn-sm">شواهد</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">نوع</dt>
+  <dd class="col-sm-9">{{ evidence.get_kind_display }}</dd>
+
+  <dt class="col-sm-3">خلاصه</dt>
+  <dd class="col-sm-9">{{ evidence.summary|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">منبع</dt>
+  <dd class="col-sm-9">{{ evidence.source }}</dd>
+
+  <dt class="col-sm-3">زمان</dt>
+  <dd class="col-sm-9">{{ evidence.observed_on|jformat:"%Y/%m/%d" }}</dd>
+
+  <dt class="col-sm-3">دامنه</dt>
+  <dd class="col-sm-9">{{ evidence.scope|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">اعتبار</dt>
+  <dd class="col-sm-9">{{ evidence.get_reliability_display }}</dd>
+
+  <dt class="col-sm-3">معتبر تا</dt>
+  <dd class="col-sm-9">{% if evidence.valid_until %}{{ evidence.valid_until|jformat:"%Y/%m/%d" }}{% else %}-{% endif %}</dd>
+
+  <dt class="col-sm-3">پیوند</dt>
+  <dd class="col-sm-9">{% if evidence.url %}<a href="{{ evidence.url }}" dir="ltr" rel="noopener noreferrer" target="_blank">{{ evidence.url|truncatechars:80 }}</a>{% else %}-{% endif %}</dd>
+
+  <dt class="col-sm-3">بانک</dt>
+  <dd class="col-sm-9">{{ evidence.customer|default:"-" }}</dd>
+
+  <dt class="col-sm-3">مالک</dt>
+  <dd class="col-sm-9">{{ evidence.owner.get_full_name|default:evidence.owner.username }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3">ریسک‌های مرتبط</h2>
+{% include "risks/includes/risk_table.html" with empty_text="به ریسکی که شما ببینید وصل نیست." %}
+
+{% include "core/includes/attachments.html" with record=evidence %}
+{% include "core/includes/comments.html" with record=evidence %}
+{% endblock %}

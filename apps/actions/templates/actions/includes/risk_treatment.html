@@ -1,0 +1,62 @@
+{% load jformat %}
+{% comment %}
+  بخش طرح مواجهه‌ی صفحه‌ی ریسک. context از actions.context.risk_treatment می‌آید.
+{% endcomment %}
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="treatment">
+  <h2 class="h5 mb-0">طرح مواجهه</h2>
+  {% if can_add_plan %}
+    <a href="{% url 'actions:plan_create' risk.pk %}" class="btn btn-primary btn-sm">طرح مواجهه</a>
+  {% endif %}
+</div>
+{% if pending_reassessment %}
+  <div class="alert alert-info py-2">
+    ارزیابی جاری تازه‌ای تأیید شده است. پیش از طرح دور تازه، <a href="{{ pending_reassessment.get_absolute_url }}#reassessment">طرح قبلی را بازسنجی کنید</a>: مقایسه با هدف و تصمیم پذیرش یا ادامه‌ی اصلاح.
+  </div>
+{% endif %}
+{% if plan_due %}
+  <div class="alert {% if plan_due_passed %}alert-danger{% else %}alert-warning{% endif %} py-2">
+    ریسک «{{ plan_level }}» منتظر طرح مواجهه است. مهلت طرح: {{ plan_due|jformat:"%Y/%m/%d" }}{% if plan_due_passed %} (گذشته است){% endif %}.
+    {% if containment_due %}<div>مهلت مهار: {{ containment_due|jformat:"%Y/%m/%d %H:%M" }}</div>{% endif %}
+  </div>
+{% endif %}
+{% if treatment_plans %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>طرح</th>
+          <th>ارزیابی مبنا</th>
+          <th>سطح</th>
+          <th>مهلت طرح</th>
+          <th>اقدام‌ها</th>
+          <th>تأیید مالک</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in treatment_plans %}
+          <tr>
+            <td><a href="{{ plan.get_absolute_url }}">{{ plan.get_option_display }}</a>{% if plan == current_plan %} <span class="badge text-bg-light border">فعلی</span>{% endif %}</td>
+            <td><a href="{{ plan.assessment.get_absolute_url }}">{{ plan.assessment.code }}</a></td>
+            <td>{% include "assessments/includes/level_badge.html" with level=plan.assessment.decision_level %}</td>
+            <td class="text-nowrap">{{ plan.decision_due|jformat:"%Y/%m/%d" }}{% if plan.is_overdue %} <span class="badge text-bg-danger">گذشته</span>{% endif %}</td>
+            <td>{{ plan.actions.all|length }}</td>
+            <td>{% if plan.is_owner_approved %}{{ plan.owner_approved_at|jformat:"%Y/%m/%d" }}{% else %}<span class="text-body-secondary">هنوز نه</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% elif not plan_due %}
+  <p class="text-body-secondary">طرح مواجهه وقتی نوشته می‌شود که ریسک با ارزیابی جاری تأییدشده به «برنامه‌ی درمان» برود.</p>
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="acceptances">
+  <h2 class="h5 mb-0">پذیرش ریسک</h2>
+  {% if can_add_acceptance %}
+    <a href="{% url 'actions:acceptance_create' risk.pk %}" class="btn btn-outline-primary btn-sm">پذیرش زمان‌دار</a>
+  {% endif %}
+</div>
+{% if out_of_authority %}
+  <div class="alert alert-danger py-2">ارزیابی تصمیم نشان «منع الزام‌آور» دارد و این ریسک خارج از اختیار پذیرش است.</div>
+{% endif %}
+{% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances empty_text="پذیرشی برای این ریسک ثبت نشده است." %}

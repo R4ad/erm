@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-3">{{ title }}</h1>
+<p><a href="{{ risk.get_absolute_url }}">{{ risk }}</a></p>
+<p class="text-body-secondary small">ارزیابی جاری تازه بعد از اقدام‌ها را با ارزیابی مبنای طرح و ارزیابی هدف مقایسه کنید و تصمیم را ثبت کنید. تصمیم، گزینه‌ی طرح دور تازه را تعیین می‌کند (بخش ۲۰).</p>
+{% include "assessments/includes/comparison_table.html" %}
+{% if open_actions %}
+  <div class="alert alert-warning py-2">
+    این اقدام‌ها هنوز تأیید نشده‌اند و با بسته شدن طرح باز می‌مانند:
+    {% for action in open_actions %}<a href="{{ action.get_absolute_url }}">{{ action.code }}</a> ({{ action.get_status_display }}){% if not forloop.last %}، {% endif %}{% endfor %}
+  </div>
+{% endif %}
+<div class="row">
+  <div class="col-lg-6">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "includes/form_fields.html" %}
+      <button type="submit" class="btn btn-primary">ثبت بازسنجی</button>
+      <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

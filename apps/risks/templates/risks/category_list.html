@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}دسته‌های ریسک{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">دسته‌های ریسک</h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'risks:category_create' %}" class="btn btn-primary btn-sm">دسته‌ی جدید</a>
+    {% endif %}
+    <a href="{% url 'risks:coverage' %}" class="btn btn-outline-secondary btn-sm">جهان ریسک</a>
+  </div>
+</div>
+
+<p class="text-body-secondary small">
+  هر نمونه‌ی ریسک یک دسته‌ی اصلی دارد. دسته برای تخصیص مالک و گزارش است و امتیاز را عوض نمی‌کند (بخش ۵ سند v5).
+  دسته حذف نمی‌شود؛ دسته‌ی غیرفعال از جدول پوشش بیرون می‌رود ولی سابقه‌اش می‌ماند.
+</p>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>نام</th>
+        <th>وضعیت</th>
+        {% if can_edit %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for category in categories %}
+        <tr>
+          <td>{{ category.code }}</td>
+          <td>{{ category.name }}</td>
+          <td>
+            {% if category.is_active %}
+              <span class="badge text-bg-success">فعال</span>
+            {% else %}
+              <span class="badge text-bg-secondary">غیرفعال</span>
+            {% endif %}
+          </td>
+          {% if can_edit %}
+            <td class="text-end">
+              <a href="{% url 'risks:category_update' category.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-center text-body-secondary py-4">دسته‌ای ثبت نشده است.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

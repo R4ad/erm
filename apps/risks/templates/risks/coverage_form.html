@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}پوشش {{ cell.category.code }} در {{ cell.service.code }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-6">
+    <h1 class="h4 mb-3">پوشش «{{ cell.category }}» در خدمت {{ cell.service }}</h1>
+
+    <p class="text-body-secondary">
+      وضعیت فعلی: {% include "risks/includes/coverage_badge.html" %}
+      {% if cell.reviewed_on %}
+        <span class="small">({{ cell.reviewed_by.get_full_name|default:cell.reviewed_by.username }}، {{ cell.reviewed_on|jformat:"%Y/%m/%d" }})</span>
+      {% endif %}
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+      {% endif %}
+
+      <fieldset class="mb-3">
+        <legend class="form-label fs-6">{{ form.status.label }}</legend>
+        {% for radio in form.status %}
+          <div class="form-check">
+            {{ radio.tag }}
+            <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+          </div>
+        {% endfor %}
+        {% for error in form.status.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </fieldset>
+
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+        {{ form.reason }}
+        <div class="form-text">{{ form.reason.help_text }}</div>
+        {% for error in form.reason.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+      <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3">
+  <h2 class="h5 mb-0">ریسک‌های فعال این خانه</h2>
+  {% if can_edit_register %}
+    <a href="{% url 'risks:scenario_list' %}" class="btn btn-primary btn-sm">انتخاب سناریو برای ثبت ریسک</a>
+  {% endif %}
+</div>
+{% include "risks/includes/risk_table.html" with risks=cell_risks hide_service=True empty_text="ریسک فعالی در این خدمت و دسته ثبت نشده است." %}
+{% endblock %}

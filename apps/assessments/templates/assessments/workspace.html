@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}ارزیابی ریسک{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="h4">ارزیابی ریسک</h1>
+{% if can_start %}<a href="{% url 'assessments:candidates' %}" class="btn btn-primary">ارزیابی جدید ریسک</a>{% endif %}</div>
+<div class="table-responsive"><table class="table"><thead><tr><th>ریسک</th><th>ارزیابی</th><th>وضعیت</th><th>احتمال</th><th>اثر</th><th>امتیاز</th><th>سطح ریسک</th></tr></thead><tbody>
+{% for assessment, result in rows %}<tr><td>{{ assessment.risk }}</td><td><a href="{{ assessment.get_absolute_url }}">{{ assessment.code }}</a></td><td>{{ assessment.get_status_display }}{% if not assessment.is_approved %} (موقت){% endif %}</td><td>{{ result.likelihood|default:'-' }}</td><td>{{ result.impact|default:'-' }}</td><td>{{ result.score|default:'-' }}</td><td>{{ result.decision_level|default:'-' }}</td></tr>
+{% empty %}<tr><td colspan="7">هنوز ارزیابی‌ای ثبت نشده است.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

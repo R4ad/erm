@@ -8,6 +8,8 @@ from django.views.generic import CreateView, DetailView, UpdateView
 
 from apps.accounts.permissions import RoleRequiredMixin
 from apps.core.views import FilteredListView, FormPageMixin
+from apps.risks.permissions import can_edit_coverage, can_edit_register, visible_risks
+from apps.risks.services import active_categories, coverage_rows
 
 from .forms import (
     AssetFilterForm,
@@ -113,6 +115,15 @@ class ServiceDetailView(DetailView):
             commitments=self.object.commitments.select_related("customer", "owner"),
             dependencies=dependencies,
             dependents=visible_dependents(self.object, user),
+            # جهان ریسک فقط خدمت‌های فعال را دارد (قدم ۱۰).
+            coverage=(
+                coverage_rows([self.object], active_categories(), visible_risks(user))[0][1]
+                if self.object.is_active
+                else []
+            ),
+            can_edit_coverage=can_edit_coverage(user),
+            risks=visible_risks(user).filter(service=self.object).select_related("category", "owner"),
+            can_edit_risks=can_edit_register(user),
             **kwargs,
         )
 

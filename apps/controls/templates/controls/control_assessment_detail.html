@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ assessment.code }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    ارزیابی اثربخشی {{ assessment.code }}
+    {% include "controls/includes/effectiveness_badge.html" %}
+    {% if assessment.suspended %}<span class="badge text-bg-danger ms-1">معلق</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}
+      <a href="{% url 'controls:control_assessment_update' assessment.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>
+    {% endif %}
+    <a href="{{ control.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">کنترل</a>
+  </div>
+</div>
+
+{% if unmet %}
+  <div class="alert alert-warning">
+    داده‌های فعلی این برگه دیگر E{{ assessment.e }} را پشتیبانی نمی‌کنند:
+    <ul class="mb-0">{% for problem in unmet %}<li>{{ problem }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<dl class="row">
+  <dt class="col-sm-3">کنترل</dt>
+  <dd class="col-sm-9"><a href="{{ control.get_absolute_url }}">{{ control }}</a> ({{ control.get_kind_display }}{% if control.is_key %}، کلیدی{% endif %})</dd>
+
+  <dt class="col-sm-3">دامنه</dt>
+  <dd class="col-sm-9">{{ assessment.scope|linebreaksbr }}</dd>
+
+  <dt class="col-sm-3">وجود و طراحی</dt>
+  <dd class="col-sm-9">{{ assessment.exists|yesno:"وجود دارد,وجود ندارد" }}؛ طراحی {{ assessment.design_ok|yesno:"کافی,ناکافی" }}</dd>
+
+  <dt class="col-sm-3">پوشش</dt>
+  <dd class="col-sm-9">
+    {% if assessment.coverage_pct is not None %}{{ assessment.coverage_pct.normalize }} درصد{% else %}ثبت نشده{% endif %}
+    {% if assessment.population %}از {{ assessment.population }}{% endif %}
+  </dd>
+
+  <dt class="col-sm-3">نقاط حیاتی</dt>
+  <dd class="col-sm-9">
+    {{ assessment.critical_points|linebreaksbr|default:"-" }}
+    <div class="small">{{ assessment.critical_points_covered|yesno:"همه پوشش دارند,همه پوشش ندارند" }}</div>
+  </dd>
+
+  <dt class="col-sm-3">استثناها و انحراف‌ها</dt>
+  <dd class="col-sm-9">
+    {{ assessment.exceptions|linebreaksbr|default:"-" }}
+    {% if assessment.known_gap %}<div class="text-danger small">شکست یا شکاف شناخته‌شده در دامنه‌ی مورد اتکا</div>{% endif %}
+  </dd>
+
+  <dt class="col-sm-3">آزمون</dt>
+  <dd class="col-sm-9">
+    {{ assessment.test_method|default:"روش ثبت نشده" }}{% if assessment.test_from or assessment.test_to %}، از {{ assessment.test_from|jformat:"%Y/%m/%d"|default:"-" }} تا {{ assessment.test_to|jformat:"%Y/%m/%d"|default:"-" }}{% endif %}{% if assessment.sample_size is not None %}، نمونه {{ assessment.sample_size }}{% endif %}
+    {% if assessment.sample_rationale %}<div class="small text-body-secondary">{{ assessment.sample_rationale|linebreaksbr }}</div>{% endif %}
+  </dd>
+
+  <dt class="col-sm-3">نتیجه‌ی آزمون</dt>
+  <dd class="col-sm-9">
+    {{ assessment.test_result|linebreaksbr|default:"-" }}
+    <div class="small">اثربخشی عملیاتی: {{ assessment.operating_ok|yesno:"نشان داده شده,نشان داده نشده" }}</div>
+    <div class="small">اثر محدود اثبات‌شده: {{ assessment.limited_effect_proven|yesno:"بله,خیر" }}</div>
+  </dd>
+
+  <dt class="col-sm-3">شکست‌ها و اقدام اصلاحی</dt>
+  <dd class="col-sm-9">{{ assessment.failures|linebreaksbr|default:"-" }}</dd>
+
+  <dt class="col-sm-3">شرط‌های E4 و E5</dt>
+  <dd class="col-sm-9">
+    عملکرد مستمر: {{ assessment.sustained|yesno:"بله,خیر" }}؛
+    آزمون خرابی و دورزدن: {{ assessment.failure_bypass_tested|yesno:"بله,خیر" }}؛
+    پایش مستمر: {{ assessment.monitored|yesno:"بله,خیر" }}
+  </dd>
+
+  <dt class="col-sm-3">دلیل E</dt>
+  <dd class="col-sm-9">{{ assessment.rationale|linebreaksbr }}</dd>
+  <dt class="col-sm-3">اطمینان E</dt>
+  <dd class="col-sm-9">{{ assessment.get_confidence_display|default:"-" }}</dd>
+
+  <dt class="col-sm-3">تأییدکننده</dt>
+  <dd class="col-sm-9">{% if assessment.verified_by %}{{ assessment.verified_by.get_full_name|default:assessment.verified_by.username }}{% else %}-{% endif %}</dd>
+
+  <dt class="col-sm-3">شاهد معتبر تا</dt>
+  <dd class="col-sm-9">{% if assessment.valid_until %}{{ assessment.valid_until|jformat:"%Y/%m/%d" }} ({% if control.is_key %}{{ thresholds.key_age }}{% else %}{{ thresholds.other_age }}{% endif %} روز بعد از پایان آزمون){% else %}-{% endif %}</dd>
+
+  <dt class="col-sm-3">نسخه‌ی روش</dt>
+  <dd class="col-sm-9"><a href="{{ assessment.method_version.get_absolute_url }}">{{ assessment.method_version }}</a></dd>
+
+  <dt class="col-sm-3">ثبت‌کننده</dt>
+  <dd class="col-sm-9">{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}، {{ assessment.created_at|jformat:"%Y/%m/%d" }}</dd>
+</dl>
+
+<h2 class="h5 mt-4 mb-3">شواهد</h2>
+<ul>
+  {% for item in evidence %}
+    <li><a href="{{ item.get_absolute_url }}">{{ item }}</a> ({{ item.get_kind_display }}، {{ item.observed_on|jformat:"%Y/%m/%d" }})</li>
+  {% empty %}
+    <li class="text-body-secondary">شاهدی که شما ببینید انتخاب نشده است.</li>
+  {% endfor %}
+</ul>
+
+<h2 class="h5 mt-4 mb-3">مسیرهایی که به این ارزیابی تکیه دارند</h2>
+<ul>
+  {% for path in paths %}
+    <li><a href="{{ path.get_absolute_url }}">{{ path.name }}</a> در {{ path.assessment }} برای {{ path.assessment.risk }}</li>
+  {% empty %}
+    <li class="text-body-secondary">مسیری که شما ببینید به این ارزیابی تکیه ندارد.</li>
+  {% endfor %}
+</ul>
+
+{% include "core/includes/attachments.html" with record=assessment %}
+{% include "core/includes/comments.html" with record=assessment %}
+{% endblock %}

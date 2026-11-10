@@ -1,0 +1,33 @@
+{% comment %}
+  جدول ریسک‌ها برای صفحه‌های سناریو، خدمت و خانه‌ی جهان ریسک. hide_service و hide_scenario ستون تکراری را برمی‌دارند.
+{% endcomment %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>عنوان</th>
+        {% if not hide_service %}<th>خدمت</th>{% endif %}
+        <th>دسته</th>
+        <th>مالک</th>
+        <th>وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for risk in risks %}
+        <tr>
+          <td class="text-nowrap"><a href="{{ risk.get_absolute_url }}">{{ risk.code }}</a></td>
+          <td>{{ risk.title }}</td>
+          {% if not hide_service %}<td class="text-nowrap">{{ risk.service.code|default:"-" }}</td>{% endif %}
+          <td class="text-nowrap" title="{{ risk.category.name }}">{{ risk.category.code }}</td>
+          <td>{% if risk.owner %}{{ risk.owner.get_full_name|default:risk.owner.username }}{% else %}-{% endif %}</td>
+          <td class="text-nowrap">{% include "risks/includes/risk_status.html" %}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-body-secondary py-4">{{ empty_text|default:"ریسکی ثبت نشده است." }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

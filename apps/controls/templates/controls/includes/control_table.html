@@ -1,0 +1,49 @@
+{% comment %}
+  جدول کنترل‌ها برای کتابخانه‌ی کنترل، صفحه‌ی ریسک و صفحه‌ی پیوست A. control_links=False یعنی پیوند صفحه‌ی کنترل
+  فقط برای کنترل‌هایی است که در visible_control_ids هستند.
+{% endcomment %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>کد</th>
+        <th>عنوان</th>
+        <th>نوع</th>
+        <th>مسئول</th>
+        <th>پیوست A</th>
+        <th>وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for control in controls %}
+        <tr>
+          <td class="text-nowrap">
+            {% if visible_control_ids is None or control.pk in visible_control_ids %}
+              <a href="{{ control.get_absolute_url }}">{{ control.code }}</a>
+            {% else %}
+              {{ control.code }}
+            {% endif %}
+          </td>
+          <td>
+            {{ control.title }}
+            {% if control.is_key %}<span class="badge text-bg-warning ms-1">کلیدی</span>{% endif %}
+          </td>
+          <td class="text-nowrap">{{ control.get_kind_display }}</td>
+          <td>{{ control.owner.get_full_name|default:control.owner.username }}</td>
+          <td class="small text-nowrap">{% for iso in control.iso_controls.all %}{{ iso.code }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</td>
+          <td>
+            {% if control.is_active %}
+              <span class="badge text-bg-success">فعال</span>
+            {% else %}
+              <span class="badge text-bg-secondary">غیرفعال</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-body-secondary py-4">{{ empty_text|default:"کنترلی ثبت نشده است." }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

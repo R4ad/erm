@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ plan }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">
+    طرح مواجهه: {{ plan.get_option_display }}
+    {% if reassessment %}<span class="badge text-bg-secondary">بازسنجی‌شده و بسته</span>{% elif plan.is_owner_approved %}<span class="badge text-bg-success">تأییدشده‌ی مالک</span>{% else %}<span class="badge text-bg-light border">منتظر تأیید مالک</span>{% endif %}
+  </h1>
+  <div>
+    {% if can_edit %}<a href="{% url 'actions:plan_update' plan.pk %}" class="btn btn-outline-secondary btn-sm">ویرایش</a>{% endif %}
+    <a href="{{ risk.get_absolute_url }}#treatment" class="btn btn-outline-secondary btn-sm">ریسک</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">ریسک</dt>
+  <dd class="col-sm-9"><a href="{{ risk.get_absolute_url }}">{{ risk }}</a></dd>
+  <dt class="col-sm-3">مالک ریسک</dt>
+  <dd class="col-sm-9">{{ risk.owner.get_full_name|default:risk.owner.username|default:"-" }}</dd>
+  <dt class="col-sm-3">ارزیابی مبنا</dt>
+  <dd class="col-sm-9">
+    <a href="{{ plan.assessment.get_absolute_url }}">{{ plan.assessment.code }}</a>، امتیاز تصمیم {{ plan.assessment.score_high }}،
+    سطح {% include "assessments/includes/level_badge.html" with level=plan.level %}
+    {% if plan_required %}<div class="small text-body-secondary">برای این سطح طرح مواجهه الزامی است و پذیرش فقط موقت و استثنایی است (بخش ۱۹).</div>{% endif %}
+  </dd>
+  <dt class="col-sm-3">مهلت طرح</dt>
+  <dd class="col-sm-9">
+    {{ plan.decision_due|jformat:"%Y/%m/%d" }}{% if plan.is_overdue %} <span class="badge text-bg-danger">گذشته است</span>{% endif %}
+    {% if containment_due %}<div class="small">مهلت مهار: {{ containment_due|jformat:"%Y/%m/%d %H:%M" }}</div>{% endif %}
+  </dd>
+  <dt class="col-sm-3">دلیل و گزینه‌های بررسی‌شده</dt>
+  <dd class="col-sm-9">{{ plan.rationale|linebreaksbr }}</dd>
+  {% if plan.option_details %}
+    <dt class="col-sm-3">شرط‌های گزینه</dt>
+    <dd class="col-sm-9">{{ plan.option_details|linebreaksbr }}</dd>
+  {% endif %}
+  <dt class="col-sm-3">ارزیابی هدف</dt>
+  <dd class="col-sm-9">
+    {% if plan.target_assessment %}
+      <a href="{{ plan.target_assessment.get_absolute_url }}">{{ plan.target_assessment.code }}</a>
+      ({{ plan.target_assessment.get_status_display }}){% if plan.target_assessment.decision_level %}، سطح هدف {% include "assessments/includes/level_badge.html" with level=plan.target_assessment.decision_level %}{% endif %}
+    {% else %}-{% endif %}
+  </dd>
+  <dt class="col-sm-3">تأیید مالک</dt>
+  <dd class="col-sm-9">{% if plan.is_owner_approved %}{{ plan.owner_approved_by.get_full_name|default:plan.owner_approved_by.username }}، {{ plan.owner_approved_at|jformat:"%Y/%m/%d %H:%M" }}{% else %}-{% endif %}</dd>
+</dl>
+
+<div id="approval">
+  {% if problems %}
+    <div class="alert alert-light border py-2">
+      پیش از تأیید مالک ریسک لازم است:
+      <ul class="mb-0 small">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+    </div>
+  {% elif can_approve and not plan.is_owner_approved or can_approve and pending %}
+    <form method="post" action="{% url 'actions:plan_approve' plan.pk %}" class="alert alert-info py-2 d-flex align-items-center justify-content-between">
+      {% csrf_token %}
+      <span>{% if plan.is_owner_approved %}اقدام‌های تازه منتظر تأیید شما هستند.{% else %}شما مالک این ریسک هستید. با تأیید، طرح و همه‌ی اقدام‌هایش مصوب می‌شوند.{% endif %}</span>
+      <button type="submit" class="btn btn-success btn-sm">تأیید طرح</button>
+    </form>
+  {% elif pending or not plan.is_owner_approved %}
+    <p class="small text-body-secondary">طرح و اقدام‌های تازه را مالک ریسک تأیید می‌کند.</p>
+  {% endif %}
+</div>
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="actions">
+  <h2 class="h5 mb-0">اقدام‌ها</h2>
+  {% if can_add_action %}<a href="{% url 'actions:action_create' plan.pk %}" class="btn btn-primary btn-sm">اقدام تازه</a>{% endif %}
+</div>
+{% include "actions/includes/action_table.html" with action_list=actions empty_text="هنوز اقدامی ثبت نشده است." %}
+
+{% if reassessment or can_reassess %}
+  <div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="reassessment">
+    <h2 class="h5 mb-0">بازسنجی</h2>
+    {% if can_reassess %}<a href="{% url 'actions:reassessment_create' plan.pk %}" class="btn btn-primary btn-sm">ثبت بازسنجی</a>{% endif %}
+  </div>
+  {% if reassessment %}
+    <dl class="row">
+      <dt class="col-sm-3">تاریخ و مسئول</dt>
+      <dd class="col-sm-9">{{ reassessment.performed_on|jformat:"%Y/%m/%d" }}، {{ reassessment.responsible.get_full_name|default:reassessment.responsible.username }}</dd>
+      <dt class="col-sm-3">ارزیابی تازه</dt>
+      <dd class="col-sm-9"><a href="{{ reassessment.assessment.get_absolute_url }}">{{ reassessment.assessment.code }}</a></dd>
+      <dt class="col-sm-3">مقایسه با هدف</dt>
+      <dd class="col-sm-9">{% if reassessment.target_met is None %}طرح ارزیابی هدف تأییدشده نداشت.{% elif reassessment.target_met %}<span class="badge text-bg-success">هدف محقق شد</span>{% else %}<span class="badge text-bg-warning">هدف هنوز محقق نشده است</span>{% endif %}
+        {% if reassessment.method_changed %}<div class="small text-warning-emphasis">روش ارزیابی عوض شده و بخشی از تغییر ممکن است از روش باشد.</div>{% endif %}
+      </dd>
+      <dt class="col-sm-3">تصمیم</dt>
+      <dd class="col-sm-9"><span class="fw-semibold">{{ reassessment.get_decision_display }}</span><div>{{ reassessment.note|linebreaksbr }}</div></dd>
+    </dl>
+  {% else %}
+    <p class="small text-body-secondary">ارزیابی جاری تازه‌ای بعد از این طرح تأیید شده است. پیش از طرح دور تازه، نتیجه را با هدف مقایسه و تصمیم پذیرش یا ادامه‌ی اصلاح را ثبت کنید.</p>
+  {% endif %}
+  {% include "assessments/includes/comparison_table.html" with profiles=comparison.profiles rows=comparison.rows method_changed=comparison.method_changed %}
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mt-4 mb-3" id="acceptances">
+  <h2 class="h5 mb-0">پذیرش</h2>
+  {% if can_add_acceptance %}<a href="{% url 'actions:acceptance_create' risk.pk %}" class="btn btn-outline-primary btn-sm">پذیرش زمان‌دار</a>{% endif %}
+</div>
+<p class="small text-body-secondary">
+  {% if plan.option == "accept" %}گزینه‌ی پذیرش با یک پذیرش معتبر، با امضای مالک ریسک و صاحبان اختیار، تأیید می‌شود.
+  {% elif plan_required %}برای این سطح پذیرش فقط موقت و استثنایی است و کنار اقدام‌های طرح ثبت می‌شود.
+  {% else %}پذیرش ریسک باقیمانده، اگر لازم است، با امضای صاحبان اختیار ثبت می‌شود.{% endif %}
+</p>
+{% include "actions/includes/acceptance_table.html" with acceptance_list=acceptances empty_text="پذیرشی برای این طرح ثبت نشده است." %}
+
+{% include "core/includes/attachments.html" with record=plan %}
+{% include "core/includes/comments.html" with record=plan %}
+{% endblock %}

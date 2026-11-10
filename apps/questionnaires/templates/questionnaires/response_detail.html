@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ response }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <h1 class="h4 mb-0">{{ response.questionnaire }} {% include "questionnaires/includes/response_status.html" %}</h1>
+  <div class="d-flex flex-wrap gap-1">
+    {% if can_edit %}
+      <a href="{% url 'questionnaires:response_answer' response.pk %}" class="btn btn-primary btn-sm">ادامه‌ی پاسخ</a>
+    {% endif %}
+    {% if can_review %}
+      <a href="{% url 'questionnaires:pending_create' response.pk %}" class="btn btn-outline-primary btn-sm">ریسک در انتظار تازه</a>
+      <a href="{% url 'questionnaires:response_return' response.pk %}" class="btn btn-outline-warning btn-sm">برگشت با سؤال</a>
+      <form method="post" action="{% url 'questionnaires:response_reviewed' response.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-success btn-sm"{% if undecided %} disabled title="اول همه‌ی ریسک‌های در انتظار را تعیین تکلیف کنید"{% endif %}>بررسی تمام شد</button>
+      </form>
+    {% endif %}
+    <a href="{% url 'questionnaires:response_list' %}" class="btn btn-outline-secondary btn-sm">پاسخ‌ها</a>
+  </div>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">واحد</dt>
+  <dd class="col-sm-9">{{ response.org_unit }}</dd>
+
+  <dt class="col-sm-3">خدمت</dt>
+  <dd class="col-sm-9">{{ response.service|default:"-" }}</dd>
+
+  <dt class="col-sm-3">پاسخ‌دهنده</dt>
+  <dd class="col-sm-9">
+    {{ response.respondent.get_full_name|default:response.respondent.username }}
+    {% if response.channel == "interview" %}<span class="text-body-secondary">(مصاحبه، ثبت با {{ response.recorded_by.get_full_name|default:response.recorded_by.username }})</span>{% endif %}
+  </dd>
+
+  <dt class="col-sm-3">ارسال</dt>
+  <dd class="col-sm-9">{% if response.submitted_at %}{{ response.submitted_at|jformat:"%Y/%m/%d %H:%M" }}{% else %}هنوز ارسال نشده{% endif %}</dd>
+
+  {% if response.return_question %}
+    <dt class="col-sm-3">سؤال برگشت</dt>
+    <dd class="col-sm-9">
+      {{ response.return_question|linebreaksbr }}
+      <div class="small text-body-secondary">برگشت {{ response.returned_at|jformat:"%Y/%m/%d" }}، مهلت {{ response.return_due|jformat:"%Y/%m/%d" }}</div>
+    </dd>
+  {% endif %}
+
+  {% if response.reviewed_at %}
+    <dt class="col-sm-3">بررسی</dt>
+    <dd class="col-sm-9">{{ response.reviewed_by.get_full_name|default:response.reviewed_by.username }}، {{ response.reviewed_at|jformat:"%Y/%m/%d" }}</dd>
+  {% endif %}
+</dl>
+
+{% if response.questionnaire.is_structured %}
+<h2 class="h5 mt-4 mb-3">خدمات و شاخه‌های اختلال</h2>
+{% for service in response.structured_data %}
+  <section class="border rounded p-3 mb-3">
+    <h3 class="h6">خدمت {{ forloop.counter }}</h3>
+    {% include "questionnaires/includes/structured_answers.html" with node=service %}
+    {% for objective in service.objectives %}{% include "questionnaires/includes/structured_answers.html" with node=objective %}{% endfor %}
+    {% for event in service.events %}
+      <div class="border rounded p-3 mb-3"><h4 class="h6">اتفاق {{ forloop.counter }}</h4>
+        {% include "questionnaires/includes/structured_answers.html" with node=event %}
+        {% for path in event.paths %}<div class="border rounded p-2 mb-2"><strong>راه {{ forloop.counter }}</strong>{% include "questionnaires/includes/structured_answers.html" with node=path %}</div>{% endfor %}
+        {% for control in event.controls %}<div class="border rounded p-2 mb-2"><strong>تمهید</strong>{% include "questionnaires/includes/structured_answers.html" with node=control %}
+          <div>راه‌های تحت پوشش: {% for related_event in service.events %}{% for path in related_event.paths %}{% if path.key in control.paths %}{% for answer in related_event.answers.values %}{{ answer }} {% endfor %}: {% for answer in path.answers.values %}{{ answer }} {% endfor %}؛ {% endif %}{% endfor %}{% endfor %}</div></div>{% endfor %}
+        {% for consequence in event.consequences %}<div class="border rounded p-2 mb-2"><strong>پیامد</strong>{% include "questionnaires/includes/structured_answers.html" with node=consequence %}{% for path in event.paths %}{% if path.key == consequence.path %}<div>راه مرتبط: {% for answer in path.answers.values %}{{ answer }} {% endfor %}</div>{% endif %}{% endfor %}</div>{% endfor %}
+        {% for evidence in event.evidence %}<div class="border rounded p-2 mb-2"><strong>شاهد</strong>{% include "questionnaires/includes/structured_answers.html" with node=evidence %}<div>مربوط به:
+          {% if evidence.target == 'event' %}اتفاق{% endif %}
+          {% for path in event.paths %}{% with target='path:'|add:path.key %}{% if target == evidence.target %}راه: {% for answer in path.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+          {% for control in event.controls %}{% with target='control:'|add:control.key %}{% if target == evidence.target %}تمهید: {% for answer in control.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+          {% for consequence in event.consequences %}{% with target='consequence:'|add:consequence.key %}{% if target == evidence.target %}پیامد: {% for answer in consequence.answers.values %}{{ answer }} {% endfor %}{% endif %}{% endwith %}{% endfor %}
+        </div></div>{% endfor %}
+      </div>
+    {% endfor %}
+  </section>
+{% empty %}<p>خدمتی ثبت نشده است.</p>{% endfor %}
+{% else %}
+<h2 class="h5 mt-4 mb-3">کارکردها و پرسش‌های جلسه</h2>
+<dl class="row">
+  {% for label, value in response.fixed_items %}
+    <dt class="col-sm-3">{{ label }}</dt>
+    <dd class="col-sm-9">{{ value|linebreaksbr|default:"-" }}</dd>
+  {% endfor %}
+</dl>
+
+<h2 class="h5 mt-4 mb-3">جواب سؤال‌ها</h2>
+<ol>
+  {% for answer in answers %}
+    <li class="mb-3">
+      <div class="fw-semibold">{{ answer.question.text|linebreaksbr }}</div>
+      {% if answer.question.has_options %}
+        {% for option in answer.options.all %}
+          <span class="me-2">{{ option.text }}{% if option.indicates_risk %} <span class="badge text-bg-warning">نشانه‌ی ریسک</span>{% endif %}</span>
+        {% empty %}<span class="text-body-secondary">بی‌جواب</span>{% endfor %}
+      {% else %}
+        <div>{{ answer.text|linebreaksbr|default:"بی‌جواب" }}</div>
+      {% endif %}
+    </li>
+  {% empty %}
+    <li class="list-unstyled text-body-secondary">هنوز جوابی ثبت نشده است.</li>
+  {% endfor %}
+</ol>
+
+<h2 class="h5 mt-4 mb-3">مورد جدید</h2>
+<p>{{ response.new_item|linebreaksbr|default:"-" }}</p>
+{% endif %}
+
+<h2 class="h5 mt-4 mb-3">ریسک‌های در انتظار</h2>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>شرح</th>
+        <th>منبع</th>
+        <th>سناریو و دسته</th>
+        <th>وضعیت</th>
+        {% if can_decide %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for pending in pending_risks %}
+        <tr>
+          <td>{{ pending.description|linebreaksbr }}</td>
+          <td class="text-nowrap">{{ pending.get_source_display }}</td>
+          <td class="text-nowrap">
+            {% if pending.scenario %}<span title="{{ pending.scenario.title }}">{{ pending.scenario.code }}</span>{% endif %}
+            {% if pending.category %}<span title="{{ pending.category.name }}">{{ pending.category.code }}</span>{% endif %}
+            {% if not pending.scenario and not pending.category %}-{% endif %}
+          </td>
+          <td>
+            {% if pending.status == "pending" %}
+              <span class="badge text-bg-warning">{{ pending.get_status_display }}</span>
+            {% elif pending.status == "converted" %}
+              <span class="badge text-bg-success">{{ pending.get_status_display }}</span>
+              <a href="{{ pending.risk.get_absolute_url }}">{{ pending.risk.code }}</a>
+            {% else %}
+              <span class="badge text-bg-secondary">{{ pending.get_status_display }}</span>
+              <div class="small">{{ pending.dismiss_reason }}{% if pending.duplicate_of %} (تکراری با <a href="{{ pending.duplicate_of.get_absolute_url }}">{{ pending.duplicate_of.code }}</a>){% endif %}</div>
+            {% endif %}
+          </td>
+          {% if can_decide %}
+            <td class="text-end text-nowrap">
+              {% if pending.is_pending %}
+                <a href="{% url 'questionnaires:pending_convert' pending.pk %}" class="btn btn-primary btn-sm">ثبت در رجیستر</a>
+                <a href="{% url 'questionnaires:pending_dismiss' pending.pk %}" class="btn btn-outline-secondary btn-sm">کنار گذاشتن</a>
+              {% endif %}
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-body-secondary py-4">ریسک در انتظاری از این پاسخ نیامده است.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load jformat %}
+
+{% block title %}{{ change }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 mb-0">پیشنهاد {{ change.get_kind_display }} {{ change.risk.code }} {% include "workflow/includes/change_status.html" %}</h1>
+      <a href="{% url 'workflow:change_request_list' %}" class="btn btn-outline-secondary btn-sm">همه‌ی درخواست‌ها</a>
+    </div>
+
+    <dl class="row">
+      <dt class="col-sm-3">ریسک</dt>
+      <dd class="col-sm-9"><a href="{{ change.risk.get_absolute_url }}">{{ change.risk }}</a> · {{ change.risk.get_status_display }}</dd>
+
+      {% if change.merge_into %}
+        <dt class="col-sm-3">ادغام در</dt>
+        <dd class="col-sm-9"><a href="{{ change.merge_into.get_absolute_url }}">{{ change.merge_into }}</a> · {{ change.merge_into.get_status_display }}</dd>
+      {% endif %}
+
+      {% if change.parts %}
+        <dt class="col-sm-3">بخش‌های تازه</dt>
+        <dd class="col-sm-9">
+          <ul class="mb-0 ps-3">{% for title in change.part_titles %}<li>{{ title }}</li>{% endfor %}</ul>
+          {% if parts %}<div class="small mt-1">ساخته شد: {% for part in parts %}<a href="{{ part.get_absolute_url }}">{{ part.code }}</a>{% if not forloop.last %}، {% endif %}{% endfor %}</div>{% endif %}
+        </dd>
+      {% endif %}
+
+      <dt class="col-sm-3">دلیل</dt>
+      <dd class="col-sm-9">{{ change.reason|linebreaksbr }}</dd>
+
+      <dt class="col-sm-3">پیشنهاددهنده</dt>
+      <dd class="col-sm-9">{{ change.proposed_by.get_full_name|default:change.proposed_by.username }}، {{ change.created_at|jformat:"%Y/%m/%d" }}</dd>
+
+      <dt class="col-sm-3">مالک ریسک</dt>
+      <dd class="col-sm-9">{{ change.risk.owner.get_full_name|default:change.risk.owner.username }}</dd>
+
+      {% if change.decided_by %}
+        <dt class="col-sm-3">تصمیم</dt>
+        <dd class="col-sm-9">
+          {{ change.get_status_display }} با {{ change.decided_by.get_full_name|default:change.decided_by.username }}، {{ change.decided_at|jformat:"%Y/%m/%d" }}
+          {% if change.decision_note %}<div>{{ change.decision_note|linebreaksbr }}</div>{% endif %}
+        </dd>
+      {% endif %}
+    </dl>
+
+    {% if can_decide %}
+      <h2 class="h5 mt-4 mb-2">تصمیم شما به‌عنوان مالک ریسک</h2>
+      <p class="small text-body-secondary">
+        {% if change.kind == "merge" %}با تأیید، ریسک {{ change.risk.code }} با همین کد و سابقه «بسته‌شده» می‌شود و به {{ change.merge_into.code }} اشاره می‌کند.
+        {% else %}با تأیید، برای هر بخش یک ریسک تازه با کد تازه و «تفکیک از {{ change.risk.code }}» ساخته می‌شود و {{ change.risk.code }} با همان کد می‌ماند.{% endif %}
+      </p>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
+        {% with field=form.note %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            <div class="form-text">{{ field.help_text }}</div>
+            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+        {% endwith %}
+        <button type="submit" name="decision" value="approve" class="btn btn-primary">تأیید</button>
+        <button type="submit" name="decision" value="reject" class="btn btn-outline-danger">رد</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

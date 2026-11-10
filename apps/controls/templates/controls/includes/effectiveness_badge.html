@@ -1,0 +1,4 @@
+{% with problem=assessment.credit_problem %}
+  <span class="badge {% if problem %}text-bg-secondary{% elif assessment.e >= 3 %}text-bg-success{% elif assessment.e == 2 %}text-bg-warning{% else %}text-bg-light border{% endif %}">E{{ assessment.e }}</span>
+  {% if problem %}<span class="small text-danger">{{ problem }}؛ در Bc ‏E1 حساب می‌شود</span>{% endif %}
+{% endwith %}

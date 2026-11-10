@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">{{ title }}</h1>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+      {% endif %}
+      {% for legend, fields in form.fieldsets %}
+        <fieldset class="border rounded p-3 mb-3">
+          <legend class="h6 float-none w-auto px-2 mb-0">{{ legend }}</legend>
+          {% for field in fields %}{% include "includes/field.html" %}{% endfor %}
+        </fieldset>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+      <a href="{{ cancel_url }}" class="btn btn-outline-secondary">انصراف</a>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">کنترل</div>
+      <div class="card-body small">
+        <div class="fw-bold">{{ control }}</div>
+        <div>{{ control.get_kind_display }}{% if control.is_key %}، کنترل کلیدی{% endif %}</div>
+        <div>مسئول: {{ control.owner.get_full_name|default:control.owner.username }}</div>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">سطح‌های E (بخش ۱۶)</div>
+      <ul class="list-group list-group-flush small">
+        {% for level in levels %}
+          <li class="list-group-item"><span class="fw-bold">E{{ level.value }} {{ level.name }}:</span> {{ level.criteria }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">شرط‌ها در این نسخه‌ی روش</div>
+      <ul class="list-group list-group-flush small">
+        <li class="list-group-item">E2 و بالاتر: اثر واقعی کنترل با شاهد آزمون اثبات شده و روش، نتیجه و دلیل نمونه ثبت است. صرف نصب و اجرا اعتبار کاهش ندارد. کنترل بدون شاهد E1 است.</li>
+        <li class="list-group-item">E3 و بالاتر: طراحی کافی، اثربخشی عملیاتی، پوشش دست‌کم {{ thresholds.coverage.normalize }} درصد، همه‌ی نقاط حیاتی، بدون شکاف شناخته‌شده، نمونه‌ی دست‌کم {{ thresholds.sample }}، و تأییدکننده‌ای جز مسئول کنترل.</li>
+        <li class="list-group-item">E4: عملکرد مستمر در دوره‌ی بررسی. E5: به‌اضافه‌ی آزمون خرابی و دورزدن و پایش مستمر.</li>
+        <li class="list-group-item">شاهد کنترل کلیدی {{ thresholds.key_age }} روز و کنترل‌های دیگر {{ thresholds.other_age }} روز بعد از پایان آزمون کهنه می‌شود؛ کنترل با شاهد کهنه در Bc فقط E1 حساب می‌شود.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
