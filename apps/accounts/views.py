@@ -5,7 +5,8 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 from django.views.decorators.http import require_POST
 
 from apps.api.spa import spa_login_url, spa_ready
@@ -67,8 +68,10 @@ def staff_import(request):
             form.add_error("file", str(error))
         else:
             confirm_form = StaffImportConfirmForm(initial={"token": token, "deactivate_missing": deactivate})
-            return render(request, "accounts/staff_import.html", {"report": report, "confirm_form": confirm_form})
-    return render(request, "accounts/staff_import.html", {"form": form})
+            context = {"report": report, "confirm_form": confirm_form}
+            return TemplateResponse(request, "accounts/staff_import.html", context)
+    # TemplateResponse، نه render: رابط React همین view را اجرا می‌کند و فرم و گزارش را از context می‌خواند.
+    return TemplateResponse(request, "accounts/staff_import.html", {"form": form})
 
 
 @require_POST
@@ -89,7 +92,7 @@ def staff_import_confirm(request):
     finally:
         path.unlink()  # بعد از تأیید، فایل در هر حال پاک می‌شود
     messages.success(request, "کارکنان وارد شدند. گزارش آن‌چه انجام شد:")
-    return render(request, "accounts/staff_import.html", {"report": report})
+    return TemplateResponse(request, "accounts/staff_import.html", {"report": report})
 
 
 class UserListView(RoleRequiredMixin, FilteredListView):

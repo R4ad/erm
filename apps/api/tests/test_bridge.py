@@ -111,7 +111,8 @@ def test_django_addresses_map_to_their_react_routes():
     assert spa_route("/actions/mine/") == "/"
     assert spa_route("/risks/coverage/3/1/") == "/risks/coverage/3/1"
     # صفحه‌ای که هنوز فقط در جنگو است، یا نشانی‌ای که اصلاً نیست، پیوند معمولی جنگو می‌ماند.
-    assert spa_route("/accounts/users/") is None
+    assert spa_route("/reports/") is None
+    assert spa_route("/audit/export/?event=login") is None  # فایل Excel همیشه از خود جنگو
     assert spa_route("/no-such-page/") is None
     assert spa_route("") is None
 

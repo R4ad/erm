@@ -3,6 +3,7 @@
 
 from . import formatting as fmt
 from .actions import reassessment_form
+from .admin_pages import staff_import_form, staff_import_result
 from .assessments import impact_forms, impact_profile, initiator_form, path_form
 from .controls import control_assessment_form
 from .questionnaire_pages import pending_convert, pending_dismiss, question_form, question_forms
@@ -138,6 +139,9 @@ FORM_PAGES = {
     "catalog:asset_update": None,
     "organization:unit_create": None,
     "organization:unit_update": None,
+    "workcalendar:holiday_create": None,
+    "workcalendar:holiday_update": None,
+    "accounts:staff_import": staff_import_form,
 }
 
 # صفحه‌هایی که به‌جای یک form چند فرم با پیشوند دارند؛ خطاهای فرستادن ناموفق از همه‌ی این فرم‌ها خوانده می‌شود.
@@ -163,4 +167,13 @@ POST_ONLY_PAGES = {
     "actions:notice_read",
     "actions:review_detail",
     "questionnaires:response_reviewed",
+    "workcalendar:holiday_delete",
+    "accounts:staff_import_confirm",
+}
+
+# صفحه‌هایی که بعد از فرستادن موفق به صفحه‌ی دیگر نمی‌روند و نتیجه را در همان صفحه نشان می‌دهند؛ تابع، آن نتیجه را از
+# context پاسخ می‌خواند (default_message پیامی است برای وقتی که view خودش پیامی نگذاشته است).
+POST_RESULTS = {
+    "accounts:staff_import": staff_import_result,
+    "accounts:staff_import_confirm": staff_import_result,
 }

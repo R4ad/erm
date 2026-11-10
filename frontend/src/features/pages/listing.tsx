@@ -5,13 +5,16 @@ import { useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Checkbox, Field, Input, Select } from "@/components/ui/field";
 import { Pagination } from "@/components/ui/pagination";
 import { PageSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
+import { useSession } from "@/features/session/session";
 import { faText } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks";
+import { formatJalali, parseJalali } from "@/lib/jalali";
 import type { FormField, FormSchema, Listing } from "@/lib/types";
 
 import { activeFilters } from "./page-data";
@@ -86,6 +89,44 @@ function FilterCheckbox({
   );
 }
 
+/**
+ * تاریخ شمسی فیلتر (مثل «از تاریخ» سوابق ممیزی). نشانی فقط با تاریخ کامل و درست یا کادر خالی عوض می‌شود، نه با
+ * هر رقمی که تایپ می‌شود؛ تاریخ نادرست را خود فرم جنگو هم رد می‌کند و خطایش زیر کادر می‌آید.
+ */
+function FilterDate({
+  field,
+  value,
+  onChange,
+}: {
+  field: FormField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { today } = useSession();
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setText(value);
+  }
+  return (
+    <Field label={field.label} error={field.errors.map(faText)}>
+      <DatePicker
+        name={field.name}
+        value={text}
+        today={parseJalali(today.jalali) ?? undefined}
+        placeholder={field.placeholder ? faText(field.placeholder) : undefined}
+        onChange={(next) => {
+          setText(next);
+          const date = parseJalali(next);
+          if (date) onChange(formatJalali(date));
+          else if (!next.trim()) onChange("");
+        }}
+      />
+    </Field>
+  );
+}
+
 interface FilterBarProps {
   schema: FormSchema | null | undefined;
   label: string;
@@ -97,21 +138,30 @@ export function FilterBar({ schema, label }: FilterBarProps) {
   if (!schema?.fields.length) return null;
   const fields = schema.fields.filter((field) => field.kind !== "hidden");
   const active = activeFilters(schema, params);
+  const defaults = schema.defaults ?? {};
 
-  function update(name: string, value: string, replace = false) {
+  /** مقدار فیلتر در نشانی، یا اگر نیست همان پیش‌فرضی که view به کار برده است. */
+  function current(name: string) {
+    return params.get(name) ?? defaults[name] ?? "";
+  }
+
+  /** «همه» برای فیلتری که پیش‌فرض دارد پارامتر خالی است؛ برداشتن فیلتر (remove) پیش‌فرض را برمی‌گرداند. */
+  function update(name: string, value: string, { replace = false, remove = false } = {}) {
     const next = new URLSearchParams(params);
     if (value) next.set(name, value);
+    else if (name in defaults && !remove) next.set(name, "");
     else next.delete(name);
     next.delete("page");
-    setParams(next, { replace });
+    // خروج از کادر تاریخ همان تاریخ را دوباره می‌فرستد؛ نشانی یکسان دوباره ثبت نمی‌شود.
+    if (next.toString() !== params.toString()) setParams(next, { replace });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const next = new URLSearchParams(params);
-    for (const field of fields) {
-      // تیک‌خورده همان «on» فرم جنگوست و تیک‌نخورده یعنی نبودن پارامتر.
+    // انتخاب‌ها و تیک‌ها همان لحظه در نشانی‌اند؛ Enter فقط متن و تاریخ را می‌فرستد.
+    for (const field of fields.filter((item) => item.kind === "text" || item.kind === "date")) {
       const value = String(data.get(field.name) ?? "").trim();
       if (value) next.set(field.name, value);
       else next.delete(field.name);
@@ -139,19 +189,22 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                 <SearchBox
                   field={field}
                   value={params.get(field.name) ?? ""}
-                  onSearch={(value) => update(field.name, value, true)}
+                  onSearch={(value) => update(field.name, value, { replace: true })}
                 />
               </div>
             ) : field.kind === "select" || field.kind === "radio" ? (
-              <Field key={field.name} label={field.label}>
+              <Field key={field.name} label={field.label} error={field.errors.map(faText)}>
                 <Select
                   name={field.name}
-                  value={params.get(field.name) ?? ""}
+                  value={current(field.name)}
                   onChange={(event) => update(field.name, event.target.value)}
                 >
-                  <option value="">
-                    {field.empty_label && !/^-+$/.test(field.empty_label) ? field.empty_label : "همه"}
-                  </option>
+                  {/* فیلتر اجباری (نوع رکورد سوابق ممیزی) گزینه‌ی «همه» ندارد، مثل فرم جنگو. */}
+                  {!field.required && (
+                    <option value="">
+                      {field.empty_label && !/^-+$/.test(field.empty_label) ? field.empty_label : "همه"}
+                    </option>
+                  )}
                   {(field.choices ?? []).map((choice) => (
                     <option key={choice.value} value={choice.value}>
                       {choice.label}
@@ -159,6 +212,13 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                   ))}
                 </Select>
               </Field>
+            ) : field.kind === "date" ? (
+              <FilterDate
+                key={field.name}
+                field={field}
+                value={params.get(field.name) ?? ""}
+                onChange={(value) => update(field.name, value, { replace: true })}
+              />
             ) : field.kind === "checkbox" ? (
               // هم‌تراز با پایین کادرهای کنارش، که برچسبشان بالای کادر است.
               <div key={field.name} className="flex items-end pb-2">
@@ -179,7 +239,7 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                   <li key={chip.name}>
                     <button
                       type="button"
-                      onClick={() => update(chip.name, "")}
+                      onClick={() => update(chip.name, "", { remove: true })}
                       className="inline-flex h-7 items-center gap-1.5 rounded-full border border-accent-line/60 bg-accent-soft ps-3 pe-2 text-xs text-fg transition-colors hover:border-accent"
                       aria-label={`برداشتن فیلتر ${chip.label}`}
                     >

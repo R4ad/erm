@@ -76,6 +76,8 @@ const FORM_ROUTES = [
   "catalog/assets/:pk/edit",
   "units/new",
   "units/:pk/edit",
+  "holidays/new",
+  "holidays/:pk/edit",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -292,6 +294,26 @@ export const routes: RouteObject[] = [
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
             }),
+          },
+          {
+            path: "accounts/users",
+            lazy: async () => ({ Component: (await import("@/features/admin/UserListPage")).UserListPage }),
+          },
+          {
+            path: "accounts/staff-import",
+            lazy: async () => ({ Component: (await import("@/features/admin/StaffImportPage")).StaffImportPage }),
+          },
+          {
+            path: "holidays",
+            lazy: async () => ({ Component: (await import("@/features/admin/HolidayListPage")).HolidayListPage }),
+          },
+          {
+            path: "audit",
+            lazy: async () => ({ Component: (await import("@/features/admin/AuditPages")).AuditEventListPage }),
+          },
+          {
+            path: "audit/changes",
+            lazy: async () => ({ Component: (await import("@/features/admin/AuditPages")).AuditChangeListPage }),
           },
           {
             path: "actions/notices",

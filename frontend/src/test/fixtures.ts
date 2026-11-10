@@ -13,6 +13,8 @@ import type {
   AssessmentDetail,
   AssetDetail,
   AssetList,
+  AuditChangeList,
+  AuditEventList,
   ChangeDetail,
   CommitmentList,
   ComparePage,
@@ -29,6 +31,7 @@ import type {
   FormField,
   FormPageData,
   FormSchema,
+  HolidayList,
   ImpactRow,
   Level,
   MethodPage,
@@ -53,10 +56,12 @@ import type {
   Session,
   SoaDetail,
   SoaList,
+  StaffImportResult,
   StartForm,
   SupplierDetail,
   SupplierList,
   UnitList,
+  UserList,
 } from "../lib/types";
 
 export const levels = {
@@ -207,6 +212,10 @@ export const routeTable: RouteEntry[] = [
     route: "/method/:number",
     form: false,
   },
+  { name: "accounts:user_list", pattern: "^/accounts/users/$", route: "/accounts/users", form: false },
+  { name: "workcalendar:holiday_list", pattern: "^/holidays/$", route: "/holidays", form: false },
+  { name: "audit:event_list", pattern: "^/audit/$", route: "/audit", form: false },
+  { name: "audit:change_list", pattern: "^/audit/changes/$", route: "/audit/changes", form: false },
   { name: "risks:risk_create", pattern: "^/risks/new/$", route: "/risks/new", form: true },
   { name: "risks:risk_update", pattern: "^/risks/(?<pk>[0-9]+)/edit/$", route: "/risks/:pk/edit", form: true },
   {
@@ -495,6 +504,14 @@ export const routeTable: RouteEntry[] = [
   },
   { name: "organization:unit_create", pattern: "^/units/new/$", route: "/units/new", form: true },
   { name: "organization:unit_update", pattern: "^/units/(?<pk>[0-9]+)/edit/$", route: "/units/:pk/edit", form: true },
+  { name: "workcalendar:holiday_create", pattern: "^/holidays/new/$", route: "/holidays/new", form: true },
+  {
+    name: "workcalendar:holiday_update",
+    pattern: "^/holidays/(?<pk>[0-9]+)/edit/$",
+    route: "/holidays/:pk/edit",
+    form: true,
+  },
+  { name: "accounts:staff_import", pattern: "^/accounts/staff-import/$", route: "/accounts/staff-import", form: true },
 ];
 
 export function csrf(authenticated = false): CsrfState {
@@ -5719,6 +5736,788 @@ export function dependencyForm(overrides: Partial<FormPageData> = {}): FormPageD
       },
       messages: [],
     } satisfies FormPageData),
+    ...overrides,
+  };
+}
+
+// --- مدیریت سامانه (apps/api/admin_pages.py) ---
+
+export function userList(overrides: Partial<UserList> = {}): UserList {
+  return {
+    ...({
+      view: "accounts:user_list",
+      messages: [],
+      title: "کاربران",
+      results: [
+        {
+          id: 2,
+          name: "کاربر آزمون یکم",
+          username: "test.one",
+          personnel_code: "1021",
+          org_unit: "واحد آزمون",
+          roles: ["عضو GRC", "مدیر واحد"],
+          is_active: true,
+        },
+        {
+          id: 3,
+          name: "کاربر آزمون دوم",
+          username: "test.two",
+          personnel_code: null,
+          org_unit: null,
+          roles: [],
+          is_active: false,
+        },
+      ],
+      count: 2,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "جست‌وجو",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "نام، نام کاربری یا کد پرسنلی",
+          },
+          {
+            name: "unit",
+            label: "واحد",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه‌ی واحدها",
+            choices: [
+              {
+                value: "1",
+                label: "واحد آزمون",
+              },
+              {
+                value: "2",
+                label: "— زیرواحد آزمون",
+              },
+            ],
+          },
+          {
+            name: "role",
+            label: "نقش",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه‌ی نقش‌ها",
+            choices: [
+              {
+                value: "مدیر سامانه",
+                label: "مدیر سامانه",
+              },
+              {
+                value: "مدیر واحد",
+                label: "مدیر واحد",
+              },
+              {
+                value: "عضو GRC",
+                label: "عضو GRC",
+              },
+              {
+                value: "کارگروه امنیت",
+                label: "کارگروه امنیت",
+              },
+              {
+                value: "کمیته امنیت",
+                label: "کمیته امنیت",
+              },
+              {
+                value: "فقط مشاهده",
+                label: "فقط مشاهده",
+              },
+            ],
+          },
+          {
+            name: "status",
+            label: "وضعیت",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "active",
+                label: "فعال",
+              },
+              {
+                value: "inactive",
+                label: "غیرفعال",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      import_url: "/accounts/staff-import/",
+    } as UserList),
+    ...overrides,
+  };
+}
+
+export function holidayList(overrides: Partial<HolidayList> = {}): HolidayList {
+  return {
+    ...({
+      view: "workcalendar:holiday_list",
+      messages: [],
+      title: "تعطیلات",
+      results: [
+        {
+          id: 1,
+          date: {
+            iso: "2026-11-19",
+            jalali: "1405/08/28",
+          },
+          weekday: "پنجشنبه",
+          title: "تعطیلی آزمون یکم",
+          edit_url: "/holidays/1/edit/",
+          delete_url: "/holidays/1/delete/",
+        },
+        {
+          id: 2,
+          date: {
+            iso: "2026-11-21",
+            jalali: "1405/08/30",
+          },
+          weekday: "شنبه",
+          title: "تعطیلی آزمون دوم",
+          edit_url: "/holidays/2/edit/",
+          delete_url: "/holidays/2/delete/",
+        },
+      ],
+      count: 2,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "year",
+            label: "سال",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "1405",
+            errors: [],
+            empty_label: "همه‌ی سال‌ها",
+            choices: [
+              {
+                value: "1405",
+                label: "1405",
+              },
+              {
+                value: "1404",
+                label: "1404",
+              },
+            ],
+          },
+        ],
+        errors: [],
+        multipart: false,
+        defaults: { year: "1405" },
+      },
+      create_url: "/holidays/new/",
+      note: "پنجشنبه و جمعه همیشه تعطیل‌اند و لازم نیست این‌جا ثبت شوند. تعطیلات رسمی هر سال را از تقویم رسمی وارد کنید.",
+    } as HolidayList),
+    ...overrides,
+  };
+}
+
+export function holidayForm(overrides: Partial<FormPageData> = {}): FormPageData {
+  return {
+    ...({
+      view: "workcalendar:holiday_create",
+      title: "تعطیلی جدید",
+      form: {
+        fields: [
+          {
+            name: "date",
+            label: "تاریخ",
+            help: "",
+            required: true,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+          {
+            name: "title",
+            label: "مناسبت",
+            help: "",
+            required: true,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            max_length: 200,
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      cancel: {
+        href: "/holidays/",
+        route: "/holidays",
+      },
+      messages: [],
+    } as FormPageData),
+    ...overrides,
+  };
+}
+
+export function auditEventList(overrides: Partial<AuditEventList> = {}): AuditEventList {
+  return {
+    ...({
+      view: "audit:event_list",
+      messages: [],
+      title: "سوابق ممیزی",
+      results: [
+        {
+          id: 7,
+          at: {
+            iso: "2026-11-09T10:34:45+00:00",
+            jalali: "1405/08/18 14:04",
+          },
+          user: "کاربر آزمون یکم",
+          username: "test.one",
+          event: {
+            value: "permission_denied",
+            label: "دسترسی ردشده",
+          },
+          warning: true,
+          summary: "/accounts/users/",
+          ip_address: null,
+        },
+        {
+          id: 6,
+          at: {
+            iso: "2026-11-09T10:30:00+00:00",
+            jalali: "1405/08/18 14:00",
+          },
+          user: null,
+          username: "unknown",
+          event: {
+            value: "login_failed",
+            label: "ورود ناموفق",
+          },
+          warning: true,
+          summary: null,
+          ip_address: "10.20.1.99",
+        },
+        {
+          id: 5,
+          at: {
+            iso: "2026-11-09T10:29:00+00:00",
+            jalali: "1405/08/18 13:59",
+          },
+          user: null,
+          username: null,
+          event: {
+            value: "export",
+            label: "خروجی گرفتن",
+          },
+          warning: false,
+          summary: "رویدادهای Audit Log (12 ردیف)",
+          ip_address: null,
+        },
+      ],
+      count: 3,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "q",
+            label: "کاربر",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "نام یا نام کاربری",
+          },
+          {
+            name: "event",
+            label: "رویداد",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "login",
+                label: "ورود",
+              },
+              {
+                value: "logout",
+                label: "خروج",
+              },
+              {
+                value: "login_failed",
+                label: "ورود ناموفق",
+              },
+              {
+                value: "permission_denied",
+                label: "دسترسی ردشده",
+              },
+              {
+                value: "roles_changed",
+                label: "تغییر نقش",
+              },
+              {
+                value: "managed_units_changed",
+                label: "تغییر واحدهای تحت مدیریت",
+              },
+              {
+                value: "scope_units_changed",
+                label: "تغییر دامنه‌ی مشاهده",
+              },
+              {
+                value: "export",
+                label: "خروجی گرفتن",
+              },
+            ],
+          },
+          {
+            name: "start",
+            label: "از تاریخ",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+          {
+            name: "end",
+            label: "تا تاریخ",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+        ],
+        errors: [],
+        multipart: false,
+      },
+      tabs: [
+        {
+          label: "ورود و رویدادها",
+          href: "/audit/",
+        },
+        {
+          label: "تغییرات داده",
+          href: "/audit/changes/",
+        },
+      ],
+      export_url: "/audit/export/",
+    } as AuditEventList),
+    ...overrides,
+  };
+}
+
+export function auditChangeList(overrides: Partial<AuditChangeList> = {}): AuditChangeList {
+  return {
+    ...({
+      view: "audit:change_list",
+      messages: [],
+      title: "سوابق ممیزی",
+      results: [
+        {
+          id: 3,
+          at: {
+            iso: "2026-11-09T10:34:45+00:00",
+            jalali: "1405/08/18 14:04",
+          },
+          user: {
+            id: 1,
+            name: "کاربر آزمون",
+          },
+          type: {
+            value: "~",
+            label: "ویرایش",
+          },
+          record: "1405/08/29 تعطیلی آزمون",
+          reason: null,
+          changes: [
+            {
+              label: "مناسبت",
+              old: "عنوان قدیم آزمون",
+              new: "عنوان تازه‌ی آزمون",
+            },
+          ],
+          hidden_edit: false,
+        },
+        {
+          id: 2,
+          at: {
+            iso: "2026-11-09T10:30:00+00:00",
+            jalali: "1405/08/18 14:00",
+          },
+          user: {
+            id: 1,
+            name: "کاربر آزمون",
+          },
+          type: {
+            value: "~",
+            label: "ویرایش",
+          },
+          record: "1405/08/29 تعطیلی آزمون",
+          reason: "تغییر رمز",
+          changes: [],
+          hidden_edit: true,
+        },
+        {
+          id: 1,
+          at: {
+            iso: "2026-11-09T10:00:00+00:00",
+            jalali: "1405/08/18 13:30",
+          },
+          user: null,
+          type: {
+            value: "+",
+            label: "ایجاد",
+          },
+          record: "1405/08/29 تعطیلی آزمون",
+          reason: null,
+          changes: [],
+          hidden_edit: false,
+        },
+      ],
+      count: 3,
+      page: 1,
+      pages: 1,
+      filters: {
+        fields: [
+          {
+            name: "model",
+            label: "نوع رکورد",
+            help: "",
+            required: true,
+            disabled: false,
+            kind: "select",
+            value: "workcalendar.holiday",
+            errors: [],
+            choices: [
+              {
+                value: "workcalendar.holiday",
+                label: "تعطیلی",
+              },
+              {
+                value: "risks.risk",
+                label: "ریسک",
+              },
+              {
+                value: "accounts.user",
+                label: "کاربر",
+              },
+            ],
+          },
+          {
+            name: "q",
+            label: "کاربر",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "text",
+            value: "",
+            errors: [],
+            placeholder: "نام یا نام کاربری",
+          },
+          {
+            name: "history_type",
+            label: "تغییر",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "select",
+            value: "",
+            errors: [],
+            empty_label: "همه",
+            choices: [
+              {
+                value: "+",
+                label: "ایجاد",
+              },
+              {
+                value: "~",
+                label: "ویرایش",
+              },
+              {
+                value: "-",
+                label: "حذف",
+              },
+            ],
+          },
+          {
+            name: "start",
+            label: "از تاریخ",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+          {
+            name: "end",
+            label: "تا تاریخ",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "date",
+            value: "",
+            errors: [],
+            placeholder: "مثلاً 1405/01/15",
+          },
+        ],
+        errors: [],
+        multipart: false,
+        defaults: { model: "workcalendar.holiday" },
+      },
+      tabs: [
+        {
+          label: "ورود و رویدادها",
+          href: "/audit/",
+        },
+        {
+          label: "تغییرات داده",
+          href: "/audit/changes/",
+        },
+      ],
+    } as AuditChangeList),
+    ...overrides,
+  };
+}
+
+export function staffImportForm(overrides: Partial<FormPageData> = {}): FormPageData {
+  return {
+    ...({
+      view: "accounts:staff_import",
+      title: "ورود کارکنان از فایل منابع انسانی",
+      form: {
+        fields: [
+          {
+            name: "file",
+            label: "فایل Excel منابع انسانی",
+            help: "",
+            required: true,
+            disabled: false,
+            kind: "file",
+            value: null,
+            errors: [],
+            accept: ".xlsx",
+          },
+          {
+            name: "deactivate_missing",
+            label: "کسانی که کد پرسنلی دارند ولی در فایل نیستند غیرفعال شوند",
+            help: "",
+            required: false,
+            disabled: false,
+            kind: "checkbox",
+            value: false,
+            errors: [],
+          },
+        ],
+        errors: [],
+        multipart: true,
+      },
+      cancel: {
+        href: "/accounts/users/",
+        route: "/accounts/users",
+      },
+      messages: [],
+      intro: "اول گزارش آزمایشی نشان داده می‌شود و تا آن را تأیید نکنید، چیزی ذخیره نمی‌شود.",
+      submit: "بارگذاری و گزارش آزمایشی",
+    } as FormPageData),
+    ...overrides,
+  };
+}
+
+/** گزارش آزمایشی بعد از بارگذاری فایل: هنوز چیزی ذخیره نشده و confirm فیلدهای پنهان دکمه‌ی تأیید است. */
+export function staffImportDryRun(overrides: Partial<StaffImportResult> = {}): StaffImportResult {
+  return {
+    ...({
+      message: "گزارش آزمایشی آماده است؛ هنوز چیزی ذخیره نشده است.",
+      redirect: null,
+      report: {
+        dry_run: true,
+        sections: [
+          {
+            title: "واحدهای تازه",
+            count: 2,
+            lines: ["واحد آزمون", "واحد آزمون / زیرواحد آزمون"],
+            level: null,
+          },
+          {
+            title: "کاربران تازه",
+            count: 1,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "کاربران به‌روزشده",
+            count: 1,
+            lines: ["1021 کاربر آزمون یکم: واحد سازمانی"],
+            level: null,
+          },
+          {
+            title: "کاربران بدون تغییر",
+            count: 0,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "کاربرانی که در فایل نیستند و فعال ماندند",
+            count: 1,
+            lines: ["1044 کاربر آزمون دوم"],
+            level: null,
+          },
+          {
+            title: "واحدهایی که مدیرشان تعیین یا عوض شد",
+            count: 1,
+            lines: ["واحد آزمون / زیرواحد آزمون: کاربر آزمون یکم"],
+            level: null,
+          },
+          {
+            title: "واحدهایی که مدیرشان همان ماند",
+            count: 0,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "نقش «مدیر واحد» داده شد به",
+            count: 1,
+            lines: ["test.one کاربر آزمون یکم"],
+            level: null,
+          },
+          {
+            title: "نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند",
+            count: 1,
+            lines: ["test.two کاربر آزمون دوم"],
+            level: "warning",
+          },
+          {
+            title: "ردیف‌هایی که وارد نشدند",
+            count: 1,
+            lines: ["ردیف 4: کد پرسنلی خالی است."],
+            level: "danger",
+          },
+        ],
+      },
+      confirm: {
+        url: "/accounts/staff-import/confirm/",
+        values: {
+          token: "00000000-0000-4000-8000-000000000000",
+          deactivate_missing: false,
+        },
+      },
+    } as StaffImportResult),
+    ...overrides,
+  };
+}
+
+/** گزارش آن‌چه بعد از تأیید انجام شد. */
+export function staffImportDone(overrides: Partial<StaffImportResult> = {}): StaffImportResult {
+  return {
+    ...({
+      message: "کارکنان وارد شدند. گزارش آن‌چه انجام شد:",
+      redirect: null,
+      report: {
+        dry_run: false,
+        sections: [
+          {
+            title: "واحدهای تازه",
+            count: 2,
+            lines: ["واحد آزمون", "واحد آزمون / زیرواحد آزمون"],
+            level: null,
+          },
+          {
+            title: "کاربران تازه",
+            count: 1,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "کاربران به‌روزشده",
+            count: 1,
+            lines: ["1021 کاربر آزمون یکم: واحد سازمانی"],
+            level: null,
+          },
+          {
+            title: "کاربران بدون تغییر",
+            count: 0,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "کاربرانی که در فایل نیستند و فعال ماندند",
+            count: 1,
+            lines: ["1044 کاربر آزمون دوم"],
+            level: null,
+          },
+          {
+            title: "واحدهایی که مدیرشان تعیین یا عوض شد",
+            count: 1,
+            lines: ["واحد آزمون / زیرواحد آزمون: کاربر آزمون یکم"],
+            level: null,
+          },
+          {
+            title: "واحدهایی که مدیرشان همان ماند",
+            count: 0,
+            lines: [],
+            level: null,
+          },
+          {
+            title: "نقش «مدیر واحد» داده شد به",
+            count: 1,
+            lines: ["test.one کاربر آزمون یکم"],
+            level: null,
+          },
+          {
+            title: "نقش «مدیر واحد» دارند ولی مدیر هیچ واحدی نیستند",
+            count: 1,
+            lines: ["test.two کاربر آزمون دوم"],
+            level: "warning",
+          },
+          {
+            title: "ردیف‌هایی که وارد نشدند",
+            count: 1,
+            lines: ["ردیف 4: کد پرسنلی خالی است."],
+            level: "danger",
+          },
+        ],
+      },
+      confirm: null,
+    } as StaffImportResult),
     ...overrides,
   };
 }

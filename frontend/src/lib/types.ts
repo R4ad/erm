@@ -423,6 +423,11 @@ export interface FormSchema {
   /** خطاهای کل فرم (non_field_errors). */
   errors: string[];
   multipart: boolean;
+  /**
+   * فقط در فرم فیلتر فهرست: مقداری که view وقتی پارامتر در نشانی نیست به کار می‌برد (مثل سال جاری تعطیلات). برای
+   * «همه» پارامتر خالی فرستاده می‌شود، چون نبودنش همین پیش‌فرض است.
+   */
+  defaults?: Record<string, string>;
 }
 
 export interface PageMessage {
@@ -1688,4 +1693,92 @@ export interface MethodPage {
   decision_matrix: { likelihood: number; cells: { score: number; level: MethodLevel | null; raised: boolean }[] }[];
   parameters: { key: string; label: string; value: string; unit: string; note: string }[];
   active_url: string;
+}
+
+// مدیریت سامانه (apps/api/admin_pages.py): کاربران، ورود کارکنان، تعطیلات و سوابق ممیزی
+
+export interface UserRow {
+  id: number;
+  name: string | null;
+  username: string;
+  personnel_code: string | null;
+  org_unit: string | null;
+  /** نام گروه‌ها، همان نقش‌های سامانه. */
+  roles: string[];
+  is_active: boolean;
+}
+
+export interface UserList extends Listing<UserRow> {
+  import_url: string;
+}
+
+/** یک بخش گزارش ورود کارکنان؛ level برای بخش‌هایی که کار دستی لازم دارند. */
+export interface ImportSection {
+  title: string;
+  count: number;
+  lines: string[];
+  level: "warning" | "danger" | null;
+}
+
+/**
+ * نتیجه‌ی فرستادن فایل کارکنان (گزارش آزمایشی با confirm) یا تأیید آن (آن‌چه انجام شد، بی confirm). confirm همان
+ * فیلدهای پنهان دکمه‌ی تأیید صفحه‌ی جنگوست که دوباره به همان view فرستاده می‌شود.
+ */
+export interface StaffImportResult extends FormResult {
+  report: { dry_run: boolean; sections: ImportSection[] };
+  confirm: { url: string; values: { token: string; deactivate_missing: boolean } } | null;
+}
+
+export interface HolidayRow {
+  id: number;
+  date: Day;
+  weekday: string;
+  title: string;
+  edit_url: string;
+  delete_url: string;
+}
+
+export interface HolidayList extends Listing<HolidayRow> {
+  create_url: string;
+  note: string;
+}
+
+export interface AuditTab {
+  label: string;
+  href: string;
+}
+
+export interface AuditEventRow {
+  id: number;
+  at: Moment;
+  /** نام کاربر واردشده؛ برای ورود ناموفق و خط فرمان null. */
+  user: string | null;
+  username: string | null;
+  event: Choice;
+  /** ورود ناموفق و دسترسی ردشده. */
+  warning: boolean;
+  summary: string | null;
+  ip_address: string | null;
+}
+
+export interface AuditEventList extends Listing<AuditEventRow> {
+  tabs: AuditTab[];
+  /** خروجی Excel با همین فیلترها؛ تا فیلترها درست نباشند null. */
+  export_url: string | null;
+}
+
+export interface AuditChangeRow {
+  id: number;
+  at: Moment;
+  user: Person | null;
+  type: Choice;
+  record: string;
+  reason: string | null;
+  changes: { label: string; old: string; new: string }[];
+  /** ویرایشی که فیلد نمایش‌دادنی‌اش عوض نشده (مثلاً رمز یا نقش). */
+  hidden_edit: boolean;
+}
+
+export interface AuditChangeList extends Listing<AuditChangeRow> {
+  tabs: AuditTab[];
 }
