@@ -1,9 +1,10 @@
 import copy
 
 from django import forms
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.catalog.forms import (
     OwnerChoiceField,
@@ -29,7 +30,7 @@ from .models import (
     RiskScenario,
     Tag,
 )
-from .permissions import can_edit_register
+from .permissions import can_edit_register, visible_risks
 from .services import (
     active_categories,
     active_risks,
@@ -378,8 +379,10 @@ class ScenarioRiskCreateForm(RiskForm):
 class RiskFilterForm(BootstrapFormMixin, forms.Form):
     q = forms.CharField(label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا عنوان"}))
     status = forms.ChoiceField(label="وضعیت", required=False, choices=[("", "همه")] + Risk.Status.choices)
-    category = forms.ModelChoiceField(RiskCategory.objects.all(), label="دسته", required=False, empty_label="همه")
+    level = forms.ChoiceField(label="سطح تصمیم", required=False)
+    category = forms.ModelMultipleChoiceField(RiskCategory.objects.all(), label="دسته", required=False)
     service = ServiceChoiceField(Service.objects.none(), label="خدمت", required=False, empty_label="همه")
+    owner = forms.ChoiceField(label="مالک", required=False)
     unit = UnitChoiceField(OrgUnit.objects.all(), label="واحد", required=False, empty_label="همه‌ی واحدها")
     tag = forms.ModelChoiceField(Tag.objects.all(), label="برچسب", required=False, empty_label="همه")
     channel = forms.ChoiceField(label="کانال ورود", required=False, choices=[("", "همه")] + Risk.Channel.choices)
@@ -388,20 +391,51 @@ class RiskFilterForm(BootstrapFormMixin, forms.Form):
     )
 
     def __init__(self, *args, user, **kwargs):
+        from apps.methodology.services import active_version
+
         super().__init__(*args, **kwargs)
         # فقط خدمت‌هایی که کاربر می‌بیند در فهرست می‌آیند، تا نام خدمت‌های دیگر لو نرود.
         self.fields["service"].queryset = visible_services(user)
+        version = active_version()
+        levels = sorted(version.risk_levels.all(), key=lambda level: -level.rank) if version else []
+        self.fields["level"].choices = (
+            [("", "همه")] + [(str(level.rank), level.name) for level in levels] + [("none", "ارزیابی‌نشده")]
+        )
+        # مالک‌ها فقط از ریسک‌هایی که کاربر می‌بیند؛ «بدون مالک» یعنی خالی یا مالک غیرفعال.
+        owners = (
+            User.objects.filter(owned_risks__in=visible_risks(user)).distinct().order_by("first_name", "last_name")
+        )
+        self.fields["owner"].choices = (
+            [("", "همه"), ("none", "بدون مالک")]
+            + [(str(owner.pk), owner.get_full_name() or owner.username) for owner in owners]
+        )
 
     def filter(self, risks):
+        from apps.assessments.models import Assessment
+
         data = self.cleaned_data
         for word in data["q"].split():
             risks = risks.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(description__icontains=word))
         if data["status"]:
             risks = risks.filter(status=data["status"])
+        if data["level"]:
+            # سطح فعلی ریسک: سطح تصمیم آخرین ارزیابی جاری تأییدشده.
+            latest = Assessment.objects.filter(
+                risk=OuterRef("pk"), kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED
+            ).order_by("-approved_at", "-pk")
+            risks = risks.annotate(current_rank=Subquery(latest.values("decision_level__rank")[:1]))
+            if data["level"] == "none":
+                risks = risks.filter(current_rank__isnull=True)
+            else:
+                risks = risks.filter(current_rank=int(data["level"]))
         if data["category"]:
-            risks = risks.filter(category=data["category"])
+            risks = risks.filter(category__in=data["category"])
         if data["service"]:
             risks = risks.filter(service=data["service"])
+        if data["owner"] == "none":
+            risks = risks.filter(Q(owner__isnull=True) | Q(owner__is_active=False))
+        elif data["owner"]:
+            risks = risks.filter(owner_id=int(data["owner"]))
         if data["unit"]:
             risks = risks.filter(org_unit__in=get_subtree_ids(data["unit"]))
         if data["tag"]:

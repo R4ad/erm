@@ -230,24 +230,48 @@ export interface RiskRow {
   is_active: boolean;
   needs_completion: boolean;
   level: Level | null;
+  score: number | null;
   category: { code: string; name: string };
   service: { code: string; name: string } | null;
+  scenario: { code: string; version: number } | null;
   org_unit: string;
   owner: Person | null;
   channel: Choice;
   created_at: Day;
+  next_action: RiskNextAction | null;
 }
 
 export type RiskOrdering = "newest" | "oldest" | "code" | "-code" | "level" | "-level";
+
+export interface RiskNextAction {
+  label: string;
+  icon: string;
+  tone: "brand" | "danger" | "warning" | "neutral";
+  href: string;
+  route: string | null;
+}
+
+export type RegisterTab = "all" | "mine" | "assessment" | "treatment_plan" | "incomplete" | "unowned";
 
 export interface RiskPage {
   count: number;
   page: number;
   pages: number;
+  page_size: number;
   ordering: RiskOrdering;
   results: RiskRow[];
+  pipeline: { status: string; label: string; icon: string; count: number }[];
+  tabs: Record<RegisterTab, number>;
+  active: number;
+  closed: number;
   can_create: boolean;
+  can_send_to_assessment: boolean;
   create_url: string;
+}
+
+export interface BulkTransitionResult {
+  done: string[];
+  failed: { code: string; problems: string[] }[];
 }
 
 export type RiskFilters = Record<string, { label: string; choices: Choice[] }>;

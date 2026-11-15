@@ -11,7 +11,8 @@ from apps.accounts.roles import Role
 from apps.assessments.models import Assessment
 from apps.assessments.services import create_assessment
 from apps.audit.models import AuditEvent
-from apps.catalog.tests.factories import make_user
+from apps.catalog.models import Customer
+from apps.catalog.tests.factories import make_service, make_user
 from apps.core.jalali import to_jalali
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
@@ -516,3 +517,117 @@ def test_the_register_sorts_by_code_and_by_current_level(api, grc, unit):
     assert codes("-level") == ([low.code, critical.code, unrated.code], "-level")
     assert codes("code") == (sorted([low.code, unrated.code, critical.code]), "code")
     assert codes("nonsense") == ([critical.code, unrated.code, low.code], "newest")
+
+
+def test_the_register_shows_active_risks_with_pipeline_and_tab_counts(api, grc, unit):
+    owner = make_user("owner", first_name="رضا", last_name="مالکی")
+    mine = make_risk("قطع درگاه پرداخت", unit, owner=grc)
+    planning = make_risk("نشت داده", unit, owner=owner, status=Risk.Status.TREATMENT_PLAN)
+    # عامل آغازگر و مسیر تحقق نوشته نشده، پس هر سه ریسک فعال «نیازمند تکمیل»اند.
+    incomplete = make_risk("ریسک بی‌مالک فعال", unit, owner=make_user("gone", is_active=False))
+    closed = make_risk("ریسک بسته", unit, status=Risk.Status.CLOSED)
+    make_risk("ریسک ردشده", unit, status=Risk.Status.REJECTED)
+
+    data = api(grc).get(reverse("api:risk_list")).json()
+    assert {row["code"] for row in data["results"]} == {mine.code, planning.code, incomplete.code}
+    assert data["active"] == 3
+    assert data["closed"] == 2
+    assert data["tabs"] == {
+        "all": 3, "mine": 1, "assessment": 0, "treatment_plan": 1, "incomplete": 3, "unowned": 1,
+    }
+    pipeline = {step["status"]: step["count"] for step in data["pipeline"]}
+    assert pipeline["registered"] == 2
+    assert pipeline["closed"] == 1
+    assert data["can_send_to_assessment"] is True
+
+    rows = {row["code"]: row for row in data["results"]}
+    assert rows[incomplete.code]["owner"] is None
+    assert rows[incomplete.code]["next_action"]["label"] == "بدون مالک فعال"
+    assert rows[planning.code]["next_action"]["label"] == "نوشتن طرح مواجهه"
+    assert rows[planning.code]["next_action"]["tone"] == "danger"
+    assert rows[mine.code]["next_action"]["label"] == "تکمیل اطلاعات ریسک"
+    assert rows[mine.code]["scenario"] is None
+
+    data = api(grc).get(reverse("api:risk_list"), {"status": Risk.Status.CLOSED}).json()
+    assert [row["code"] for row in data["results"]] == [closed.code]
+    assert data["results"][0]["next_action"] is None
+
+
+def test_the_register_filters_by_level_owner_and_several_categories(api, grc, unit):
+    t2 = RiskCategory.objects.exclude(code="T1").order_by("code").first()
+    rated = make_risk("قطع درگاه پرداخت", unit, owner=grc)
+    other = make_risk("نشت داده", unit, owner=grc, category=t2)
+    orphan = make_risk("ریسک بی‌مالک", unit)
+    approve(rated, grc, "بحرانی")
+
+    def codes(params):
+        response = api(grc).get(reverse("api:risk_list"), params)
+        assert response.status_code == 200, response.json()
+        return {row["code"] for row in response.json()["results"]}
+
+    critical = str(level("بحرانی").rank)
+    assert codes({"level": critical}) == {rated.code}
+    assert codes({"level": "none"}) == {other.code, orphan.code}
+    assert codes({"owner": "none"}) == {orphan.code}
+    assert codes({"owner": str(grc.pk)}) == {rated.code, other.code}
+    t1 = RiskCategory.objects.get(code="T1")
+    assert codes({"category": [str(t2.pk)]}) == {other.code}
+    assert codes({"category": [str(t1.pk), str(t2.pk)]}) == {rated.code, other.code, orphan.code}
+
+    filters = api(grc).get(reverse("api:risk_filters")).json()
+    assert {"value": critical, "label": level("بحرانی").name} in filters["level"]["choices"]
+    assert filters["owner"]["choices"][0]["value"] in ("", "none")
+    assert len(filters["category"]["choices"]) == RiskCategory.objects.count()
+
+
+def test_the_register_exports_the_filtered_or_selected_risks(api, grc, unit):
+    first = make_risk("قطع درگاه پرداخت", unit)
+    make_risk("نشت داده", unit)
+
+    response = api(grc).get(reverse("api:risk_export"))
+    assert response.status_code == 200
+    assert response["Content-Disposition"] == 'attachment; filename="risk-register.xlsx"'
+    assert response.content[:2] == b"PK"
+
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    selected = api(grc).get(reverse("api:risk_export"), {"ids": [str(first.pk)]})
+    sheet = load_workbook(BytesIO(selected.content)).active
+    assert sheet.sheet_view.rightToLeft is True
+    assert [row[0].value for row in sheet.iter_rows(min_row=2)] == [first.code]
+
+
+def test_the_register_sends_selected_risks_to_assessment(api, grc, unit, manager):
+    owner = make_user("owner")
+    service = make_service("SRV-1", org_unit=unit)
+    ready = make_risk("قطع درگاه پرداخت", unit, owner=owner, service=service)
+    ready.customers.add(Customer.objects.create(name="بانک ملت"))
+    missing = make_risk("نشت داده", unit)
+    wrong = make_risk("ریسک در ارزیابی", unit, status=Risk.Status.ASSESSMENT)
+    url = reverse("api:risk_bulk_transition")
+
+    response = api(grc).post(
+        url,
+        {"transition": "send_to_assessment", "ids": [ready.pk, missing.pk, wrong.pk], "reason": "فرض قابل آزمون"},
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["done"] == [ready.code]
+    failed = {row["code"]: row["problems"] for row in data["failed"]}
+    assert set(failed) == {missing.code, wrong.code}
+    assert "خدمت ریسک تعیین نشده است." in failed[missing.code]
+    ready.refresh_from_db()
+    assert ready.status == Risk.Status.ASSESSMENT
+
+    rejected = api(grc).post(url, {"transition": "reject", "ids": [wrong.pk]}, content_type="application/json")
+    assert rejected.status_code == 400
+
+    # مدیر واحد این انتقال را ندارد؛ همه‌ی ریسک‌ها با دلیل برمی‌گردند و چیزی تغییر نمی‌کند.
+    assert api(manager).get(reverse("api:risk_list")).json()["can_send_to_assessment"] is False
+    data = api(manager).post(
+        url, {"transition": "send_to_assessment", "ids": [missing.pk]}, content_type="application/json"
+    ).json()
+    assert data["done"] == []
