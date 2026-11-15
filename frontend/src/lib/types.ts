@@ -282,6 +282,8 @@ export interface Transition {
   description: string;
   target: string;
   href: string;
+  /** شرط‌های برقرارنشده؛ تا رفعشان انتقال غیرفعال است. */
+  problems?: string[];
 }
 
 export interface AssessmentRow {
@@ -293,6 +295,8 @@ export interface AssessmentRow {
   score: [number, number] | null;
   meeting_date: Day | null;
   approved_at: Moment | null;
+  /** توضیح کوتاه ردیف در پرونده‌ی ریسک: موعد هدف، «مبنای تصمیم»، کنترل‌های کنارگذاشته‌ی ارزیابی ذاتی. */
+  detail?: string;
   href: string;
 }
 
@@ -328,6 +332,62 @@ export interface RecordParts {
   comments: Comment[];
   attach_url: string | null;
   comment_url: string;
+}
+
+export interface RiskControl {
+  code: string;
+  title: string;
+  kind: string;
+  iso: string[];
+  is_key: boolean;
+  /** E مؤثر امروز؛ بدون ارزیابی یا با شاهد کهنه ۱. */
+  e: number;
+  no_valid_evidence: boolean;
+  problem: string | null;
+  href: string | null;
+}
+
+export interface RiskStep {
+  status: string;
+  label: string;
+  state: "done" | "current" | "todo" | "skipped";
+  date: Day | null;
+}
+
+export interface RiskBanner {
+  tone: "warning" | "danger";
+  title: string;
+  text: string;
+  link: { label: string; href: string } | null;
+  /** زبانه‌ای از پرونده که نوار به آن می‌برد، مثل questions. */
+  tab: string | null;
+}
+
+export interface LatestResult {
+  code: string;
+  href: string;
+  approved_at: Day | null;
+  method_version: number;
+  horizon_months: number;
+  a: number | null;
+  b: number | null;
+  likelihood: number | null;
+  impact: number | null;
+  score: number | null;
+  level: Level | null;
+  explanation: string;
+  note: string;
+}
+
+export interface TimelineEntry {
+  status: string;
+  label: string;
+  from: string | null;
+  reason: string;
+  meeting_date: Day | null;
+  by: Person | null;
+  role: string;
+  at: Moment;
 }
 
 export interface RiskDetail extends RecordParts {
@@ -366,21 +426,20 @@ export interface RiskDetail extends RecordParts {
     kind: string;
     reliability: string;
     observed_on: Day | null;
+    valid_until: Day | null;
     expired: boolean;
     confidential: boolean;
     href: string;
   }[];
-  controls: { code: string; title: string; href: string | null }[];
+  /** قدمت مجاز شاهد کنترل کلیدی در نسخه‌ی روش فعال (روز). */
+  key_evidence_age: number | null;
+  controls: RiskControl[];
+  stepper: RiskStep[];
+  banner: RiskBanner | null;
+  latest: LatestResult | null;
+  timeline: TimelineEntry[];
   workflow: {
     transitions: Transition[];
-    timeline: {
-      from: string;
-      to: string;
-      reason: string;
-      meeting_date: Day | null;
-      by: Person | null;
-      at: Moment;
-    }[];
     questions: {
       text: string;
       due: Deadline | Day | null;

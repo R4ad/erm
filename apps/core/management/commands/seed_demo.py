@@ -20,13 +20,17 @@ from apps.actions.models import (
     TreatmentAction,
     TreatmentPlan,
 )
-from apps.assessments.models import Assessment
-from apps.catalog.models import Customer, Dependency, Service, Supplier
+from apps.assessments.models import Assessment, ImpactDetail
+from apps.catalog.models import Customer, Dependency, Responsibility, Service, Supplier
+from apps.controls.effectiveness import Thresholds
+from apps.controls.models import Control, ControlAssessment, IsoControl
+from apps.core.choices import Confidence
+from apps.core.models import Comment
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
-from apps.risks.models import Coverage, Risk, RiskCategory
+from apps.risks.models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario
 from apps.workcalendar.workdays import add_working_days
-from apps.workflow.models import StatusTransition
+from apps.workflow.models import RiskQuestion, StatusTransition
 
 S = Risk.Status
 AS = TreatmentAction.Status
@@ -307,16 +311,133 @@ class Command(BaseCommand):
             )
         return acceptance
 
+    def record(self, risk):
+        """پرونده‌ی کامل نمونه‌ی صفحه‌ی ۰۴ فیگما: از پرسشنامه تا برنامه‌ی درمان، سه ارزیابی ذاتی، جاری و هدف،
+        چهار کنترل با E4 تا E1، شواهد، پیوندهای بیرونی، پرسش‌های جواب‌داده و طرحی که منتظر تأیید مالک است."""
+        now = timezone.now()
+        scenario = RiskScenario.objects.create(
+            title="قطع خدمت پرداخت به‌دلیل خرابی پایگاه داده",
+            service=risk.service,
+            service_name_snapshot=risk.service.name,
+            event="قطع خدمت",
+            conditions="خرابی پایگاه داده‌ی اصلی بدون جایگزین آماده",
+            consequence="توقف تسویه‌ی بین‌بانکی",
+            category=risk.category,
+        )
+        RiskScenario.objects.filter(pk=scenario.pk).update(version=2)
+        Risk.objects.filter(pk=risk.pk).update(created_at=now - timedelta(days=40), scenario=scenario, scenario_version=2)
+        chain = [
+            (S.QUESTIONS, S.REGISTERED, 35, self.sara, "برگشت به رجیستر پس از پاسخ همه‌ی پرسش‌ها", None),
+            (S.REGISTERED, S.ASSESSMENT, 25, self.neda, "ارسال جهت ارزیابی؛ گزارش رخداد قطع ۳ ساعته به ریسک وصل شد", None),
+            (S.ASSESSMENT, S.TREATMENT_PLAN, 6, self.sara,
+             "تأیید ارزیابی جاری و طراحی برنامه‌ی درمان (ردیف ۶)", self.today - timedelta(days=6)),
+        ]
+        for source, target, days_ago, by, reason, meeting in chain:
+            record = StatusTransition.objects.create(
+                risk=risk, from_status=source, to_status=target, created_by=by, reason=reason, meeting_date=meeting
+            )
+            StatusTransition.objects.filter(pk=record.pk).update(created_at=now - timedelta(days=days_ago))
+        for days_ago, text, answer in [
+            (38, "آخرین آزمون بازیابی پایگاه داده‌ی ساتنا کی و با چه نتیجه‌ای انجام شد؟",
+             "شهریور ۱۴۰۵؛ بازیابی کامل ۲ ساعت و ۴۰ دقیقه طول کشید."),
+            (38, "آیا سایت دوم داده را هم‌زمان دریافت می‌کند؟", "خیر، تکثیر غیرهم‌زمان با تأخیر حدود ۵ دقیقه است."),
+        ]:
+            RiskQuestion.objects.create(
+                risk=risk, text=text, asked_by=self.neda, due=self.today - timedelta(days=days_ago - 7),
+                answer=answer, answered_by=self.ali, answered_at=now - timedelta(days=days_ago - 2),
+            )
+
+        inherent = self.assessment(risk, 4, 20, kind=Assessment.Kind.INHERENT, days_ago=30)
+        current = self.assessment(risk, 3, 12, days_ago=14)
+        target = self.assessment(risk, 2, 6, kind=Assessment.Kind.TARGET, days_ago=13)
+        Assessment.objects.filter(pk=inherent.pk).update(likelihood_low=5, likelihood_high=5, impact_low=4, impact_high=4)
+        Assessment.objects.filter(pk=current.pk).update(
+            a=3, a_basis="forward", a_confidence=Confidence.MEDIUM, a_rationale="دو رخداد مشابه در سه سال و هشدارهای ظرفیت دیسک.", b_low=4, b_high=4,
+            likelihood_low=3, likelihood_high=3, impact_low=4, impact_high=4, confidence=Confidence.MEDIUM,
+        )
+        Assessment.objects.filter(pk=target.pk).update(
+            likelihood_low=3, likelihood_high=3, impact_low=2, impact_high=2,
+            target_due=self.today + timedelta(days=150),
+        )
+        ImpactDetail.objects.create(
+            assessment=current, customer=self.banks[0], scale=self.version.scales.get(code="S"), level=4,
+            rationale="توقف تسویه‌ی ساتنا بیش از ۲ ساعت برای بانک ملت", confidence=Confidence.MEDIUM,
+        )
+
+        def evidence(title, kind, reliability, days_ago, **fields):
+            item = Evidence.objects.create(
+                title=title, kind=kind, reliability=reliability, summary=title, source="واحد عملیات زیرساخت",
+                observed_on=self.today - timedelta(days=days_ago), owner=self.ali, **fields,
+            )
+            item.risks.add(risk)
+            return item
+
+        E = Evidence
+        incident = evidence("گزارش رخداد قطع ۳ ساعته‌ی ساتنا — مهر", E.Kind.INCIDENT, E.Reliability.HIGH, 50)
+        evidence("تحلیل اثر کسب‌وکار (BIA) ساتنا: RTO ۲ ساعت، MTPD ۸ ساعت", E.Kind.BIA_CONTRACT, E.Reliability.HIGH, 60)
+        evidence("نتیجه‌ی آزمون بازیابی شهریور", E.Kind.TEST, E.Reliability.MEDIUM, 70,
+                 access_class=E.AccessClass.CONFIDENTIAL)
+        evidence("قرارداد SLA بانک ملت", E.Kind.BIA_CONTRACT, E.Reliability.HIGH, 400,
+                 valid_until=self.today - timedelta(days=45), customer=self.banks[0])
+        cab = evidence("سوابق جلسه‌های CAB سه ماه اخیر", E.Kind.TEST, E.Reliability.HIGH, 20)
+        replication = evidence("گزارش پایش تکثیر پایگاه داده", E.Kind.TEST, E.Reliability.MEDIUM, 25)
+        disk = evidence("داشبورد ظرفیت ذخیره‌ساز", E.Kind.STATISTICS, E.Reliability.MEDIUM, 30)
+
+        sample = Thresholds.of(self.version).sample
+        controls = [
+            ("مدیریت تغییر با تأیید CAB", Control.Kind.PREVENTIVE, True, "8.32", 4, cab),
+            ("تکثیر غیرهم‌زمان پایگاه داده به سایت دوم", Control.Kind.RECOVERY, True, "8.14", 3, replication),
+            ("پایش ظرفیت و سلامت دیسک ذخیره‌ساز", Control.Kind.PREVENTIVE, False, "8.16", 2, disk),
+            ("رویه‌ی بازیابی مستند و مانور سالانه", Control.Kind.RECOVERY, False, "5.30", None, None),
+        ]
+        for title, kind, key, iso, e, proof in controls:
+            control = Control.objects.create(
+                title=title, objective=title, kind=kind, owner=self.ali, operated_by=Responsibility.DATIN, is_key=key
+            )
+            control.iso_controls.add(IsoControl.objects.get(code=iso))
+            risk.controls.add(control)
+            if e is None:
+                continue
+            test = ControlAssessment(
+                control=control, method_version=self.version, scope="پایگاه داده‌ی ساتنا در سایت اصلی و دوم",
+                exists=True, design_ok=e >= 3, operating_ok=True, coverage_pct=100 if e >= 3 else 60,
+                critical_points_covered=e >= 3, sample_size=sample if e >= 3 else 5,
+                test_from=self.today - timedelta(days=50), test_to=self.today - timedelta(days=20),
+                sustained=e >= 4, e=e, confidence=Confidence.MEDIUM, rationale=f"شرط‌های E{e} برقرار است.",
+                verified_by=self.sara if e >= 3 else None, created_by=self.sara,
+            )
+            test.save()
+            test.evidence.add(proof)
+
+        for kind, ref in [
+            (ExternalLink.Kind.INCIDENT, "INC-20431"),
+            (ExternalLink.Kind.CHANGE, "CHG-1182"),
+            (ExternalLink.Kind.CONTINUITY_PLAN, "BCP-SATNA-02"),
+        ]:
+            ExternalLink.objects.create(risk=risk, kind=kind, ref=ref)
+        for by, text in [
+            (self.ali, "سایت دوم تا پایان آذر به تکثیر هم‌زمان می‌رسد؛ برآورد هزینه در طرح آمده است."),
+            (self.sara, "شاهد قرارداد SLA منقضی است؛ نسخه‌ی تمدیدشده را وصل کنید."),
+        ]:
+            Comment.objects.create(content_object=risk, text=text, created_by=by)
+
+        plan = self.plan(risk, current, approved=False)
+        self.action(plan, "تکثیر هم‌زمان پایگاه داده‌ی ساتنا به سایت دوم", AS.PLANNED, self.mehdi, self.sara, 60)
+        self.action(plan, "مانور بازیابی فصلی با سناریوی خرابی دیسک", AS.PLANNED, self.mehdi, self.sara, 30)
+        risk.refresh_from_db()
+        return incident
+
     def risks(self):
         # برنامه‌ی درمان: منتظر طرح، طرح منتظر تأیید مالک، طرح تأییدشده
         leak = self.risk("نشت داده‌ی مشتریان از محیط آزمون", "SRV-IPG", self.sara, "T1", S.TREATMENT_PLAN)
         self.entered(leak, S.TREATMENT_PLAN, 2)
         self.assessment(leak, 4, 20)
 
-        satna = self.risk("قطع سرویس انتقال وجه ساتنا", "SRV-SATNA", self.sara, "T3", S.TREATMENT_PLAN)
-        self.entered(satna, S.TREATMENT_PLAN, 4)
-        satna_current = self.assessment(satna, 3, 12)
-        self.plan(satna, satna_current, approved=False)
+        satna = self.risk(
+            "قطع سرویس انتقال وجه ساتنا به‌دلیل خرابی پایگاه داده‌ی اصلی", "SRV-SATNA", self.sara, "T3",
+            S.TREATMENT_PLAN, channel=Risk.Channel.QUESTIONNAIRE,
+        )
+        self.record(satna)
 
         sms = self.risk("وابستگی به ارائه‌دهنده‌ی پیامک", "SRV-SMS", self.sara, "T5", S.TREATMENT_PLAN)
         self.entered(sms, S.TREATMENT_PLAN, 10)

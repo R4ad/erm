@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge, Count, type Tone } from "@/components/ui/badge";
+import { Badge, Count } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -31,6 +31,8 @@ import { cn } from "@/lib/cn";
 import { fa, faText } from "@/lib/format";
 import { useDebouncedValue, useTitle } from "@/lib/hooks";
 import type { BulkTransitionResult, RegisterTab, RiskFilters, RiskOrdering, RiskPage, RiskRow } from "@/lib/types";
+
+import { STATUS_TONES } from "./status";
 
 /** فیلترهای دکمه‌ای ردیف جست‌وجوی فیگما، به همان ترتیب از راست. */
 const MENU_FILTERS = ["status", "level", "category", "service", "owner"] as const;
@@ -59,18 +61,6 @@ const COLUMNS = [
 ] as const;
 type Column = (typeof COLUMNS)[number]["key"];
 const COLUMNS_KEY = "register-columns";
-
-const STATUS_TONES: Record<string, Tone> = {
-  questions: "warning",
-  registered: "neutral",
-  submitted: "neutral",
-  assessment: "info",
-  treatment_plan: "warning",
-  treatment: "brand",
-  review: "gold",
-  closed: "success",
-  rejected: "danger",
-};
 
 const ACTION_TONES: Record<string, string> = {
   brand: "text-brand",

@@ -18,7 +18,7 @@ from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, PendingRisk, Question, Questionnaire, Response
 from apps.risks.models import Risk, RiskCategory
-from apps.workflow.models import RiskQuestion
+from apps.workflow.models import RiskQuestion, StatusTransition
 
 pytestmark = pytest.mark.django_db
 
@@ -189,6 +189,102 @@ def test_the_risk_detail_has_the_dossier_and_jalali_dates(api, grc, manager, uni
 
     owner_view = api(manager).get(reverse("api:risk_detail", args=[risk.pk])).json()
     assert owner_view["actions"]["edit"] is None
+
+
+def test_the_risk_record_has_the_figma_stepper_banner_and_timeline(api, grc, manager, unit):
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.QUESTIONS, owner=manager,
+                     channel=Risk.Channel.QUESTIONNAIRE)
+    RiskQuestion.objects.create(
+        risk=risk, text="آخرین آزمون بازیابی کی بود؟", asked_by=grc, due=timezone.localdate() + datetime.timedelta(days=7)
+    )
+
+    data = api(grc).get(reverse("api:risk_detail", args=[risk.pk])).json()
+    states = [(step["status"], step["state"]) for step in data["stepper"]]
+    assert states == [
+        ("questions", "current"), ("registered", "todo"), ("assessment", "todo"), ("treatment_plan", "todo"),
+        ("treatment", "todo"), ("review", "todo"), ("closed", "todo"),
+    ]
+    assert data["stepper"][0]["date"]["jalali"] == to_jalali(timezone.localdate(risk.created_at))
+    assert data["banner"]["title"].startswith("مهلت جواب پرسش‌ها: ")
+    assert data["banner"]["tab"] == "questions"
+    assert data["timeline"] == [
+        {
+            "status": "questions", "label": "در پاسخ به پرسش‌ها", "from": None,
+            "reason": "ساخته‌شده از پاسخ پرسشنامه‌ی واحد عملیات", "meeting_date": None, "by": None,
+            "role": "سامانه", "at": data["timeline"][0]["at"],
+        }
+    ]
+    back = data["workflow"]["transitions"][0]
+    assert back["name"] == "back_to_register"
+    assert back["problems"]  # پرسش باز است، پس برگشت به رجیستر هنوز مسدود است
+    assert data["latest"] is None
+
+    # ریسکی که از رجیستر شروع شد، مرحله‌ی پرسش‌ها را نگذرانده است.
+    registered = make_risk("نشت داده", unit, status=Risk.Status.ASSESSMENT)
+    StatusTransition.objects.create(
+        risk=registered, from_status=Risk.Status.REGISTERED, to_status=Risk.Status.ASSESSMENT, created_by=grc,
+        reason="ارسال جهت ارزیابی",
+    )
+    data = api(grc).get(reverse("api:risk_detail", args=[registered.pk])).json()
+    assert [step["state"] for step in data["stepper"]][:3] == ["skipped", "done", "current"]
+    assert [entry["label"] for entry in data["timeline"]] == ["در ارزیابی", "ثبت‌شده در رجیستر"]
+    assert data["timeline"][0]["role"] == "عضو GRC"
+    assert data["banner"] is None
+
+    rejected = make_risk("ریسک ردشده", unit, status=Risk.Status.REJECTED)
+    steps = api(grc).get(reverse("api:risk_detail", args=[rejected.pk])).json()["stepper"]
+    assert (steps[-1]["status"], steps[-1]["state"]) == ("rejected", "done")
+
+
+def test_the_risk_record_explains_the_latest_result_and_rates_controls(api, grc, unit):
+    from apps.controls.models import Control, ControlAssessment, IsoControl
+    from apps.risks.models import Evidence
+
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.TREATMENT_PLAN, owner=grc)
+    approve(risk, grc, "بالا")
+    Assessment.objects.filter(risk=risk).update(
+        likelihood_low=3, likelihood_high=3, impact_low=4, impact_high=4, score_low=12, score_high=12,
+        base_level=level("بالا"),
+    )
+    StatusTransition.objects.create(
+        risk=risk, from_status=Risk.Status.ASSESSMENT, to_status=Risk.Status.TREATMENT_PLAN, created_by=grc
+    )
+    owner = make_user("control-owner")
+    tested = Control.objects.create(title="مدیریت تغییر", objective="CAB", kind=Control.Kind.PREVENTIVE,
+                                    owner=owner, operated_by="datin", is_key=True)
+    tested.iso_controls.add(IsoControl.objects.get(code="8.32"))
+    untested = Control.objects.create(title="مانور بازیابی", objective="مانور", kind=Control.Kind.RECOVERY,
+                                      owner=owner, operated_by="datin")
+    risk.controls.add(tested, untested)
+    proof = Evidence.objects.create(title="سوابق CAB", kind=Evidence.Kind.TEST, summary="-", source="-",
+                                    observed_on=timezone.localdate(), reliability="high", owner=grc)
+    test = ControlAssessment(
+        control=tested, method_version=MethodVersion.objects.get(number=1), scope="تولید", exists=True,
+        operating_ok=True, test_to=timezone.localdate() - datetime.timedelta(days=5), e=2,
+        rationale="اثر محدود", created_by=grc,
+    )
+    test.save()
+    test.evidence.add(proof)
+
+    data = api(grc).get(reverse("api:risk_detail", args=[risk.pk])).json()
+    latest = data["latest"]
+    assert (latest["likelihood"], latest["impact"], latest["score"]) == (3, 4, 12)
+    assert latest["level"]["name"] == "بالا"
+    assert "سطح پایه‌ی امتیاز ۱۲ «بالا» است" in latest["explanation"]
+    assert latest["note"].startswith("بدون نشان «رویداد در حال وقوع»")
+    controls = {row["code"]: row for row in data["controls"]}
+    assert controls[tested.code] | {"href": None} == {
+        "code": tested.code, "title": "مدیریت تغییر", "kind": "پیشگیرانه", "iso": ["A.8.32"], "is_key": True,
+        "e": 2, "no_valid_evidence": False, "problem": None, "href": None,
+    }
+    assert controls[untested.code]["e"] == 1
+    assert controls[untested.code]["no_valid_evidence"] is True
+    assert data["controls"][0]["code"] == tested.code  # کنترل کلیدی اول
+    assert data["assessments"][0]["detail"].startswith("مبنای تصمیم · ")
+    banner = data["banner"]
+    assert banner["title"].startswith("مهلت ثبت طرح مواجهه: ")
+    assert banner["text"].endswith("طرح هنوز ثبت نشده است.")
+    assert data["key_evidence_age"] > 0
 
 
 def test_my_work_lists_the_risk_questions_waiting_for_the_unit_manager(api, grc, manager, unit):

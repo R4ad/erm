@@ -31,6 +31,7 @@ from apps.workflow.lifecycle import can_perform, get_transition
 from apps.workflow.services import WorkflowError, perform_transition
 
 from . import formatting as fmt
+from . import risk_record
 from .base import ApiView
 from .records import record_parts
 from .routes import spa_route
@@ -340,13 +341,15 @@ class RiskBulkTransitionView(ApiView):
         return Response({"done": done, "failed": failed})
 
 
-def transition_link(risk, transition):
+def transition_link(risk, transition, problems=()):
     return {
         "name": transition.name,
         "label": transition.label,
         "description": transition.description,
         "target": transition.target_label,
         "href": reverse("workflow:transition", args=[risk.pk, transition.name]),
+        # شرط‌های برقرارنشده؛ دکمه‌ی انتقال تا رفع آن‌ها با دلیلش غیرفعال است (فیگما ۰۴).
+        "problems": list(problems),
     }
 
 
@@ -356,7 +359,7 @@ def related_risk(risk, visible):
     return {"code": risk.code, "href": risk.get_absolute_url() if visible else None}
 
 
-def assessment_row(assessment):
+def assessment_row(assessment, control_codes=(), decision_id=None):
     return {
         "id": assessment.pk,
         "code": assessment.code,
@@ -366,6 +369,7 @@ def assessment_row(assessment):
         "score": [assessment.score_low, assessment.score_high] if assessment.score_low else None,
         "meeting_date": fmt.day(assessment.meeting_date),
         "approved_at": fmt.moment(assessment.approved_at),
+        "detail": risk_record.assessment_detail(assessment, list(control_codes), assessment.pk == decision_id),
         "href": assessment.get_absolute_url(),
     }
 
@@ -387,6 +391,13 @@ class RiskDetailView(ApiView):
         service_visible = risk.service_id and visible_services(user).filter(pk=risk.service_id).exists()
         visible_control_ids = set(visible_controls(user).filter(risks=risk).values_list("pk", flat=True))
         plan = treatment["current_plan"]
+        timeline = list(workflow["timeline"].order_by("created_at", "pk"))
+        controls = risk_record.control_rows(risk, visible_control_ids)
+        control_codes = [control["code"] for control in controls]
+        problems = {
+            row["name"]: row["problems"]
+            for row in risk_record.transitions(risk, user, workflow["transitions"])
+        }
         # ریسک ردشده یا بسته‌شده فقط سابقه است و ویرایش نمی‌شود، مثل صفحه‌ی جنگو.
         can_edit = risk.is_active and can_edit_register(user)
         return Response(
@@ -453,32 +464,25 @@ class RiskDetailView(ApiView):
                         "kind": item.get_kind_display(),
                         "reliability": item.get_reliability_display(),
                         "observed_on": fmt.day(item.observed_on),
+                        "valid_until": fmt.day(item.valid_until),
                         "expired": item.is_expired,
                         "confidential": item.access_class == item.AccessClass.CONFIDENTIAL,
                         "href": item.get_absolute_url(),
                     }
                     for item in visible_evidence(user).filter(risks=risk)
                 ],
-                "controls": [
-                    {
-                        "code": control.code,
-                        "title": control.title,
-                        "href": control.get_absolute_url() if control.pk in visible_control_ids else None,
-                    }
-                    for control in risk.controls.all()
-                ],
+                "key_evidence_age": risk_record.key_evidence_age(),
+                "controls": controls,
+                "stepper": risk_record.stepper(risk, timeline),
+                "banner": risk_record.banner(
+                    risk, reverse("actions:plan_create", args=[risk.pk]) if treatment["can_add_plan"] else None
+                ),
+                "latest": risk_record.latest_result(current),
+                "timeline": risk_record.timeline_rows(risk, timeline),
                 "workflow": {
-                    "transitions": [transition_link(risk, transition) for transition in workflow["transitions"]],
-                    "timeline": [
-                        {
-                            "from": entry.get_from_status_display(),
-                            "to": entry.get_to_status_display(),
-                            "reason": entry.reason,
-                            "meeting_date": fmt.day(entry.meeting_date),
-                            "by": fmt.person(entry.created_by),
-                            "at": fmt.moment(entry.created_at),
-                        }
-                        for entry in workflow["timeline"]
+                    "transitions": [
+                        transition_link(risk, transition, problems.get(transition.name, ()))
+                        for transition in workflow["transitions"]
                     ],
                     "questions": [
                         {
@@ -509,7 +513,12 @@ class RiskDetailView(ApiView):
                     "merged_risks": [related_risk(item, True) for item in workflow["merged_risks"]],
                     "split_parts": [related_risk(item, True) for item in workflow["split_parts"]],
                 },
-                "assessments": [assessment_row(item) for item in assessments["assessments"]],
+                "assessments": [
+                    assessment_row(item, control_codes, current.pk if current else None)
+                    for item in assessments["assessments"].order_by(
+                        F("approved_at").desc(nulls_first=True), "-created_at", "-pk"
+                    )
+                ],
                 "treatment": {
                     "current_plan": (
                         {
