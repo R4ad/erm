@@ -152,3 +152,49 @@ def test_empty_report_and_invalid_period_are_rendered(client, grc):
         reverse("reports:management"), {"start": "1405/09/01", "end": "1405/08/01"}
     )
     assert response.context["form"].errors and "current" not in response.context
+
+
+def test_report_api_shapes_the_figma_dashboard(grc, owner):
+    from datetime import timedelta as days
+
+    from rest_framework.test import APIClient
+
+    from apps.assessments.models import Assessment
+
+    first = make_risk(owner)
+    older = approved(first, grc, "متوسط", 6)
+    Assessment.objects.filter(pk=older.pk).update(approved_at=timezone.now() - days(300))
+    current = approved(first, grc, "بالا", 12)
+    Assessment.objects.filter(pk=current.pk).update(likelihood_high=3, impact_high=4)
+    second = make_risk(owner, "قطع سرویس پیامک")
+    supplier = Supplier.objects.create(name="ارائه‌دهنده‌ی پیامک")
+    for risk in (first, second):
+        Dependency.objects.create(service=risk.service, supplier=supplier)
+
+    api = APIClient(HTTP_HOST="127.0.0.1")
+    api.force_authenticate(grc)
+    data = api.get(reverse("api:management_report")).json()
+
+    assert data["months"] == 6
+    assert data["kpis"]["active"]["count"] == 2
+    assert data["kpis"]["high"]["count"] == 1
+    high = next(row for row in data["distribution"] if row["label"] == "بالا")
+    medium = next(row for row in data["distribution"] if row["label"] == "متوسط")
+    assert (high["count"], high["delta"], medium["delta"]) == (1, 1, -1)
+    unassessed = data["distribution"][-1]
+    assert unassessed["level"] is None and unassessed["count"] == 1
+    l3 = next(row for row in data["matrix"]["rows"] if row["likelihood"] == 3)
+    assert [cell["count"] for cell in l3["cells"]] == [0, 0, 0, 1, 0]
+    assert data["matrix"]["unassessed"] == 1
+    [change] = data["changes"]
+    assert (change["before"]["name"], change["after"]["name"]) == ("متوسط", "بالا")
+    assert change["reason"]["label"] == "ارزیابی جاری تازه"
+    assert data["concentration"] == [
+        {"key": "dep-0", "target": "ارائه‌دهنده‌ی پیامک", "risks": 2, "services": 2, "shared": False}
+    ]
+    assert api.get(reverse("api:management_report"), {"months": 7}).json()["months"] == 6
+
+    export = api.get(reverse("api:management_export"), {"months": 12})
+    assert export.status_code == 200
+    assert export["Content-Type"].startswith("application/vnd.openxmlformats")
+    assert export.content[:2] == b"PK"

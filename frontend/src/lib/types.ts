@@ -182,6 +182,46 @@ export interface MyWork {
   sections: WorkSection[];
 }
 
+export interface ReportKpi {
+  count?: number;
+  percent?: number | null;
+  note: string;
+}
+
+export interface ManagementReport {
+  today: Today;
+  months: number;
+  periods: number[];
+  start: Day;
+  kpis: Record<"active" | "critical" | "high" | "coverage" | "key_controls", ReportKpi>;
+  distribution: { level: Level | null; label: string; count: number; delta: number; up_is_good: boolean }[];
+  matrix: {
+    rows: { likelihood: number; cells: { impact: number; count: number; level: Level | null }[] }[];
+    unassessed: number;
+  };
+  overdue: {
+    key: string;
+    code: string;
+    title: string;
+    level: Level | null;
+    owner: string | null;
+    service: string | null;
+    days: number;
+    route: string | null;
+  }[];
+  acceptances: { key: string; label: string; icon: string; tone: WorkTone; count: number; route: string }[];
+  changes: {
+    key: string;
+    code: string;
+    title: string;
+    before: Level | null;
+    after: Level | null;
+    reason: { label: string; tone: WorkTone };
+    route: string | null;
+  }[];
+  concentration: { key: string; target: string; risks: number; services: number; shared: boolean }[];
+}
+
 export interface RiskRow {
   id: number;
   code: string;

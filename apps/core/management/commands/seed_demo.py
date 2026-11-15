@@ -21,10 +21,10 @@ from apps.actions.models import (
     TreatmentPlan,
 )
 from apps.assessments.models import Assessment
-from apps.catalog.models import Customer, Service
+from apps.catalog.models import Customer, Dependency, Service, Supplier
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
-from apps.risks.models import Risk, RiskCategory
+from apps.risks.models import Coverage, Risk, RiskCategory
 from apps.workcalendar.workdays import add_working_days
 from apps.workflow.models import StatusTransition
 
@@ -50,6 +50,8 @@ class Command(BaseCommand):
         self.organization()
         self.catalog()
         self.risks()
+        self.report_history()
+        self.dependencies()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     # ───────────── افراد و سازمان ─────────────
@@ -131,6 +133,43 @@ class Command(BaseCommand):
             service.customers.set(self.banks[:3] if critical else self.banks[:1])
             self.services[code] = service
 
+    def dependencies(self):
+        """وابستگی‌های مشترک برای کارت «تمرکز وابستگی و نقطه‌ی شکست مشترک» و پوشش بررسی‌شده‌ی چند خدمت حیاتی."""
+        dc = Supplier.objects.create(name="مرکز داده‌ی اصلی (آسیاتک)", is_critical=True, contract_owner=self.ali)
+        sms = Supplier.objects.create(name="ارائه‌دهنده‌ی پیامک", is_critical=False, contract_owner=self.ali)
+        links = [
+            ("SRV-CORE", ["SRV-SATNA", "SRV-PAYA", "SRV-IPG", "SRV-MB", "SRV-ARC"], None),
+            ("SRV-HSM", ["SRV-SATNA", "SRV-PAYA", "SRV-IPG"], None),
+            (None, ["SRV-SMS", "SRV-MB", "SRV-IPG"], sms),
+            (None, ["SRV-CORE", "SRV-ARC", "SRV-PORTAL"], dc),
+        ]
+        for upstream, services, supplier in links:
+            for code in services:
+                Dependency.objects.create(
+                    service=self.services[code],
+                    upstream_service=self.services[upstream] if upstream else None,
+                    supplier=supplier,
+                    is_shared_point=supplier is dc,
+                    description="وابستگی عملیاتی روزانه",
+                )
+        for code in ["SRV-HSM", "SRV-PAYA"]:
+            for category in RiskCategory.objects.filter(is_active=True):
+                Coverage.objects.create(
+                    service=self.services[code], category=category, status=Coverage.Status.REVIEWED,
+                    reviewed_by=self.sara,
+                )
+
+    def report_history(self):
+        """ارزیابی جاری قدیمی‌تر برای چند ریسک، تا «تغییر سطح در دوره» و تغییر توزیع سطح نسبت به شش ماه قبل داده داشته
+        باشند. ارزیابی قدیمی پیش از آغاز دوره‌ی شش‌ماهه تأیید شده است."""
+        currents = Assessment.objects.filter(
+            kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED
+        ).select_related("risk", "decision_level").order_by("risk__code")
+        scores = {1: 3, 2: 6, 3: 12, 4: 20}
+        for base, shift in zip(list(currents)[:6], [-1, 1, -1, 1, -1, 1], strict=False):
+            rank = min(max(base.decision_level.rank + shift, 1), 4)
+            self.assessment(base.risk, rank, scores[rank], days_ago=240)
+
     # ───────────── ریسک‌ها ─────────────
 
     def risk(self, title, service, owner, category, status, channel=Risk.Channel.INTERVIEW, ready=True):
@@ -163,16 +202,31 @@ class Command(BaseCommand):
         Risk.objects.filter(pk=risk.pk).update(status=status_before)
         level = self.levels[rank]
         approved = timezone.now() - timedelta(days=days_ago)
+        likelihood, impact = self.cell(score, flip=risk.pk % 2 == 1)
         Assessment.objects.filter(pk=assessment.pk).update(
             status=status,
             decision_level=level,
             base_level=level,
+            likelihood_low=likelihood,
+            likelihood_high=likelihood,
+            impact_low=impact,
+            impact_high=impact,
             score_low=score,
             score_high=score,
             approved_at=approved if status == Assessment.Status.APPROVED else None,
         )
         assessment.refresh_from_db()
         return assessment
+
+    @staticmethod
+    def cell(score, flip=False):
+        """خانه‌ی L × I امتیاز: نزدیک‌ترین جفت به قطر، تا ماتریس گزارش مدیریتی خانه‌های متنوع داشته باشد."""
+        pairs = [(likelihood, impact) for likelihood in range(1, 6) for impact in range(1, 6) if likelihood * impact == score]
+        if not pairs:
+            side = min(5, max(1, round(score**0.5)))
+            return side, side
+        likelihood, impact = min(pairs, key=lambda pair: (abs(pair[0] - pair[1]), -pair[1]))
+        return (impact, likelihood) if flip else (likelihood, impact)
 
     def entered(self, risk, to_status, days_ago):
         record = StatusTransition.objects.create(

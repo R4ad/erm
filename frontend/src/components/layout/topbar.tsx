@@ -90,7 +90,9 @@ function TopbarCrumbs() {
   } else {
     const trail = activeTrail(pathname, navigation);
     crumbs = [{ label: "خانه", to: "/" }];
+    // فیگما: «خانه › ماژول › صفحه» و برای صفحه‌های میز کار جز خود خانه «خانه › میز کار › صفحه».
     if (trail?.module) crumbs.push({ label: trail.module.title });
+    else if (trail && trail.link.route !== "/") crumbs.push({ label: navigation.desk.title });
     if (trail && trail.link.route !== "/") crumbs.push({ label: trail.link.label, to: trail.link.route ?? undefined });
     if (trail?.link.route === "/") crumbs.push({ label: trail.link.label });
   }

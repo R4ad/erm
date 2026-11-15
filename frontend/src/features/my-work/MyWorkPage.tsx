@@ -244,7 +244,7 @@ function PlanRow({ row }: { row: WorkPlanRow }) {
         className="flex flex-col gap-2 px-4 py-3 text-inherit no-underline transition-colors hover:bg-subtle/60"
       >
         <span className="flex items-center justify-between gap-3">
-          <span className="code text-ink-2">{row.code}</span>
+          <span className="code text-xs text-ink-2">{row.code}</span>
           <LevelBadge level={row.level} />
         </span>
         <span className="text-base font-semibold text-ink">{faText(row.title)}</span>

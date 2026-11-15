@@ -170,9 +170,17 @@ def management_report(user, start=None, end=None):
         target = dependency.supplier or dependency.upstream_service or dependency.asset
         key = (target._meta.label, target.pk)
         row = concentration.setdefault(
-            key, {"target": str(target), "services": set(), "common": False}
+            key,
+            {
+                "target": str(target),
+                "name": getattr(target, "name", str(target)),
+                "services": set(),
+                "service_ids": set(),
+                "common": False,
+            },
         )
         row["services"].add(str(dependency.service))
+        row["service_ids"].add(dependency.service_id)
         row["common"] |= dependency.is_shared_point
     concentrations = [
         row

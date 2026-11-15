@@ -35,6 +35,7 @@ import type {
   ImpactRow,
   Level,
   MethodPage,
+  ManagementReport,
   MyWork,
   WorkTask,
   NoticeList,
@@ -69,6 +70,7 @@ export const levels = {
   critical: { rank: 4, name: "بحرانی", color: "#dc3545", text_color: "#fff" },
   high: { rank: 3, name: "بالا", color: "#fd7e14", text_color: "#000" },
   medium: { rank: 2, name: "متوسط", color: "#ffc107", text_color: "#000" },
+  low: { rank: 1, name: "پایین", color: "#198754", text_color: "#fff" },
 } satisfies Record<string, Level>;
 
 const today = { iso: "2026-11-04", jalali: "1405/08/13", weekday: "چهارشنبه" };
@@ -537,7 +539,14 @@ export function session(): Session {
             count: 3,
             tone: "gold",
           },
-          { key: "reports:management", label: "گزارش مدیریتی", href: "/reports/", route: null, count: null, tone: null },
+          {
+            key: "reports:management",
+            label: "گزارش مدیریتی",
+            href: "/reports/",
+            route: null,
+            count: null,
+            tone: null,
+          },
         ],
       },
       modules: [
@@ -605,8 +614,22 @@ export function session(): Session {
           key: "config",
           title: "پیکربندی سامانه",
           items: [
-            { key: "methodology:active", label: "تعریف متدولوژی", href: "/method/", route: "/method", count: null, tone: null },
-            { key: "organization:unit_list", label: "چارت سازمانی", href: "/units/", route: "/units", count: null, tone: null },
+            {
+              key: "methodology:active",
+              label: "تعریف متدولوژی",
+              href: "/method/",
+              route: "/method",
+              count: null,
+              tone: null,
+            },
+            {
+              key: "organization:unit_list",
+              label: "چارت سازمانی",
+              href: "/units/",
+              route: "/units",
+              count: null,
+              tone: null,
+            },
           ],
         },
       ],
@@ -760,6 +783,78 @@ export function myWork(): MyWork {
         ],
       },
     ],
+  };
+}
+
+/** داده‌ی صفحه‌ی گزارش مدیریتی، به همان شکل apps/api/reports.py. */
+export function managementReport(months = 6): ManagementReport {
+  const cell = (likelihood: number, impact: number) => {
+    const score = likelihood * impact;
+    const level = score >= 16 ? levels.critical : score >= 10 ? levels.high : score >= 5 ? levels.medium : levels.low;
+    const count = likelihood === 4 && impact === 5 ? 2 : likelihood === 3 && impact === 3 ? 1 : 0;
+    return { impact, count, level };
+  };
+  return {
+    today,
+    months,
+    periods: [1, 3, 6, 12],
+    start: { iso: "2026-05-15", jalali: "1405/02/25" },
+    kpis: {
+      active: { count: 16, note: "۷ هنوز ارزیابی جاری تأییدشده ندارند" },
+      critical: { count: 2, note: "۱ ریسک هنوز طرح مواجهه ندارند" },
+      high: { count: 2, note: "۰ پذیرش موقت و استثنایی" },
+      coverage: { percent: 50, note: "۳ از ۶ خدمت حیاتی · شرط: ارزیابی جاری کامل" },
+      key_controls: { percent: null, note: "۰ از ۰ کنترل کلیدی مرتبط با مسیرها" },
+    },
+    distribution: [
+      { level: levels.critical, label: "بحرانی", count: 2, delta: 0, up_is_good: false },
+      { level: levels.high, label: "بالا", count: 2, delta: 0, up_is_good: false },
+      { level: levels.medium, label: "متوسط", count: 4, delta: 3, up_is_good: false },
+      { level: levels.low, label: "پایین", count: 1, delta: 0, up_is_good: true },
+      { level: null, label: "ارزیابی‌نشده", count: 7, delta: -3, up_is_good: false },
+    ],
+    matrix: {
+      rows: [5, 4, 3, 2, 1].map((likelihood) => ({
+        likelihood,
+        cells: [1, 2, 3, 4, 5].map((impact) => cell(likelihood, impact)),
+      })),
+      unassessed: 7,
+    },
+    overdue: [
+      {
+        key: "action-28",
+        code: "TR-1405-0009",
+        title: "ثبت جلسه‌های ممتاز و بازبینی هفتگی",
+        level: levels.critical,
+        owner: "کاربر آزمون",
+        service: "خدمت آزمون",
+        days: 3,
+        route: "/actions/28",
+      },
+    ],
+    acceptances: [
+      { key: "expired", label: "منقضی‌شده", icon: "clock", tone: "danger", count: 1, route: "/actions/acceptances" },
+      {
+        key: "unsigned",
+        label: "فاقد امضای لازم",
+        icon: "signature",
+        tone: "warning",
+        count: 1,
+        route: "/actions/acceptances",
+      },
+    ],
+    changes: [
+      {
+        key: "change-9",
+        code: "RK-1405-0004",
+        title: "ریسک آزمون چهارم",
+        before: levels.high,
+        after: levels.medium,
+        reason: { label: "پس از اقدام", tone: "success" },
+        route: "/risks/4",
+      },
+    ],
+    concentration: [{ key: "dep-0", target: "شبکه‌ی مرکزی", risks: 7, services: 5, shared: false }],
   };
 }
 
