@@ -52,6 +52,16 @@ export function dateTime(moment: Moment | null | undefined): string {
   return time ? `${longDate(moment)}، ساعت ${fa(time)}` : longDate(moment);
 }
 
+/** زمان گذشته به زبان آدم: «همین حالا»، «۲ دقیقه پیش»، «۳ ساعت پیش» و بعد از یک روز تاریخ. */
+export function ago(moment: Moment, now: number): string {
+  const minutes = Math.floor((now - Date.parse(moment.iso)) / 60_000);
+  if (minutes < 1) return "همین حالا";
+  if (minutes < 60) return `${fa(minutes)} دقیقه پیش`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${fa(hours)} ساعت پیش`;
+  return shortDate(moment);
+}
+
 export function isDeadline(value: Day | Deadline | null | undefined): value is Deadline {
   return Boolean(value && "days_left" in value);
 }

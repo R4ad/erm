@@ -238,47 +238,74 @@ function impactForm(
 }
 
 describe("ImpactProfilePage", () => {
-  it("lays out one group per stakeholder and one labelled row per dimension", async () => {
-    impactForm();
+  it("lays out the Figma matrix and opens a cell in the side editor", async () => {
+    const { user } = impactForm();
     expect(
-      await screen.findByRole("heading", { name: "پروفایل پیامد ارزیابی جاری AS-1405-0001", level: 1 }),
+      await screen.findByRole("heading", { name: "پروفایل پیامد — ریسک آزمون شماره‌ی ۱", level: 1 }),
     ).toBeInTheDocument();
-    const nav = screen.getByRole("navigation", { name: "ذی‌نفعان" });
-    expect(within(nav).getByRole("link", { name: "بانک آزمون" })).toHaveAttribute("href", "#stakeholder-1");
+    const overview = screen.getByRole("region", { name: "خلاصه‌ی پیامد" });
+    expect(overview).toHaveTextContent("I هنوز معلوم نیست");
+    expect(overview).toHaveTextContent("۳ خانه هنوز ثبت نشده (برقرار نیست)");
 
-    const datin = screen.getByRole("region", { name: "داتین" });
-    expect(datin).toHaveTextContent("مبنای مالی داتین درآمد عملیاتی");
-    const service = within(datin).getByRole("group", { name: "S خدمت و تداوم، داتین" });
-    expect(within(service).getByRole("combobox", { name: "سطح" })).toHaveValue("0");
-    expect(within(service).getByRole("option", { name: "ثبت‌نشده" })).toBeInTheDocument();
-    expect(within(service).getByRole("combobox", { name: "اطمینان" })).toHaveValue("high");
-    const financial = within(datin).getByRole("group", { name: "F مالی، داتین" });
-    expect(within(financial).getByRole("spinbutton", { name: "مبنای مالی (ریال)" })).toHaveValue(null);
-    expect(within(service).queryByRole("spinbutton", { name: "مبنای مالی (ریال)" })).not.toBeInTheDocument();
+    const matrix = screen.getByRole("region", { name: "ماتریس پیامد" });
+    const table = within(matrix).getByRole("table");
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["بُعد", "داتینبیشینه: ۰", "بانک آزمونبیشینه: -", "بیشینه‌ی بُعد"]);
+    expect(
+      within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Sخدمت و تداوم", "Fمالی"]);
+    expect(within(table).getByRole("button", { name: "S خدمت و تداوم، داتین: سطح ۰، بدون شاهد" })).toBeInTheDocument();
 
-    const bank = screen.getByRole("region", { name: "بانک آزمون" });
-    expect(bank).toHaveTextContent("خدمت حیاتی");
-    expect(bank).toHaveTextContent("RTO۲۴۰ دقیقه");
-    expect(bank).toHaveTextContent("MTPDثبت‌نشده");
-    expect(bank).toHaveTextContent("۵٬۰۰۰٬۰۰۰٬۰۰۰ ریال");
-    const bankService = within(bank).getByRole("group", { name: "S خدمت و تداوم، بانک آزمون" });
-    expect(bankService).toHaveTextContent("پیشنهاد سامانه: سطح ۳. مدت اختلال بیش از یک‌چهارم RTO است.");
-    expect(bankService).toHaveTextContent("سطح موقت کمتر از ۳ ثبت نشود");
+    // ویرایشگر با اولین خانه‌ی ثبت‌نشده باز می‌شود.
+    const first = within(table).getByRole("button", { name: "F مالی، داتین: ثبت‌نشده" });
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("region", { name: "ویرایش خانه: F (مالی) · داتین" })).toBeInTheDocument();
+
+    await user.click(within(table).getByRole("button", { name: /^S خدمت و تداوم، بانک آزمون/ }));
+    const editor = screen.getByRole("region", { name: "ویرایش خانه: S (خدمت و تداوم) · بانک آزمون" });
+    expect(editor).toHaveTextContent("پیشنهاد سامانه: سطح ۳");
+    expect(editor).toHaveTextContent("مدت اختلال بیش از یک‌چهارم RTO است.");
+    expect(editor).toHaveTextContent("سطح موقت کمتر از ۳ ثبت نشود");
+    expect(editor).toHaveTextContent("خدمت حیاتی · RTO ۲۴۰ دقیقه · MTPD ثبت‌نشده");
+    expect(within(editor).getByRole("group", { name: "سطح" })).toBeInTheDocument();
+    expect(
+      within(editor)
+        .getAllByRole("radio")
+        .map((radio) => radio.getAttribute("value")),
+    ).toEqual(["0", "1", "2", "3", "4", "5", "unknown"]);
     await expectNoAxeViolations();
   });
 
-  it("sends every row under its own prefix and puts Django's errors next to the right cell", async () => {
+  it("sends every cell under its own prefix and reopens the cell Django rejected", async () => {
     const { api, user } = impactForm(
       reply(400, {
         message: "بعضی خانه‌ها ایراد دارند؛ پیام زیر هر خانه را ببینید.",
         errors: { "7-F-rationale": ["صفر یعنی «اثر ندارد» و دلیل می‌خواهد."] },
       }),
     );
-    const bank = await screen.findByRole("region", { name: "بانک آزمون" });
-    const financial = within(bank).getByRole("group", { name: "F مالی، بانک آزمون" });
-    await user.selectOptions(within(financial).getByRole("combobox", { name: "سطح" }), "0");
-    await user.selectOptions(within(financial).getByRole("combobox", { name: "اطمینان" }), "high");
-    await user.click(screen.getByRole("button", { name: "ذخیره" }));
+    const matrix = await screen.findByRole("region", { name: "ماتریس پیامد" });
+    await user.click(within(matrix).getByRole("button", { name: /^F مالی، بانک آزمون/ }));
+    const editor = screen.getByRole("region", { name: "ویرایش خانه: F (مالی) · بانک آزمون" });
+    await user.click(within(within(editor).getByRole("group", { name: "سطح" })).getByRole("radio", { name: "۰" }));
+    await user.click(
+      within(within(editor).getByRole("group", { name: "اطمینان" })).getByRole("radio", { name: "زیاد" }),
+    );
+    expect(screen.getByText("تغییرهای ذخیره‌نشده")).toBeInTheDocument();
+    await user.click(within(editor).getByRole("button", { name: "انصراف" }));
+    expect(screen.queryByText("تغییرهای ذخیره‌نشده")).not.toBeInTheDocument();
+
+    await user.click(within(matrix).getByRole("button", { name: /^F مالی، بانک آزمون/ }));
+    const again = screen.getByRole("region", { name: "ویرایش خانه: F (مالی) · بانک آزمون" });
+    await user.click(within(within(again).getByRole("group", { name: "سطح" })).getByRole("radio", { name: "۰" }));
+    await user.click(
+      within(within(again).getByRole("group", { name: "اطمینان" })).getByRole("radio", { name: "زیاد" }),
+    );
+    await user.click(screen.getByRole("button", { name: "ذخیره‌ی پیش‌نویس" }));
 
     await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
     const [call] = api.callsTo("POST forms/");
@@ -293,28 +320,52 @@ describe("ImpactProfilePage", () => {
       "7-F-rationale": "",
       "7-F-evidence": [],
     });
-    // دو ذی‌نفع، هر کدام S با شش فیلد و F با هفت فیلد (مبنای مالی).
+    // دو ذی‌نفع، هر کدام S با شش فیلد و F با هفت فیلد (مبنای مالی)؛ «ذخیره‌ی پیش‌نویس» next نمی‌فرستد.
     expect(Object.keys(values)).toHaveLength(26);
 
-    const summary = await screen.findByRole("alert");
-    await waitFor(() => expect(summary).toHaveFocus());
-    const link = within(summary).getByRole("link", { name: /بانک آزمون، F مالی، دلیل: صفر یعنی/ });
-    const rationale = within(financial).getByRole("textbox", { name: "دلیل" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("بعضی خانه‌ها ایراد دارند");
+    const rejected = screen.getByRole("region", { name: "ویرایش خانه: F (مالی) · بانک آزمون" });
+    const rationale = within(rejected).getByRole("textbox", { name: /دلیل/ });
     expect(rationale).toHaveAttribute("aria-invalid", "true");
     expect(rationale).toHaveAccessibleDescription("صفر یعنی «اثر ندارد» و دلیل می‌خواهد.");
-    await user.click(link);
-    expect(rationale).toHaveFocus();
+    expect(within(matrix).getByRole("button", { name: /^F مالی، بانک آزمون: سطح ۰.*ایراد دارد$/ })).toBeInTheDocument();
   });
 
-  it("goes back to the dossier after saving", async () => {
-    const { user, location } = impactForm();
-    const datin = await screen.findByRole("region", { name: "داتین" });
-    const financial = within(datin).getByRole("group", { name: "F مالی، داتین" });
-    await user.selectOptions(within(financial).getByRole("combobox", { name: "سطح" }), "unknown");
-    await user.type(within(financial).getByRole("textbox", { name: "دلیل" }), "صورت‌های مالی هنوز نرسیده است");
-    await user.click(screen.getByRole("button", { name: "ذخیره" }));
-    await waitFor(() => expect(location()).toBe("/assessments/1"));
+  it("continues to the initiator form after saving", async () => {
+    const { api, user, location } = impactForm({
+      message: "ذخیره شد.",
+      redirect: { href: "/assessments/1/initiator/", route: "/assessments/1/initiator" },
+    });
+    const editor = await screen.findByRole("region", { name: "ویرایش خانه: F (مالی) · داتین" });
+    await user.click(
+      within(within(editor).getByRole("group", { name: "سطح" })).getByRole("radio", { name: "نامعلوم" }),
+    );
+    await user.type(within(editor).getByRole("textbox", { name: /دلیل/ }), "صورت‌های مالی هنوز نرسیده است");
+    await user.click(within(editor).getByRole("button", { name: "اعمال «نامعلوم»" }));
+    // خانه‌ی ثبت‌نشده‌ی بعدی باز می‌شود.
+    expect(screen.getByRole("region", { name: "ویرایش خانه: S (خدمت و تداوم) · بانک آزمون" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^F مالی، داتین: نامعلوم، بدون شاهد/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "ادامه: عامل آغازگر (A)" }));
+    await waitFor(() => expect(location()).toBe("/assessments/1/initiator"));
+    const values = (api.callsTo("POST forms/")[0]!.body as { values: Record<string, unknown> }).values;
+    expect(values).toMatchObject({
+      next: "initiator",
+      "datin-F-level": "unknown",
+      "datin-F-rationale": "صورت‌های مالی هنوز نرسیده است",
+    });
     expect(await screen.findByText("ذخیره شد.")).toBeInTheDocument();
+  });
+
+  it("stays on the matrix after saving a draft and reads it again", async () => {
+    const { api, user, location } = impactForm({
+      message: "ذخیره شد.",
+      redirect: { href: "/assessments/1/impacts/", route: "/assessments/1/impacts" },
+    });
+    await user.click(await screen.findByRole("button", { name: "ذخیره‌ی پیش‌نویس" }));
+    expect(await screen.findByText("ذخیره شد.")).toBeInTheDocument();
+    expect(location()).toBe("/assessments/1/impacts");
+    await waitFor(() => expect(api.callsTo("GET forms/")).toHaveLength(2));
   });
 });
 

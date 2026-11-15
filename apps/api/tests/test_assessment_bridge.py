@@ -160,10 +160,35 @@ def test_the_impact_profile_is_one_page_of_prefixed_forms(api, grc, ready, bank)
     assert body["errors"]["datin-D-rationale"] == ["صفر یعنی «اثر ندارد» و دلیل می‌خواهد."]
     assert "بعضی خانه‌ها ایراد دارند" in body["message"]
 
+    # «ذخیره‌ی پیش‌نویس» در همین صفحه می‌ماند و «ادامه» به عامل آغازگر می‌رود (فیگما ۰۶).
     saved = send(api(grc), url, {**values, f"{bank.pk}-S-level": "4"})
     assert saved.status_code == 200
-    assert saved.json()["redirect"]["route"] == f"/assessments/{ready.pk}"
+    assert saved.json()["redirect"]["route"] == f"/assessments/{ready.pk}/impacts"
     assert ready.impacts.get(customer=bank, scale__code="S").level == 4
+    continued = send(api(grc), url, {**values, "next": "initiator"})
+    assert continued.json()["redirect"]["route"] == f"/assessments/{ready.pk}/initiator"
+
+
+def test_the_impact_profile_carries_the_figma_header_and_overview(api, grc, ready, bank):
+    url = reverse("assessments:impact_profile", args=[ready.pk])
+    data = form(api(grc), url).json()
+
+    header = data["assessment"]
+    assert header["code"] == ready.code and header["stakeholders"] == ["داتین", bank.name]
+    assert header["saved_at"]["jalali"]
+    overview = data["overview"]
+    assert overview["impact"] == [3, 3]
+    assert overview["top"] == {"code": "S", "name": ready.method_version.scales.get(code="S").name, "stakeholder": bank.name}
+    assert [check["ok"] for check in overview["checks"]] == [True, True, True]
+    assert data["note"].startswith("سطح S از مدت اختلال")
+
+    # یک خانه نامعلوم شود: I بازه یا نامعلوم است و توضیح کارت همان را می‌گوید.
+    detail = ready.impacts.get(customer=bank, scale__code="S")
+    detail.level, detail.confidence = None, ""
+    detail.save()
+    overview = form(api(grc), url).json()["overview"]
+    assert overview["top"] is None
+    assert "نامعلوم" in overview["text"]
 
 
 def test_two_assessments_are_compared_column_by_column(api, grc, ready):

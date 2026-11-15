@@ -500,6 +500,54 @@ class Command(BaseCommand):
             AssessmentReview.objects.filter(pk=review.pk).update(created_at=now - timedelta(days=days_ago))
         return assessment
 
+    def impact_profile(self, risk, assessment):
+        """پروفایل پیامد نیمه‌کاره‌ی یک ارزیابی پیش‌نویس برای صفحه‌ی ۰۶ فیگما: داتین و دو بانک، سطح ۵ داده برای بانک
+        ملت، F بانک ملت با مبلغ زیان و پیشنهاد سامانه، یک خانه‌ی نامعلوم بی‌شاهد و یک خانه‌ی ثبت‌نشده."""
+        mellat, tejarat = self.banks[0], self.banks[1]
+        Customer.objects.filter(pk=mellat.pk).update(financial_basis=5_200 * 10**9)
+        risk.customers.set([mellat, tejarat])
+        proofs = []
+        for title, kind, days_ago in [
+            ("گزارش آزمون نفوذ همراه‌بانک", Evidence.Kind.TEST, 30),
+            ("گزارش رخداد مشابه ۱۴۰۳", Evidence.Kind.INCIDENT, 300),
+            ("بند ۱۲ قرارداد پشتیبانی بانک‌ها", Evidence.Kind.BIA_CONTRACT, 90),
+        ]:
+            item = Evidence.objects.create(
+                title=title, kind=kind, reliability=Evidence.Reliability.HIGH, summary=title,
+                source="واحد امنیت اطلاعات", observed_on=self.today - timedelta(days=days_ago), owner=self.sara,
+            )
+            item.risks.add(risk)
+            proofs.append(item)
+        unknown = "داده‌ی کافی از واکنش مشتریان بانک تجارت نیست؛ نظرسنجی آذر نتیجه را روشن می‌کند."
+        cells = {
+            "S": [(1, "اختلال جزئی در محیط آزمون همراه‌بانک", 1), (0, "خدمت بانک قطع نمی‌شود", 1),
+                  (0, "خدمت بانک قطع نمی‌شود", 1)],
+            "D": [(4, "افشای داده‌ی دو بانک در محیط آزمون", 2), (5, "افشای اطلاعات هویتی مشتریان", 3),
+                  (4, "افشای اطلاعات ۲۸۰ هزار حساب", 2)],
+            "F": [(2, "هزینه‌ی پاسخ به رخداد و جریمه‌ی قراردادی", 1),
+                  (3, "هزینه‌ی اطلاع‌رسانی به مشتریان، پاسخ به رخداد و جریمه‌ی قراردادی بر اساس بند ۱۲ قرارداد؛ "
+                      "تجربه‌ی رخداد مشابه ۱۴۰۳.", 1), None],
+            "C": [(3, "نقض بند محرمانگی قرارداد", 1), (4, "نقض الزام حفاظت از داده‌ی بانک مرکزی", 2),
+                  (3, "نقض بند محرمانگی قرارداد", 1)],
+            "R": [(3, "آسیب به اعتماد بانک‌ها", 1), (4, "پوشش رسانه‌ای و شکایت مشتریان", 1), ("?", unknown, 0)],
+        }
+        columns = [None, mellat, tejarat]
+        for scale in self.version.scales.filter(kind="impact"):
+            for customer, cell in zip(columns, cells.get(scale.code, []), strict=False):
+                if cell is None:
+                    continue
+                level, rationale, proof_count = cell
+                is_mellat_f = scale.code == "F" and customer == mellat
+                detail = ImpactDetail.objects.create(
+                    assessment=assessment, customer=customer, scale=scale,
+                    level=None if level == "?" else level, rationale=rationale,
+                    confidence="" if level == "?" else Confidence.MEDIUM,
+                    actual_value=42 * 10**9 if is_mellat_f else None,
+                    basis=5_200 * 10**9 if is_mellat_f else None,
+                )
+                detail.evidence.add(*proofs[:proof_count])
+        return assessment
+
     def risks(self):
         # برنامه‌ی درمان: منتظر طرح، طرح منتظر تأیید مالک، طرح تأییدشده
         leak = self.risk("نشت داده‌ی مشتریان از محیط آزمون", "SRV-IPG", self.sara, "T1", S.TREATMENT_PLAN)
@@ -550,7 +598,7 @@ class Command(BaseCommand):
         hsm = self.risk("خرابی HSM و توقف امضای تراکنش", "SRV-HSM", self.maryam, "T3", S.ASSESSMENT)
         self.qc_assessment(hsm)
         mb = self.risk("حمله‌ی credential stuffing به همراه‌بانک", "SRV-MB", self.hossein, "T1", S.ASSESSMENT)
-        self.assessment(mb, 3, 10, status=Assessment.Status.DRAFT)
+        self.impact_profile(mb, self.assessment(mb, 3, 10, status=Assessment.Status.DRAFT))
 
         # شناسایی: ثبت‌شده، ارسال‌شده، در پاسخ به پرسش‌ها
         self.risk("قطع برق مرکز داده‌ی اصلی", "SRV-CORE", self.ali, "T7", S.REGISTERED)

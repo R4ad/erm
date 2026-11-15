@@ -4,12 +4,13 @@
 
 from decimal import Decimal
 
+from django.db.models import Max
 from django.urls import reverse
 
 from apps.assessments.forms import ReferralForm, ReviewForm
 from apps.assessments.models import AssessmentReview
 from apps.assessments.results import submission_checks
-from apps.assessments.services import band_list
+from apps.assessments.services import band_list, impact_summary
 from apps.methodology.services import MethodTables
 from apps.risks.permissions import can_add_evidence, visible_evidence
 
@@ -592,6 +593,73 @@ IMPACT_INTRO = (
 )
 
 
+IMPACT_NOTE = (
+    "سطح S از مدت اختلال و RTO/MTPD همان بانک پیشنهاد می‌شود؛ همزمانی اثر چند بانک فقط با علت یا وابستگی مشترک "
+    "مستند پذیرفته است."
+)
+
+
+def _impact_overview(assessment):
+    """کارت بالای پروفایل پیامد فیگما ۰۶: I و خانه‌ای که از آن آمده، توضیح خانه‌های نامعلوم و سه بررسی؛ همه از
+    موتور محاسبه روی آنچه ذخیره شده است."""
+    summary = impact_summary(assessment)
+    names = {scale.code: scale.name for scale, _ in summary.rows}
+    top_level = max((level.value for scale, _ in summary.rows for level in scale.levels.all()), default=None)
+    high = summary.impact.high if summary.impact else None
+    top = None
+    if high is not None:
+        for cell, detail in summary.cells:
+            if detail is not None and detail.engine_level is not None and (detail.level_high or detail.level) == high:
+                top = {"code": cell.dimension, "name": names.get(cell.dimension, ""), "stakeholder": cell.stakeholder}
+                break
+    details = [detail for _, detail in summary.cells if detail is not None]
+    unknown = [f"{cell.dimension} · {cell.stakeholder}" for cell, detail in summary.cells if detail and detail.is_unknown]
+    open_cells = len(unknown) + len(summary.missing)
+    if summary.problems:
+        text = " ".join(str(problem) for problem in summary.problems)
+    elif not details:
+        text = "هنوز خانه‌ای از پروفایل پیامد ثبت نشده است؛ I بیشترین سطح معتبر خانه‌هاست."
+    elif high is None:
+        text = (
+            f"{fa(open_cells)} خانه‌ی نامعلوم یا ثبت‌نشده می‌تواند I را بالاتر ببرد؛ تا روشن شدنشان I کران بالای "
+            "قابل دفاعی ندارد."
+        )
+    elif open_cells and top and high == top_level:
+        parts = [f"خانه‌ی نامعلوم {'، '.join(unknown)}"] if unknown else []
+        if summary.missing:
+            parts.append(f"{fa(len(summary.missing))} خانه‌ی ثبت‌نشده")
+        text = (
+            f"{' و '.join(parts)} نمی‌تواند I را بالاتر ببرد، چون سطح معلوم دیگری همین حالا {fa(high)} است؛ "
+            "دلیلش همچنان لازم است."
+        )
+    elif open_cells:
+        text = (
+            f"I فعلاً بازه است، چون {fa(open_cells)} خانه‌ی نامعلوم یا ثبت‌نشده می‌تواند آن را بالاتر ببرد."
+        )
+    else:
+        text = "I بیشترین سطح معتبر بین ابعاد و ذی‌نفعان است و خانه‌ی دیگری آن را بالاتر نمی‌برد."
+    unexplained = [
+        detail for detail in details
+        if not detail.rationale.strip() or (detail.level is not None and not detail.confidence)
+    ]
+    missing = len(summary.missing)
+    return {
+        "impact": band_list(summary.impact),
+        "top": top,
+        "text": text,
+        "checks": [
+            {"label": "پروفایل تمام‌صفر نیست", "ok": not summary.problems},
+            {
+                "label": "دلیل و اطمینان برای همه‌ی خانه‌های ثبت‌شده"
+                if not unexplained
+                else f"{fa(len(unexplained))} خانه دلیل یا اطمینان ندارد",
+                "ok": not unexplained,
+            },
+            {"label": f"{fa(missing)} خانه هنوز ثبت نشده" if missing else "همه‌ی خانه‌ها ثبت شده", "ok": not missing},
+        ],
+    }
+
+
 def impact_forms(context):
     """همه‌ی فرم‌های پروفایل پیامد، برای خواندن خطاهای فرستادن ناموفق."""
     return [form for group in context["groups"] for form in group["forms"]]
@@ -634,9 +702,17 @@ def impact_profile(context, request):
                 "rows": rows,
             }
         )
+    saved = assessment.impacts.aggregate(at=Max("updated_at"))["at"]
     return {
         "title": f"پروفایل پیامد ارزیابی {assessment.get_kind_display()} {assessment.code}",
         "cancel_url": assessment.get_absolute_url(),
         "intro": IMPACT_INTRO,
         "groups": groups,
+        "assessment": {
+            **_header(assessment),
+            "stakeholders": [group["name"] for group in groups],
+            "saved_at": fmt.moment(saved) if saved else None,
+        },
+        "overview": _impact_overview(assessment),
+        "note": IMPACT_NOTE,
     }

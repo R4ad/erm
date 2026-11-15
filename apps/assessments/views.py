@@ -315,7 +315,10 @@ class ImpactProfileView(EditableAssessmentMixin, TemplateView):
             for form in forms:
                 form.save(self.assessment)
         messages.success(request, f"پروفایل پیامد ارزیابی {self.assessment.code} ذخیره شد.")
-        return redirect(self.assessment.get_absolute_url())
+        # «ذخیره‌ی پیش‌نویس» در همین صفحه می‌ماند و «ادامه» به گام بعدی پرونده، عامل آغازگر، می‌رود (فیگما ۰۶).
+        if request.POST.get("next") == "initiator":
+            return redirect("assessments:initiator", self.assessment.pk)
+        return redirect("assessments:impact_profile", self.assessment.pk)
 
 
 def evidence_choices(risk, current=()):

@@ -56,3 +56,15 @@ export function useSectionFromHash(ready: boolean) {
     document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({ block: "start" });
   }, [ready, hash]);
 }
+
+function subscribeMinute(notify: () => void) {
+  const timer = window.setInterval(notify, 30_000);
+  return () => window.clearInterval(timer);
+}
+
+const minuteNow = () => Math.floor(Date.now() / 60_000) * 60_000;
+
+/** ساعت دیواری با دقت دقیقه برای «۲ دقیقه پیش»؛ هر دقیقه دوباره رندر می‌کند. */
+export function useNow(): number {
+  return useSyncExternalStore(subscribeMinute, minuteNow, minuteNow);
+}

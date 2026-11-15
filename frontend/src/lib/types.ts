@@ -660,6 +660,10 @@ export interface FormPageData {
   guides?: FormGuide[];
   // پروفایل پیامد: چند فرم با پیشوند، یک گروه برای هر ذی‌نفع
   groups?: ImpactGroup[];
+  /** سرپرونده و کارت خلاصه‌ی پروفایل پیامد (فیگما ۰۶). */
+  assessment?: AssessmentHeader & { stakeholders: string[]; saved_at: Moment | null };
+  overview?: ImpactOverview;
+  note?: string;
   // بازسنجی طرح مواجهه: مقایسه‌ی مبنا، ارزیابی تازه و هدف، و اقدام‌هایی که هنوز تأیید نشده‌اند
   comparison?: Comparison;
   open_actions?: { code: string; href: string; status: ActionStatus }[];
@@ -698,6 +702,14 @@ export interface ImpactRow extends FormSchema {
   scale: { code: string; name: string };
   suggestion: { level: number | null; note: string } | null;
   provisional_note: string;
+}
+
+/** I از آنچه ذخیره شده، خانه‌ای که از آن آمده و سه بررسی پروفایل. */
+export interface ImpactOverview {
+  impact: [number, number] | null;
+  top: { code: string; name: string; stakeholder: string } | null;
+  text: string;
+  checks: { label: string; ok: boolean }[];
 }
 
 export interface ImpactGroup {

@@ -1890,6 +1890,22 @@ export function impactProfileForm(): FormPageData {
     cancel: { href: "/assessments/1/", route: "/assessments/1" },
     messages: [],
     intro: "برای داتین و هر بانک متأثر، سطح هر بُعد را با دلیل و شاهد ثبت کنید.",
+    assessment: {
+      ...assessmentDetail().assessment,
+      stakeholders: ["داتین", "بانک آزمون"],
+      saved_at: null,
+    },
+    overview: {
+      impact: null,
+      top: null,
+      text: "۳ خانه‌ی نامعلوم یا ثبت‌نشده می‌تواند I را بالاتر ببرد.",
+      checks: [
+        { label: "پروفایل تمام‌صفر نیست", ok: true },
+        { label: "دلیل و اطمینان برای همه‌ی خانه‌های ثبت‌شده", ok: false },
+        { label: "۳ خانه هنوز ثبت نشده", ok: false },
+      ],
+    },
+    note: "سطح S از مدت اختلال و RTO/MTPD همان بانک پیشنهاد می‌شود.",
     groups: [
       {
         name: "داتین",
