@@ -132,8 +132,36 @@ def transitions(risk, user, available):
     ]
 
 
+def floor_for(version, impact):
+    """کف پیامدی که برای این I برقرار است (بالاترین سطح میان کف‌های min_impact ≤ I)، یا None."""
+    floors = [floor for floor in version.impact_floors.select_related("min_level") if impact >= floor.min_impact]
+    return max(floors, key=lambda row: row.min_level.rank, default=None)
+
+
+def level_reason(version, impact, score, base, decision, escalation_reasons=()):
+    """کف پیامد، سطح پایه و قاعده‌های تقدم به زبان کاربر (بخش ۱۸)؛ پرونده‌ی ریسک و پرونده‌ی ارزیابی هر دو آن را
+    نشان می‌دهند."""
+    if impact is None or score is None or decision is None:
+        return ""
+    parts = []
+    floor = floor_for(version, impact)
+    sentence = f"سطح پایه‌ی امتیاز {fa(score)} «{base.name}» است" if base else ""
+    if floor and base:
+        if floor.min_level.rank > base.rank:
+            parts.append(f"کف پیامد برای I={fa(impact)} دست‌کم «{floor.min_level.name}» است؛ {sentence}، پس کف سطح "
+                         f"را به «{floor.min_level.name}» رساند.")
+        else:
+            parts.append(f"کف پیامد برای I={fa(impact)} دست‌کم «{floor.min_level.name}» است؛ {sentence}، پس کف "
+                         "تغییری نداد.")
+    elif sentence:
+        parts.append(f"{sentence}.")
+    if escalation_reasons:
+        parts.append(f"قاعده‌ی تقدم سطح تصمیم را «{decision.name}» کرد: {'، '.join(escalation_reasons)}.")
+    return " ".join(parts)
+
+
 def explanation(assessment):
-    """دلیل سطح تصمیم به زبان کاربر (بخش ۱۸): پیامد غالب، کف پیامد، سطح پایه و قاعده‌های تقدم."""
+    """دلیل سطح تصمیم ارزیابی تأییدشده: پیامد غالب، کف پیامد، سطح پایه و قاعده‌های تقدم."""
     impact, score = assessment.impact_high, assessment.score_high
     if impact is None or score is None or assessment.decision_level is None:
         return ""
@@ -148,23 +176,13 @@ def explanation(assessment):
     if detail and (detail.level_high or detail.level) == impact:
         whom = f" برای {detail.customer.name}" if detail.customer_id else ""
         parts.append(f"پیامد I از بُعد {detail.scale.code} ({detail.scale.name}){whom} برابر {fa(impact)} است.")
-    floors = [floor for floor in assessment.method_version.impact_floors.select_related("min_level") if impact >= floor.min_impact]
-    floor = max(floors, key=lambda row: row.min_level.rank, default=None)
-    base = assessment.base_level
-    sentence = f"سطح پایه‌ی امتیاز {fa(score)} «{base.name}» است" if base else ""
-    if floor and base:
-        if floor.min_level.rank > base.rank:
-            parts.append(f"کف پیامد برای I={fa(impact)} دست‌کم «{floor.min_level.name}» است؛ {sentence}، پس کف سطح "
-                         f"را به «{floor.min_level.name}» رساند.")
-        else:
-            parts.append(f"کف پیامد برای I={fa(impact)} دست‌کم «{floor.min_level.name}» است؛ {sentence}، پس کف "
-                         "تغییری نداد.")
-    elif sentence:
-        parts.append(f"{sentence}.")
-    if assessment.escalation_reasons:
-        parts.append(f"قاعده‌ی تقدم سطح تصمیم را «{assessment.decision_level.name}» کرد: "
-                     f"{'، '.join(assessment.escalation_reasons)}.")
-    return " ".join(parts)
+    parts.append(
+        level_reason(
+            assessment.method_version, impact, score, assessment.base_level, assessment.decision_level,
+            assessment.escalation_reasons,
+        )
+    )
+    return " ".join(part for part in parts if part)
 
 
 FLAGS = ["رویداد در حال وقوع", "منع الزام‌آور", "عبور از حد تحمل مشتری"]

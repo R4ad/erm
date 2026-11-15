@@ -310,7 +310,9 @@ describe("risk dossier", () => {
     expect(await screen.findByRole("heading", { name: "مقایسه‌ی ارزیابی‌ها", level: 1 })).toBeInTheDocument();
     expect(router.state.location.pathname + router.state.location.search).toBe("/assessments/compare?id=2&id=1");
     await user.click(screen.getByRole("link", { name: "AS-1405-0001" }));
-    expect(await screen.findByRole("heading", { name: "ارزیابی جاری AS-1405-0001", level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "ارزیابی جاری — ریسک آزمون شماره‌ی ۱", level: 1 }),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/assessments/1");
   });
 });

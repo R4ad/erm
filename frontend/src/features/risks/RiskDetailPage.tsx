@@ -22,8 +22,9 @@ import { LevelBadge, RISK_CLASSES, riskKey, ScoreChip } from "@/components/ui/le
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MenuLink } from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
-import { useGoTo, useRouteOf } from "@/features/session/links";
+import { useGoTo } from "@/features/session/links";
 import { get } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { dateTime, fa, faText, longDate, safeExternalUrl, shortDate } from "@/lib/format";
@@ -92,30 +93,6 @@ function Related({ risk }: { risk: RelatedRisk }) {
 }
 
 /** یک کار در منوها: در همین رابط اگر صفحه‌اش هست، وگرنه صفحه‌ی جنگو با نشانه‌اش. */
-function MenuLink({ href, label, icon }: { href: string; label: string; icon: IconName }) {
-  const route = useRouteOf()(href);
-  const content = (
-    <>
-      <Icon name={icon} size={16} />
-      {label}
-    </>
-  );
-  return (
-    <DropdownMenuItem asChild>
-      {route ? (
-        <Link to={route} viewTransition>
-          {content}
-        </Link>
-      ) : (
-        <a href={href}>
-          {content}
-          <span className="sr-only">({t("shell.classic")})</span>
-        </a>
-      )}
-    </DropdownMenuItem>
-  );
-}
-
 const TRANSITION_ICONS: Record<string, IconName> = {
   send_to_assessment: "flow",
   back_to_register: "list",

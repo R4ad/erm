@@ -7,11 +7,15 @@ from decimal import Decimal
 from django.urls import reverse
 
 from apps.assessments.forms import ReferralForm, ReviewForm
+from apps.assessments.models import AssessmentReview
+from apps.assessments.results import submission_checks
 from apps.assessments.services import band_list
+from apps.methodology.services import MethodTables
 from apps.risks.permissions import can_add_evidence, visible_evidence
 
 from . import formatting as fmt
 from .forms import describe_field, describe_form
+from .risk_record import fa, floor_for, level_reason
 
 DATIN = "داتین"
 
@@ -155,11 +159,14 @@ def _initiator(assessment, likelihood):
     }
 
 
-def _path(row, can_edit):
+def _path(row, can_edit, scenario_b=None):
     path, result = row.path, row.result
     return {
         "id": path.pk,
         "name": path.name,
+        "evidence": _evidence(path.evidence.all()),
+        # مسیری که B سناریو از آن آمده (بیشترین B مسیرها)؛ فیگما ۰۵ آن را برجسته می‌کند.
+        "determining": bool(result and result.b and scenario_b is not None and result.b.high == scenario_b),
         "description": path.description,
         "independent": path.independent,
         "independence_rationale": path.independence_rationale,
@@ -194,7 +201,9 @@ def _likelihood(assessment, likelihood, can_edit):
         "incomplete": [str(reason) for reason in likelihood.incomplete],
         "blockers": [str(blocker) for blocker in likelihood.blockers],
         "initiator": _initiator(assessment, likelihood),
-        "paths": [_path(row, can_edit) for row in likelihood.paths],
+        "paths": [
+            _path(row, can_edit, likelihood.b.high if likelihood.b else None) for row in likelihood.paths
+        ],
     }
 
 
@@ -223,6 +232,169 @@ def _impacts(summary):
             {"code": scale.code, "name": scale.name, "cells": [_impact_cell(detail) for detail in cells]}
             for scale, cells in summary.rows
         ],
+    }
+
+
+CHECKS = [
+    ("owner", "مالک فعال، خدمت و دست‌کم یک بانک"),
+    ("scope", "افق، فرض‌ها و موعد هدف"),
+    ("initiator", "A با دلیل و شاهد"),
+    ("paths", "دست‌کم یک مسیر تحقق با B0 و اطمینان"),
+    ("impacts", "دلیل و اطمینان برای همه‌ی خانه‌های پیامد"),
+    ("impact_evidence", "شاهد برای سطح‌های مثبت پیامد"),
+    ("escalation", "دلیل و شاهد قاعده‌ی تقدم"),
+    ("engine", "ورودی‌های موتور معتبرند؛ نتیجه ناقص نیست"),
+]
+
+
+def _checks(assessment, outcome):
+    """«بررسی‌های پیش از تأیید» فیگما: هر گروه از قاعده‌های مسدودکننده با برقرار بودن یا نبودنش. ارزیابی
+    تأییدشده قفل است و بررسی‌هایش هنگام تأیید برقرار بوده، پس None."""
+    if assessment.is_approved:
+        return None
+    found = {}
+    for group, problem in submission_checks(assessment):
+        found.setdefault(group, []).append(str(problem))
+    found.setdefault("engine", []).extend(str(reason) for reason in outcome.incomplete_reasons)
+    rows = []
+    for key, label in CHECKS:
+        if key == "escalation" and not assessment.has_escalation_flag:
+            continue
+        if key == "initiator":
+            codes = [item.code for item in assessment.a_evidence.all()]
+            label = f"A با شاهد ({'، '.join(codes)})" if codes else label
+        problems = list(dict.fromkeys(found.get(key, [])))
+        rows.append({"key": key, "label": label, "ok": not problems, "problems": problems})
+    return rows
+
+
+def _steps(assessment, outcome, likelihood, summary, checks):
+    """شش گام بالای پرونده‌ی ارزیابی فیگما: دامنه، پیامد، A، مسیرها، نتیجه و کنترل کیفیت."""
+    risk = assessment.risk
+    impact = summary.impact.high if summary.impact else None
+    b = likelihood.b.high if likelihood.b else None
+    warnings = sum(len(row["problems"]) for row in checks or [] if not row["ok"])
+    scope_ok = bool(risk.initiator.strip() and (risk.realization_path.strip() or risk.scope.strip()))
+    rows = [
+        ("scope", "دامنه و سناریو", scope_ok, "مرز آغازگر روشن" if scope_ok else "مرز آغازگر نیازمند تکمیل"),
+        (
+            "impacts", "پروفایل پیامد", impact is not None,
+            f"ذی‌نفع {fa(len(summary.stakeholders))} · I = {fa(impact)}" if impact is not None else "ناقص",
+        ),
+        (
+            "initiator", "عامل آغازگر (A)", assessment.a_recorded,
+            f"{fa(assessment.a_evidence.count())} شاهد · A = {fa(assessment.a_display)}"
+            if assessment.a_recorded else "ثبت نشده",
+        ),
+        (
+            "paths", "مسیرهای تحقق", b is not None,
+            f"{fa(len(likelihood.paths))} مسیر · B = {fa(b)}" if b is not None else f"{fa(len(likelihood.paths))} مسیر",
+        ),
+        (
+            "result", "نتیجه و تصمیم", assessment.is_approved,
+            outcome.decision_level.name if assessment.is_approved and outcome.decision_level else "موقت تا تأیید",
+        ),
+        (
+            "review", "کنترل کیفیت", assessment.is_approved,
+            "تأییدشده" if assessment.is_approved else (f"{fa(warnings)} هشدار" if warnings else "بدون هشدار"),
+        ),
+    ]
+    current = next((index for index, row in enumerate(rows) if not row[2]), None)
+    return [
+        {
+            "key": key,
+            "label": label,
+            "sub": sub,
+            "state": "done" if ok else ("current" if index == current else "todo"),
+            "warning": key == "review" and bool(warnings) and not ok,
+        }
+        for index, (key, label, ok, sub) in enumerate(rows)
+    ]
+
+
+def _chain(assessment, outcome, likelihood, summary):
+    """«زنجیره‌ی محاسبه»: A و B ⇒ L از جدول A×B، × I = امتیاز ⇒ سطح تصمیم، با جدول احتمال نسخه‌ی روش."""
+    version = assessment.method_version
+    tables = MethodTables(version)
+    a = assessment.a_high or assessment.a
+    b = likelihood.b.high if likelihood.b else None
+    level_l = outcome.likelihood.high if outcome.likelihood else None
+    impact = outcome.impact.high if outcome.impact else None
+    score = outcome.decision_score
+    l_scale = next((scale for scale in version.scales.all() if scale.code == "L"), None)
+    l_name = ""
+    if l_scale and level_l is not None:
+        found = next((level for level in l_scale.levels.all() if level.value == level_l), None)
+        l_name = found.name if found and found.name else ""
+    source = ""
+    if impact is not None:
+        for cell, detail in summary.cells:
+            if detail is not None and detail.engine_level is not None and (detail.level_high or detail.level) == impact:
+                source = f"{cell.dimension} · {cell.stakeholder}"
+                break
+    floor = floor_for(version, impact) if impact is not None else None
+    notes = []
+    determining = [row.path.name for row in likelihood.paths if row.result and row.result.b and row.result.b.high == b]
+    if determining:
+        notes.append({"icon": "check", "text": (
+            "هر مسیر: B = کمتر از B0 و Bc؛ سناریو: B = بیشترین B مسیرها ⇒ "
+            f"{'، '.join(f'«{name}»' for name in determining)} با B = {fa(b)} تعیین‌کننده است."
+        )})
+    elif not likelihood.paths:
+        notes.append({"icon": "info", "text": "هنوز مسیر تحققی ثبت نشده است؛ B از مسیرها می‌آید."})
+    if a is not None and b is not None and level_l is not None:
+        named = f" ({l_name})" if l_name else ""
+        notes.append({"icon": "check", "text": (
+            f"جدول احتمال نسخه‌ی {fa(version.number)} برای A{fa(a)} و B{fa(b)} مقدار L = {fa(level_l)}{named} می‌دهد."
+        )})
+    reason = level_reason(version, impact, score, outcome.base_level, outcome.decision_level, outcome.escalation_reasons)
+    if reason:
+        notes.append({"icon": "info", "text": reason})
+    notes.append({"icon": "info", "text": "امتیاز در خروجی ویرایش نمی‌شود و کنترل دوباره در حاصل‌ضرب اعمال نمی‌شود."})
+    return {
+        "a": assessment.a_display if assessment.a_recorded else None,
+        "a_basis": assessment.get_a_basis_display() if assessment.a_recorded else "",
+        "b": band_list(likelihood.b),
+        "likelihood": band_list(outcome.likelihood),
+        "likelihood_name": l_name,
+        "impact": band_list(outcome.impact),
+        "impact_source": source,
+        "score": band_list(outcome.score),
+        "base_level": fmt.level(outcome.base_level),
+        "decision_level": fmt.level(outcome.decision_level),
+        "floor": f"کف I={fa(impact)}: {floor.min_level.name}" if floor else "",
+        "grid": {
+            "a": a,
+            "b": b,
+            "rows": [{"a": row_a, "cells": cells} for row_a, cells in tables.likelihood_grid()],
+        },
+        "notes": notes,
+    }
+
+
+CONFIDENCE_KEYS = {"کم": "low", "متوسط": "medium", "زیاد": "high"}
+
+
+def _flags(assessment, outcome):
+    return {
+        "items": [
+            {"label": "رویداد در حال وقوع", "on": assessment.ongoing_incident},
+            {"label": "منع الزام‌آور (خارج از اختیار پذیرش)", "on": assessment.binding_prohibition},
+            {"label": "عبور از حد تحمل مشتری", "on": assessment.customer_tolerance_exceeded},
+        ],
+        "confidence": outcome.confidence_label,
+        "confidence_key": CONFIDENCE_KEYS.get(outcome.confidence_label, ""),
+    }
+
+
+def _people(reviews):
+    """ارسال‌کننده و کنترل‌کننده‌ی سرپرونده از سابقه‌ی کنترل کیفیت: آخرین ارسال و آخرین تصمیم."""
+    reviews = list(reviews)  # تازه‌ترین اول، طبق Meta.ordering
+    submitted = next((item for item in reviews if item.action == AssessmentReview.Action.SUBMIT), None)
+    decided = next((item for item in reviews if item.action != AssessmentReview.Action.SUBMIT), None)
+    return {
+        "submitted_at": fmt.moment(submitted.created_at) if submitted else None,
+        "reviewer": fmt.person(decided.created_by) if decided else None,
     }
 
 
@@ -261,9 +433,14 @@ def assessment_detail(context, request):
             ("مشتری سناریو", str(snapshot.get("customer", ""))),
             ("نوع و دامنه پیامد", str(snapshot.get("consequence", ""))),
         ])
+    checks = _checks(assessment, context["outcome"])
     return {
         "title": _title(assessment),
-        "assessment": _header(assessment),
+        "assessment": {**_header(assessment), **_people(context["reviews"])},
+        "steps": _steps(assessment, context["outcome"], context["likelihood"], context["summary"], checks),
+        "chain": _chain(assessment, context["outcome"], context["likelihood"], context["summary"]),
+        "checks": checks,
+        "flags": _flags(assessment, context["outcome"]),
         "risk_details": [{"label": label, "value": value} for label, value in risk_rows],
         "outcome": _outcome(context["outcome"], assessment),
         "review": _review(context, assessment),

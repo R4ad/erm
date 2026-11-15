@@ -910,6 +910,9 @@ export interface AssessmentHeader {
     evidence: EvidenceRef[];
   } | null;
   href: string;
+  /** آخرین ارسال برای کنترل کیفیت و آخرین کسی که درباره‌اش تصمیم گرفت (سرپرونده‌ی فیگما ۰۵). */
+  submitted_at?: Moment | null;
+  reviewer?: Person | null;
 }
 
 export interface AssessmentOutcome {
@@ -953,6 +956,10 @@ export interface AssessmentReview {
 export interface AssessmentPath {
   id: number;
   name: string;
+  /** شواهد B0 مسیر. */
+  evidence: EvidenceRef[];
+  /** B سناریو از این مسیر آمده است. */
+  determining: boolean;
   description: string;
   independent: boolean;
   independence_rationale: string;
@@ -1011,7 +1018,50 @@ export interface AssessmentImpacts {
   rows: { code: string; name: string; cells: (ImpactCell | null)[] }[];
 }
 
+export interface AssessmentStep {
+  key: "scope" | "impacts" | "initiator" | "paths" | "result" | "review";
+  label: string;
+  sub: string;
+  state: "done" | "current" | "todo";
+  warning: boolean;
+}
+
+/** «زنجیره‌ی محاسبه»ی فیگما ۰۵؛ همه از موتور محاسبه و نسخه‌ی روش ارزیابی. */
+export interface AssessmentChain {
+  a: string | null;
+  a_basis: string;
+  b: [number, number] | null;
+  likelihood: [number, number] | null;
+  likelihood_name: string;
+  impact: [number, number] | null;
+  impact_source: string;
+  score: [number, number] | null;
+  base_level: Level | null;
+  decision_level: Level | null;
+  floor: string;
+  grid: { a: number | null; b: number | null; rows: { a: number; cells: (number | null)[] }[] };
+  notes: { icon: "check" | "info"; text: string }[];
+}
+
+export interface AssessmentCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  problems: string[];
+}
+
+export interface AssessmentFlags {
+  items: { label: string; on: boolean }[];
+  confidence: string;
+  confidence_key: "" | "low" | "medium" | "high";
+}
+
 export interface AssessmentDetail {
+  steps: AssessmentStep[];
+  chain: AssessmentChain;
+  /** بررسی‌های پیش از تأیید؛ ارزیابی تأییدشده null. */
+  checks: AssessmentCheck[] | null;
+  flags: AssessmentFlags;
   risk_details?: { label: string; value: string }[];
   view: string;
   title: string;

@@ -1647,6 +1647,56 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
       approved_at: null,
       escalation: null,
       href: "/assessments/1/",
+      submitted_at: null,
+      reviewer: null,
+    },
+    steps: [
+      { key: "scope", label: "دامنه و سناریو", sub: "مرز آغازگر روشن", state: "done", warning: false },
+      { key: "impacts", label: "پروفایل پیامد", sub: "ذی‌نفع ۲ · I = ۳", state: "done", warning: false },
+      { key: "initiator", label: "عامل آغازگر (A)", sub: "۱ شاهد · A = ۲", state: "done", warning: false },
+      { key: "paths", label: "مسیرهای تحقق", sub: "۱ مسیر · B = ۳", state: "done", warning: false },
+      { key: "result", label: "نتیجه و تصمیم", sub: "موقت تا تأیید", state: "current", warning: false },
+      { key: "review", label: "کنترل کیفیت", sub: "۱ هشدار", state: "todo", warning: true },
+    ],
+    chain: {
+      a: "2",
+      a_basis: "شواهد آینده‌نگر",
+      b: [3, 3],
+      likelihood: [2, 2],
+      likelihood_name: "کم",
+      impact: [3, 3],
+      impact_source: "S · بانک آزمون",
+      score: [6, 6],
+      base_level: levels.medium,
+      decision_level: levels.medium,
+      floor: "کف I=۳: پایین",
+      grid: {
+        a: 2,
+        b: 3,
+        rows: [1, 2, 3].map((a) => ({ a, cells: [1, 2, 3].map((b) => Math.min(a, b)) })),
+      },
+      notes: [
+        { icon: "check", text: "«مسیر آزمون» با B = ۳ تعیین‌کننده است." },
+        { icon: "info", text: "امتیاز در خروجی ویرایش نمی‌شود و کنترل دوباره در حاصل‌ضرب اعمال نمی‌شود." },
+      ],
+    },
+    checks: [
+      { key: "owner", label: "مالک فعال، خدمت و دست‌کم یک بانک", ok: true, problems: [] },
+      {
+        key: "impact_evidence",
+        label: "شاهد برای سطح‌های مثبت پیامد",
+        ok: false,
+        problems: ["خانه‌ی S · بانک آزمون (سطح ۳) شاهد ندارد"],
+      },
+    ],
+    flags: {
+      items: [
+        { label: "رویداد در حال وقوع", on: false },
+        { label: "منع الزام‌آور (خارج از اختیار پذیرش)", on: false },
+        { label: "عبور از حد تحمل مشتری", on: true },
+      ],
+      confidence: "متوسط",
+      confidence_key: "medium",
     },
     outcome: {
       provisional: true,
@@ -1700,6 +1750,8 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
         {
           id: 1,
           name: "مسیر آزمون",
+          evidence: [{ code: "EV-1405-0002", href: "/risks/evidence/2/" }],
+          determining: false,
           description: "مراحل مسیر آزمون",
           independent: false,
           independence_rationale: "",
@@ -1743,7 +1795,11 @@ export function assessmentInReview(): AssessmentDetail {
   const data = assessmentDetail();
   return {
     ...data,
-    assessment: { ...data.assessment, status: { value: "in_qc", label: "در کنترل کیفیت" } },
+    assessment: {
+      ...data.assessment,
+      status: { value: "in_qc", label: "در کنترل کیفیت" },
+      submitted_at: assessmentAt,
+    },
     review: {
       ...data.review,
       can_submit: false,

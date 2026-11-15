@@ -20,7 +20,7 @@ from apps.actions.models import (
     TreatmentAction,
     TreatmentPlan,
 )
-from apps.assessments.models import Assessment, ImpactDetail
+from apps.assessments.models import Assessment, AssessmentReview, ImpactDetail, Path
 from apps.catalog.models import Customer, Dependency, Responsibility, Service, Supplier
 from apps.controls.effectiveness import Thresholds
 from apps.controls.models import Control, ControlAssessment, IsoControl
@@ -383,7 +383,6 @@ class Command(BaseCommand):
         replication = evidence("گزارش پایش تکثیر پایگاه داده", E.Kind.TEST, E.Reliability.MEDIUM, 25)
         disk = evidence("داشبورد ظرفیت ذخیره‌ساز", E.Kind.STATISTICS, E.Reliability.MEDIUM, 30)
 
-        sample = Thresholds.of(self.version).sample
         controls = [
             ("مدیریت تغییر با تأیید CAB", Control.Kind.PREVENTIVE, True, "8.32", 4, cab),
             ("تکثیر غیرهم‌زمان پایگاه داده به سایت دوم", Control.Kind.RECOVERY, True, "8.14", 3, replication),
@@ -391,23 +390,7 @@ class Command(BaseCommand):
             ("رویه‌ی بازیابی مستند و مانور سالانه", Control.Kind.RECOVERY, False, "5.30", None, None),
         ]
         for title, kind, key, iso, e, proof in controls:
-            control = Control.objects.create(
-                title=title, objective=title, kind=kind, owner=self.ali, operated_by=Responsibility.DATIN, is_key=key
-            )
-            control.iso_controls.add(IsoControl.objects.get(code=iso))
-            risk.controls.add(control)
-            if e is None:
-                continue
-            test = ControlAssessment(
-                control=control, method_version=self.version, scope="پایگاه داده‌ی ساتنا در سایت اصلی و دوم",
-                exists=True, design_ok=e >= 3, operating_ok=True, coverage_pct=100 if e >= 3 else 60,
-                critical_points_covered=e >= 3, sample_size=sample if e >= 3 else 5,
-                test_from=self.today - timedelta(days=50), test_to=self.today - timedelta(days=20),
-                sustained=e >= 4, e=e, confidence=Confidence.MEDIUM, rationale=f"شرط‌های E{e} برقرار است.",
-                verified_by=self.sara if e >= 3 else None, created_by=self.sara,
-            )
-            test.save()
-            test.evidence.add(proof)
+            self.control(risk, title, kind, key, iso, e, proof)
 
         for kind, ref in [
             (ExternalLink.Kind.INCIDENT, "INC-20431"),
@@ -426,6 +409,96 @@ class Command(BaseCommand):
         self.action(plan, "مانور بازیابی فصلی با سناریوی خرابی دیسک", AS.PLANNED, self.mehdi, self.sara, 30)
         risk.refresh_from_db()
         return incident
+
+    def control(self, risk, title, kind, key, iso, e, proof):
+        """کنترل وصل به ریسک با یک ارزیابی اثربخشی که شرط‌های E خودش را دارد (e خالی یعنی بدون ارزیابی)."""
+        control = Control.objects.create(
+            title=title, objective=title, kind=kind, owner=self.ali, operated_by=Responsibility.DATIN, is_key=key
+        )
+        control.iso_controls.add(IsoControl.objects.get(code=iso))
+        risk.controls.add(control)
+        if e is None:
+            return control, None
+        sample = Thresholds.of(self.version).sample
+        test = ControlAssessment(
+            control=control, method_version=self.version, scope=f"دامنه‌ی {risk.service.name}",
+            exists=True, design_ok=e >= 3, operating_ok=True, coverage_pct=100 if e >= 3 else 60,
+            critical_points_covered=e >= 3, sample_size=sample if e >= 3 else 5,
+            test_from=self.today - timedelta(days=50), test_to=self.today - timedelta(days=20),
+            sustained=e >= 4, e=e, confidence=Confidence.MEDIUM, rationale=f"شرط‌های E{e} برقرار است.",
+            verified_by=self.sara if e >= 3 else None, created_by=self.sara,
+        )
+        test.save()
+        test.evidence.add(proof)
+        return control, test
+
+    def qc_assessment(self, risk):
+        """ارزیابی جاری در کنترل کیفیت برای صفحه‌ی ۰۵ فیگما، با ورودی‌های واقعی تا موتور محاسبه نتیجه‌ی موقت را حساب
+        کند: A، سه مسیر با کنترل‌های E۳، E۲ و E۴، پروفایل پیامد کامل جز شاهد یک خانه، و یک برگشت با یادداشت."""
+        now = timezone.now()
+
+        def evidence(title, kind, days_ago):
+            item = Evidence.objects.create(
+                title=title, kind=kind, reliability=Evidence.Reliability.HIGH, summary=title,
+                source="واحد امنیت اطلاعات", observed_on=self.today - timedelta(days=days_ago), owner=self.maryam,
+            )
+            item.risks.add(risk)
+            return item
+
+        incident = evidence("گزارش رخداد توقف HSM در اردیبهشت", Evidence.Kind.INCIDENT, 120)
+        storage = evidence("گزارش سلامت ذخیره‌ساز HSM", Evidence.Kind.TEST, 15)
+        change = evidence("سوابق تغییر پیکربندی HSM", Evidence.Kind.TEST, 18)
+        _, replication = self.control(
+            risk, "تکثیر کلیدها به HSM پشتیبان", Control.Kind.PREVENTIVE, True, "8.14", 3, storage
+        )
+        _, monitoring = self.control(
+            risk, "پایش سلامت دیسک و ماژول HSM", Control.Kind.PREVENTIVE, False, "8.16", 2, storage
+        )
+        _, cab = self.control(risk, "تأیید CAB برای تغییر پیکربندی HSM", Control.Kind.PREVENTIVE, True, "8.32", 4, change)
+
+        assessment = Assessment(
+            risk=risk, kind=Assessment.Kind.CURRENT, method_version=self.version, created_by=self.neda,
+            horizon_months=12, assumptions="HSM پشتیبان در سایت دوم هم‌زمان نگه داشته می‌شود.",
+            a=3, a_basis="forward", a_confidence=Confidence.MEDIUM,
+            a_rationale="دو توقف در سه سال و هشدارهای سلامت ماژول در شش ماه اخیر.",
+        )
+        assessment._history_user = self.neda
+        assessment.save()
+        assessment.a_evidence.add(incident)
+        for name, b0, controls, proof in [
+            ("مسیر ۱ — خرابی دیسک ذخیره‌ساز اصلی بدون تکثیر به‌روز", 5, [replication, monitoring], storage),
+            ("مسیر ۲ — خطای انسانی در تغییر پیکربندی HSM", 3, [cab], change),
+            ("مسیر ۳ — دورزدن رویه‌ی تغییر با حساب مدیر اضطراری", 4, [], incident),
+        ]:
+            path = Path.objects.create(
+                assessment=assessment, name=name, description=name, b0=b0, b0_confidence=Confidence.MEDIUM,
+                b0_rationale="از شاهد رخداد و آزمون‌های اخیر.",
+            )
+            path.evidence.add(proof)
+            path.control_assessments.add(*controls)
+        levels = {
+            "S": [3, 3, 2, 4], "D": [1, 1, 1, 2], "F": [2, 2, 1, 3], "C": [1, 2, 1, 2], "R": [1, 1, 1, 2],
+        }
+        columns = [None, *risk.customers.order_by("name")]
+        for scale in self.version.scales.filter(kind="impact"):
+            for customer, level in zip(columns, levels.get(scale.code, [1, 1, 1, 1]), strict=False):
+                detail = ImpactDetail.objects.create(
+                    assessment=assessment, customer=customer, scale=scale, level=level,
+                    rationale=f"سطح {scale.name} از گزارش رخداد و قراردادها", confidence=Confidence.MEDIUM,
+                )
+                # خانه‌ی R بانک تجارت بی‌شاهد می‌ماند، تا «بررسی‌های پیش از تأیید» هشدار فیگما را نشان دهد.
+                if not (scale.code == "R" and customer is not None and customer.name == "بانک تجارت"):
+                    detail.evidence.add(incident)
+        Assessment.objects.filter(pk=assessment.pk).update(status=Assessment.Status.IN_QC)
+        for days_ago, action, by, notes in [
+            (3, AssessmentReview.Action.SUBMIT, self.neda, ""),
+            (2, AssessmentReview.Action.RETURN, self.sara,
+             "برای خانه‌ی R بانک تجارت یا شاهد اضافه کنید یا سطح را با دلیل به صفر برگردانید."),
+            (1, AssessmentReview.Action.SUBMIT, self.neda, "شاهد مسیرهای ۱ و ۲ اضافه شد."),
+        ]:
+            review = AssessmentReview.objects.create(assessment=assessment, action=action, notes=notes, created_by=by)
+            AssessmentReview.objects.filter(pk=review.pk).update(created_at=now - timedelta(days=days_ago))
+        return assessment
 
     def risks(self):
         # برنامه‌ی درمان: منتظر طرح، طرح منتظر تأیید مالک، طرح تأییدشده
@@ -475,7 +548,7 @@ class Command(BaseCommand):
 
         # در ارزیابی: یکی در کنترل کیفیت، یکی پیش‌نویس
         hsm = self.risk("خرابی HSM و توقف امضای تراکنش", "SRV-HSM", self.maryam, "T3", S.ASSESSMENT)
-        self.assessment(hsm, 3, 12, status=Assessment.Status.IN_QC)
+        self.qc_assessment(hsm)
         mb = self.risk("حمله‌ی credential stuffing به همراه‌بانک", "SRV-MB", self.hossein, "T1", S.ASSESSMENT)
         self.assessment(mb, 3, 10, status=Assessment.Status.DRAFT)
 
