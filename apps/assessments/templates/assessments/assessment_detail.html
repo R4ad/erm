@@ -31,9 +31,6 @@
   {% if assessment.target_due %}<dt class="col-sm-3">موعد تحقق هدف</dt><dd class="col-sm-9">{{ assessment.target_due|jformat:"%Y/%m/%d" }}</dd>{% endif %}
   {% if assessment.scope_snapshot %}<dt class="col-sm-3">دامنه هنگام تأیید</dt><dd class="col-sm-9">{{ assessment.scope_snapshot.service }}؛ {% for customer in assessment.scope_snapshot.customers %}{{ customer.name }}{% if not forloop.last %}، {% endif %}{% endfor %}</dd>{% endif %}
 
-  <dt class="col-sm-3">تاریخ جلسه‌ی کارگروه</dt>
-  <dd class="col-sm-9">{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}بدون جلسه (ارزیابی عادی){% endif %}</dd>
-
   <dt class="col-sm-3">فرض‌ها</dt>
   <dd class="col-sm-9">{{ assessment.assumptions|linebreaksbr|default:"-" }}</dd>
 
@@ -219,7 +216,7 @@
       </dd>
     {% endif %}
     <dt class="col-sm-3">A</dt>
-    <dd class="col-sm-9">{{ assessment.a_display }}{% if assessment.a_confidence %}، اطمینان {{ assessment.get_a_confidence_display }}{% endif %}</dd>
+    <dd class="col-sm-9">{{ assessment.a_display }}</dd>
     <dt class="col-sm-3">دلیل</dt>
     <dd class="col-sm-9">{{ assessment.a_rationale|linebreaksbr }}</dd>
     <dt class="col-sm-3">شواهد</dt>
@@ -252,7 +249,7 @@
             {% if row.path.exceptions %}<div class="small">استثناها: {{ row.path.exceptions|truncatechars:100 }}</div>{% endif %}
             {% for note in row.notes %}<div class="small text-danger">{{ note }}</div>{% endfor %}
           </td>
-          <td class="text-center" title="{{ row.path.b0_rationale }}">{{ row.path.b0_display }}{% if row.path.b0_confidence %}<div class="small text-body-secondary">اطمینان {{ row.path.get_b0_confidence_display }}</div>{% endif %}</td>
+          <td class="text-center" title="{{ row.path.b0_rationale }}">{{ row.path.b0_display }}</td>
           <td class="small">
             {% for item in row.controls %}
               <div>
@@ -321,7 +318,6 @@
               {% if detail %}
                 <span class="{% if detail.is_unknown %}text-warning-emphasis{% else %}fw-bold{% endif %}">{{ detail.level_display }}</span>
                 {% if detail.actual_value is not None %}<div class="small text-body-secondary">{{ detail.actual_value.normalize }} {{ detail.unit }}</div>{% endif %}
-                {% if detail.confidence %}<div class="small text-body-secondary">اطمینان {{ detail.get_confidence_display }}</div>{% endif %}
               {% else %}
                 <span class="text-body-secondary">-</span>
               {% endif %}
@@ -333,6 +329,6 @@
   </table>
 </div>
 <p class="small text-body-secondary">
-  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود.
+  صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود.
 </p>
 {% endblock %}

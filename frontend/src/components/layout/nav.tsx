@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
+import { formatNumber } from "@/lib/format";
 import { locale, t } from "@/lib/i18n";
 import type { NavGroup, NavLink } from "@/lib/types";
 
@@ -35,6 +36,18 @@ export function activeRoute(pathname: string, groups: NavGroup[]): string | null
   return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
+/** شمار نخوانده‌های یک صف. در منوی جمع‌شده فقط یک نقطه‌ی کوچک روی آیکون می‌ماند و عدد را راهنما می‌گوید. */
+function Badge({ value, collapsed }: { value: number; collapsed: boolean }) {
+  if (collapsed) {
+    return <span aria-hidden className="absolute end-3.5 top-2 size-1.5 rounded-full bg-accent-text" />;
+  }
+  return (
+    <span aria-hidden className="rounded-full bg-surface px-1.5 text-[0.6875rem] leading-5 font-medium text-fg tabular">
+      {formatNumber(value)}
+    </span>
+  );
+}
+
 function NavItem({
   link,
   active,
@@ -47,8 +60,9 @@ function NavItem({
   onNavigate?: () => void;
 }) {
   const Icon = NAV_ICONS[link.key] ?? FALLBACK_ICON;
+  const badge = link.badge ?? 0;
   const classes = cn(
-    "group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm text-muted transition-colors duration-150",
+    "group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm text-fg/75 transition-colors duration-150",
     "hover:bg-surface hover:text-fg",
     active && "bg-accent-soft font-medium text-fg hover:bg-accent-soft",
     collapsed && "justify-center px-0",
@@ -65,14 +79,21 @@ function NavItem({
       className={cn("size-[1.125rem] shrink-0 transition-colors", active ? "text-accent-text" : "group-hover:text-fg")}
     />
   );
-  const label = <span className={cn("min-w-0 flex-1 truncate", collapsed && "sr-only")}>{link.label}</span>;
+  const label = (
+    <span className={cn("min-w-0 flex-1 truncate", collapsed && "sr-only")}>
+      {link.label}
+      {badge > 0 && <span className="sr-only">، {formatNumber(badge)} مورد نخوانده</span>}
+    </span>
+  );
+  const tip = badge > 0 ? `${link.label} (${formatNumber(badge)})` : link.label;
 
   if (link.route === null) {
     return (
-      <Tooltip content={`${link.label}، ${t("shell.classic")}`} side={TIP_SIDE} disabled={!collapsed}>
+      <Tooltip content={`${tip}، ${t("shell.classic")}`} side={TIP_SIDE} disabled={!collapsed}>
         <a href={link.href} className={classes}>
           {icon}
           {label}
+          {badge > 0 && <Badge value={badge} collapsed={collapsed} />}
           {!collapsed && <SquareArrowOutUpLeft aria-hidden className="size-3.5 shrink-0 text-faint ltr:-scale-x-100" />}
           <span className="sr-only">({t("shell.classic")})</span>
         </a>
@@ -80,7 +101,7 @@ function NavItem({
     );
   }
   return (
-    <Tooltip content={link.label} side={TIP_SIDE} disabled={!collapsed}>
+    <Tooltip content={tip} side={TIP_SIDE} disabled={!collapsed}>
       <Link
         to={link.route}
         viewTransition
@@ -91,6 +112,7 @@ function NavItem({
         {indicator}
         {icon}
         {label}
+        {badge > 0 && <Badge value={badge} collapsed={collapsed} />}
       </Link>
     </Tooltip>
   );
@@ -106,15 +128,20 @@ interface NavGroupsProps {
 
 export function NavGroups({ groups, active, collapsed = false, onNavigate }: NavGroupsProps) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col">
       {groups.map((group, index) => {
         const id = `nav-group-${index}`;
         return (
-          <section key={group.title} aria-labelledby={id} className="flex flex-col gap-1">
+          <section
+            key={group.title}
+            aria-labelledby={id}
+            // خط جداکننده و فاصله‌ی بالا، گروه را از گروه قبل جدا می‌کند؛ عنوان گروه کوچک‌تر و کم‌رنگ‌تر از
+            // پیوندهاست تا با آن‌ها اشتباه نشود.
+            className={cn("flex flex-col gap-1", index > 0 && "mt-5 border-t border-line/70 pt-5")}
+          >
             <h2 id={id} className={cn("px-2.5 pb-1 text-[0.6875rem] font-medium text-muted", collapsed && "sr-only")}>
               {group.title}
             </h2>
-            {collapsed && index > 0 && <span aria-hidden className="mx-3 mb-1 h-px bg-line" />}
             <ul className="flex flex-col gap-0.5">
               {group.items.map((link) => (
                 <li key={link.key}>

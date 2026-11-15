@@ -44,7 +44,7 @@ def test_the_dossier_shows_the_engine_result_and_what_the_user_may_do(api, grc, 
     assert data["view"] == "assessments:assessment_detail"
     assert data["title"] == f"ارزیابی جاری {ready.code}"
     assert data["assessment"]["risk"]["code"] == ready.risk.code
-    assert data["assessment"]["meeting_date"]["jalali"] == "1405/07/28"
+    assert "meeting_date" not in data["assessment"]
     outcome = data["outcome"]
     assert outcome["score"] == [6, 6] and outcome["decision_level"]["name"] == "متوسط"
     assert outcome["likelihood"] == [2, 2] and outcome["provisional"] is True

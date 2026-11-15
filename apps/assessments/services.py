@@ -148,17 +148,19 @@ class StakeholderFacts:
     label: str = ""
 
 
-def stakeholder_facts(assessment, customer):
+def stakeholder_facts(assessment, customer, on=None):
     service = assessment.risk.service
     critical = bool(service and service.is_critical)
     if customer is None:
         return StakeholderFacts(critical=critical, rto=None, mtpd=None, basis=None, label=DATIN)
     link = None
     if service:
-        # رابطه‌ی جاری خدمت و بانک؛ رابطه‌ای که «اعتبار تا»ی آن گذشته کنار می‌رود.
+        # فقط حدودی که در تاریخ ارزیابی معتبرند به کار می‌روند.
+        on = on or timezone.localdate()
         link = (
             ServiceCustomer.objects.filter(service=service, customer=customer)
-            .exclude(valid_until__lt=timezone.localdate())
+            .exclude(valid_from__gt=on)
+            .exclude(valid_until__lt=on)
             .order_by(F("valid_from").desc(nulls_last=True))
             .first()
         )

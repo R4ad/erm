@@ -524,22 +524,82 @@ export function session(): Session {
     today,
     navigation: [
       {
-        title: "کار روزانه",
+        title: "میز کار",
         items: [
           { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/" },
-          { key: "actions:notices", label: "اعلان‌های پایش", href: "/actions/notices/", route: "/actions/notices" },
+          {
+            key: "actions:notices",
+            label: "اعلان‌های پایش",
+            href: "/actions/notices/",
+            route: "/actions/notices",
+            badge: 2,
+          },
           { key: "reports:management", label: "گزارش مدیریتی", href: "/reports/", route: null },
+        ],
+      },
+      {
+        title: "شناسایی ریسک",
+        items: [
+          { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
+          { key: "risks:coverage", label: "جهان ریسک", href: "/risks/coverage/", route: "/risks/coverage" },
+          {
+            key: "risks:scenario_list",
+            label: "کتابخانه‌ی سناریو",
+            href: "/risks/scenarios/",
+            route: "/risks/scenarios",
+          },
+          { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
+          {
+            key: "workflow:change_request_list",
+            label: "ادغام و تفکیک",
+            href: "/workflow/requests/",
+            route: "/workflow/requests",
+          },
+        ],
+      },
+      {
+        title: "ارزیابی",
+        items: [
+          { key: "assessments:assessment_list", label: "ارزیابی ریسک", href: "/assessments/", route: "/assessments" },
+          { key: "methodology:active", label: "روش ارزیابی", href: "/method/", route: "/method" },
+          {
+            key: "risks:category_list",
+            label: "دسته‌های ریسک",
+            href: "/risks/categories/",
+            route: "/risks/categories",
+          },
+        ],
+      },
+      {
+        title: "مواجهه",
+        items: [
+          { key: "actions:action_list", label: "اقدام‌ها", href: "/actions/", route: "/actions" },
+          {
+            key: "actions:acceptance_list",
+            label: "پذیرش‌های ریسک",
+            href: "/actions/acceptances/",
+            route: "/actions/acceptances",
+          },
+          { key: "controls:control_list", label: "کتابخانه‌ی کنترل", href: "/controls/", route: "/controls" },
+          { key: "controls:soa_list", label: "بیانیه‌ی کاربردپذیری", href: "/controls/soa/", route: "/controls/soa" },
+        ],
+      },
+      {
+        title: "پرسشنامه",
+        items: [
           {
             key: "questionnaires:answer_home",
             label: "پاسخ به سؤال‌ها",
             href: "/questionnaires/",
             route: "/questionnaires",
           },
-        ],
-      },
-      {
-        title: "پرسشنامه",
-        items: [
+          {
+            key: "workflow:question_list",
+            label: "پرسش‌های ریسک",
+            href: "/workflow/questions/",
+            route: "/questionnaires/risk-questions",
+            badge: 1,
+          },
           {
             key: "questionnaires:response_list",
             label: "پاسخ‌ها و بررسی",
@@ -555,21 +615,31 @@ export function session(): Session {
         ],
       },
       {
-        title: "ریسک‌ها",
+        title: "کاتالوگ سازمان",
         items: [
-          { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
-          { key: "assessments:assessment_list", label: "ارزیابی ریسک", href: "/assessments/", route: "/assessments" },
-          { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
-          { key: "controls:control_list", label: "کتابخانه‌ی کنترل", href: "/controls/", route: "/controls" },
-          { key: "controls:soa_list", label: "بیانیه‌ی کاربردپذیری", href: "/controls/soa/", route: "/controls/soa" },
+          { key: "catalog:service_list", label: "خدمات", href: "/catalog/services/", route: "/catalog/services" },
+          {
+            key: "catalog:commitment_list",
+            label: "تعهدها",
+            href: "/catalog/commitments/",
+            route: "/catalog/commitments",
+          },
+          { key: "catalog:asset_list", label: "دارایی‌ها", href: "/catalog/assets/", route: "/catalog/assets" },
+          {
+            key: "catalog:supplier_list",
+            label: "تأمین‌کنندگان",
+            href: "/catalog/suppliers/",
+            route: "/catalog/suppliers",
+          },
+          { key: "catalog:customer_list", label: "بانک‌ها", href: "/catalog/customers/", route: "/catalog/customers" },
+          { key: "organization:unit_list", label: "ساختار سازمانی", href: "/units/", route: "/units" },
         ],
       },
       {
-        title: "خدمات و سازمان",
+        title: "مدیریت سامانه",
         items: [
-          { key: "catalog:service_list", label: "خدمات", href: "/catalog/services/", route: "/catalog/services" },
-          { key: "methodology:active", label: "روش ارزیابی", href: "/method/", route: "/method" },
-          { key: "organization:unit_list", label: "ساختار سازمانی", href: "/units/", route: "/units" },
+          { key: "accounts:user_list", label: "کاربران", href: "/accounts/users/", route: "/accounts/users" },
+          { key: "audit:event_list", label: "سوابق ممیزی", href: "/audit/", route: "/audit" },
         ],
       },
     ],
@@ -1241,12 +1311,11 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
     help: "برای برگشت و ارجاع اجباری است.",
     rows: 2,
   });
-  const cell = (level: string, confidence = "زیاد") => ({
+  const cell = (level: string) => ({
     level,
     unknown: false,
     value: null,
     unit: "",
-    confidence,
     rationale: "دلیل آزمونی",
   });
   return {
@@ -1262,7 +1331,6 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
       risk: { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" },
       method_version: { label: "نسخه‌ی 1: روش آزمون", number: 1, href: "/method/1/" },
       horizon_months: 12,
-      meeting_date: { iso: "2026-10-20", jalali: "1405/07/28" },
       assumptions: "",
       created_by: tester,
       created_at: assessmentAt,
@@ -1314,7 +1382,6 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
       initiator: {
         basis: { value: "forward", label: "شواهد آینده‌نگر" },
         rate: null,
-        confidence: "زیاد",
         rationale: "دلیل آزمونی A",
         evidence: [{ code: "EV-1405-0001", href: "/risks/evidence/1/" }],
       },
@@ -1328,7 +1395,6 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
           exceptions: "",
           notes: [],
           b0: "3",
-          b0_confidence: "زیاد",
           b0_rationale: "دلیل آزمونی B0",
           controls: [],
           bc: [5, 5],
@@ -1346,7 +1412,7 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
       missing: [],
       stakeholders: ["داتین", "بانک آزمون"],
       rows: [
-        { code: "S", name: "خدمت و تداوم", cells: [cell("0"), cell("3", "متوسط")] },
+        { code: "S", name: "خدمت و تداوم", cells: [cell("0"), cell("3")] },
         { code: "F", name: "مالی", cells: [cell("0"), null] },
       ],
     },
@@ -1398,26 +1464,8 @@ function impactRow(prefix: string, code: string, name: string, extra: Partial<Im
   ];
   const fields = [
     field({ name: `${prefix}-level`, label: "سطح", kind: "select", empty_label: "ثبت‌نشده", choices: levelChoices }),
-    field({
-      name: `${prefix}-level_high`,
-      label: "تا",
-      kind: "select",
-      empty_label: "-",
-      choices: ["1", "2", "3", "4", "5"].map((value) => ({ value, label: value })),
-    }),
     field({ name: `${prefix}-actual_value`, label: "مقدار واقعی", kind: "number" }),
     ...(code === "F" ? [field({ name: `${prefix}-basis`, label: "مبنای مالی (ریال)", kind: "number" })] : []),
-    field({
-      name: `${prefix}-confidence`,
-      label: "اطمینان",
-      kind: "select",
-      empty_label: "-",
-      choices: [
-        { value: "low", label: "کم" },
-        { value: "medium", label: "متوسط" },
-        { value: "high", label: "زیاد" },
-      ],
-    }),
     field({ name: `${prefix}-rationale`, label: "دلیل", kind: "textarea", rows: 2 }),
     field({
       name: `${prefix}-evidence`,
@@ -1442,13 +1490,7 @@ function impactRow(prefix: string, code: string, name: string, extra: Partial<Im
 /** پروفایل پیامد با داتین و یک بانک: هر کدام دو بُعد S و F. */
 export function impactProfileForm(): FormPageData {
   const datinS = impactRow("datin-S", "S", "خدمت و تداوم");
-  datinS.fields = datinS.fields.map((item) =>
-    item.name === "datin-S-level"
-      ? { ...item, value: "0" }
-      : item.name === "datin-S-confidence"
-        ? { ...item, value: "high" }
-        : item,
-  );
+  datinS.fields = datinS.fields.map((item) => (item.name === "datin-S-level" ? { ...item, value: "0" } : item));
   return {
     view: "assessments:impact_profile",
     title: "پروفایل پیامد ارزیابی جاری AS-1405-0001",

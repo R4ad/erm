@@ -22,19 +22,50 @@
 
       <div class="collapse navbar-collapse" id="main-menu">
         <ul class="navbar-nav">
+          {# همان گروه‌های منوی رابط تازه (apps/api/session.py): نام هر گروه مرحله‌ی خودش در روش است. #}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              ریسک‌ها
+              میز کار
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'actions:my_work' %}">کارهای من</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:notices' %}">اعلان‌های پایش</a></li>
+              <li><a class="dropdown-item" href="{% url 'reports:management' %}">گزارش مدیریتی</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              شناسایی ریسک
             </a>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item" href="{% url 'risks:risk_list' %}">رجیستر ریسک</a></li>
-              <li><a class="dropdown-item" href="{% url 'assessments:assessment_list' %}">ارزیابی ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'risks:coverage' %}">جهان ریسک</a></li>
               <li><a class="dropdown-item" href="{% url 'risks:scenario_list' %}">کتابخانه‌ی سناریو</a></li>
               <li><a class="dropdown-item" href="{% url 'risks:evidence_list' %}">شواهد</a></li>
               <li><a class="dropdown-item" href="{% url 'workflow:change_request_list' %}">ادغام و تفکیک</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{% url 'risks:coverage' %}">جهان ریسک</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              ارزیابی
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'assessments:assessment_list' %}">ارزیابی ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'methodology:active' %}">روش ارزیابی</a></li>
               <li><a class="dropdown-item" href="{% url 'risks:category_list' %}">دسته‌های ریسک</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              مواجهه
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'actions:action_list' %}">اقدام‌ها</a></li>
+              <li><a class="dropdown-item" href="{% url 'actions:acceptance_list' %}">پذیرش‌های ریسک</a></li>
+              <li><a class="dropdown-item" href="{% url 'controls:control_list' %}">کتابخانه‌ی کنترل</a></li>
+              {% if user|can_view_soa %}
+              <li><a class="dropdown-item" href="{% url 'controls:soa_list' %}">بیانیه‌ی کاربردپذیری</a></li>
+              {% endif %}
             </ul>
           </li>
           <li class="nav-item dropdown">
@@ -50,30 +81,7 @@
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              کنترل‌ها
-            </a>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="{% url 'controls:control_list' %}">کتابخانه‌ی کنترل</a></li>
-              {% if user|can_view_soa %}
-              <li><a class="dropdown-item" href="{% url 'controls:soa_list' %}">بیانیه‌ی کاربردپذیری</a></li>
-              {% endif %}
-            </ul>
-          </li>
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              اقدامات
-            </a>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="{% url 'actions:my_work' %}">کارهای من</a></li>
-              <li><a class="dropdown-item" href="{% url 'actions:notices' %}">اعلان‌های پایش</a></li>
-              <li><a class="dropdown-item" href="{% url 'actions:action_list' %}">اقدام‌ها</a></li>
-              <li><a class="dropdown-item" href="{% url 'actions:acceptance_list' %}">پذیرش‌های ریسک</a></li>
-            </ul>
-          </li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'reports:management' %}">گزارش‌ها</a></li>
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              خدمات و دارایی‌ها
+              کاتالوگ سازمان
             </a>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item" href="{% url 'catalog:service_list' %}">خدمات</a></li>
@@ -81,17 +89,25 @@
               <li><a class="dropdown-item" href="{% url 'catalog:asset_list' %}">دارایی‌ها</a></li>
               <li><a class="dropdown-item" href="{% url 'catalog:supplier_list' %}">تأمین‌کنندگان</a></li>
               <li><a class="dropdown-item" href="{% url 'catalog:customer_list' %}">بانک‌ها</a></li>
+              <li><a class="dropdown-item" href="{% url 'organization:unit_list' %}">ساختار سازمانی</a></li>
             </ul>
           </li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'methodology:active' %}">روش ارزیابی</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'organization:unit_list' %}">ساختار سازمانی</a></li>
-          {% if user.is_system_admin %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'accounts:user_list' %}">کاربران</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'accounts:staff_import' %}">ورود کارکنان</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'workcalendar:holiday_list' %}">تعطیلات</a></li>
-          {% endif %}
-          {% if user.can_view_audit_log %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'audit:event_list' %}">سوابق ممیزی</a></li>
+          {% if user.is_system_admin or user.can_view_audit_log %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              مدیریت سامانه
+            </a>
+            <ul class="dropdown-menu">
+              {% if user.is_system_admin %}
+              <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}">کاربران</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:staff_import' %}">ورود کارکنان</a></li>
+              <li><a class="dropdown-item" href="{% url 'workcalendar:holiday_list' %}">تعطیلات</a></li>
+              {% endif %}
+              {% if user.can_view_audit_log %}
+              <li><a class="dropdown-item" href="{% url 'audit:event_list' %}">سوابق ممیزی</a></li>
+              {% endif %}
+            </ul>
+          </li>
           {% endif %}
         </ul>
 

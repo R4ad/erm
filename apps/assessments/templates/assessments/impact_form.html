@@ -10,7 +10,7 @@
 
 <div class="alert alert-light border small">
   برای داتین و هر بانک متأثر، سطح هر بُعد را با دلیل و شاهد ثبت کنید. صفر یعنی «اثر ندارد» و دلیل می‌خواهد؛ اگر داده نیست «نامعلوم» را با دلیل انتخاب کنید و صفر نگذارید.
-  اگر داده کافی نیست، سطح را بازه بگیرید (مثلاً ۳ تا ۴). با مدت اختلال و مبلغ زیان، سامانه سطح S و F را پیشنهاد می‌دهد؛ سطح دیگر دلیل می‌خواهد.
+  با مدت اختلال و مبلغ زیان، سامانه سطح S و F را پیشنهاد می‌دهد؛ سطح دیگر دلیل می‌خواهد.
   خانه‌ای که «ثبت‌نشده» بماند ذخیره نمی‌شود.
 </div>
 
@@ -37,9 +37,7 @@
             <tr>
               <th style="min-width: 9rem">بُعد</th>
               <th style="min-width: 14rem">سطح</th>
-              <th style="min-width: 5rem">تا</th>
               <th style="min-width: 10rem">مقدار واقعی</th>
-              <th style="min-width: 7rem">اطمینان</th>
               <th style="min-width: 14rem">دلیل</th>
               <th style="min-width: 12rem">شواهد</th>
             </tr>
@@ -59,7 +57,6 @@
                   {% endif %}
                 </td>
                 <td>{{ form.level }}{% for error in form.level.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}{% for error in form.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
-                <td>{{ form.level_high }}{% for error in form.level_high.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
                 <td>
                   {{ form.actual_value }}{% for error in form.actual_value.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                   {% if form.unit %}<div class="mt-1">{{ form.unit }}</div>{% endif %}
@@ -68,7 +65,6 @@
                     {{ form.basis }}{% for error in form.basis.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                   {% endif %}
                 </td>
-                <td>{{ form.confidence }}{% for error in form.confidence.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
                 <td>{{ form.rationale }}{% for error in form.rationale.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</td>
                 <td>{{ form.evidence }}</td>
               </tr>

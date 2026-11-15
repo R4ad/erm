@@ -44,6 +44,8 @@ export interface NavLink {
   label: string;
   href: string;
   route: string | null;
+  /** شمار چیزهای نخوانده یا بی‌جواب این صفحه؛ null یعنی این صفحه شمارنده ندارد. */
+  badge?: number | null;
 }
 
 export interface NavGroup {
@@ -702,7 +704,6 @@ export interface AssessmentHeader {
     description: string;
     initiator?: string;
   };
-  meeting_date: Day | null;
   assumptions: string;
   created_by: Person | null;
   created_at: Moment;
@@ -762,7 +763,6 @@ export interface AssessmentPath {
   exceptions: string;
   notes: string[];
   b0: string;
-  b0_confidence: string;
   b0_rationale: string;
   controls: { code: string; href: string; e: number; recorded_e: number; note: string }[];
   bc: Band | null;
@@ -788,7 +788,6 @@ export interface AssessmentLikelihood {
       suggestion: { level: number | null; note: string } | null;
       insufficient: string[];
     } | null;
-    confidence: string;
     rationale: string;
     evidence: EvidenceRef[];
   } | null;
@@ -800,7 +799,6 @@ export interface ImpactCell {
   unknown: boolean;
   value: string | null;
   unit: string;
-  confidence: string;
   rationale: string;
 }
 

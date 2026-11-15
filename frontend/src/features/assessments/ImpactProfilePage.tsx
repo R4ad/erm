@@ -99,8 +99,6 @@ function Row({ row, groupName, field }: { row: ImpactRow; groupName: string; fie
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* متن سطح‌ها بلند است؛ سطح دو ستون می‌گیرد تا گزینه‌ی انتخاب‌شده خوانا بماند. */}
         <div className="sm:col-span-2">{part("level")}</div>
-        {part("level_high")}
-        {part("confidence")}
         {part("actual_value")}
         {part("unit")}
         {part("basis")}

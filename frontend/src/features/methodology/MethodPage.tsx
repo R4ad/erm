@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/states";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { Fact, Section, SectionNav } from "@/features/records/dossier";
+import { DocSection, DossierLayout, Fact, Facts } from "@/features/records/dossier";
 import { useRouteOf } from "@/features/session/links";
 import { cn } from "@/lib/cn";
 import { dateTime, fa, faText, longDate } from "@/lib/format";
@@ -369,10 +369,12 @@ export function MethodPage() {
           انجام می‌شوند.
         </Alert>
       )}
-      <Card>
-        <CardHeader icon={<ListChecks />} title="مشخصات نسخه" />
-        <CardContent>
-          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[9rem_1fr]">
+      <DossierLayout
+        navLabel="بخش‌های روش ارزیابی"
+        factsLabel="مشخصات نسخه‌ی روش"
+        sections={SECTIONS}
+        facts={
+          <Facts>
             <Fact label="منبع">{version.source || <span className="text-muted">-</span>}</Fact>
             {version.based_on && <Fact label="کپی‌شده از">{versionName(version.based_on)}</Fact>}
             <Fact label="تصویب">
@@ -398,214 +400,213 @@ export function MethodPage() {
                 <Paragraphs text={version.change_notes} />
               </Fact>
             )}
-          </dl>
-        </CardContent>
-      </Card>
-      <SectionNav label="بخش‌های روش ارزیابی" sections={SECTIONS} />
+          </Facts>
+        }
+      >
+        <DocSection id="likelihood" title="احتمال" icon={<Gauge />}>
+          <Strategy label={version.likelihood_strategy.label}>
+            {version.likelihood_strategy.value === "paths_v5" &&
+              "در هر مسیر، B کمینه‌ی B0 و Bc همان مسیر است؛ B سناریو بیشینه‌ی B مسیرهاست و L از جدول A × B خوانده می‌شود (بخش ۱۵ و ۱۷ سند v5)."}
+          </Strategy>
+          <div className="flex flex-col gap-10">
+            {data.likelihood_scales.map((scale) => (
+              <div key={scale.code} className="flex flex-col gap-4">
+                <ScaleBlock scale={scale} />
+                {scale.code === "Bc" && <BcRules data={data} />}
+              </div>
+            ))}
+            <LikelihoodGrid data={data} />
+          </div>
+        </DocSection>
 
-      <Section id="likelihood" title="احتمال" icon={<Gauge />}>
-        <Strategy label={version.likelihood_strategy.label}>
-          {version.likelihood_strategy.value === "paths_v5" &&
-            "در هر مسیر، B کمینه‌ی B0 و Bc همان مسیر است؛ B سناریو بیشینه‌ی B مسیرهاست و L از جدول A × B خوانده می‌شود (بخش ۱۵ و ۱۷ سند v5)."}
-        </Strategy>
-        <div className="flex flex-col gap-10">
-          {data.likelihood_scales.map((scale) => (
-            <div key={scale.code} className="flex flex-col gap-4">
-              <ScaleBlock scale={scale} />
-              {scale.code === "Bc" && <BcRules data={data} />}
-            </div>
-          ))}
-          <LikelihoodGrid data={data} />
-        </div>
-      </Section>
-
-      <Section id="impact" title="پیامد" icon={<Scale />}>
-        <Strategy label={version.impact_strategy.label}>
-          {version.impact_strategy.value === "max" && (
-            <>
-              پیامد نهایی بزرگ‌ترین سطح معتبر بین بُعدها و ذی‌نفعان است:{" "}
-              <Formula>{`I = max(${data.impact_scales.map((scale) => scale.code).join(", ")})`}</Formula>
-            </>
-          )}
-        </Strategy>
-        <Paragraphs text={version.impact_guidance} />
-        <Card className="table-shell overflow-clip">
-          <table className="data-table">
-            <caption className="sr-only">بُعدهای پیامد</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="w-0">
-                  نماد
-                </th>
-                <th scope="col">بُعد</th>
-                <th scope="col">دامنه</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.impact_scales.map((scale) => (
-                <tr key={scale.code}>
-                  <td data-label="نماد" className="w-0">
-                    <a href={`#scale-${scale.code}`} className="code text-accent-text underline underline-offset-4">
-                      {scale.code}
-                    </a>
-                  </td>
-                  <td data-primary className="font-medium whitespace-nowrap">
-                    {scale.name}
-                  </td>
-                  <td data-label="دامنه" data-wide>
-                    {scale.scope}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <div className="flex flex-col gap-10">
-          {data.impact_scales.map((scale) => (
-            <ScaleBlock key={scale.code} scale={scale} />
-          ))}
-        </div>
-      </Section>
-
-      <Section id="levels" title="سطح ریسک و تصمیم" icon={<Grid3x3 />}>
-        <p className="text-sm">
-          <Formula>Score = L × I</Formula>
-        </p>
-        <Paragraphs text={version.decision_guidance} />
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div className="flex flex-col gap-4">
-            <h3 className="text-base font-semibold text-fg">مرز سطح‌ها</h3>
-            <Card className="table-shell overflow-clip">
-              <table className="data-table">
-                <caption className="sr-only">بازه‌ی امتیاز هر سطح ریسک</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">سطح</th>
-                    <th scope="col">امتیاز</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.risk_levels.map((level) => (
-                    <tr key={level.name}>
-                      <td data-primary>
-                        <LevelChip level={level} />
-                      </td>
-                      <td data-label="امتیاز" className="tabular">
-                        {fa(level.min_score)} تا {fa(level.max_score)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-            <h3 className="text-base font-semibold text-fg">کف سطح تصمیم</h3>
-            {data.floors.length ? (
-              <ul className="flex list-disc flex-col gap-1.5 ps-5 text-sm leading-7">
-                {data.floors.map((floor) => (
-                  <li key={floor.min_impact}>
-                    پیامد {fa(floor.min_impact)} یا بیشتر: دست‌کم «{floor.min_level}»، هر چه امتیاز باشد
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted">کفی تعریف نشده است.</p>
+        <DocSection id="impact" title="پیامد" icon={<Scale />}>
+          <Strategy label={version.impact_strategy.label}>
+            {version.impact_strategy.value === "max" && (
+              <>
+                پیامد نهایی بزرگ‌ترین سطح معتبر بین بُعدها و ذی‌نفعان است:{" "}
+                <Formula>{`I = max(${data.impact_scales.map((scale) => scale.code).join(", ")})`}</Formula>
+              </>
             )}
-          </div>
-          <div className="flex min-w-0 flex-col gap-4">
-            <h3 className="text-base font-semibold text-fg">سطح تصمیم برای هر L و I</h3>
-            <DecisionMatrix data={data} />
-            <p className="text-xs leading-6 text-muted">
-              عدد کوچک هر خانه امتیاز L × I است. «کف» یعنی کف پیامد سطح را بالاتر از سطح پایه‌ی امتیاز برده است.
-            </p>
-          </div>
-        </div>
-      </Section>
-
-      <Section id="rules" title="قواعد هر سطح و پذیرش" icon={<ListChecks />}>
-        <Paragraphs text={version.acceptance_guidance} />
-        <Card className="table-shell overflow-clip">
-          <table className="data-table">
-            <caption className="sr-only">تصمیم، امضا و مهلت‌های هر سطح ریسک</caption>
-            <thead>
-              <tr>
-                <th scope="col">سطح</th>
-                <th scope="col">تصمیم و مرجع مجاز</th>
-                <th scope="col">امضای کنار مالک ریسک</th>
-                <th scope="col">مهلت مهار</th>
-                <th scope="col">مهلت طرح</th>
-                <th scope="col">حداکثر اعتبار پذیرش</th>
-                <th scope="col">دوره‌ی بازبینی</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.risk_levels.map((level) => (
-                <tr key={level.name}>
-                  <td data-primary className="w-0">
-                    <LevelChip level={level} />
-                  </td>
-                  <td data-label="تصمیم" data-wide className="min-w-64 leading-7">
-                    {level.decision_rule}
-                  </td>
-                  <td data-label="امضای کنار مالک" data-wide>
-                    {level.co_approver}
-                  </td>
-                  {(["containment", "plan", "acceptance", "review"] as const).map((key) => (
-                    <td
-                      key={key}
-                      data-label={
-                        { containment: "مهلت مهار", plan: "مهلت طرح", acceptance: "اعتبار پذیرش", review: "بازبینی" }[
-                          key
-                        ]
-                      }
-                      className="whitespace-nowrap"
-                    >
-                      {level[key] ? faText(level[key]) : <span className="text-muted">-</span>}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <p className="text-xs text-muted">
-          ماه، ماه تقویم شمسی است؛ مثلاً پذیرش ۶ ماهه از ۱۰ مهر تا ۱۰ فروردین اعتبار دارد.
-        </p>
-      </Section>
-
-      <Section id="parameters" title="پارامترها" icon={<SlidersHorizontal />}>
-        {data.parameters.length ? (
+          </Strategy>
+          <Paragraphs text={version.impact_guidance} />
           <Card className="table-shell overflow-clip">
             <table className="data-table">
-              <caption className="sr-only">پارامترهای این نسخه</caption>
+              <caption className="sr-only">بُعدهای پیامد</caption>
               <thead>
                 <tr>
-                  <th scope="col">پارامتر</th>
-                  <th scope="col">مقدار</th>
-                  <th scope="col">منبع</th>
+                  <th scope="col" className="w-0">
+                    نماد
+                  </th>
+                  <th scope="col">بُعد</th>
+                  <th scope="col">دامنه</th>
                 </tr>
               </thead>
               <tbody>
-                {data.parameters.map((parameter) => (
-                  <tr key={parameter.key}>
-                    <td data-primary className="min-w-56">
-                      {parameter.label}
+                {data.impact_scales.map((scale) => (
+                  <tr key={scale.code}>
+                    <td data-label="نماد" className="w-0">
+                      <a href={`#scale-${scale.code}`} className="code text-accent-text underline underline-offset-4">
+                        {scale.code}
+                      </a>
                     </td>
-                    <td data-label="مقدار" className="whitespace-nowrap">
-                      <span className="font-medium text-fg tabular">{fa(parameter.value)}</span>{" "}
-                      <span className="text-muted">{parameter.unit}</span>
+                    <td data-primary className="font-medium whitespace-nowrap">
+                      {scale.name}
                     </td>
-                    <td data-label="منبع" data-wide data-empty={parameter.note ? undefined : ""}>
-                      <span className="text-xs text-muted">{parameter.note}</span>
+                    <td data-label="دامنه" data-wide>
+                      {scale.scope}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </Card>
-        ) : (
-          <p className="text-sm text-muted">پارامتری ثبت نشده است.</p>
-        )}
-      </Section>
+          <div className="flex flex-col gap-10">
+            {data.impact_scales.map((scale) => (
+              <ScaleBlock key={scale.code} scale={scale} />
+            ))}
+          </div>
+        </DocSection>
+
+        <DocSection id="levels" title="سطح ریسک و تصمیم" icon={<Grid3x3 />}>
+          <p className="text-sm">
+            <Formula>Score = L × I</Formula>
+          </p>
+          <Paragraphs text={version.decision_guidance} />
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+            <div className="flex flex-col gap-4">
+              <h3 className="text-base font-semibold text-fg">مرز سطح‌ها</h3>
+              <Card className="table-shell overflow-clip">
+                <table className="data-table">
+                  <caption className="sr-only">بازه‌ی امتیاز هر سطح ریسک</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">سطح</th>
+                      <th scope="col">امتیاز</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.risk_levels.map((level) => (
+                      <tr key={level.name}>
+                        <td data-primary>
+                          <LevelChip level={level} />
+                        </td>
+                        <td data-label="امتیاز" className="tabular">
+                          {fa(level.min_score)} تا {fa(level.max_score)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+              <h3 className="text-base font-semibold text-fg">کف سطح تصمیم</h3>
+              {data.floors.length ? (
+                <ul className="flex list-disc flex-col gap-1.5 ps-5 text-sm leading-7">
+                  {data.floors.map((floor) => (
+                    <li key={floor.min_impact}>
+                      پیامد {fa(floor.min_impact)} یا بیشتر: دست‌کم «{floor.min_level}»، هر چه امتیاز باشد
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted">کفی تعریف نشده است.</p>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              <h3 className="text-base font-semibold text-fg">سطح تصمیم برای هر L و I</h3>
+              <DecisionMatrix data={data} />
+              <p className="text-xs leading-6 text-muted">
+                عدد کوچک هر خانه امتیاز L × I است. «کف» یعنی کف پیامد سطح را بالاتر از سطح پایه‌ی امتیاز برده است.
+              </p>
+            </div>
+          </div>
+        </DocSection>
+
+        <DocSection id="rules" title="قواعد هر سطح و پذیرش" icon={<ListChecks />}>
+          <Paragraphs text={version.acceptance_guidance} />
+          <Card className="table-shell overflow-clip">
+            <table className="data-table">
+              <caption className="sr-only">تصمیم، امضا و مهلت‌های هر سطح ریسک</caption>
+              <thead>
+                <tr>
+                  <th scope="col">سطح</th>
+                  <th scope="col">تصمیم و مرجع مجاز</th>
+                  <th scope="col">امضای کنار مالک ریسک</th>
+                  <th scope="col">مهلت مهار</th>
+                  <th scope="col">مهلت طرح</th>
+                  <th scope="col">حداکثر اعتبار پذیرش</th>
+                  <th scope="col">دوره‌ی بازبینی</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.risk_levels.map((level) => (
+                  <tr key={level.name}>
+                    <td data-primary className="w-0">
+                      <LevelChip level={level} />
+                    </td>
+                    <td data-label="تصمیم" data-wide className="min-w-64 leading-7">
+                      {level.decision_rule}
+                    </td>
+                    <td data-label="امضای کنار مالک" data-wide>
+                      {level.co_approver}
+                    </td>
+                    {(["containment", "plan", "acceptance", "review"] as const).map((key) => (
+                      <td
+                        key={key}
+                        data-label={
+                          { containment: "مهلت مهار", plan: "مهلت طرح", acceptance: "اعتبار پذیرش", review: "بازبینی" }[
+                            key
+                          ]
+                        }
+                        className="whitespace-nowrap"
+                      >
+                        {level[key] ? faText(level[key]) : <span className="text-muted">-</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          <p className="text-xs text-muted">
+            ماه، ماه تقویم شمسی است؛ مثلاً پذیرش ۶ ماهه از ۱۰ مهر تا ۱۰ فروردین اعتبار دارد.
+          </p>
+        </DocSection>
+
+        <DocSection id="parameters" title="پارامترها" icon={<SlidersHorizontal />}>
+          {data.parameters.length ? (
+            <Card className="table-shell overflow-clip">
+              <table className="data-table">
+                <caption className="sr-only">پارامترهای این نسخه</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">پارامتر</th>
+                    <th scope="col">مقدار</th>
+                    <th scope="col">منبع</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.parameters.map((parameter) => (
+                    <tr key={parameter.key}>
+                      <td data-primary className="min-w-56">
+                        {parameter.label}
+                      </td>
+                      <td data-label="مقدار" className="whitespace-nowrap">
+                        <span className="font-medium text-fg tabular">{fa(parameter.value)}</span>{" "}
+                        <span className="text-muted">{parameter.unit}</span>
+                      </td>
+                      <td data-label="منبع" data-wide data-empty={parameter.note ? undefined : ""}>
+                        <span className="text-xs text-muted">{parameter.note}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          ) : (
+            <p className="text-sm text-muted">پارامتری ثبت نشده است.</p>
+          )}
+        </DocSection>
+      </DossierLayout>
     </article>
   );
 }

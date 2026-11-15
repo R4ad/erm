@@ -1,13 +1,12 @@
-import { FileSearch, Lock, PencilLine, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { FileSearch, Lock, PencilLine, Plus, ShieldAlert } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailState, FilterBar, ListBody } from "@/features/pages/listing";
 import { activeFilters, usePageData } from "@/features/pages/page-data";
+import { DossierLayout, Fact, Facts, Section, SectionBody } from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
 import { RiskTable } from "@/features/risks/RiskTable";
 import { count, longDate, safeExternalUrl, shortDate } from "@/lib/format";
@@ -103,16 +102,6 @@ export function EvidenceListPage() {
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  if (children === null || children === undefined || children === "") return null;
-  return (
-    <div className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-sm text-fg">{children}</dd>
-    </div>
-  );
-}
-
 export function EvidenceDetailPage() {
   const page = usePageData<EvidenceDetail>();
   useTitle(page.data?.title ?? "شاهد");
@@ -145,62 +134,60 @@ export function EvidenceDetailPage() {
           )
         }
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card>
-            <CardHeader icon={<FileSearch />} title="خلاصه" />
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm leading-8 whitespace-pre-line text-fg/90">{evidence.summary}</p>
-              {evidence.scope && (
-                <p className="rounded-lg bg-surface px-3 py-2 text-xs whitespace-pre-line text-muted">
-                  دامنه: {evidence.scope}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          <section aria-labelledby="evidence-risks" className="flex flex-col gap-3">
-            <h2 id="evidence-risks" className="text-heading font-semibold">
-              ریسک‌های مرتبط
-            </h2>
-            <RiskTable risks={risks} caption="ریسک‌های مرتبط با این شاهد" empty="به ریسکی که شما ببینید وصل نیست." />
-          </section>
-          <Attachments record={page.data} />
-          <Comments record={page.data} />
-        </div>
-        <aside aria-label="مشخصات شاهد">
-          <Card className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
-            <CardHeader title="مشخصات" />
-            <CardContent>
-              <dl className="flex flex-col divide-y divide-line">
-                <Fact label="منبع">{evidence.source}</Fact>
-                <Fact label="زمان">{longDate(evidence.observed_on)}</Fact>
-                <Fact label="اعتبار">{evidence.reliability.label}</Fact>
-                <Fact label="معتبر تا">{evidence.valid_until ? longDate(evidence.valid_until) : null}</Fact>
-                <Fact label="طبقه‌ی دسترسی">{evidence.access_class.label}</Fact>
-                <Fact label="بانک">{evidence.customer}</Fact>
-                <Fact label="مالک">{evidence.owner?.name}</Fact>
-                <Fact label="پیوند">
-                  {evidence.url &&
-                    (link ? (
-                      <a
-                        href={link}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                        className="break-all text-accent-text hover:underline"
-                        dir="ltr"
-                      >
-                        {evidence.url}
-                        <span className="sr-only"> (در برگه‌ی تازه)</span>
-                      </a>
-                    ) : (
-                      <bdi className="break-all">{evidence.url}</bdi>
-                    ))}
-                </Fact>
-              </dl>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+      <DossierLayout
+        navLabel="بخش‌های پرونده‌ی شاهد"
+        factsLabel="مشخصات شاهد"
+        sections={[
+          { id: "summary", label: "خلاصه" },
+          { id: "risks", label: "ریسک‌های مرتبط" },
+          { id: "attachments", label: "پیوست‌ها" },
+          { id: "comments", label: "نظرها" },
+        ]}
+        facts={
+          <Facts>
+            <Fact label="منبع">{evidence.source}</Fact>
+            <Fact label="زمان">{longDate(evidence.observed_on)}</Fact>
+            <Fact label="اعتبار">{evidence.reliability.label}</Fact>
+            <Fact label="معتبر تا">{evidence.valid_until ? longDate(evidence.valid_until) : null}</Fact>
+            <Fact label="طبقه‌ی دسترسی">{evidence.access_class.label}</Fact>
+            <Fact label="بانک">{evidence.customer}</Fact>
+            <Fact label="مالک">{evidence.owner?.name}</Fact>
+            <Fact label="پیوند">
+              {evidence.url &&
+                (link ? (
+                  <a
+                    href={link}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    className="break-all text-accent-text hover:underline"
+                    dir="ltr"
+                  >
+                    {evidence.url}
+                    <span className="sr-only"> (در برگه‌ی تازه)</span>
+                  </a>
+                ) : (
+                  <bdi className="break-all">{evidence.url}</bdi>
+                ))}
+            </Fact>
+          </Facts>
+        }
+      >
+        <Section id="summary" title="خلاصه" icon={<FileSearch />}>
+          <SectionBody className="flex flex-col gap-3">
+            <p className="text-sm leading-8 whitespace-pre-line text-fg/90">{evidence.summary}</p>
+            {evidence.scope && (
+              <p className="rounded-lg bg-surface px-3 py-2 text-xs whitespace-pre-line text-muted">
+                دامنه: {evidence.scope}
+              </p>
+            )}
+          </SectionBody>
+        </Section>
+        <Section id="risks" title="ریسک‌های مرتبط" icon={<ShieldAlert />} count={risks.length}>
+          <RiskTable risks={risks} caption="ریسک‌های مرتبط با این شاهد" empty="به ریسکی که شما ببینید وصل نیست." />
+        </Section>
+        <Attachments record={page.data} />
+        <Comments record={page.data} />
+      </DossierLayout>
     </article>
   );
 }

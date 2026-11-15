@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { Alert } from "@/components/ui/states";
+import { cn } from "@/lib/cn";
 import { fa, faText } from "@/lib/format";
 import type { Comparison } from "@/lib/types";
 
@@ -31,16 +32,26 @@ function Trend({ trend }: { trend: "" | "up" | "down" }) {
   return null;
 }
 
-export function ComparisonTable({ data, caption }: { data: Comparison; caption: string }) {
+/** `bare` وقتی است که جدول خودش داخل یک بخش پرونده نشسته و کارت خودش را لازم ندارد. */
+export function ComparisonTable({
+  data,
+  caption,
+  bare = false,
+}: {
+  data: Comparison;
+  caption: string;
+  bare?: boolean;
+}) {
+  const Box = bare ? "div" : Card;
   return (
-    <div className="flex flex-col gap-4">
+    <div className={cn("flex flex-col", bare ? "gap-0" : "gap-4")}>
       {data.method_changed && (
-        <Alert tone="warning">
+        <Alert tone="warning" className={cn(bare && "m-5 mb-0")}>
           نسخه‌ی روش این ارزیابی‌ها یکی نیست؛ بخشی از تغییر سطح ممکن است از تغییر روش آمده باشد و جدا از اثر اقدام‌ها
           گزارش می‌شود (بخش ۲۱).
         </Alert>
       )}
-      <Card className="table-shell overflow-clip">
+      <Box className={cn(!bare && "table-shell overflow-clip")}>
         <div className="table-scroll">
           <table className="data-table data-matrix">
             <caption className="sr-only">{caption}؛ جهت تغییر هر خانه نسبت به ستون اول است.</caption>
@@ -86,8 +97,8 @@ export function ComparisonTable({ data, caption }: { data: Comparison; caption: 
             </tbody>
           </table>
         </div>
-      </Card>
-      <p className="text-xs leading-6 text-muted">
+      </Box>
+      <p className={cn("text-xs leading-6 text-muted", bare && "px-5 py-4")}>
         پیامد هر بُعد بیشترین سطح آن در ستون‌های داتین و بانک‌هاست؛ «؟» یعنی خانه‌ای نامعلوم یا ثبت‌نشده است.{" "}
         <ArrowDown aria-hidden className="inline size-3.5 text-success" />
         <span className="sr-only">پیکان رو به پایین</span> یعنی کمتر از ستون اول و{" "}

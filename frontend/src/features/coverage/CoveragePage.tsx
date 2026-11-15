@@ -5,6 +5,7 @@ import { AppLink } from "@/components/ui/app-link";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { StatTile } from "@/components/ui/stat-tile";
 import { FilterBar, ListBody } from "@/features/pages/listing";
 import { activeFilters, usePageData } from "@/features/pages/page-data";
 import { count, fa, formatNumber } from "@/lib/format";
@@ -44,16 +45,6 @@ export function CoverageCellBadge({ cell, service }: { cell: CoverageCell; servi
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="flex flex-col gap-1 p-4 sm:p-5">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-display font-bold text-fg tabular">{value}</p>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
-    </Card>
-  );
-}
-
 export function CoveragePage() {
   useTitle("جهان ریسک");
   const [params] = useSearchParams();
@@ -76,7 +67,7 @@ export function CoveragePage() {
       />
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          <Stat
+          <StatTile
             label="پوشش خدمات حیاتی"
             value={data.critical.percent === null ? "—" : `${fa(data.critical.percent)}٪`}
             hint={
@@ -85,9 +76,14 @@ export function CoveragePage() {
                 : `${formatNumber(data.critical.complete)} از ${formatNumber(data.critical.total)} خدمت حیاتی، بدون خانه‌ی در انتظار`
             }
           />
-          <Stat label="بررسی‌شده" value={formatNumber(data.counts.reviewed)} hint="خانه در خدمت‌هایی که می‌بینید" />
-          <Stat label="نامرتبط" value={formatNumber(data.counts.not_relevant)} hint="با دلیل مستند" />
-          <Stat label="در انتظار بررسی" value={formatNumber(data.counts.pending)} />
+          <StatTile label="بررسی‌شده" value={formatNumber(data.counts.reviewed)} hint="خانه در خدمت‌هایی که می‌بینید" />
+          <StatTile label="نامرتبط" value={formatNumber(data.counts.not_relevant)} hint="با دلیل مستند" />
+          <StatTile
+            label="در انتظار بررسی"
+            value={formatNumber(data.counts.pending)}
+            hint="خانه‌ای که هنوز بررسی نشده است"
+            tone={data.counts.pending ? "warning" : "neutral"}
+          />
         </div>
       )}
       <FilterBar schema={data?.filters} label="فیلتر جهان ریسک" />

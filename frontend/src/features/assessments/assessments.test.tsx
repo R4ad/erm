@@ -198,7 +198,7 @@ describe("ImpactProfilePage", () => {
     const service = within(datin).getByRole("group", { name: "S خدمت و تداوم، داتین" });
     expect(within(service).getByRole("combobox", { name: "سطح" })).toHaveValue("0");
     expect(within(service).getByRole("option", { name: "ثبت‌نشده" })).toBeInTheDocument();
-    expect(within(service).getByRole("combobox", { name: "اطمینان" })).toHaveValue("high");
+    expect(within(service).queryByRole("combobox", { name: "اطمینان" })).not.toBeInTheDocument();
     const financial = within(datin).getByRole("group", { name: "F مالی، داتین" });
     expect(within(financial).getByRole("spinbutton", { name: "مبنای مالی (ریال)" })).toHaveValue(null);
     expect(within(service).queryByRole("spinbutton", { name: "مبنای مالی (ریال)" })).not.toBeInTheDocument();
@@ -224,7 +224,6 @@ describe("ImpactProfilePage", () => {
     const bank = await screen.findByRole("region", { name: "بانک آزمون" });
     const financial = within(bank).getByRole("group", { name: "F مالی، بانک آزمون" });
     await user.selectOptions(within(financial).getByRole("combobox", { name: "سطح" }), "0");
-    await user.selectOptions(within(financial).getByRole("combobox", { name: "اطمینان" }), "high");
     await user.click(screen.getByRole("button", { name: "ذخیره" }));
 
     await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
@@ -233,15 +232,13 @@ describe("ImpactProfilePage", () => {
     const values = (call!.body as { values: Record<string, unknown> }).values;
     expect(values).toMatchObject({
       "datin-S-level": "0",
-      "datin-S-confidence": "high",
       "datin-F-level": "",
       "7-F-level": "0",
-      "7-F-confidence": "high",
       "7-F-rationale": "",
       "7-F-evidence": [],
     });
-    // دو ذی‌نفع، هر کدام S با شش فیلد و F با هفت فیلد (مبنای مالی).
-    expect(Object.keys(values)).toHaveLength(26);
+    // دو ذی‌نفع و پنج بُعد آزمونی؛ F مبنای مالی اضافه دارد.
+    expect(Object.keys(values)).toHaveLength(18);
 
     const summary = await screen.findByRole("alert");
     await waitFor(() => expect(summary).toHaveFocus());

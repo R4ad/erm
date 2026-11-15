@@ -354,22 +354,6 @@ export function RiskListPage() {
 
       {page && page.results.length > 0 && (
         <section aria-labelledby="register-results" className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 id="register-results" className="text-heading font-semibold">
-              نتیجه‌ها
-            </h2>
-            <div className="w-full sm:w-56">
-              <Field label="مرتب‌سازی">
-                <Select value={ordering} onChange={(event) => sortBy(event.target.value as RiskOrdering)}>
-                  {ORDERINGS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          </div>
           <Card
             className={cn(
               "table-shell overflow-clip transition-opacity",
@@ -377,6 +361,26 @@ export function RiskListPage() {
             )}
             aria-busy={risks.isFetching}
           >
+            {/* شمار نتیجه‌ها و مرتب‌سازی روی خود جدول می‌نشینند، نه جدا از آن. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+              <h2 id="register-results" className="text-sm font-semibold text-fg">
+                {count(page.count, "ریسک")}
+              </h2>
+              <label className="flex items-center gap-2 text-xs text-muted">
+                مرتب‌سازی
+                <Select
+                  className="h-8 w-44 text-xs"
+                  value={ordering}
+                  onChange={(event) => sortBy(event.target.value as RiskOrdering)}
+                >
+                  {ORDERINGS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            </div>
             <table className="data-table">
               <caption className="sr-only">
                 ریسک‌ها، {ORDERINGS.find((option) => option.value === ordering)?.label}

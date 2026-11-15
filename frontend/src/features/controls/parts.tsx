@@ -1,6 +1,6 @@
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { SectionEmpty } from "@/features/records/dossier";
 import { fa, faText } from "@/lib/format";
 import type { Applicability, ControlRow, Effectiveness } from "@/lib/types";
 
@@ -109,16 +109,6 @@ export function ControlRows({ controls, caption }: { controls: ControlRow[]; cap
 }
 
 export function ControlTable({ controls, caption, empty }: { controls: ControlRow[]; caption: string; empty: string }) {
-  if (!controls.length) {
-    return (
-      <p className="rounded-xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-muted">
-        {empty}
-      </p>
-    );
-  }
-  return (
-    <Card className="table-shell overflow-clip">
-      <ControlRows controls={controls} caption={caption} />
-    </Card>
-  );
+  if (!controls.length) return <SectionEmpty>{empty}</SectionEmpty>;
+  return <ControlRows controls={controls} caption={caption} />;
 }

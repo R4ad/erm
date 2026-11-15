@@ -99,7 +99,7 @@ def test_the_rate_follows_the_a_table_and_says_when_data_is_not_enough(assessmen
 
 
 def post_initiator(client, assessment, **fields):
-    data = {"a_basis": "rate", "a_confidence": "medium", "a_rationale": "داده‌ی سامانه‌ی انتشار", **fields}
+    data = {"a_basis": "rate", "a_rationale": "داده‌ی سامانه‌ی انتشار", **fields}
     return client.post(reverse("assessments:initiator", args=[assessment.pk]), data)
 
 
@@ -107,9 +107,11 @@ def test_a_from_rate_needs_enough_data_for_a_single_level(client, grc, assessmen
     client.force_login(grc)
     page = client.get(reverse("assessments:initiator", args=[assessment.pk]))
     assert page.context["risk"].initiator == "ایجاد یک بسته‌ی انتشار نامعتبر"
+    assert "a_high" not in page.context["form"].fields
+    assert "a_confidence" not in page.context["form"].fields
 
     response = post_initiator(client, assessment, a_count="3", a_period_months="6", a_coverage="99", a_level="3")
-    assert "A را بازه بگذارید" in response.context["form"].errors["a_level"][0]
+    assert "نامعلوم" in response.context["form"].errors["a_level"][0]
     assert response.context["form"].rate.suggestion.level == 3
 
     response = post_initiator(
@@ -119,13 +121,13 @@ def test_a_from_rate_needs_enough_data_for_a_single_level(client, grc, assessmen
         a_period_months="6",
         a_denominator="۴۸۰ بسته",
         a_coverage="99",
-        a_level="3",
+        a_level="unknown",
         a_high="4",
         a_evidence=[evidence.pk],
     )
     assert response.url == f"{assessment.get_absolute_url()}#likelihood"
     assessment.refresh_from_db()
-    assert (assessment.a, assessment.a_high, assessment.a_display) == (3, 4, "3 تا 4")
+    assert (assessment.a, assessment.a_high, assessment.a_display) == (None, None, "نامعلوم")
     assert assessment.a_rate == Decimal(6) and list(assessment.a_evidence.all()) == [evidence]
 
 
@@ -133,9 +135,6 @@ def test_forward_evidence_drops_rate_data_and_needs_a_reason(client, grc, assess
     client.force_login(grc)
     response = post_initiator(client, assessment, a_basis="forward", a_level="4", a_rationale="")
     assert "الزامی است" in response.context["form"].errors["a_rationale"][0]
-    response = post_initiator(client, assessment, a_basis="forward", a_level="4", a_confidence="")
-    assert "اطمینان" in response.context["form"].errors["a_confidence"][0]
-
     post_initiator(client, assessment, a_basis="forward", a_count="7", a_period_months="12", a_level="4")
     assessment.refresh_from_db()
     assert (assessment.a_basis, assessment.a, assessment.a_count, assessment.a_period_months) == (
@@ -176,7 +175,9 @@ def test_a_path_takes_only_current_preventive_controls_of_the_risk(client, grc, 
     client.force_login(grc)
     url = reverse("assessments:path_create", args=[assessment.pk])
 
-    choices = list(client.get(url).context["form"].fields["control_assessments"].queryset)
+    fields = client.get(url).context["form"].fields
+    assert "b0_high" not in fields and "b0_confidence" not in fields
+    choices = list(fields["control_assessments"].queryset)
     assert current in choices and second in choices
     assert old not in choices and detective not in choices and unrelated not in choices
 

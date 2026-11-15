@@ -56,3 +56,34 @@ export function useSectionFromHash(ready: boolean) {
     document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({ block: "start" });
   }, [ready, hash]);
 }
+
+/**
+ * کدام بخش صفحه الان جلوی چشم است، برای پررنگ کردن همان بخش در فهرست بخش‌ها. بخشی که بالاتر از همه از زیر نوار
+ * بالا گذشته باشد انتخاب می‌شود، و تا وقتی هیچ‌کدام نگذشته‌اند، بخش اول.
+ */
+export function useActiveSection(ids: string[]): string | null {
+  const key = ids.join(",");
+  const [active, setActive] = useState<string | null>(ids[0] ?? null);
+  useEffect(() => {
+    const sections = key ? key.split(",") : [];
+    if (sections.length === 0) return;
+    function pick() {
+      // مرز، کمی زیر نوار بالای چسبان است تا عنوان بخشی که تازه از زیرش رد شده فعال شمرده شود.
+      const edge = (document.documentElement.clientHeight || 0) * 0.3;
+      let current = sections[0] ?? null;
+      for (const id of sections) {
+        const top = document.getElementById(id)?.getBoundingClientRect().top;
+        if (top !== undefined && top <= edge) current = id;
+      }
+      setActive(current);
+    }
+    pick();
+    window.addEventListener("scroll", pick, { passive: true });
+    window.addEventListener("resize", pick);
+    return () => {
+      window.removeEventListener("scroll", pick);
+      window.removeEventListener("resize", pick);
+    };
+  }, [key]);
+  return active;
+}

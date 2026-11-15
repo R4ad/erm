@@ -12,7 +12,6 @@ const overflows = (page: Page) => page.evaluate(() => document.documentElement.s
 test.describe("assessments", () => {
   test("shows the approved scope and target deadline without requiring a meeting", async ({ page, api }) => {
     const data = assessmentDetail();
-    data.assessment.meeting_date = null;
     data.assessment.target_due = { iso: "2026-12-01", jalali: "1405/09/10" };
     data.assessment.scope_snapshot = {
       service: "خدمت در زمان تأیید",
@@ -21,7 +20,7 @@ test.describe("assessments", () => {
     };
     api.on("GET pages/", () => data);
     await page.goto("/app/assessments/1");
-    await expect(page.getByText("بدون جلسه (ارزیابی عادی)")).toBeVisible();
+    await expect(page.getByText("جلسه‌ی کارگروه", { exact: true })).toHaveCount(0);
     await expect(page.getByText("موعد تحقق هدف", { exact: true })).toBeVisible();
     await expect(page.getByText("خدمت در زمان تأیید؛ بانک در زمان تأیید")).toBeVisible();
     await expectAccessible(page);
@@ -92,7 +91,6 @@ test.describe("assessments", () => {
       await expect(bank.getByText(/پیشنهاد سامانه: سطح ۳/)).toBeVisible();
       const financial = bank.getByRole("group", { name: "F مالی، بانک آزمون" });
       await financial.getByRole("combobox", { name: "سطح" }).selectOption("0");
-      await financial.getByRole("combobox", { name: "اطمینان" }).selectOption("high");
       // دکمه‌ی ذخیره در فرم بلند پایین صفحه می‌ماند.
       const save = page.getByRole("button", { name: "ذخیره" });
       await expect(save).toBeInViewport();

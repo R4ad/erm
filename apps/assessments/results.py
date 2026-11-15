@@ -8,10 +8,7 @@ from apps.methodology.engine import Inputs, InvalidInput, calculate
 from apps.methodology.services import MethodTables
 
 from .models import Assessment
-from .services import band_or_none, impact_summary, likelihood_summary
-
-ORDER = [Confidence.LOW, Confidence.MEDIUM, Confidence.HIGH]
-
+from .services import band_or_none, impact_summary, likelihood_summary, stakeholder_facts
 
 @dataclass
 class Outcome:
@@ -68,6 +65,17 @@ def compute(assessment, on=None):
         result = calculate(tables, inputs)
     except InvalidInput as error:
         return Computation(Outcome(problems=error.messages), likelihood, impacts)
+    incomplete_reasons = list(result.incomplete_reasons)
+    if assessment.risk.service_id and assessment.risk.service.is_critical:
+        for customer in impacts.stakeholders:
+            if customer is None:
+                continue
+            facts = stakeholder_facts(assessment, customer, on=on)
+            if facts.rto is None or facts.mtpd is None or not 0 < facts.rto < facts.mtpd:
+                incomplete_reasons.append(
+                    f"حدود RTO و MTPD معتبر خدمت حیاتی برای {customer.name} مشخص نیست؛ "
+                    "ارزیابی تا تعیین حدود معتبر کامل نیست (بخش ۹)."
+                )
     outcome = Outcome(
         b=result.b,
         likelihood=result.likelihood,
@@ -76,35 +84,12 @@ def compute(assessment, on=None):
         base_level=result.base_level,
         decision_level=result.decision_level,
         escalation_reasons=list(result.escalation_reasons),
-        incomplete_reasons=list(result.incomplete_reasons),
-        confidence=overall_confidence(assessment, result, likelihood, impacts, tables),
+        incomplete_reasons=incomplete_reasons,
+        confidence=Confidence.LOW if incomplete_reasons else (assessment.confidence or Confidence.LOW),
         out_of_acceptance_authority=result.out_of_acceptance_authority,
         acceptance_restricted=result.acceptance_restricted,
     )
     return Computation(outcome, likelihood, impacts)
-
-
-def overall_confidence(assessment, result, likelihood, impacts, tables):
-    """کمترین اطمینان در مؤلفه‌های تعیین‌کننده (بخش ۷ و جواب س۶۱): A؛ B0 و E کنترل‌های مسیری که B سناریو را
-    تعیین کرده؛ و خانه‌هایی از پروفایل پیامد که I از آن‌ها آمده. ارزیابی ناقص اطمینان کم دارد، چون دست‌کم یک
-    مؤلفه‌ی تعیین‌کننده کران قابل دفاعی ندارد."""
-    if result.incomplete or not result.b or not result.impact:
-        return Confidence.LOW
-    values = [assessment.a_confidence]
-    top_bc = max(tables.scale_values["Bc"])
-    for row in likelihood.paths:
-        path_result = row.result
-        if not path_result.b or path_result.b.high != result.b.high:
-            continue
-        if path_result.b0.high <= path_result.bc.high:
-            values.append(row.path.b0_confidence)
-        if path_result.bc.high <= path_result.b0.high and path_result.bc.high < top_bc:
-            values.extend(item.control_assessment.confidence for item in row.controls if item.e >= 2)
-    for impact, detail in impacts.cells:
-        if detail and detail.level is not None and (detail.level_high or detail.level) == result.impact.high:
-            values.append(detail.confidence)
-    # اطمینانی که ثبت نشده، کم حساب می‌شود.
-    return min((value or Confidence.LOW for value in values), key=ORDER.index)
 
 
 def outcome(assessment):
@@ -152,17 +137,14 @@ def submission_problems(assessment, computation=None):
     likelihood = computation.likelihood
     if not assessment.a_recorded:
         problems.append("A ثبت نشده است.")
+    if assessment.a_high is not None:
+        problems.append("A در پیش‌نویس قدیمی به صورت بازه ثبت شده است؛ عامل آغازگر را بازبینی و دوباره ذخیره کنید.")
     if not likelihood.paths:
         problems.append("دست‌کم یک مسیر تحقق لازم است (بخش ۱۵).")
     problems.extend(likelihood.blockers)
     for row in likelihood.paths:
-        path = row.path
-        if path.b0 is not None and not path.b0_confidence:
-            problems.append(f"اطمینان B0 مسیر «{path.name}» ثبت نشده است.")
-        for item in row.controls:
-            control_assessment = item.control_assessment
-            if item.e >= 2 and not control_assessment.confidence:
-                problems.append(f"اطمینان E در {control_assessment.code} ثبت نشده است.")
+        if row.path.b0_high is not None:
+            problems.append(f"B0 مسیر «{row.path.name}» به صورت بازه ثبت شده است؛ مسیر را بازبینی و دوباره ذخیره کنید.")
 
     impacts = computation.impacts
     if impacts.missing:
@@ -171,10 +153,10 @@ def submission_problems(assessment, computation=None):
         if detail is None:
             continue
         label = f"{impact.dimension} برای {impact.stakeholder}"
+        if detail.level_high is not None:
+            problems.append(f"پیامد {label} به صورت بازه ثبت شده است؛ پروفایل پیامد را بازبینی و دوباره ذخیره کنید.")
         if not detail.rationale.strip():
             problems.append(f"پیامد {label} دلیل ندارد.")
-        if detail.level is not None and not detail.confidence:
-            problems.append(f"اطمینان پیامد {label} ثبت نشده است.")
         if detail.level and not detail.evidence.exists():
             problems.append(f"پیامد {label} شاهد ندارد.")
 

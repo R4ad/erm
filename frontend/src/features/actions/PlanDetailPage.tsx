@@ -1,10 +1,9 @@
-import { ArrowLeftRight, ListChecks, PencilLine, Plus, ShieldCheck, Stamp } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, ListChecks, PencilLine, Plus, ShieldCheck, Stamp } from "lucide-react";
 import { useState } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,7 +11,16 @@ import { ComparisonTable } from "@/features/assessments/ComparisonTable";
 import { useBridgeAction } from "@/features/forms/bridge-action";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { ActionError, Fact, Prose, Reasons, Section, SectionNav } from "@/features/records/dossier";
+import {
+  ActionError,
+  Fact,
+  Prose,
+  Reasons,
+  Section,
+  SectionBody,
+  SectionEmpty,
+  SectionNav,
+} from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
 import { dateTime, fa, faText, longDate } from "@/lib/format";
 import { useSectionFromHash, useTitle } from "@/lib/hooks";
@@ -63,11 +71,11 @@ function Header({ data }: { data?: PlanDetail }) {
   );
 }
 
-function Facts({ data }: { data: PlanDetail }) {
+function Summary({ data }: { data: PlanDetail }) {
   const { plan } = data;
   return (
-    <Card>
-      <CardContent className="pt-5">
+    <Section id="summary" title="خلاصه‌ی طرح" icon={<ClipboardList />}>
+      <SectionBody>
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
           <Fact label="ریسک">
             {plan.risk.href ? (
@@ -138,8 +146,8 @@ function Facts({ data }: { data: PlanDetail }) {
             {plan.approved_by && plan.approved_at ? `${plan.approved_by.name}، ${dateTime(plan.approved_at)}` : "-"}
           </Fact>
         </dl>
-      </CardContent>
-    </Card>
+      </SectionBody>
+    </Section>
   );
 }
 
@@ -152,34 +160,36 @@ function Approval({ data }: { data: PlanDetail }) {
   if (empty) return null;
   return (
     <Section id="approval" title="تأیید مالک ریسک" icon={<ShieldCheck />}>
-      <Reasons tone="info" title="پیش از تأیید مالک ریسک لازم است:" items={approval.problems} />
-      {url && (
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-fg">{faText(approval.message)}</p>
-            <Button variant="primary" loading={action.isPending} onClick={() => setConfirming(true)}>
-              {!action.isPending && <ShieldCheck aria-hidden />}
-              تأیید طرح
-            </Button>
-          </CardContent>
-          <ConfirmDialog
-            open={confirming}
-            onOpenChange={setConfirming}
-            title={`طرح «${plan.option.label}» ریسک ${plan.risk.code} تأیید شود؟`}
-            description="با تأیید، طرح و همه‌ی اقدام‌های برنامه‌ریزی‌شده‌اش مصوب می‌شوند و تأیید شما در تاریخچه می‌ماند."
-            confirmLabel="تأیید طرح"
-            loading={action.isPending}
-            onConfirm={() => {
-              setConfirming(false);
-              action.mutate({ url, values: {} });
-            }}
-          />
-        </Card>
-      )}
-      <ActionError error={action.error} />
-      {approval.waiting_for_owner && (
-        <p className="text-sm text-muted">طرح و اقدام‌های تازه را مالک ریسک تأیید می‌کند.</p>
-      )}
+      <SectionBody className="flex flex-col gap-4">
+        <Reasons tone="info" title="پیش از تأیید مالک ریسک لازم است:" items={approval.problems} />
+        {url && (
+          <>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-fg">{faText(approval.message)}</p>
+              <Button variant="primary" loading={action.isPending} onClick={() => setConfirming(true)}>
+                {!action.isPending && <ShieldCheck aria-hidden />}
+                تأیید طرح
+              </Button>
+            </div>
+            <ConfirmDialog
+              open={confirming}
+              onOpenChange={setConfirming}
+              title={`طرح «${plan.option.label}» ریسک ${plan.risk.code} تأیید شود؟`}
+              description="با تأیید، طرح و همه‌ی اقدام‌های برنامه‌ریزی‌شده‌اش مصوب می‌شوند و تأیید شما در تاریخچه می‌ماند."
+              confirmLabel="تأیید طرح"
+              loading={action.isPending}
+              onConfirm={() => {
+                setConfirming(false);
+                action.mutate({ url, values: {} });
+              }}
+            />
+          </>
+        )}
+        <ActionError error={action.error} />
+        {approval.waiting_for_owner && (
+          <p className="text-sm text-muted">طرح و اقدام‌های تازه را مالک ریسک تأیید می‌کند.</p>
+        )}
+      </SectionBody>
     </Section>
   );
 }
@@ -200,11 +210,9 @@ function Actions({ data }: { data: PlanDetail }) {
       }
     >
       {data.actions.length ? (
-        <Card className="table-shell overflow-clip">
-          <ActionTable actions={data.actions} caption="اقدام‌های این طرح" />
-        </Card>
+        <ActionTable actions={data.actions} caption="اقدام‌های این طرح" />
       ) : (
-        <p className="text-sm text-muted">هنوز اقدامی ثبت نشده است.</p>
+        <SectionEmpty>هنوز اقدامی ثبت نشده است.</SectionEmpty>
       )}
     </Section>
   );
@@ -227,54 +235,53 @@ function Reassessment({ data }: { data: PlanDetail }) {
       }
     >
       {reassessment ? (
-        <Card>
-          <CardContent className="pt-5">
-            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
-              <Fact label="تاریخ و مسئول">
-                {longDate(reassessment.performed_on)}، {reassessment.responsible?.name}
-              </Fact>
-              <Fact label="ارزیابی تازه">
-                <AppLink href={reassessment.assessment.href} className="code">
-                  {reassessment.assessment.code}
-                </AppLink>
-              </Fact>
-              <Fact label="مقایسه با هدف">
-                <span className="flex flex-col gap-1.5">
-                  {reassessment.target_met === null ? (
-                    <span>طرح ارزیابی هدف تأییدشده نداشت.</span>
-                  ) : reassessment.target_met ? (
-                    <Badge tone="success" className="self-start">
-                      هدف محقق شد
-                    </Badge>
-                  ) : (
-                    <Badge tone="warning" className="self-start">
-                      هدف هنوز محقق نشده است
-                    </Badge>
-                  )}
-                  {reassessment.method_changed && (
-                    <span className="text-xs text-warning">
-                      روش ارزیابی عوض شده و بخشی از تغییر ممکن است از روش باشد.
-                    </span>
-                  )}
-                </span>
-              </Fact>
-              <Fact label="تصمیم">
-                <span className="flex flex-col gap-1">
-                  <span className="font-semibold">{reassessment.decision.label}</span>
-                  <Prose text={reassessment.note} />
-                </span>
-              </Fact>
-            </dl>
-          </CardContent>
-        </Card>
+        <SectionBody>
+          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
+            <Fact label="تاریخ و مسئول">
+              {longDate(reassessment.performed_on)}، {reassessment.responsible?.name}
+            </Fact>
+            <Fact label="ارزیابی تازه">
+              <AppLink href={reassessment.assessment.href} className="code">
+                {reassessment.assessment.code}
+              </AppLink>
+            </Fact>
+            <Fact label="مقایسه با هدف">
+              <span className="flex flex-col gap-1.5">
+                {reassessment.target_met === null ? (
+                  <span>طرح ارزیابی هدف تأییدشده نداشت.</span>
+                ) : reassessment.target_met ? (
+                  <Badge tone="success" className="self-start">
+                    هدف محقق شد
+                  </Badge>
+                ) : (
+                  <Badge tone="warning" className="self-start">
+                    هدف هنوز محقق نشده است
+                  </Badge>
+                )}
+                {reassessment.method_changed && (
+                  <span className="text-xs text-warning">
+                    روش ارزیابی عوض شده و بخشی از تغییر ممکن است از روش باشد.
+                  </span>
+                )}
+              </span>
+            </Fact>
+            <Fact label="تصمیم">
+              <span className="flex flex-col gap-1">
+                <span className="font-semibold">{reassessment.decision.label}</span>
+                <Prose text={reassessment.note} />
+              </span>
+            </Fact>
+          </dl>
+        </SectionBody>
       ) : (
-        <p className="text-sm text-muted">
+        <SectionEmpty>
           ارزیابی جاری تازه‌ای بعد از این طرح تأیید شده است. پیش از طرح دور تازه، نتیجه را با هدف مقایسه و تصمیم پذیرش
           یا ادامه‌ی اصلاح را ثبت کنید.
-        </p>
+        </SectionEmpty>
       )}
       {data.comparison && (
         <ComparisonTable
+          bare
           data={data.comparison}
           caption={`مقایسه‌ی ارزیابی مبنا، تازه و هدف ریسک ${data.plan.risk.code}`}
         />
@@ -298,13 +305,11 @@ function Acceptances({ data }: { data: PlanDetail }) {
         )
       }
     >
-      <p className="text-sm text-muted">{faText(data.acceptance_note)}</p>
+      <p className="border-b border-line px-5 py-3 text-sm text-muted">{faText(data.acceptance_note)}</p>
       {data.acceptances.length ? (
-        <Card className="table-shell overflow-clip">
-          <AcceptanceTable acceptances={data.acceptances} caption="پذیرش‌های این طرح" />
-        </Card>
+        <AcceptanceTable acceptances={data.acceptances} caption="پذیرش‌های این طرح" />
       ) : (
-        <p className="text-sm text-muted">پذیرشی برای این طرح ثبت نشده است.</p>
+        <SectionEmpty>پذیرشی برای این طرح ثبت نشده است.</SectionEmpty>
       )}
     </Section>
   );
@@ -317,18 +322,21 @@ export function PlanDetailPage() {
   if (!page.data) return <DetailState query={page} header={<Header />} />;
   const data = page.data;
   const sections = [
+    { id: "summary", label: "خلاصه", show: true },
     { id: "approval", label: "تأیید", show: Boolean(data.approval.problems.length || data.approval.approve_url) },
     { id: "actions", label: "اقدام‌ها", show: true },
     { id: "reassessment", label: "بازسنجی", show: Boolean(data.reassessment || data.reassess_url) },
     { id: "acceptances", label: "پذیرش", show: true },
+    { id: "attachments", label: "پیوست‌ها", show: true },
+    { id: "comments", label: "نظرها", show: true },
   ].filter((section) => section.show);
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
         <Header data={data} />
         <SectionNav label="بخش‌های طرح" sections={sections} />
       </div>
-      <Facts data={data} />
+      <Summary data={data} />
       <Approval data={data} />
       <Actions data={data} />
       <Reassessment data={data} />

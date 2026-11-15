@@ -12,7 +12,7 @@ import { PageSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/features/session/session";
-import { faText } from "@/lib/format";
+import { count, faText } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks";
 import { formatJalali, parseJalali } from "@/lib/jalali";
 import type { FormField, FormSchema, Listing } from "@/lib/types";
@@ -182,10 +182,11 @@ export function FilterBar({ schema, label }: FilterBarProps) {
   return (
     <Card className="p-4 sm:p-5">
       <form role="search" aria-label={label} onSubmit={submit} className="flex flex-col gap-4">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* فیلترها کنار هم می‌چینند و سطر بعد را پر می‌کنند؛ فهرستی با یک فیلتر، کادر خالی نمی‌سازد. */}
+        <div className="flex flex-wrap items-start gap-4">
           {fields.map((field) =>
             field.kind === "text" ? (
-              <div key={field.name} className="md:col-span-2 xl:col-span-1">
+              <div key={field.name} className="min-w-64 max-w-sm flex-[2_1_18rem]">
                 <SearchBox
                   field={field}
                   value={params.get(field.name) ?? ""}
@@ -193,7 +194,12 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                 />
               </div>
             ) : field.kind === "select" || field.kind === "radio" ? (
-              <Field key={field.name} label={field.label} error={field.errors.map(faText)}>
+              <Field
+                key={field.name}
+                label={field.label}
+                error={field.errors.map(faText)}
+                className="min-w-48 flex-[1_1_12rem]"
+              >
                 <Select
                   name={field.name}
                   value={current(field.name)}
@@ -213,12 +219,13 @@ export function FilterBar({ schema, label }: FilterBarProps) {
                 </Select>
               </Field>
             ) : field.kind === "date" ? (
-              <FilterDate
-                key={field.name}
-                field={field}
-                value={params.get(field.name) ?? ""}
-                onChange={(value) => update(field.name, value, { replace: true })}
-              />
+              <div key={field.name} className="min-w-48 flex-[1_1_12rem]">
+                <FilterDate
+                  field={field}
+                  value={params.get(field.name) ?? ""}
+                  onChange={(value) => update(field.name, value, { replace: true })}
+                />
+              </div>
             ) : field.kind === "checkbox" ? (
               // هم‌تراز با پایین کادرهای کنارش، که برچسبشان بالای کادر است.
               <div key={field.name} className="flex items-end pb-2">
@@ -332,6 +339,8 @@ export function ListBody<T, D extends Listing<T>>({ query, label, filtered, empt
         className={cn("table-shell overflow-clip transition-opacity", fetching && "opacity-60")}
         aria-busy={query.isFetching}
       >
+        {/* شمار همه‌ی نتیجه‌ها (نه فقط این صفحه) روی خود جدول، تا جدول سرصفحه‌ی خودش را داشته باشد. */}
+        <p className="border-b border-line px-5 py-3 text-sm font-semibold text-fg">{count(data.count, "مورد")}</p>
         {children(data)}
       </Card>
       <Pagination

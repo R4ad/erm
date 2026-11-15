@@ -26,7 +26,6 @@
         <th>نوع</th>
         <th>نسخه‌ی روش</th>
         <th>افق</th>
-        <th>جلسه‌ی کارگروه</th>
         <th>ثبت‌کننده</th>
         <th>وضعیت</th>
         <th>سطح تصمیم</th>
@@ -40,14 +39,13 @@
           <td>{{ assessment.get_kind_display }}</td>
           <td>{{ assessment.method_version.number }}</td>
           <td>{{ assessment.horizon_months }} ماه</td>
-          <td>{% if assessment.meeting_date %}{{ assessment.meeting_date|jformat:"%Y/%m/%d" }}{% else %}-{% endif %}</td>
           <td>{{ assessment.created_by.get_full_name|default:assessment.created_by.username }}</td>
           <td><span class="badge text-bg-light border">{{ assessment.get_status_display }}</span></td>
           <td>{% if assessment.is_approved %}{% include "assessments/includes/level_badge.html" with level=assessment.decision_level %}{% else %}-{% endif %}</td>
         </tr>
       {% empty %}
         <tr>
-          <td colspan="8" class="text-center text-body-secondary py-4">هنوز ارزیابی‌ای ثبت نشده است.</td>
+          <td colspan="7" class="text-center text-body-secondary py-4">هنوز ارزیابی‌ای ثبت نشده است.</td>
         </tr>
       {% endfor %}
     </tbody>

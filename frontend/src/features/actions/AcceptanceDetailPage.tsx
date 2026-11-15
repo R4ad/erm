@@ -1,10 +1,9 @@
-import { Ban, Check, FileText, PencilLine, Send, Signature, X } from "lucide-react";
+import { Ban, Check, ClipboardList, FileText, PencilLine, Send, Signature, X } from "lucide-react";
 import { useState } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -13,7 +12,17 @@ import { useBridgeAction, type ActionValue } from "@/features/forms/bridge-actio
 import { FieldControl } from "@/features/forms/field-control";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { ActionError, CodeLinks, Fact, NotesField, Prose, Reasons, Section } from "@/features/records/dossier";
+import {
+  ActionError,
+  CodeLinks,
+  Fact,
+  NotesField,
+  Prose,
+  Reasons,
+  Section,
+  SectionBody,
+  SectionNav,
+} from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
 import { useSession } from "@/features/session/session";
 import { dateTime, fa, faText, longDate } from "@/lib/format";
@@ -99,11 +108,11 @@ function Decision({ data }: { data: AcceptanceDetail }) {
   return null;
 }
 
-function Facts({ data }: { data: AcceptanceDetail }) {
+function Summary({ data }: { data: AcceptanceDetail }) {
   const { acceptance, risk, assessment, cap } = data;
   return (
-    <Card>
-      <CardContent className="pt-5">
+    <Section id="summary" title="خلاصه‌ی پذیرش" icon={<ClipboardList />}>
+      <SectionBody>
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
           <Fact label="ریسک">
             {risk.href ? (
@@ -226,8 +235,8 @@ function Facts({ data }: { data: AcceptanceDetail }) {
           </Fact>
           <Fact label="مسئول پیگیری">{acceptance.follow_up_by?.name ?? "-"}</Fact>
         </dl>
-      </CardContent>
-    </Card>
+      </SectionBody>
+    </Section>
   );
 }
 
@@ -237,8 +246,8 @@ function SubmitBox({ data }: { data: AcceptanceDetail }) {
   const url = data.submit_url;
   if (!url) return null;
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-5">
+    <Section id="submit" title="ارسال برای امضا" icon={<Send />}>
+      <SectionBody className="flex flex-col gap-4">
         <ActionError error={action.error} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-fg">
@@ -249,7 +258,7 @@ function SubmitBox({ data }: { data: AcceptanceDetail }) {
             ارسال برای امضا
           </Button>
         </div>
-      </CardContent>
+      </SectionBody>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -262,7 +271,7 @@ function SubmitBox({ data }: { data: AcceptanceDetail }) {
           action.mutate({ url, values: {} });
         }}
       />
-    </Card>
+    </Section>
   );
 }
 
@@ -342,74 +351,72 @@ function SignBox({ form, url, code }: { form: SignForm; url: string; code: strin
   const set = (name: string, value: ActionValue) => setValues((current) => ({ ...current, [name]: value }));
   const titleId = `sign-${form.authority}-title`;
   return (
-    <section aria-labelledby={titleId}>
-      <Card>
-        <CardHeader
-          as="h3"
-          icon={<Signature />}
-          titleId={titleId}
-          title={`امضای شما به‌عنوان ${form.label}`}
-          description={form.intro || undefined}
-        />
-        <CardContent className="flex flex-col gap-4">
-          <ActionError error={action.error} />
-          {form.errors.length > 0 && <Reasons tone="danger" items={form.errors} />}
-          {visible.map((field) =>
-            field.kind === "textarea" ? (
-              <NotesField
-                key={field.name}
-                field={field}
-                value={typeof values[field.name] === "string" ? (values[field.name] as string) : ""}
-                onChange={(value) => set(field.name, value)}
-                disabled={action.isPending}
-              />
-            ) : (
-              <FieldControl
-                key={field.name}
-                field={{ ...field, disabled: field.disabled || action.isPending }}
-                id={`sign-${form.authority}-${field.name}`}
-                value={values[field.name] ?? null}
-                onChange={(value) => set(field.name, value)}
-                today={parseJalali(today.jalali) ?? undefined}
-              />
-            ),
-          )}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              loading={busy("approve")}
+    <section aria-labelledby={titleId} className="border-t border-line">
+      <div className="flex flex-col gap-1 px-5 pt-4">
+        <h3 id={titleId} className="flex items-center gap-2 text-sm font-semibold text-fg">
+          <Signature aria-hidden className="size-4 text-accent-text" />
+          امضای شما به‌عنوان {form.label}
+        </h3>
+        {form.intro && <p className="text-xs text-muted">{form.intro}</p>}
+      </div>
+      <div className="flex flex-col gap-4 px-5 pt-4 pb-5">
+        <ActionError error={action.error} />
+        {form.errors.length > 0 && <Reasons tone="danger" items={form.errors} />}
+        {visible.map((field) =>
+          field.kind === "textarea" ? (
+            <NotesField
+              key={field.name}
+              field={field}
+              value={typeof values[field.name] === "string" ? (values[field.name] as string) : ""}
+              onChange={(value) => set(field.name, value)}
               disabled={action.isPending}
-              onClick={() => setConfirming("approve")}
-            >
-              {!busy("approve") && <Check aria-hidden />}
-              تأیید پذیرش
-            </Button>
-            <Button
-              variant="danger"
-              loading={busy("reject")}
-              disabled={action.isPending}
-              onClick={() => setConfirming("reject")}
-            >
-              {!busy("reject") && <X aria-hidden />}
-              رد پذیرش
-            </Button>
-          </div>
-        </CardContent>
-        <ConfirmDialog
-          open={confirming !== null}
-          onOpenChange={(open) => !open && setConfirming(null)}
-          title={confirming === "reject" ? `پذیرش ${code} رد شود؟` : `پذیرش ${code} را تأیید می‌کنید؟`}
-          description={`امضای شما به‌عنوان ${form.label} ثبت می‌شود و پس گرفته نمی‌شود.`}
-          confirmLabel={confirming === "reject" ? "رد پذیرش" : "تأیید پذیرش"}
-          tone={confirming === "reject" ? "danger" : "primary"}
-          loading={action.isPending}
-          onConfirm={() => {
-            const decision = confirming;
-            setConfirming(null);
-            if (decision) action.mutate({ url, values: { ...values, decision } });
-          }}
-        />
-      </Card>
+            />
+          ) : (
+            <FieldControl
+              key={field.name}
+              field={{ ...field, disabled: field.disabled || action.isPending }}
+              id={`sign-${form.authority}-${field.name}`}
+              value={values[field.name] ?? null}
+              onChange={(value) => set(field.name, value)}
+              today={parseJalali(today.jalali) ?? undefined}
+            />
+          ),
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            loading={busy("approve")}
+            disabled={action.isPending}
+            onClick={() => setConfirming("approve")}
+          >
+            {!busy("approve") && <Check aria-hidden />}
+            تأیید پذیرش
+          </Button>
+          <Button
+            variant="danger"
+            loading={busy("reject")}
+            disabled={action.isPending}
+            onClick={() => setConfirming("reject")}
+          >
+            {!busy("reject") && <X aria-hidden />}
+            رد پذیرش
+          </Button>
+        </div>
+      </div>
+      <ConfirmDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={confirming === "reject" ? `پذیرش ${code} رد شود؟` : `پذیرش ${code} را تأیید می‌کنید؟`}
+        description={`امضای شما به‌عنوان ${form.label} ثبت می‌شود و پس گرفته نمی‌شود.`}
+        confirmLabel={confirming === "reject" ? "رد پذیرش" : "تأیید پذیرش"}
+        tone={confirming === "reject" ? "danger" : "primary"}
+        loading={action.isPending}
+        onConfirm={() => {
+          const decision = confirming;
+          setConfirming(null);
+          if (decision) action.mutate({ url, values: { ...values, decision } });
+        }}
+      />
     </section>
   );
 }
@@ -456,13 +463,11 @@ function RevokeBox({ data }: { data: AcceptanceDetail }) {
 function Signatures({ data }: { data: AcceptanceDetail }) {
   return (
     <Section id="signatures" title="امضاها" icon={<Signature />}>
-      <Card className="overflow-clip">
-        <ul aria-label="امضاهای لازم" className="divide-y divide-line">
-          {data.signatures.map((row) => (
-            <SignatureRow key={row.authority} row={row} />
-          ))}
-        </ul>
-      </Card>
+      <ul aria-label="امضاهای لازم" className="divide-y divide-line">
+        {data.signatures.map((row) => (
+          <SignatureRow key={row.authority} row={row} />
+        ))}
+      </ul>
       {data.sign_forms.map((form) => (
         <SignBox key={form.authority} form={form} url={data.sign_url} code={data.acceptance.code} />
       ))}
@@ -478,10 +483,22 @@ export function AcceptanceDetailPage() {
   if (!page.data) return <DetailState query={page} header={<Header />} />;
   const data = page.data;
   return (
-    <div className="flex flex-col gap-6">
-      <Header data={data} />
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
+        <Header data={data} />
+        <SectionNav
+          label="بخش‌های پذیرش"
+          sections={[
+            { id: "summary", label: "خلاصه" },
+            ...(data.submit_url ? [{ id: "submit", label: "ارسال" }] : []),
+            { id: "signatures", label: "امضاها" },
+            { id: "attachments", label: "پیوست‌ها" },
+            { id: "comments", label: "نظرها" },
+          ]}
+        />
+      </div>
       <Decision data={data} />
-      <Facts data={data} />
+      <Summary data={data} />
       <Reasons tone="info" title={faText(data.problems_title)} items={data.problems} />
       <SubmitBox data={data} />
       <Signatures data={data} />

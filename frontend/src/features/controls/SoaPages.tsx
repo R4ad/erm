@@ -3,12 +3,11 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/states";
 import { DetailState, FilterBar, ListBody } from "@/features/pages/listing";
 import { activeFilters, usePageData } from "@/features/pages/page-data";
-import { Prose, Section } from "@/features/records/dossier";
+import { Prose, Section, SectionBody } from "@/features/records/dossier";
 import { RiskTable } from "@/features/risks/RiskTable";
 import { cn } from "@/lib/cn";
 import { count, fa, longDate } from "@/lib/format";
@@ -192,13 +191,13 @@ export function SoaDetailPage() {
           {data.warning}
         </Alert>
       )}
-      <Card>
-        <CardHeader
-          icon={<FileCheck />}
-          title="ردیف بیانیه"
-          description={iso.updated_at ? `آخرین تغییر ${longDate(iso.updated_at)}` : undefined}
-        />
-        <CardContent className="text-sm leading-8 text-fg/90">
+      <Section
+        id="statement"
+        title="ردیف بیانیه"
+        icon={<FileCheck />}
+        description={iso.updated_at ? `آخرین تغییر ${longDate(iso.updated_at)}` : undefined}
+      >
+        <SectionBody className="text-sm leading-8 text-fg/90">
           {iso.justification !== null ? (
             <>
               <span className="block text-xs text-muted">دلیل</span>
@@ -209,16 +208,16 @@ export function SoaDetailPage() {
               کاربرد این کنترل هنوز تعیین نشده است. کاربرد، دلیل و وضعیت اجرا را عضو GRC ثبت می‌کند.
             </p>
           )}
-        </CardContent>
-      </Card>
-      <Section id="controls" title="کنترل‌های سازمان" icon={<ShieldCheck />}>
+        </SectionBody>
+      </Section>
+      <Section id="controls" title="کنترل‌های سازمان" icon={<ShieldCheck />} count={data.controls.length}>
         <ControlTable
           controls={data.controls}
           caption="کنترل‌های سازمان که این کنترل پیوست A را اجرا می‌کنند"
           empty="کنترل سازمانی به این کنترل نگاشت نشده است."
         />
       </Section>
-      <Section id="risks" title="ریسک‌هایی که به این کنترل‌ها تکیه دارند" icon={<Workflow />}>
+      <Section id="risks" title="ریسک‌هایی که به این کنترل‌ها تکیه دارند" icon={<Workflow />} count={data.risks.length}>
         <RiskTable
           risks={data.risks}
           caption="ریسک‌هایی که به کنترل‌های این ردیف تکیه دارند"

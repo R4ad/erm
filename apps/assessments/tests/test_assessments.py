@@ -1,8 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 from django.db import IntegrityError, transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.roles import Role
 from apps.assessments.models import Assessment, ImpactDetail
@@ -10,6 +12,7 @@ from apps.assessments.services import (
     StakeholderFacts,
     create_assessment,
     impact_summary,
+    stakeholder_facts,
     suggest_duration,
     suggest_financial,
 )
@@ -78,6 +81,22 @@ def test_the_duration_suggestion_follows_the_s_table():
     assert suggest_duration(None, facts(), QUARTER) is None
 
 
+def test_duration_suggestion_does_not_use_limits_before_their_validity(risk, bank, grc):
+    assessment = create_assessment(risk, grc, "current", horizon_months=12)
+    link = ServiceCustomer.objects.get(service=risk.service, customer=bank)
+    today = timezone.localdate()
+    link.valid_from = today + timedelta(days=1)
+    link.save()
+
+    assert stakeholder_facts(assessment, bank, on=today).rto is None
+    assert stakeholder_facts(assessment, bank, on=today + timedelta(days=1)).rto == 120
+
+    link.valid_from = None
+    link.valid_until = today - timedelta(days=1)
+    link.save()
+    assert stakeholder_facts(assessment, bank, on=today).mtpd is None
+
+
 def test_the_financial_suggestion_uses_the_bounds_of_the_method_version(v1):
     f = scale(v1, "F")
     basis = 10_000_000_000
@@ -100,11 +119,12 @@ def test_grc_creates_assessments_only_while_the_risk_is_being_assessed(client, g
     response = client.post(url, {"kind": "inherent", "horizon_months": 12})
     assert "کنترل‌های کنارگذاشته" in response.context["form"].errors["assumptions"][0]
 
-    response = client.post(url, {"kind": "current", "horizon_months": 12, "meeting_date": "1405/08/12"})
+    assert "meeting_date" not in form.fields
+    response = client.post(url, {"kind": "current", "horizon_months": 12, "assessment_confidence": "medium"})
     assessment = Assessment.objects.get()
     assert response.url == reverse("assessments:impact_profile", args=[assessment.pk])
     assert assessment.code.startswith("AS-1405-") and assessment.method_version == v1
-    assert assessment.meeting_date.isoformat() == "2026-11-03"
+    assert assessment.confidence == "medium"
 
     risk.status = S.REGISTERED
     risk.save()
@@ -154,6 +174,8 @@ def test_the_impact_profile_has_datin_and_each_affected_bank(client, grc, risk, 
     }
     response = client.post(url, data)
     forms = {form.prefix: form for group in response.context["groups"] for form in group["forms"]}
+    assert "level_high" not in forms["datin-D"].fields
+    assert "confidence" not in forms["datin-D"].fields
     # پیشنهاد هر خانه حتی بعد از خانه‌ی ایراددار حساب شده است.
     assert forms[f"{bank.pk}-S"].suggestion.level == 4
     # سامانه برای ۲۰۰ دقیقه سطح ۴ پیشنهاد می‌دهد؛ سطح دیگر دلیل می‌خواهد.
@@ -180,7 +202,7 @@ def test_the_impact_profile_has_datin_and_each_affected_bank(client, grc, risk, 
     s = assessment.impacts.get(customer=bank, scale__code="S")
     assert (s.level, s.actual_value, s.unit, list(s.evidence.all())) == (3, Decimal(200), "دقیقه", [evidence])
     assert assessment.impacts.get(customer=None, scale__code="C").level is None
-    assert assessment.impacts.get(customer=None, scale__code="R").engine_level == (2, 3)
+    assert assessment.impacts.get(customer=None, scale__code="R").engine_level == 2
     assert assessment.impacts.count() == 4
 
 

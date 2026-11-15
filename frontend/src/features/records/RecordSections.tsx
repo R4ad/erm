@@ -4,10 +4,9 @@ import { useId, useState, type FormEvent } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Textarea } from "@/components/ui/field";
-import { EmptyState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
+import { Section, SectionEmpty } from "@/features/records/dossier";
 import { bridge, errorMessage, post } from "@/lib/api";
 import { dateTime, faText, fileSize, longDate } from "@/lib/format";
 import type { FormResult, RecordParts } from "@/lib/types";
@@ -26,13 +25,10 @@ export function Attachments({ record, as = "h2" }: { record: RecordParts; as?: "
       افزودن پیوست
     </AppLink>
   );
-  if (!record.attachments.length) {
-    return <EmptyState as={as} icon={<Paperclip />} title="فایلی پیوست نشده است" action={upload} />;
-  }
   return (
-    <Card className="overflow-clip">
-      <CardHeader icon={<Paperclip />} title="پیوست‌ها" as={as} actions={upload} />
-      <ul className="divide-y divide-line border-t border-line">
+    <Section id="attachments" title="پیوست‌ها" icon={<Paperclip />} as={as} actions={upload}>
+      {!record.attachments.length && <SectionEmpty>هنوز فایلی پیوست نشده است.</SectionEmpty>}
+      <ul className="divide-y divide-line">
         {record.attachments.map((attachment) => (
           <li key={attachment.id} className="flex items-start gap-3 px-5 py-4">
             <Paperclip aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-muted" />
@@ -53,7 +49,7 @@ export function Attachments({ record, as = "h2" }: { record: RecordParts; as?: "
           </li>
         ))}
       </ul>
-    </Card>
+    </Section>
   );
 }
 
@@ -108,10 +104,9 @@ function Composer({ url }: { url: string }) {
 
 export function Comments({ record, as = "h2" }: { record: RecordParts; as?: "h2" | "h3" }) {
   return (
-    <Card className="overflow-clip">
-      <CardHeader icon={<MessageSquare />} title="نظرها" as={as} />
+    <Section id="comments" title="نظرها" icon={<MessageSquare />} as={as} count={record.comments.length}>
       {record.comments.length ? (
-        <ul className="divide-y divide-line border-t border-line">
+        <ul className="divide-y divide-line">
           {record.comments.map((comment) => (
             <li key={comment.id} className="flex gap-3 px-5 py-4">
               <span
@@ -139,9 +134,9 @@ export function Comments({ record, as = "h2" }: { record: RecordParts; as?: "h2"
           ))}
         </ul>
       ) : (
-        <p className="border-t border-line px-5 py-4 text-sm text-muted">هنوز نظری نیست.</p>
+        <SectionEmpty>هنوز نظری نیست.</SectionEmpty>
       )}
       <Composer url={record.comment_url} />
-    </Card>
+    </Section>
   );
 }

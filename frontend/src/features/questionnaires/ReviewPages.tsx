@@ -10,13 +10,12 @@ import {
   Plus,
   Undo2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Deadline } from "@/components/ui/deadline";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,7 +23,16 @@ import { Alert } from "@/components/ui/states";
 import { useBridgeAction } from "@/features/forms/bridge-action";
 import { DetailState, FilterBar, ListBody } from "@/features/pages/listing";
 import { activeFilters, usePageData } from "@/features/pages/page-data";
-import { ActionError, Fact, Prose, Section } from "@/features/records/dossier";
+import {
+  ActionError,
+  DossierLayout,
+  Fact,
+  Facts,
+  Prose,
+  Section,
+  SectionBody,
+  SectionEmpty,
+} from "@/features/records/dossier";
 import { count, dateTime, formatNumber, longDate, shortDate } from "@/lib/format";
 import { useSectionFromHash, useTitle } from "@/lib/hooks";
 import type { PendingRiskRow, ResponseReview, ReviewList } from "@/lib/types";
@@ -187,6 +195,7 @@ function PendingRisks({ data }: { data: ResponseReview }) {
       id="pending"
       title="ریسک‌های در انتظار"
       icon={<Hourglass />}
+      count={data.pending_risks.length}
       actions={
         data.review && (
           <AppLink href={data.review.pending_create_url} button={{ variant: "secondary", size: "sm" }}>
@@ -197,15 +206,13 @@ function PendingRisks({ data }: { data: ResponseReview }) {
       }
     >
       {data.pending_risks.length ? (
-        <Card className="overflow-clip">
-          <ul aria-label="ریسک‌های در انتظار این پاسخ" className="divide-y divide-line">
-            {data.pending_risks.map((item) => (
-              <PendingItem key={item.id} item={item} />
-            ))}
-          </ul>
-        </Card>
+        <ul aria-label="ریسک‌های در انتظار این پاسخ" className="divide-y divide-line">
+          {data.pending_risks.map((item) => (
+            <PendingItem key={item.id} item={item} />
+          ))}
+        </ul>
       ) : (
-        <p className="text-sm text-muted">ریسک در انتظاری از این پاسخ نیامده است.</p>
+        <SectionEmpty>ریسک در انتظاری از این پاسخ نیامده است.</SectionEmpty>
       )}
     </Section>
   );
@@ -219,49 +226,59 @@ function Review({ data }: { data: ResponseReview }) {
   if (!review) return null;
   return (
     <Section id="review" title="بررسی عضو GRC" icon={<CheckCheck />}>
-      <Card>
-        <CardContent className="flex flex-col gap-4 pt-5">
-          <p className="text-sm leading-7 text-fg">
-            هر ریسک در انتظار را در رجیستر ثبت کنید یا با دلیل کنار بگذارید. اگر جوابی مبهم است، پاسخ را با سؤال مشخص
-            برگردانید؛ مهلت جواب پنج روز کاری است.
+      <SectionBody className="flex flex-col gap-4">
+        <p className="text-sm leading-7 text-fg">
+          هر ریسک در انتظار را در رجیستر ثبت کنید یا با دلیل کنار بگذارید. اگر جوابی مبهم است، پاسخ را با سؤال مشخص
+          برگردانید؛ مهلت جواب پنج روز کاری است.
+        </p>
+        <ActionError error={action.error} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            disabled={review.undecided}
+            loading={action.isPending}
+            aria-describedby={review.undecided ? "review-undecided" : undefined}
+            onClick={() => setConfirming(true)}
+          >
+            {!action.isPending && <CheckCheck aria-hidden />}
+            بررسی تمام شد
+          </Button>
+          <AppLink href={review.return_url} button={{ variant: "secondary" }}>
+            <Undo2 aria-hidden className="rtl:-scale-x-100" />
+            برگشت با سؤال
+          </AppLink>
+        </div>
+        {review.undecided && (
+          <p id="review-undecided" className="text-xs text-warning">
+            اول همه‌ی ریسک‌های در انتظار را در رجیستر ثبت کنید یا کنار بگذارید.
           </p>
-          <ActionError error={action.error} />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="primary"
-              disabled={review.undecided}
-              loading={action.isPending}
-              aria-describedby={review.undecided ? "review-undecided" : undefined}
-              onClick={() => setConfirming(true)}
-            >
-              {!action.isPending && <CheckCheck aria-hidden />}
-              بررسی تمام شد
-            </Button>
-            <AppLink href={review.return_url} button={{ variant: "secondary" }}>
-              <Undo2 aria-hidden className="rtl:-scale-x-100" />
-              برگشت با سؤال
-            </AppLink>
-          </div>
-          {review.undecided && (
-            <p id="review-undecided" className="text-xs text-warning">
-              اول همه‌ی ریسک‌های در انتظار را در رجیستر ثبت کنید یا کنار بگذارید.
-            </p>
-          )}
-        </CardContent>
-        <ConfirmDialog
-          open={confirming}
-          onOpenChange={setConfirming}
-          title="بررسی این پاسخ تمام شود؟"
-          description="پاسخ «بررسی‌شده» می‌شود و بعد از آن دیگر برگشت داده نمی‌شود."
-          confirmLabel="بررسی تمام شد"
-          loading={action.isPending}
-          onConfirm={() => {
-            setConfirming(false);
-            action.mutate({ url: review.reviewed_url, values: {} });
-          }}
-        />
-      </Card>
+        )}
+      </SectionBody>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="بررسی این پاسخ تمام شود؟"
+        description="پاسخ «بررسی‌شده» می‌شود و بعد از آن دیگر برگشت داده نمی‌شود."
+        confirmLabel="بررسی تمام شد"
+        loading={action.isPending}
+        onConfirm={() => {
+          setConfirming(false);
+          action.mutate({ url: review.reviewed_url, values: {} });
+        }}
+      />
     </Section>
+  );
+}
+
+/** تیتر یک تکه‌ی داخل بخش «جواب‌ها»، روی خط جداکننده‌ی همان بخش. */
+function SubHeading({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2 border-t border-line px-5 py-3 text-sm font-semibold text-fg first-of-type:border-t-0">
+      <span aria-hidden className="text-accent-text [&>svg]:size-4">
+        {icon}
+      </span>
+      {children}
+    </h3>
   );
 }
 
@@ -270,16 +287,18 @@ function Answers({ data }: { data: ResponseReview }) {
     return (
       <Section id="answers" title="خدمات و شاخه‌های اختلال" icon={<ListChecks />}>
         {data.structured.data.length ? (
-          <StructuredResponse
-            id={String(data.response.id)}
-            response={{
-              can_edit: false,
-              structured_data: data.structured.data,
-              structured_questions: data.structured.questions,
-            }}
-          />
+          <SectionBody>
+            <StructuredResponse
+              id={String(data.response.id)}
+              response={{
+                can_edit: false,
+                structured_data: data.structured.data,
+                structured_questions: data.structured.questions,
+              }}
+            />
+          </SectionBody>
         ) : (
-          <p className="text-sm text-muted">خدمتی ثبت نشده است.</p>
+          <SectionEmpty>خدمتی ثبت نشده است.</SectionEmpty>
         )}
       </Section>
     );
@@ -287,112 +306,101 @@ function Answers({ data }: { data: ResponseReview }) {
   const answers = data.answers ?? [];
   return (
     <Section id="answers" title="جواب‌ها" icon={<ListChecks />}>
-      <Card>
-        <CardHeader as="h3" icon={<Briefcase />} title="کارکردها و پرسش‌های جلسه" />
-        <CardContent>
-          <dl className="flex flex-col divide-y divide-line">
-            {(data.fixed ?? []).map((item) => (
-              <div key={item.label} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-                <dt className="text-xs text-muted">{item.label}</dt>
-                <dd className="text-sm text-fg/90">
-                  <Prose text={item.value} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader as="h3" icon={<ClipboardList />} title="جواب سؤال‌ها" />
-        <CardContent>
-          {answers.length ? (
-            <ol className="flex flex-col divide-y divide-line">
-              {answers.map((answer, index) => (
-                <li key={answer.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                  <span
-                    aria-hidden
-                    className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-xs text-muted tabular"
-                  >
-                    {formatNumber(index + 1)}
-                  </span>
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <p className="text-sm font-medium whitespace-pre-line text-fg">{answer.question}</p>
-                    {answer.has_options ? (
-                      answer.options.length ? (
-                        <p className="flex flex-wrap items-center gap-2 text-sm text-fg/90">
-                          {answer.options.map((option) => (
-                            <span key={option.text} className="inline-flex items-center gap-1.5">
-                              {option.text}
-                              {option.indicates_risk && <Badge tone="warning">نشانه‌ی ریسک</Badge>}
-                            </span>
-                          ))}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted">بی‌جواب</p>
-                      )
-                    ) : answer.text ? (
-                      <p className="text-sm leading-7 whitespace-pre-line text-fg/90">{answer.text}</p>
+      <SubHeading icon={<Briefcase />}>کارکردها و پرسش‌های جلسه</SubHeading>
+      <SectionBody>
+        <dl className="flex flex-col divide-y divide-line">
+          {(data.fixed ?? []).map((item) => (
+            <div key={item.label} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+              <dt className="text-xs text-muted">{item.label}</dt>
+              <dd className="text-sm text-fg/90">
+                <Prose text={item.value} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </SectionBody>
+      <SubHeading icon={<ClipboardList />}>جواب سؤال‌ها</SubHeading>
+      <SectionBody>
+        {answers.length ? (
+          <ol className="flex flex-col divide-y divide-line">
+            {answers.map((answer, index) => (
+              <li key={answer.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                <span
+                  aria-hidden
+                  className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-xs text-muted tabular"
+                >
+                  {formatNumber(index + 1)}
+                </span>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <p className="text-sm font-medium whitespace-pre-line text-fg">{answer.question}</p>
+                  {answer.has_options ? (
+                    answer.options.length ? (
+                      <p className="flex flex-wrap items-center gap-2 text-sm text-fg/90">
+                        {answer.options.map((option) => (
+                          <span key={option.text} className="inline-flex items-center gap-1.5">
+                            {option.text}
+                            {option.indicates_risk && <Badge tone="warning">نشانه‌ی ریسک</Badge>}
+                          </span>
+                        ))}
+                      </p>
                     ) : (
                       <p className="text-sm text-muted">بی‌جواب</p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="text-sm text-muted">هنوز جوابی ثبت نشده است.</p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader as="h3" icon={<FilePlus2 />} title="مورد جدید" />
-        <CardContent>
-          <p className="text-sm leading-7 text-fg/90">
-            <Prose text={data.new_item ?? ""} />
-          </p>
-        </CardContent>
-      </Card>
+                    )
+                  ) : answer.text ? (
+                    <p className="text-sm leading-7 whitespace-pre-line text-fg/90">{answer.text}</p>
+                  ) : (
+                    <p className="text-sm text-muted">بی‌جواب</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted">هنوز جوابی ثبت نشده است.</p>
+        )}
+      </SectionBody>
+      <SubHeading icon={<FilePlus2 />}>مورد جدید</SubHeading>
+      <SectionBody>
+        <p className="text-sm leading-7 text-fg/90">
+          <Prose text={data.new_item ?? ""} />
+        </p>
+      </SectionBody>
     </Section>
   );
 }
 
-function Facts({ data }: { data: ResponseReview }) {
+function ResponseFacts({ data }: { data: ResponseReview }) {
   const { response } = data;
   return (
-    <Card className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
-      <CardHeader title="مشخصات" />
-      <CardContent>
-        <dl className="grid grid-cols-[6.5rem_1fr] gap-x-4 gap-y-3 text-sm">
-          <Fact label="پرسشنامه">
-            <AppLink href={response.questionnaire.href}>{response.questionnaire.title}</AppLink>
-          </Fact>
-          <Fact label="واحد">{response.org_unit}</Fact>
-          {!response.is_structured && (
-            <Fact label="خدمت">
-              {response.service ? (
-                <>
-                  <bdi className="code">{response.service.code}</bdi> {response.service.name}
-                </>
-              ) : (
-                "-"
-              )}
-            </Fact>
+    <Facts>
+      <Fact label="پرسشنامه">
+        <AppLink href={response.questionnaire.href}>{response.questionnaire.title}</AppLink>
+      </Fact>
+      <Fact label="واحد">{response.org_unit}</Fact>
+      {!response.is_structured && (
+        <Fact label="خدمت">
+          {response.service ? (
+            <>
+              <bdi className="code">{response.service.code}</bdi> {response.service.name}
+            </>
+          ) : (
+            "-"
           )}
-          <Fact label="پاسخ‌دهنده">
-            {response.respondent?.name ?? "-"}
-            {response.interview && (
-              <span className="block text-xs text-muted">مصاحبه، ثبت با {response.recorded_by?.name}</span>
-            )}
-          </Fact>
-          <Fact label="ارسال">{response.submitted_at ? dateTime(response.submitted_at) : "هنوز ارسال نشده"}</Fact>
-          {response.reviewed_at && (
-            <Fact label="بررسی">
-              {response.reviewed_by?.name}، {longDate(response.reviewed_at)}
-            </Fact>
-          )}
-        </dl>
-      </CardContent>
-    </Card>
+        </Fact>
+      )}
+      <Fact label="پاسخ‌دهنده">
+        {response.respondent?.name ?? "-"}
+        {response.interview && (
+          <span className="block text-xs text-muted">مصاحبه، ثبت با {response.recorded_by?.name}</span>
+        )}
+      </Fact>
+      <Fact label="ارسال">{response.submitted_at ? dateTime(response.submitted_at) : "هنوز ارسال نشده"}</Fact>
+      {response.reviewed_at && (
+        <Fact label="بررسی">
+          {response.reviewed_by?.name}، {longDate(response.reviewed_at)}
+        </Fact>
+      )}
+    </Facts>
   );
 }
 
@@ -438,16 +446,20 @@ export function ResponseReviewPage() {
           </p>
         </Alert>
       )}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-8">
-          <Review data={data} />
-          <PendingRisks data={data} />
-          <Answers data={data} />
-        </div>
-        <aside aria-label="مشخصات پاسخ">
-          <Facts data={data} />
-        </aside>
-      </div>
+      <DossierLayout
+        navLabel="بخش‌های پاسخ"
+        factsLabel="مشخصات پاسخ"
+        sections={[
+          ...(data.review ? [{ id: "review", label: "بررسی" }] : []),
+          { id: "pending", label: "ریسک‌های در انتظار" },
+          { id: "answers", label: data.structured ? "خدمات" : "جواب‌ها" },
+        ]}
+        facts={<ResponseFacts data={data} />}
+      >
+        <Review data={data} />
+        <PendingRisks data={data} />
+        <Answers data={data} />
+      </DossierLayout>
     </article>
   );
 }

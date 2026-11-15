@@ -65,10 +65,9 @@ export function Field({ label, hint, error, required = false, className, id, chi
   );
 }
 
+// نشان «اجباری» کنار هر برچسب است، پس باید آرام بماند؛ نشان رنگی پررنگ با نشان‌های وضعیت صفحه اشتباه می‌شد.
 export function RequiredMark() {
-  return (
-    <span className="rounded-md bg-accent-soft px-1.5 py-px text-[0.6875rem] font-medium text-accent-text">اجباری</span>
-  );
+  return <span className="text-[0.6875rem] font-normal text-muted">اجباری</span>;
 }
 
 export function FieldError({ id, messages }: { id?: string; messages?: string[] }) {

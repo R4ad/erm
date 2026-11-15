@@ -1,13 +1,13 @@
-import { BookOpen, PencilLine, Plus } from "lucide-react";
+import { BookOpen, PencilLine, Plus, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailState, FilterBar, ListBody } from "@/features/pages/listing";
 import { activeFilters, usePageData } from "@/features/pages/page-data";
+import { Section as DossierSection, SectionBody } from "@/features/records/dossier";
 import { RiskTable } from "@/features/risks/RiskTable";
 import { count, fa } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
@@ -99,7 +99,7 @@ export function ScenarioListPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Part({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <h3 className="text-xs font-medium text-muted">{title}</h3>
@@ -147,29 +147,26 @@ export function ScenarioDetailPage() {
           </>
         }
       />
-      <Card>
-        <CardHeader
-          icon={<BookOpen />}
-          title="شرح سناریو"
-          description={`دسته‌ی اصلی ${scenario.category.code} ${scenario.category.name}`}
-        />
-        <CardContent className="flex flex-col gap-5">
-          {scenario.narrative && <Section title="متن سناریو">{scenario.narrative}</Section>}
-          <Section title="رویداد اصلی">{scenario.event}</Section>
-          <Section title="شرایط">{scenario.conditions}</Section>
-          <Section title="پیامد">{scenario.consequence}</Section>
-        </CardContent>
-      </Card>
-      <section aria-labelledby="scenario-risks" className="flex flex-col gap-3">
-        <h2 id="scenario-risks" className="text-heading font-semibold">
-          ریسک‌های ساخته‌شده از این سناریو
-        </h2>
+      <DossierSection
+        id="narrative"
+        title="شرح سناریو"
+        icon={<BookOpen />}
+        description={`دسته‌ی اصلی ${scenario.category.code} ${scenario.category.name}`}
+      >
+        <SectionBody className="flex flex-col gap-5">
+          {scenario.narrative && <Part title="متن سناریو">{scenario.narrative}</Part>}
+          <Part title="رویداد اصلی">{scenario.event}</Part>
+          <Part title="شرایط">{scenario.conditions}</Part>
+          <Part title="پیامد">{scenario.consequence}</Part>
+        </SectionBody>
+      </DossierSection>
+      <DossierSection id="risks" title="ریسک‌های ساخته‌شده از این سناریو" icon={<ShieldAlert />} count={risks.length}>
         <RiskTable
           risks={risks}
           caption="ریسک‌های ساخته‌شده از این سناریو"
           empty="ریسکی از این سناریو که شما ببینید ثبت نشده است."
         />
-      </section>
+      </DossierSection>
     </article>
   );
 }

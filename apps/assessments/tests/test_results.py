@@ -9,7 +9,7 @@ from apps.assessments.models import Assessment, AssessmentReview, ImpactDetail, 
 from apps.assessments.results import compute, outcome, submission_problems
 from apps.assessments.review import ReviewError, can_decide_referral, can_review, review, submit
 from apps.assessments.services import create_assessment, likelihood_summary
-from apps.catalog.models import Customer, Responsibility
+from apps.catalog.models import Customer, Responsibility, ServiceCustomer
 from apps.catalog.tests.factories import make_service, make_user
 from apps.controls.models import Control
 from apps.controls.tests.factories import valid_control_assessment
@@ -101,6 +101,7 @@ def ready(risk, grc, bank, evidence):
     assessment.a_basis = "forward"
     assessment.a = 2
     assessment.a_confidence = "high"
+    assessment.confidence = "medium"
     assessment.a_rationale = "برنامه‌ی انتشار سال بعد"
     assessment.save()
     assessment.a_evidence.add(evidence)
@@ -122,18 +123,63 @@ def ready(risk, grc, bank, evidence):
     return assessment
 
 
-def test_a_complete_assessment_gets_score_levels_and_the_lowest_determining_confidence(ready):
+def test_a_complete_assessment_gets_score_levels_and_the_overall_confidence(ready):
     result = compute(ready).outcome
 
     assert (result.b.high, result.likelihood.high, result.impact.high, result.score.high) == (3, 2, 3, 6)
     assert result.base_level.name == result.decision_level.name == "متوسط"
     assert result.escalation_reasons == [] and not result.incomplete
-    # اطمینان کل کمترین اطمینان مؤلفه‌های تعیین‌کننده است: A و B0 زیاد، پیامد تعیین‌کننده متوسط.
+    # اطمینان کلی جداگانه ثبت می‌شود، بدون اطمینان برای تک‌تک مؤلفه‌ها.
     assert result.confidence == "medium"
     # خانه‌ای که I را تعیین نکرده در اطمینان کل اثری ندارد.
     ready.impacts.filter(level=0).update(confidence="low")
     assert compute(ready).outcome.confidence == "medium"
     assert submission_problems(ready) == []
+
+
+def test_legacy_draft_ranges_need_review_before_submission(ready, bank):
+    ready.a_high = 3
+    ready.save()
+    ready.paths.update(b0_high=4)
+    ready.impacts.filter(customer=bank, scale__code="S").update(level_high=4)
+
+    problems = submission_problems(ready)
+    assert any("A در پیش‌نویس قدیمی" in problem for problem in problems)
+    assert any("B0 مسیر" in problem and "بازه" in problem for problem in problems)
+    assert any("پیامد S برای بانک الف" in problem and "بازه" in problem for problem in problems)
+
+
+def test_unspecified_overall_confidence_is_conservatively_low(ready):
+    ready.confidence = ""
+    assert compute(ready).outcome.confidence == "low"
+
+
+def test_critical_service_without_valid_recovery_limits_remains_incomplete(ready, bank, checker):
+    service = ready.risk.service
+    service.is_critical = True
+    service.save()
+    link = ServiceCustomer.objects.create(service=service, customer=bank, rto_minutes=120)
+
+    result = compute(ready).outcome
+    assert result.score.high == 6
+    assert result.incomplete and result.confidence == "low"
+    assert "RTO و MTPD" in result.incomplete_reasons[0]
+
+    link.mtpd_minutes = 480
+    link.save()
+    assert not compute(ready).outcome.incomplete
+
+    link.valid_from = timezone.localdate() + timedelta(days=1)
+    link.save()
+    assert compute(ready).outcome.incomplete
+    submit(ready, ready.created_by)
+    review(ready, checker, A.APPROVE)
+    ready.refresh_from_db()
+    assert ready.is_incomplete and ready.confidence == "low"
+
+    link.valid_from = None
+    link.save()
+    assert outcome(ready).incomplete  # نتیجه‌ی تأییدشده تاریخی حفظ می‌شود.
 
 
 def test_an_escalation_flag_raises_the_decision_level_and_keeps_the_score(ready, evidence):
@@ -175,7 +221,7 @@ def test_submission_lists_what_blocks_quality_control(risk, grc, bank, ready):
 
     problems = submission_problems(ready)
     assert "تاریخ جلسه‌ی کارگروه ثبت نشده است." not in problems
-    assert "اطمینان B0 مسیر «انتشار از مسیر رسمی» ثبت نشده است." in problems
+    assert not any("اطمینان B0" in problem for problem in problems)
     label = f"{detail.scale.code} برای بانک الف"
     assert f"پیامد {label} شاهد ندارد." in problems and f"پیامد {label} دلیل ندارد." in problems
     assert any("R برای داتین" in problem for problem in problems)

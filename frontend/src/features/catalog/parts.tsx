@@ -1,10 +1,8 @@
 import { Link2, PencilLine } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Section } from "@/features/records/dossier";
+import { Section, SectionEmpty } from "@/features/records/dossier";
 import { shortDate } from "@/lib/format";
 import type { Dependent, Validity } from "@/lib/types";
 
@@ -41,15 +39,6 @@ export function ActiveBadge({ active }: { active: boolean }) {
   );
 }
 
-/** کادر خالی یک بخش پرونده، با همان متن صفحه‌ی جنگو. */
-export function EmptyNote({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-muted">
-      {children}
-    </p>
-  );
-}
-
 /** پیوند ویرایش یک ردیف؛ نام رکورد در نام دسترس‌پذیر پیوند می‌آید تا «ویرایش»ها از هم جدا باشند. */
 export function RowEdit({ href, name }: { href: string; name: string }) {
   return (
@@ -72,44 +61,42 @@ export function ActionsHeader() {
 /** خدمت‌هایی که کاربر می‌بیند و به این خدمت، تأمین‌کننده یا دارایی وابسته‌اند (dependents_table.html). */
 export function DependentsSection({ dependents }: { dependents: Dependent[] }) {
   return (
-    <Section id="dependents" title="خدمت‌های وابسته" icon={<Link2 />}>
+    <Section id="dependents" title="خدمت‌های وابسته" icon={<Link2 />} count={dependents.length}>
       {dependents.length ? (
-        <Card className="table-shell overflow-clip">
-          <table className="data-table">
-            <caption className="sr-only">خدمت‌هایی که به این رکورد وابسته‌اند</caption>
-            <thead>
-              <tr>
-                <th scope="col">خدمت</th>
-                <th scope="col">شرح</th>
-                <th scope="col">اعتبار</th>
+        <table className="data-table">
+          <caption className="sr-only">خدمت‌هایی که به این رکورد وابسته‌اند</caption>
+          <thead>
+            <tr>
+              <th scope="col">خدمت</th>
+              <th scope="col">شرح</th>
+              <th scope="col">اعتبار</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dependents.map((item) => (
+              <tr key={item.id}>
+                <td data-primary className="min-w-56">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <AppLink href={item.service.href}>
+                      <bdi className="code">{item.service.code}</bdi>
+                    </AppLink>
+                    <span className="font-medium text-fg">{item.service.name}</span>
+                    {item.service.is_critical && <Badge tone="danger">حیاتی</Badge>}
+                    {item.is_shared_point && <Badge tone="warning">نقطه‌ی شکست مشترک</Badge>}
+                  </span>
+                </td>
+                <td data-label="شرح" data-wide data-empty={item.description ? undefined : ""} className="min-w-48">
+                  <span className="text-sm whitespace-pre-line">{item.description}</span>
+                </td>
+                <td data-label="اعتبار" data-empty={hasValidity(item.validity) ? undefined : ""}>
+                  <ValidityText validity={item.validity} />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {dependents.map((item) => (
-                <tr key={item.id}>
-                  <td data-primary className="min-w-56">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <AppLink href={item.service.href}>
-                        <bdi className="code">{item.service.code}</bdi>
-                      </AppLink>
-                      <span className="font-medium text-fg">{item.service.name}</span>
-                      {item.service.is_critical && <Badge tone="danger">حیاتی</Badge>}
-                      {item.is_shared_point && <Badge tone="warning">نقطه‌ی شکست مشترک</Badge>}
-                    </span>
-                  </td>
-                  <td data-label="شرح" data-wide data-empty={item.description ? undefined : ""} className="min-w-48">
-                    <span className="text-sm whitespace-pre-line">{item.description}</span>
-                  </td>
-                  <td data-label="اعتبار" data-empty={hasValidity(item.validity) ? undefined : ""}>
-                    <ValidityText validity={item.validity} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+            ))}
+          </tbody>
+        </table>
       ) : (
-        <EmptyNote>هیچ خدمتی از خدمت‌هایی که می‌بینید به این وابسته نیست.</EmptyNote>
+        <SectionEmpty>هیچ خدمتی از خدمت‌هایی که می‌بینید به این وابسته نیست.</SectionEmpty>
       )}
     </Section>
   );

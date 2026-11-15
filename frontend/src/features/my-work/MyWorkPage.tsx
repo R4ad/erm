@@ -20,13 +20,14 @@ import {
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
 import { ClassicLink } from "@/components/ui/classic-link";
 import { Deadline } from "@/components/ui/deadline";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSkeleton } from "@/components/ui/skeleton";
+import { StatTile } from "@/components/ui/stat-tile";
 import { EmptyState, ErrorState } from "@/components/ui/states";
+import { Section } from "@/features/records/dossier";
 import { get } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { faText, formatNumber, longDate } from "@/lib/format";
@@ -53,41 +54,6 @@ function tally(sections: WorkSection[]) {
   const overdue = items.filter((item) => item.due?.overdue).length;
   const soon = items.filter((item) => item.due && !item.due.overdue && item.due.days_left <= 7).length;
   return { total: items.length, overdue, soon };
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number;
-  hint: string;
-  icon: LucideIcon;
-  tone?: "neutral" | "danger" | "warning";
-}) {
-  const accent = { neutral: "text-accent-text", danger: "text-danger", warning: "text-warning" }[tone];
-  return (
-    <Card className="relative overflow-hidden p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs text-muted">{label}</p>
-          <p className={cn("text-display font-bold tabular", value > 0 && tone !== "neutral" ? accent : "text-fg")}>
-            {formatNumber(value)}
-          </p>
-        </div>
-        <span
-          aria-hidden
-          className={cn("grid size-10 place-items-center rounded-xl border border-line bg-surface", accent)}
-        >
-          <Icon className="size-5" />
-        </span>
-      </div>
-      <p className="mt-2 text-xs text-muted">{hint}</p>
-    </Card>
-  );
 }
 
 function ItemLabel({ item }: { item: WorkItem }) {
@@ -132,31 +98,22 @@ function Row({ item }: { item: WorkItem }) {
   );
 }
 
-function Section({ section }: { section: WorkSection }) {
+function WorkSectionCard({ section }: { section: WorkSection }) {
   const Icon = SECTION_ICONS[section.key] ?? ListChecks;
-  const id = `section-${section.key}`;
   return (
-    <Card aria-labelledby={id} role="region" className="overflow-clip">
-      <CardHeader
-        titleId={id}
-        icon={<Icon />}
-        title={
-          <span className="flex items-center gap-2">
-            {section.title}
-            <span className="rounded-full bg-surface px-2 text-xs font-medium text-muted tabular">
-              {formatNumber(section.items.length)}
-            </span>
-          </span>
-        }
-        description={section.hint || undefined}
-        className="border-b border-line pb-4"
-      />
+    <Section
+      id={`section-${section.key}`}
+      title={section.title}
+      icon={<Icon />}
+      count={section.items.length}
+      description={section.hint || undefined}
+    >
       <ul className="divide-y divide-line">
         {section.items.map((item) => (
           <Row key={item.key} item={item} />
         ))}
       </ul>
-    </Card>
+    </Section>
   );
 }
 
@@ -214,30 +171,30 @@ export function MyWorkPage() {
       ) : (
         <>
           <section aria-label="خلاصه" className="grid gap-4 sm:grid-cols-3">
-            <Stat
+            <StatTile
               label="کارهای باز"
-              value={numbers.total}
+              value={formatNumber(numbers.total)}
               hint={`در ${formatNumber(sections.length)} بخش`}
               icon={ListChecks}
             />
-            <Stat
+            <StatTile
               label="مهلت گذشته"
-              value={numbers.overdue}
+              value={formatNumber(numbers.overdue)}
               hint={numbers.overdue ? "اول سراغ این‌ها بروید." : "هیچ کاری از مهلتش عقب نیست."}
               icon={TriangleAlert}
-              tone="danger"
+              tone={numbers.overdue ? "danger" : "neutral"}
             />
-            <Stat
+            <StatTile
               label="مهلت تا ۷ روز دیگر"
-              value={numbers.soon}
+              value={formatNumber(numbers.soon)}
               hint="کارهایی که مهلتشان این هفته تمام می‌شود."
               icon={CalendarClock}
-              tone="warning"
+              tone={numbers.soon ? "warning" : "neutral"}
             />
           </section>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             {sections.map((section) => (
-              <Section key={section.key} section={section} />
+              <WorkSectionCard key={section.key} section={section} />
             ))}
           </div>
         </>

@@ -129,8 +129,8 @@ class AssessmentCreateView(RoleRequiredMixin, CreateView):
                 horizon_months=data["horizon_months"],
                 horizon_rationale=data.get("horizon_rationale", ""),
                 target_due=data.get("target_due"),
-                meeting_date=data.get("meeting_date"),
                 assumptions=data.get("assumptions", ""),
+                confidence=data.get("assessment_confidence", ""),
             )
         except AssessmentError as error:
             for problem in error.problems:

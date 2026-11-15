@@ -26,6 +26,12 @@ class EvidenceChoiceField(forms.ModelMultipleChoiceField):
 
 class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
     FLAGS = ["ongoing_incident", "binding_prohibition", "customer_tolerance_exceeded"]
+    assessment_confidence = forms.ChoiceField(
+        label="اطمینان کلی ارزیابی",
+        required=False,
+        choices=[("", "تعیین‌نشده")] + Confidence.choices,
+        help_text="برای تصمیم پذیرش؛ اگر تعیین نشود، اطمینان کم در نظر گرفته می‌شود.",
+    )
 
     class Meta:
         model = Assessment
@@ -34,7 +40,6 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
             "horizon_months",
             "horizon_rationale",
             "target_due",
-            "meeting_date",
             "assumptions",
             "ongoing_incident",
             "binding_prohibition",
@@ -43,7 +48,7 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
             "escalation_evidence",
         ]
         field_classes = {
-            "meeting_date": JalaliDateField, "target_due": JalaliDateField,
+            "target_due": JalaliDateField,
             "escalation_evidence": EvidenceChoiceField,
         }
         widgets = {
@@ -59,6 +64,7 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
     def __init__(self, *args, risk, **kwargs):
         super().__init__(*args, **kwargs)
         self.risk = risk
+        self.initial["assessment_confidence"] = self.instance.confidence
         if self.instance.pk:
             del self.fields["kind"]  # نوع ارزیابی بعد از ثبت عوض نمی‌شود
             current = list(self.instance.escalation_evidence.all())
@@ -86,6 +92,14 @@ class AssessmentForm(BootstrapFormMixin, forms.ModelForm):
                 self.add_error("escalation_evidence", "قاعده‌ی تقدم با شاهد ثبت می‌شود (بخش ۱۸).")
         return data
 
+    def save(self, commit=True):
+        assessment = super().save(commit=False)
+        assessment.confidence = self.cleaned_data.get("assessment_confidence", "")
+        if commit:
+            assessment.save()
+            self.save_m2m()
+        return assessment
+
 
 class ReviewForm(BootstrapFormMixin, forms.Form):
     notes = forms.CharField(
@@ -112,21 +126,15 @@ def level_choices(scale, empty="ثبت‌نشده"):
     return choices
 
 
-def high_choices(scale):
-    return [("", "-")] + [(level.value, str(level.value)) for level in scale.levels.all() if level.value > 0]
-
-
 class ImpactDetailForm(BootstrapFormMixin, forms.Form):
     """سطح یک بُعد برای یک ذی‌نفع. «ثبت‌نشده» یعنی این خانه هنوز ارزیابی نشده و ردیفی ذخیره نمی‌شود."""
 
     level = forms.ChoiceField(label="سطح", required=False)
-    level_high = forms.TypedChoiceField(label="تا", required=False, coerce=int, empty_value=None)
     actual_value = forms.DecimalField(label="مقدار واقعی", required=False, min_value=0, max_digits=20, decimal_places=4)
     unit = forms.CharField(
         label="واحد", required=False, max_length=50, widget=forms.TextInput(attrs={"placeholder": "واحد، مثل رکورد"})
     )
     basis = forms.IntegerField(label="مبنای مالی (ریال)", required=False, min_value=1)
-    confidence = forms.ChoiceField(label="اطمینان", required=False, choices=[("", "-")] + Confidence.choices)
     rationale = forms.CharField(label="دلیل", required=False, widget=forms.Textarea(attrs={"rows": 2}))
     evidence = EvidenceChoiceField(label="شواهد", required=False, queryset=Evidence.objects.none())
 
@@ -138,7 +146,6 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
             kwargs.setdefault("initial", {"basis": facts.basis})
         super().__init__(*args, **kwargs)
         self.fields["level"].choices = level_choices(scale)
-        self.fields["level_high"].choices = high_choices(scale)
         self.fields["evidence"].queryset = evidence
         self.fields["evidence"].widget.attrs["size"] = 3
         if scale.code in UNITS:
@@ -152,11 +159,9 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
     def initial_from(instance):
         return {
             "level": UNKNOWN if instance.level is None else str(instance.level),
-            "level_high": instance.level_high,
             "actual_value": instance.actual_value,
             "unit": instance.unit,
             "basis": instance.basis,
-            "confidence": instance.confidence,
             "rationale": instance.rationale,
             "evidence": list(instance.evidence.all()),
         }
@@ -179,16 +184,13 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
         data = super().clean()
         level = data.get("level", "")
         self.suggestion = self.compute_suggestion(data)
-        others = [data.get("level_high"), data.get("actual_value"), data.get("rationale"), data.get("confidence")]
+        others = [data.get("actual_value"), data.get("rationale")]
         if level == "":
             if any(value not in (None, "") for value in others) or data.get("evidence"):
                 self.add_error("level", "سطح را انتخاب کنید، یا «نامعلوم» را.")
             return data
         number = None if level == UNKNOWN else int(level)
-        high = data.get("level_high")
         rationale = data.get("rationale", "").strip()
-        if high is not None and (number is None or high <= number):
-            self.add_error("level_high", "کران بالا باید از سطح بیشتر باشد؛ برای سطح قطعی خالی بگذارید.")
         if number is None and not rationale:
             self.add_error("rationale", "برای «نامعلوم» بنویسید چه داده‌ای نیست و کی به دست می‌آید.")
         if number == 0 and not rationale:
@@ -196,8 +198,6 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
         suggested = self.suggestion.level if self.suggestion else None
         if suggested is not None and number != suggested and not rationale:
             self.add_error("rationale", f"سامانه سطح {suggested} را پیشنهاد می‌دهد؛ دلیل سطح دیگر را بنویسید.")
-        if number is not None and not data.get("confidence"):
-            self.add_error("confidence", "اطمینان این سطح را انتخاب کنید.")
         data["number"] = number
         return data
 
@@ -212,11 +212,11 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
         if detail is None:
             detail = ImpactDetail(assessment=assessment, customer=self.customer, scale=self.scale)
         detail.level = data["number"]
-        detail.level_high = data.get("level_high")
+        detail.level_high = None
         detail.actual_value = data.get("actual_value")
         detail.unit = UNITS.get(self.scale.code, data.get("unit", "")) if data.get("actual_value") is not None else ""
         detail.basis = data.get("basis") if self.scale.code == FINANCIAL_SCALE else None
-        detail.confidence = data.get("confidence", "") if data["number"] is not None else ""
+        detail.confidence = ""
         detail.rationale = data.get("rationale", "").strip()
         detail.save()
         detail.evidence.set(data.get("evidence") or [])
@@ -232,7 +232,6 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
     """عامل آغازگر (بخش ۱۴): مسیر نرخ یا شواهد آینده‌نگر، داده‌ی نرخ و سطح A با دلیل و شاهد."""
 
     a_level = forms.ChoiceField(label="A", required=False)
-    a_high = forms.TypedChoiceField(label="کران بالای A", required=False, coerce=int, empty_value=None)
 
     class Meta:
         model = Assessment
@@ -242,7 +241,6 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
             "a_period_months",
             "a_denominator",
             "a_coverage",
-            "a_confidence",
             "a_rationale",
             "a_evidence",
         ]
@@ -270,13 +268,11 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         self.scale = initiator_scale(assessment.method_version)
         self.fields["a_basis"].choices = [("", "ثبت‌نشده")] + ABasis.choices
         self.fields["a_level"].choices = level_choices(self.scale, empty="-")
-        self.fields["a_high"].choices = high_choices(self.scale)
         self.fields["a_evidence"].queryset = evidence
         self.fields["a_coverage"].validators += [MinValueValidator(0), MaxValueValidator(100)]
-        self.fields["a_confidence"].choices = [("", "-")] + Confidence.choices
         if assessment.a_recorded:
             self.initial["a_level"] = UNKNOWN if assessment.a is None else str(assessment.a)
-        self.order_fields(["risk_scope", "risk_count_unit", "risk_count_exclusions", "a_basis", *self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"])
+        self.order_fields(["risk_scope", "risk_count_unit", "risk_count_exclusions", "a_basis", *self.RATE_FIELDS, "a_level", "a_rationale"])
         self.rate = assessment_rate_check(assessment) if assessment.a_basis == ABasis.RATE else None
 
     def clean(self):
@@ -284,8 +280,8 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         basis = data.get("a_basis", "")
         if not basis:
             # A ثبت‌نشده: هر چه نوشته شده پاک می‌شود، چون مقدار A بی‌مسیر و دلیل معنا ندارد.
-            for name in [*self.RATE_FIELDS, "a_level", "a_high", "a_confidence", "a_rationale"]:
-                data[name] = "" if name in ("a_denominator", "a_level", "a_confidence", "a_rationale") else None
+            for name in [*self.RATE_FIELDS, "a_level", "a_rationale"]:
+                data[name] = "" if name in ("a_denominator", "a_level", "a_rationale") else None
             data["a_evidence"] = []
             return data
         if basis == ABasis.FORWARD:
@@ -301,23 +297,18 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
             self.add_error("a_level", "سطح A را انتخاب کنید، یا «نامعلوم» را.")
             return data
         number = parse_level(level)
-        high = data.get("a_high")
-        if high is not None and (number is None or high <= number):
-            self.add_error("a_high", "کران بالا باید از A بیشتر باشد؛ برای سطح قطعی خالی بگذارید.")
         if not data.get("a_rationale", "").strip():
             self.add_error("a_rationale", "مسیر انتخابی و دلیل آن الزامی است (بخش ۱۴).")
-        if number is not None and not data.get("a_confidence"):
-            self.add_error("a_confidence", "اطمینان A را انتخاب کنید.")
         if basis == ABasis.RATE and not self.errors:
             self.rate = assessment_rate_check(
                 self.instance, data["a_count"], data["a_period_months"], data.get("a_coverage")
             )
-            if self.rate.insufficient and number is not None and high is None:
+            if self.rate.insufficient and number is not None:
                 self.add_error(
                     "a_level",
                     "داده‌ی نرخ برای سطح قطعی کافی نیست: "
                     + " ".join(self.rate.insufficient)
-                    + " A را بازه بگذارید، «نامعلوم» ثبت کنید یا مسیر شواهد آینده‌نگر را انتخاب کنید (بخش ۱۴).",
+                    + " A را «نامعلوم» ثبت کنید یا مسیر شواهد آینده‌نگر را انتخاب کنید (بخش ۱۴).",
                 )
         data["a_number"] = number
         return data
@@ -326,9 +317,8 @@ class InitiatorForm(BootstrapFormMixin, forms.ModelForm):
         assessment = super().save(commit=False)
         data = self.cleaned_data
         assessment.a = data.get("a_number") if assessment.a_basis else None
-        assessment.a_high = data.get("a_high") if assessment.a_basis else None
-        if not assessment.a_basis or assessment.a is None:
-            assessment.a_confidence = ""
+        assessment.a_high = None
+        assessment.a_confidence = ""
         if commit:
             assessment.save()
             self.save_m2m()
@@ -356,7 +346,6 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
     """یک مسیر تحقق: B0 بدون اعتبار کنترل‌ها، کنترل‌های پیشگیرانه‌ای که مسیر را قطع می‌کنند، و استقلال موانع."""
 
     b0_level = forms.ChoiceField(label="B0")
-    b0_high = forms.TypedChoiceField(label="کران بالای B0", required=False, coerce=int, empty_value=None)
 
     class Meta:
         model = Path
@@ -364,7 +353,6 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
             "name",
             "description",
             "b0_rationale",
-            "b0_confidence",
             "evidence",
             "control_assessments",
             "critical_exception",
@@ -391,7 +379,6 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
         path = self.instance
         self.scale = assessment.method_version.scales.prefetch_related("levels").get(code="B0")
         self.fields["b0_level"].choices = level_choices(self.scale, empty="-")
-        self.fields["b0_high"].choices = high_choices(self.scale)
         if path.pk:
             self.initial["b0_level"] = UNKNOWN if path.b0 is None else str(path.b0)
             current = list(path.control_assessments.all())
@@ -399,22 +386,14 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
             current = []
         self.fields["control_assessments"].queryset = path_control_choices(assessment, current)
         self.fields["evidence"].queryset = evidence
-        self.fields["b0_confidence"].choices = [("", "-")] + Confidence.choices
-        self.order_fields(["name", "description", "b0_level", "b0_high", "b0_confidence", "b0_rationale", "evidence"])
+        self.order_fields(["name", "description", "b0_level", "b0_rationale", "evidence"])
 
     def clean(self):
         data = super().clean()
         level = data.get("b0_level", "")
         number = parse_level(level) if level else None
-        high = data.get("b0_high")
         evidence = data.get("evidence") or []
         controls = list(data.get("control_assessments") or [])
-        if level and high is not None and (number is None or high <= number):
-            self.add_error("b0_high", "کران بالا باید از B0 بیشتر باشد؛ برای سطح قطعی خالی بگذارید.")
-        if level and number is not None and not data.get("b0_confidence"):
-            self.add_error("b0_confidence", "اطمینان B0 را انتخاب کنید.")
-        if number is None:
-            data["b0_confidence"] = ""
         if number == 1 and not evidence:
             self.add_error(
                 "evidence", "B0 برابر ۱ یعنی نادر بودن دو شرط استثنایی با شواهد تأیید شده است؛ شاهد را انتخاب کنید."
@@ -445,7 +424,8 @@ class PathForm(BootstrapFormMixin, forms.ModelForm):
         path = super().save(commit=False)
         path.assessment = self.assessment
         path.b0 = self.cleaned_data["b0_number"]
-        path.b0_high = self.cleaned_data.get("b0_high")
+        path.b0_high = None
+        path.b0_confidence = ""
         if commit:
             path.save()
             self.save_m2m()

@@ -75,7 +75,6 @@ def _header(assessment):
         "horizon_rationale": assessment.horizon_rationale,
         "target_due": fmt.day(assessment.target_due),
         "scope_snapshot": assessment.scope_snapshot,
-        "meeting_date": fmt.day(assessment.meeting_date),
         "assumptions": assessment.assumptions,
         "created_by": fmt.person(assessment.created_by),
         "created_at": fmt.moment(assessment.created_at),
@@ -149,7 +148,6 @@ def _initiator(assessment, likelihood):
     return {
         "basis": fmt.choice(assessment, "a_basis"),
         "rate": rate,
-        "confidence": assessment.get_a_confidence_display() if assessment.a_confidence else "",
         "rationale": assessment.a_rationale,
         "evidence": _evidence(assessment.a_evidence.all()),
     }
@@ -166,7 +164,6 @@ def _path(row, can_edit):
         "exceptions": path.exceptions,
         "notes": [str(note) for note in row.notes],
         "b0": path.b0_display,
-        "b0_confidence": path.get_b0_confidence_display() if path.b0_confidence else "",
         "b0_rationale": path.b0_rationale,
         "controls": [
             {
@@ -206,7 +203,6 @@ def _impact_cell(detail):
         "unknown": detail.is_unknown,
         "value": _number(detail.actual_value),
         "unit": detail.unit,
-        "confidence": detail.get_confidence_display() if detail.confidence else "",
         "rationale": detail.rationale,
     }
 
@@ -372,7 +368,7 @@ def initiator_form(context, request):
                 "notes": [
                     (
                         "مسیر انتخابی و دلیلش الزامی است و دو ستون جمع یا میانگین نمی‌شوند. صفر رخداد در یک سال نرخ "
-                        "کمتر از ۰٫۱ را ثابت نمی‌کند. وقتی داده کافی نیست، A بازه یا «نامعلوم» است."
+                        "کمتر از ۰٫۱ را ثابت نمی‌کند. وقتی داده کافی نیست، A را «نامعلوم» ثبت کنید یا شواهد آینده‌نگر را بررسی کنید."
                     )
                 ],
             }
@@ -409,7 +405,7 @@ def path_form(context, request):
 
 IMPACT_INTRO = (
     "برای داتین و هر بانک متأثر، سطح هر بُعد را با دلیل و شاهد ثبت کنید. صفر یعنی «اثر ندارد» و دلیل می‌خواهد؛ اگر "
-    "داده نیست «نامعلوم» را با دلیل انتخاب کنید و صفر نگذارید. اگر داده کافی نیست، سطح را بازه بگیرید (مثلاً ۳ تا ۴). "
+    "داده نیست «نامعلوم» را با دلیل انتخاب کنید و صفر نگذارید. "
     "با مدت اختلال و مبلغ زیان، سامانه سطح S و F را پیشنهاد می‌دهد؛ سطح دیگر دلیل می‌خواهد. خانه‌ای که «ثبت‌نشده» "
     "بماند ذخیره نمی‌شود."
 )

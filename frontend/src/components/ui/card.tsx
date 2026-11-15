@@ -1,9 +1,12 @@
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
+import { formatNumber } from "@/lib/format";
 
-export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-2xl border border-line bg-panel shadow-card", className)} {...props} />;
+/** `asSection` کارتی است که خودش یک بخش صفحه است و عنوان دارد (بخش‌های پرونده‌ها). */
+export function Card({ className, asSection, ...props }: ComponentProps<"div"> & { asSection?: boolean }) {
+  const Tag = asSection ? "section" : "div";
+  return <Tag className={cn("rounded-2xl border border-line bg-panel shadow-card", className)} {...props} />;
 }
 
 interface CardHeaderProps extends Omit<ComponentProps<"div">, "title"> {
@@ -11,6 +14,8 @@ interface CardHeaderProps extends Omit<ComponentProps<"div">, "title"> {
   description?: ReactNode;
   actions?: ReactNode;
   icon?: ReactNode;
+  /** شمار ردیف‌های این کارت، کنار عنوان. بیرون از خود عنوان می‌ماند تا نام عنوان برای صفحه‌خوان عوض نشود. */
+  count?: number;
   /** سطح عنوان در ساختار صفحه؛ پیش‌فرض h2. */
   as?: "h2" | "h3";
   titleId?: string;
@@ -21,6 +26,7 @@ export function CardHeader({
   description,
   actions,
   icon,
+  count,
   as: Heading = "h2",
   titleId,
   className,
@@ -37,9 +43,16 @@ export function CardHeader({
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <Heading id={titleId} className="text-heading font-semibold text-fg">
-          {title}
-        </Heading>
+        <div className="flex min-w-0 items-center gap-2">
+          <Heading id={titleId} className="min-w-0 text-heading font-semibold text-fg">
+            {title}
+          </Heading>
+          {count !== undefined && count > 0 && (
+            <span className="rounded-full bg-surface px-2 text-xs font-medium text-muted tabular">
+              {formatNumber(count)}
+            </span>
+          )}
+        </div>
         {description && <p className="text-xs text-muted">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

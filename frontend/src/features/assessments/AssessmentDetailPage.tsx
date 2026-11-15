@@ -12,12 +12,11 @@ import {
   Undo2,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
@@ -30,11 +29,14 @@ import { usePageData } from "@/features/pages/page-data";
 import {
   ActionError,
   CodeLinks,
+  DossierLayout,
   Fact,
+  Facts,
   NotesField,
   Reasons,
   Section,
-  SectionNav,
+  SectionBody,
+  SectionEmpty,
   Stat,
 } from "@/features/records/dossier";
 import { useSession } from "@/features/session/session";
@@ -53,13 +55,6 @@ import type {
 // پرونده‌ی ارزیابی (assessments/assessment_detail.html): نتیجه‌ی موتور محاسبه، کنترل کیفیت، احتمال و پروفایل پیامد.
 // هر عدد همان است که جنگو برای همین ارزیابی حساب کرده و هر دکمه فقط وقتی هست که جنگو اجازه‌اش را داده است.
 
-const SECTIONS = [
-  { id: "result", label: "نتیجه" },
-  { id: "review", label: "کنترل کیفیت" },
-  { id: "likelihood", label: "احتمال" },
-  { id: "impacts", label: "پروفایل پیامد" },
-];
-
 function Outcome({ data }: { data: AssessmentDetail }) {
   const outcome = data.outcome;
   return (
@@ -71,37 +66,79 @@ function Outcome({ data }: { data: AssessmentDetail }) {
         outcome.provisional && <span className="text-xs text-muted">محاسبه‌ی همین حالا؛ هنگام تأیید ثابت می‌شود</span>
       }
     >
-      {outcome.problems.length > 0 ? (
-        <Reasons tone="info" title="نتیجه هنوز حساب نمی‌شود:" items={outcome.problems} />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <Stat label="احتمال (L)">{band(outcome.likelihood) || "-"}</Stat>
-            <Stat label="پیامد (I)">{band(outcome.impact) || "-"}</Stat>
-            <Stat label="امتیاز (L × I)">{band(outcome.score) || "-"}</Stat>
-            <Stat label="سطح پایه">
-              <LevelBadge level={outcome.base_level} />
-            </Stat>
-            <Stat label="سطح تصمیم">
-              <LevelBadge level={outcome.decision_level} />
-            </Stat>
-            <Stat label="اطمینان کل">{outcome.confidence || "-"}</Stat>
-          </div>
-          {outcome.score && outcome.score[0] !== outcome.score[1] && outcome.decision_score !== null && (
-            <p className="text-sm text-muted">
-              امتیاز بازه است و تصمیم بر کران بالای آن ({fa(outcome.decision_score)}) گرفته می‌شود.
-            </p>
-          )}
-          <Reasons tone="warning" title="ارزیابی ناقص: پذیرش عادی مسدود است." items={outcome.incomplete_reasons} />
-          <Reasons tone="danger" title="علت تصعید" items={outcome.escalation_reasons} />
-          {outcome.out_of_acceptance_authority ? (
-            <Alert tone="danger">خارج از اختیار پذیرش.</Alert>
-          ) : (
-            outcome.acceptance_restricted && <Alert tone="warning">اختیار پذیرش عمومی محدود است.</Alert>
-          )}
-        </>
-      )}
+      <SectionBody className="flex flex-col gap-4">
+        {outcome.problems.length > 0 ? (
+          <Reasons tone="info" title="نتیجه هنوز حساب نمی‌شود:" items={outcome.problems} />
+        ) : (
+          <>
+            {/* سطح تصمیم جوابی است که پرونده را برای آن باز می‌کنند؛ بقیه‌ی عددها پشتیبان همین‌اند. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-xl border border-line bg-surface/50 p-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted">سطح تصمیم</span>
+                <LevelBadge level={outcome.decision_level} size="lg" />
+              </div>
+              <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <dt className="text-muted">سطح پایه</dt>
+                  <dd>
+                    <LevelBadge level={outcome.base_level} />
+                  </dd>
+                </div>
+                <div className="flex items-center gap-2">
+                  <dt className="text-muted">اطمینان کل</dt>
+                  <dd className="font-medium text-fg">{outcome.confidence || "-"}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Stat label="احتمال (L)">{band(outcome.likelihood) || "-"}</Stat>
+              <Stat label="پیامد (I)">{band(outcome.impact) || "-"}</Stat>
+              <Stat label="امتیاز (L × I)">{band(outcome.score) || "-"}</Stat>
+            </div>
+            {outcome.score && outcome.score[0] !== outcome.score[1] && outcome.decision_score !== null && (
+              <p className="text-sm text-muted">
+                امتیاز بازه است و تصمیم بر کران بالای آن ({fa(outcome.decision_score)}) گرفته می‌شود.
+              </p>
+            )}
+            <Reasons tone="warning" title="ارزیابی ناقص: پذیرش عادی مسدود است." items={outcome.incomplete_reasons} />
+            <Reasons tone="danger" title="علت تصعید" items={outcome.escalation_reasons} />
+            {outcome.out_of_acceptance_authority ? (
+              <Alert tone="danger">خارج از اختیار پذیرش.</Alert>
+            ) : (
+              outcome.acceptance_restricted && <Alert tone="warning">اختیار پذیرش عمومی محدود است.</Alert>
+            )}
+          </>
+        )}
+      </SectionBody>
     </Section>
+  );
+}
+
+/** یک کار کنترل کیفیت داخل بخش «کنترل کیفیت»: عنوان h3 و محتوا، با خط جداکننده از کار قبلی. */
+function ReviewBlock({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-4 border-b border-line px-5 py-4 last:border-b-0">
+      <div className="flex flex-col gap-1">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
+          <span aria-hidden className="text-accent-text [&>svg]:size-4">
+            {icon}
+          </span>
+          {title}
+        </h3>
+        {description && <p className="text-xs text-muted">{description}</p>}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -114,28 +151,21 @@ function SubmitBox({ review }: { review: AssessmentReview }) {
   }
   const url = review.submit_url;
   return (
-    <Card>
-      <CardHeader as="h3" icon={<Send className="rtl:-scale-x-100" />} title="ارسال برای کنترل کیفیت" />
-      <CardContent className="flex flex-col gap-4">
-        <ActionError error={action.error} />
-        <NotesField
-          label="توضیح برای کنترل‌کننده (اختیاری)"
-          value={notes}
-          onChange={setNotes}
-          disabled={action.isPending}
-        />
-        <div>
-          <Button
-            variant="primary"
-            loading={action.isPending}
-            onClick={() => action.mutate({ url, values: { notes } })}
-          >
-            {!action.isPending && <Send aria-hidden className="rtl:-scale-x-100" />}
-            ارسال برای کنترل کیفیت
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <ReviewBlock icon={<Send className="rtl:-scale-x-100" />} title="ارسال برای کنترل کیفیت">
+      <ActionError error={action.error} />
+      <NotesField
+        label="توضیح برای کنترل‌کننده (اختیاری)"
+        value={notes}
+        onChange={setNotes}
+        disabled={action.isPending}
+      />
+      <div>
+        <Button variant="primary" loading={action.isPending} onClick={() => action.mutate({ url, values: { notes } })}>
+          {!action.isPending && <Send aria-hidden className="rtl:-scale-x-100" />}
+          ارسال برای کنترل کیفیت
+        </Button>
+      </div>
+    </ReviewBlock>
   );
 }
 
@@ -148,41 +178,37 @@ function ReviewBox({ review, code }: { review: AssessmentReview; code: string })
   const decide = (value: string) => action.mutate({ url, values: { action: value, notes } });
   const busy = (value: string) => action.isPending && action.variables?.values.action === value;
   return (
-    <Card>
-      <CardHeader
-        as="h3"
-        icon={<ClipboardCheck />}
-        title="کنترل کیفیت شما"
-        description="برگشت به ارزیاب و ارجاع به کارگروه توضیح می‌خواهد."
-      />
-      <CardContent className="flex flex-col gap-4">
-        <ActionError error={action.error} />
-        <NotesField field={review.review_notes} value={notes} onChange={setNotes} disabled={action.isPending} />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            loading={busy("approve")}
-            disabled={action.isPending}
-            onClick={() => setConfirming(true)}
-          >
-            {!busy("approve") && <ShieldCheck aria-hidden />}
-            تأیید ارزیابی
-          </Button>
-          <Button
-            variant="secondary"
-            loading={busy("return")}
-            disabled={action.isPending}
-            onClick={() => decide("return")}
-          >
-            {!busy("return") && <Undo2 aria-hidden />}
-            برگشت به ارزیاب
-          </Button>
-          <Button variant="danger" loading={busy("refer")} disabled={action.isPending} onClick={() => decide("refer")}>
-            {!busy("refer") && <Users aria-hidden />}
-            ارجاع به کارگروه امنیت
-          </Button>
-        </div>
-      </CardContent>
+    <ReviewBlock
+      icon={<ClipboardCheck />}
+      title="کنترل کیفیت شما"
+      description="برگشت به ارزیاب و ارجاع به کارگروه توضیح می‌خواهد."
+    >
+      <ActionError error={action.error} />
+      <NotesField field={review.review_notes} value={notes} onChange={setNotes} disabled={action.isPending} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="primary"
+          loading={busy("approve")}
+          disabled={action.isPending}
+          onClick={() => setConfirming(true)}
+        >
+          {!busy("approve") && <ShieldCheck aria-hidden />}
+          تأیید ارزیابی
+        </Button>
+        <Button
+          variant="secondary"
+          loading={busy("return")}
+          disabled={action.isPending}
+          onClick={() => decide("return")}
+        >
+          {!busy("return") && <Undo2 aria-hidden />}
+          برگشت به ارزیاب
+        </Button>
+        <Button variant="danger" loading={busy("refer")} disabled={action.isPending} onClick={() => decide("refer")}>
+          {!busy("refer") && <Users aria-hidden />}
+          ارجاع به کارگروه امنیت
+        </Button>
+      </div>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -195,7 +221,7 @@ function ReviewBox({ review, code }: { review: AssessmentReview; code: string })
           decide("approve");
         }}
       />
-    </Card>
+    </ReviewBlock>
   );
 }
 
@@ -210,44 +236,41 @@ function ReferralBox({ review }: { review: AssessmentReview }) {
   const busy = (value: string) => action.isPending && action.variables?.values.action === value;
   const decide = (value: string) => action.mutate({ url, values: { action: value, notes, meeting_date: meeting } });
   return (
-    <Card>
-      <CardHeader as="h3" icon={<Users />} title="تصمیم کارگروه امنیت" />
-      <CardContent className="flex flex-col gap-4">
-        <ActionError error={action.error} />
-        <Field
-          label={fields.meeting_date?.label ?? "تاریخ جلسه‌ی کارگروه"}
-          hint={fields.meeting_date?.help || "برای تأیید با تصمیم کارگروه لازم است."}
+    <ReviewBlock icon={<Users />} title="تصمیم کارگروه امنیت">
+      <ActionError error={action.error} />
+      <Field
+        label={fields.meeting_date?.label ?? "تاریخ جلسه‌ی کارگروه"}
+        hint={fields.meeting_date?.help || "برای تأیید با تصمیم کارگروه لازم است."}
+      >
+        <DatePicker
+          value={meeting}
+          onChange={setMeeting}
+          disabled={action.isPending}
+          today={parseJalali(today.jalali) ?? undefined}
+        />
+      </Field>
+      <NotesField field={fields.notes} value={notes} onChange={setNotes} disabled={action.isPending} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="primary"
+          loading={busy("workgroup_approve")}
+          disabled={action.isPending}
+          onClick={() => decide("workgroup_approve")}
         >
-          <DatePicker
-            value={meeting}
-            onChange={setMeeting}
-            disabled={action.isPending}
-            today={parseJalali(today.jalali) ?? undefined}
-          />
-        </Field>
-        <NotesField field={fields.notes} value={notes} onChange={setNotes} disabled={action.isPending} />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            loading={busy("workgroup_approve")}
-            disabled={action.isPending}
-            onClick={() => decide("workgroup_approve")}
-          >
-            {!busy("workgroup_approve") && <ShieldCheck aria-hidden />}
-            تأیید ارزیابی با تصمیم کارگروه
-          </Button>
-          <Button
-            variant="secondary"
-            loading={busy("workgroup_return")}
-            disabled={action.isPending}
-            onClick={() => decide("workgroup_return")}
-          >
-            {!busy("workgroup_return") && <Undo2 aria-hidden />}
-            برگشت به ارزیاب
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          {!busy("workgroup_approve") && <ShieldCheck aria-hidden />}
+          تأیید ارزیابی با تصمیم کارگروه
+        </Button>
+        <Button
+          variant="secondary"
+          loading={busy("workgroup_return")}
+          disabled={action.isPending}
+          onClick={() => decide("workgroup_return")}
+        >
+          {!busy("workgroup_return") && <Undo2 aria-hidden />}
+          برگشت به ارزیاب
+        </Button>
+      </div>
+    </ReviewBlock>
   );
 }
 
@@ -258,24 +281,27 @@ function Review({ data }: { data: AssessmentDetail }) {
     <Section id="review" title="کنترل کیفیت" icon={<ClipboardCheck />}>
       <SubmitBox review={review} />
       {status === "in_qc" && !review.can_review && !review.can_submit && (
-        <p className="text-sm text-muted">کنترل کیفیت با عضو GRC دیگری است که ارزیاب همین پرونده نیست.</p>
+        <p className="px-5 py-4 text-sm text-muted">کنترل کیفیت با عضو GRC دیگری است که ارزیاب همین پرونده نیست.</p>
       )}
       <ReviewBox review={review} code={assessment.code} />
       <ReferralBox review={review} />
       {status === "referred" && !review.can_decide_referral && (
-        <p className="text-sm text-muted">
+        <p className="px-5 py-4 text-sm text-muted">
           اختلاف به کارگروه امنیت ارجاع شده است. تصمیم کارگروه را عضو کارگروه امنیت یا عضو GRC دیگری ثبت می‌کند که طرف
           این اختلاف نیست.
         </p>
       )}
       {assessment.is_approved && assessment.approved_at && (
-        <Alert tone="success">
-          تأییدشده در {dateTime(assessment.approved_at)}؛ ارزیابی قفل است و ارزیابی بعدی ردیف تازه است.
-        </Alert>
+        <SectionBody>
+          <Alert tone="success">
+            تأییدشده در {dateTime(assessment.approved_at)}؛ ارزیابی قفل است و ارزیابی بعدی ردیف تازه است.
+          </Alert>
+        </SectionBody>
       )}
       {review.history.length > 0 ? (
-        <Card className="overflow-clip">
-          <ol aria-label="سابقه‌ی کنترل کیفیت" className="divide-y divide-line">
+        <>
+          <h3 className="border-t border-line px-5 py-3 text-sm font-semibold text-fg">سابقه‌ی کنترل کیفیت</h3>
+          <ol aria-label="سابقه‌ی کنترل کیفیت" className="divide-y divide-line border-t border-line">
             {review.history.map((item) => (
               <li key={item.id} className="flex flex-col gap-1 px-5 py-3.5 text-sm">
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -289,10 +315,9 @@ function Review({ data }: { data: AssessmentDetail }) {
               </li>
             ))}
           </ol>
-        </Card>
+        </>
       ) : (
-        !review.can_submit &&
-        status === "draft" && <p className="text-sm text-muted">هنوز برای کنترل کیفیت فرستاده نشده است.</p>
+        !review.can_submit && status === "draft" && <SectionEmpty>هنوز برای کنترل کیفیت فرستاده نشده است.</SectionEmpty>
       )}
     </Section>
   );
@@ -327,10 +352,7 @@ function Initiator({ likelihood }: { likelihood: AssessmentLikelihood }) {
           </span>
         </Fact>
       )}
-      <Fact label="A">
-        {faText(likelihood.a)}
-        {initiator.confidence && <span className="text-muted">، اطمینان {initiator.confidence}</span>}
-      </Fact>
+      <Fact label="A">{faText(likelihood.a)}</Fact>
       <Fact label="دلیل">
         <span className="whitespace-pre-line">{initiator.rationale || "-"}</span>
       </Fact>
@@ -359,7 +381,6 @@ function PathRow({ path, onDelete }: { path: AssessmentPath; onDelete: (path: As
       </th>
       <td data-label="B0" className="tabular" title={path.b0_rationale || undefined}>
         {faText(path.b0)}
-        {path.b0_confidence && <span className="block text-xs text-muted">اطمینان {path.b0_confidence}</span>}
       </td>
       <td data-label="کنترل‌های پیشگیرانه" className="text-xs">
         {path.controls.length ? (
@@ -437,59 +458,64 @@ function Likelihood({ data }: { data: AssessmentDetail }) {
         </>
       }
     >
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="A">{faText(likelihood.a)}</Stat>
-        <Stat label="B">{band(likelihood.b) || "-"}</Stat>
-        <Stat label="احتمال (L)">{band(likelihood.likelihood) || "هنوز معلوم نیست"}</Stat>
+      <SectionBody className="flex flex-col gap-4">
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="A">{faText(likelihood.a)}</Stat>
+          <Stat label="B">{band(likelihood.b) || "-"}</Stat>
+          <Stat label="احتمال (L)">{band(likelihood.likelihood) || "هنوز معلوم نیست"}</Stat>
+        </div>
+        <p className="text-xs text-muted">B سناریو بزرگ‌ترین B مسیرهاست و L فقط از جدول A × B نسخه‌ی روش می‌آید.</p>
+        {likelihood.problems.map((problem) => (
+          <Alert key={problem} tone="danger">
+            {faText(problem)}
+          </Alert>
+        ))}
+        <Reasons tone="warning" items={likelihood.incomplete} />
+        <Reasons tone="info" title="برای تأیید نهایی لازم است:" items={likelihood.blockers} />
+      </SectionBody>
+
+      <h3 className="border-t border-line px-5 py-3 text-sm font-semibold text-fg">عامل آغازگر</h3>
+      <div className="border-t border-line px-5 py-4">
+        <Initiator likelihood={likelihood} />
       </div>
-      <p className="text-xs text-muted">B سناریو بزرگ‌ترین B مسیرهاست و L فقط از جدول A × B نسخه‌ی روش می‌آید.</p>
-      {likelihood.problems.map((problem) => (
-        <Alert key={problem} tone="danger">
-          {faText(problem)}
-        </Alert>
-      ))}
-      <Reasons tone="warning" items={likelihood.incomplete} />
-      <Reasons tone="info" title="برای تأیید نهایی لازم است:" items={likelihood.blockers} />
 
-      <Card>
-        <CardHeader as="h3" title="عامل آغازگر" />
-        <CardContent>
-          <Initiator likelihood={likelihood} />
-        </CardContent>
-      </Card>
-
-      <Card className="table-shell overflow-clip">
-        <CardHeader as="h3" icon={<GitFork />} title="مسیرهای تحقق" />
-        {likelihood.paths.length ? (
-          <div className="table-scroll border-t border-line">
-            <table className="data-table">
-              <caption className="sr-only">مسیرهای تحقق</caption>
-              <thead>
-                <tr>
-                  <th scope="col">مسیر</th>
-                  <th scope="col">B0</th>
-                  <th scope="col">کنترل‌های پیشگیرانه</th>
-                  <th scope="col">Bc</th>
-                  <th scope="col">B مسیر</th>
-                  {editable && (
-                    <th scope="col">
-                      <span className="sr-only">کارها</span>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {likelihood.paths.map((path) => (
-                  <PathRow key={path.id} path={path} onDelete={setDeleting} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="border-t border-line px-5 py-6 text-center text-sm text-muted">هنوز مسیری ثبت نشده است.</p>
-        )}
-      </Card>
-      {remove.error !== null && <ActionError error={remove.error} />}
+      <h3 className="flex items-center gap-2 border-t border-line px-5 py-3 text-sm font-semibold text-fg">
+        <GitFork aria-hidden className="size-4 text-accent-text" />
+        مسیرهای تحقق
+      </h3>
+      {likelihood.paths.length ? (
+        <div className="table-scroll border-t border-line">
+          <table className="data-table">
+            <caption className="sr-only">مسیرهای تحقق</caption>
+            <thead>
+              <tr>
+                <th scope="col">مسیر</th>
+                <th scope="col">B0</th>
+                <th scope="col">کنترل‌های پیشگیرانه</th>
+                <th scope="col">Bc</th>
+                <th scope="col">B مسیر</th>
+                {editable && (
+                  <th scope="col">
+                    <span className="sr-only">کارها</span>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {likelihood.paths.map((path) => (
+                <PathRow key={path.id} path={path} onDelete={setDeleting} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="border-t border-line px-5 py-6 text-center text-sm text-muted">هنوز مسیری ثبت نشده است.</p>
+      )}
+      {remove.error !== null && (
+        <SectionBody>
+          <ActionError error={remove.error} />
+        </SectionBody>
+      )}
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
@@ -509,58 +535,55 @@ function Likelihood({ data }: { data: AssessmentDetail }) {
 
 function ImpactTable({ impacts }: { impacts: AssessmentImpacts }) {
   return (
-    <Card className="table-shell overflow-clip">
-      <div className="table-scroll">
-        <table className="data-table">
-          <caption className="sr-only">سطح هر بُعد پیامد برای داتین و هر بانک</caption>
-          <thead>
-            <tr>
-              <th scope="col">بُعد</th>
-              {impacts.stakeholders.map((name) => (
-                <th key={name} scope="col" className="text-center">
-                  {name}
-                </th>
+    <div className="table-scroll border-t border-line">
+      <table className="data-table">
+        <caption className="sr-only">سطح هر بُعد پیامد برای داتین و هر بانک</caption>
+        <thead>
+          <tr>
+            <th scope="col">بُعد</th>
+            {impacts.stakeholders.map((name) => (
+              <th key={name} scope="col" className="text-center">
+                {name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {impacts.rows.map((row) => (
+            <tr key={row.code}>
+              <th scope="row" data-primary className="text-start font-normal">
+                <bdi className="code text-accent-text">{row.code}</bdi> {row.name}
+              </th>
+              {row.cells.map((cell, index) => (
+                <td
+                  key={impacts.stakeholders[index]}
+                  data-label={impacts.stakeholders[index]}
+                  className="text-center"
+                  title={cell?.rationale || undefined}
+                >
+                  {cell ? (
+                    <span className="inline-flex flex-col items-center gap-0.5">
+                      <span className={cn("tabular", cell.unknown ? "text-warning" : "font-semibold text-fg")}>
+                        {faText(cell.level)}
+                      </span>
+                      {cell.value !== null && (
+                        <span className="text-xs text-muted">
+                          {fa(cell.value)} {cell.unit}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-muted">
+                      -<span className="sr-only">ثبت‌نشده</span>
+                    </span>
+                  )}
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody>
-            {impacts.rows.map((row) => (
-              <tr key={row.code}>
-                <th scope="row" data-primary className="text-start font-normal">
-                  <bdi className="code text-accent-text">{row.code}</bdi> {row.name}
-                </th>
-                {row.cells.map((cell, index) => (
-                  <td
-                    key={impacts.stakeholders[index]}
-                    data-label={impacts.stakeholders[index]}
-                    className="text-center"
-                    title={cell?.rationale || undefined}
-                  >
-                    {cell ? (
-                      <span className="inline-flex flex-col items-center gap-0.5">
-                        <span className={cn("tabular", cell.unknown ? "text-warning" : "font-semibold text-fg")}>
-                          {faText(cell.level)}
-                        </span>
-                        {cell.value !== null && (
-                          <span className="text-xs text-muted">
-                            {fa(cell.value)} {cell.unit}
-                          </span>
-                        )}
-                        {cell.confidence && <span className="text-xs text-muted">اطمینان {cell.confidence}</span>}
-                      </span>
-                    ) : (
-                      <span className="text-muted">
-                        -<span className="sr-only">ثبت‌نشده</span>
-                      </span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -580,26 +603,32 @@ function Impacts({ data }: { data: AssessmentDetail }) {
         )
       }
     >
-      <p className="text-sm">
-        <span className="font-semibold text-fg">پیامد (I): {band(impacts.impact) || "هنوز معلوم نیست"}</span>
-        {impacts.impact && <span className="ms-2 text-xs text-muted">بیشترین سطح معتبر بین ابعاد و ذی‌نفعان.</span>}
-      </p>
-      {impacts.problems.map((problem) => (
-        <Alert key={problem} tone="danger">
-          {faText(problem)}
-        </Alert>
-      ))}
-      {impacts.incomplete.length > 0 ? (
-        <Alert tone="warning" title="پیامد هنوز کران بالای قابل دفاعی ندارد.">
-          خانه‌های نامعلوم یا ثبت‌نشده می‌توانند آن را بالاتر ببرند.
-          {impacts.unknown.length > 0 && <p className="mt-1 text-xs">نامعلوم: {faText(impacts.unknown.join("، "))}</p>}
-          {impacts.missing.length > 0 && <p className="mt-1 text-xs">ثبت‌نشده: {faText(impacts.missing.join("، "))}</p>}
-        </Alert>
-      ) : (
-        impacts.missing.length > 0 && <Alert tone="info">ثبت‌نشده: {faText(impacts.missing.join("، "))}</Alert>
-      )}
+      <SectionBody className="flex flex-col gap-4">
+        <p className="text-sm">
+          <span className="font-semibold text-fg">پیامد (I): {band(impacts.impact) || "هنوز معلوم نیست"}</span>
+          {impacts.impact && <span className="ms-2 text-xs text-muted">بیشترین سطح معتبر بین ابعاد و ذی‌نفعان.</span>}
+        </p>
+        {impacts.problems.map((problem) => (
+          <Alert key={problem} tone="danger">
+            {faText(problem)}
+          </Alert>
+        ))}
+        {impacts.incomplete.length > 0 ? (
+          <Alert tone="warning" title="پیامد هنوز کران بالای قابل دفاعی ندارد.">
+            خانه‌های نامعلوم یا ثبت‌نشده می‌توانند آن را بالاتر ببرند.
+            {impacts.unknown.length > 0 && (
+              <p className="mt-1 text-xs">نامعلوم: {faText(impacts.unknown.join("، "))}</p>
+            )}
+            {impacts.missing.length > 0 && (
+              <p className="mt-1 text-xs">ثبت‌نشده: {faText(impacts.missing.join("، "))}</p>
+            )}
+          </Alert>
+        ) : (
+          impacts.missing.length > 0 && <Alert tone="info">ثبت‌نشده: {faText(impacts.missing.join("، "))}</Alert>
+        )}
+      </SectionBody>
       <ImpactTable impacts={impacts} />
-      <p className="text-xs text-muted">
+      <p className="border-t border-line px-5 py-3 text-xs text-muted">
         صفر یعنی «اثر ندارد» و نامعلوم با صفر پر نمی‌شود. وقتی سطح بازه است، تصمیم بر کران بالای آن گرفته می‌شود.
       </p>
     </Section>
@@ -647,37 +676,44 @@ function Header({ data }: { data: AssessmentDetail }) {
   );
 }
 
-function Facts({ data }: { data: AssessmentDetail }) {
+/** مشخصات کوتاه پرونده برای ستون کناری. متن‌های بلند (دامنه، فرض‌ها، تقدم) در بخش «دامنه و فرض‌ها» می‌آیند. */
+function AssessmentFacts({ data }: { data: AssessmentDetail }) {
+  const { assessment } = data;
+  return (
+    <Facts>
+      <Fact label="ریسک">
+        <AppLink href={assessment.risk.href}>
+          <bdi className="code">{assessment.risk.code}</bdi> {assessment.risk.title}
+        </AppLink>
+      </Fact>
+      <Fact label="نسخه‌ی روش">
+        <AppLink href={assessment.method_version.href}>{faText(assessment.method_version.label)}</AppLink>
+      </Fact>
+      <Fact label="افق">{fa(assessment.horizon_months)} ماه</Fact>
+      {assessment.target_due && <Fact label="موعد تحقق هدف">{longDate(assessment.target_due)}</Fact>}
+      <Fact label="ثبت‌کننده">
+        {assessment.created_by?.name}، {longDate(assessment.created_at)}
+      </Fact>
+    </Facts>
+  );
+}
+
+/** دامنه، فرض‌ها، قاعده‌ی تقدم و اطلاعات ریسک: همان «پرونده و دامنه»‌ی سند روش، پیش از پیامد و احتمال. */
+function Scope({ data }: { data: AssessmentDetail }) {
   const { assessment } = data;
   const escalation = assessment.escalation;
   return (
-    <Card>
-      <CardContent className="pt-5">
+    <Section id="scope" title="دامنه و فرض‌ها" icon={<ClipboardCheck />}>
+      <SectionBody>
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
-          <Fact label="ریسک">
-            <AppLink href={assessment.risk.href}>
-              <bdi className="code">{assessment.risk.code}</bdi> {assessment.risk.title}
-            </AppLink>
-          </Fact>
-          <Fact label="نسخه‌ی روش">
-            <AppLink href={assessment.method_version.href}>{faText(assessment.method_version.label)}</AppLink>
-          </Fact>
-          <Fact label="افق">{fa(assessment.horizon_months)} ماه</Fact>
           {assessment.horizon_rationale && <Fact label="دلیل افق">{assessment.horizon_rationale}</Fact>}
-          {assessment.target_due && <Fact label="موعد تحقق هدف">{longDate(assessment.target_due)}</Fact>}
           {assessment.scope_snapshot?.service && (
             <Fact label="دامنه هنگام تأیید">
               {assessment.scope_snapshot.service}؛ {assessment.scope_snapshot.customers.map((c) => c.name).join("، ")}
             </Fact>
           )}
-          <Fact label="جلسه‌ی کارگروه">
-            {assessment.meeting_date ? longDate(assessment.meeting_date) : "بدون جلسه (ارزیابی عادی)"}
-          </Fact>
           <Fact label="فرض‌ها">
             <span className="whitespace-pre-line">{assessment.assumptions || "-"}</span>
-          </Fact>
-          <Fact label="ثبت‌کننده">
-            {assessment.created_by?.name}، {longDate(assessment.created_at)}
           </Fact>
           {escalation && (
             <Fact label="قاعده‌ی تقدم">
@@ -694,27 +730,14 @@ function Facts({ data }: { data: AssessmentDetail }) {
               </span>
             </Fact>
           )}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RiskInformation({ data }: { data: AssessmentDetail }) {
-  if (!data.risk_details?.length) return null;
-  return (
-    <Card>
-      <CardHeader icon={<ClipboardCheck />} title="اطلاعات ریسک" as="h2" />
-      <CardContent>
-        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
-          {data.risk_details.map((row) => (
+          {data.risk_details?.map((row) => (
             <Fact key={row.label} label={row.label}>
               <span className="whitespace-pre-line">{row.value || "—"}</span>
             </Fact>
           ))}
         </dl>
-      </CardContent>
-    </Card>
+      </SectionBody>
+    </Section>
   );
 }
 
@@ -722,14 +745,13 @@ function AssessmentInputs({ data }: { data: AssessmentDetail }) {
   const { actions } = data;
   if (!actions.initiator && !actions.add_path && !actions.impact_profile) return null;
   return (
-    <Card>
-      <CardHeader
-        icon={<ClipboardCheck />}
-        title="ثبت پارامترهای ارزیابی"
-        description="عامل آغازگر، مسیر تحقق و پیامد را تکمیل کنید؛ نتیجه پس از ثبت اطلاعات محاسبه می‌شود."
-        as="h2"
-      />
-      <CardContent className="flex flex-wrap gap-2">
+    <Section
+      id="inputs"
+      title="ثبت پارامترهای ارزیابی"
+      icon={<ClipboardCheck />}
+      description="عامل آغازگر، مسیر تحقق و پیامد را تکمیل کنید؛ نتیجه پس از ثبت اطلاعات محاسبه می‌شود."
+    >
+      <SectionBody className="flex flex-wrap gap-2">
         {actions.initiator && (
           <AppLink href={actions.initiator} button={{ variant: "secondary" }}>
             ۱. عامل آغازگر (A)
@@ -745,8 +767,8 @@ function AssessmentInputs({ data }: { data: AssessmentDetail }) {
             ۳. پروفایل پیامد (I)
           </AppLink>
         )}
-      </CardContent>
-    </Card>
+      </SectionBody>
+    </Section>
   );
 }
 
@@ -765,19 +787,33 @@ export function AssessmentDetailPage() {
     );
   }
   const data = page.data;
+  const { actions } = data;
+  const hasInputs = Boolean(actions.initiator || actions.add_path || actions.impact_profile);
+  // ترتیب بخش‌ها همان ترتیب خود روش است: نتیجه، بعد دامنه، پیامد (I)، احتمال (A × B) و آخر کنترل کیفیت.
+  const sections = [
+    ...(hasInputs ? [{ id: "inputs", label: "پارامترها" }] : []),
+    { id: "result", label: "نتیجه" },
+    { id: "scope", label: "دامنه و فرض‌ها" },
+    { id: "impacts", label: "پیامد (I)" },
+    { id: "likelihood", label: "احتمال (L)" },
+    { id: "review", label: "کنترل کیفیت" },
+  ];
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Header data={data} />
-        <SectionNav label="بخش‌های ارزیابی" sections={SECTIONS} />
-      </div>
-      <Facts data={data} />
-      <RiskInformation data={data} />
-      <AssessmentInputs data={data} />
-      <Outcome data={data} />
-      <Review data={data} />
-      <Likelihood data={data} />
-      <Impacts data={data} />
+    <div className="flex flex-col gap-6">
+      <Header data={data} />
+      <DossierLayout
+        navLabel="بخش‌های ارزیابی"
+        factsLabel="مشخصات ارزیابی"
+        sections={sections}
+        facts={<AssessmentFacts data={data} />}
+      >
+        <AssessmentInputs data={data} />
+        <Outcome data={data} />
+        <Scope data={data} />
+        <Impacts data={data} />
+        <Likelihood data={data} />
+        <Review data={data} />
+      </DossierLayout>
     </div>
   );
 }

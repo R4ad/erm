@@ -1,15 +1,13 @@
-import { ClipboardList, FilePlus2, ListChecks, PencilLine, Plus } from "lucide-react";
+import { ClipboardList, ListChecks, PencilLine, Plus } from "lucide-react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/states";
 import { DetailState, ListBody } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { Section } from "@/features/records/dossier";
+import { Section, SectionEmpty } from "@/features/records/dossier";
 import { cn } from "@/lib/cn";
-import { count, fa, formatNumber } from "@/lib/format";
+import { fa, formatNumber } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
 import type { QuestionnaireDetail, QuestionnaireList, QuestionnaireOption, QuestionnaireQuestion } from "@/lib/types";
 
@@ -225,26 +223,17 @@ export function QuestionnaireDetailPage() {
           ? "بخش هر سؤال محل تکرار آن را در خدمت، اتفاق، راه، تمهید، پیامد یا شاهد مشخص می‌کند. پرسش‌های غیرفعال در پاسخ‌های تازه نمایش داده نمی‌شوند."
           : "هر پاسخ با کارکردهای اصلی واحد و هشت پرسش جلسه‌ی شناسایی بخش ۴ سند v5 شروع می‌شود (نتیجه، تعهد، رویداد مخل، شرایط، پیامد، وابستگی، شاهد و کنترل فعلی)، بعد این سؤال‌ها می‌آیند و در آخر «مورد جدید» با شرح آزاد. گزینه‌ای که «نشانه‌ی ریسک» است، با انتخاب شدن یک «ریسک در انتظار» برای بررسی GRC می‌سازد."}
       </p>
-      <Section
-        id="questions"
-        title="سؤال‌ها"
-        icon={<ListChecks />}
-        actions={<span className="text-sm text-muted">{count(questions.length, "سؤال")}</span>}
-      >
+      <Section id="questions" title="سؤال‌ها" icon={<ListChecks />} count={questions.length}>
         {questions.length ? (
-          <Card className="overflow-clip">
-            <ol aria-label="سؤال‌های پرسشنامه" className="divide-y divide-line">
-              {questions.map((question) => (
-                <QuestionItem key={question.id} question={question} />
-              ))}
-            </ol>
-          </Card>
+          <ol aria-label="سؤال‌های پرسشنامه" className="divide-y divide-line">
+            {questions.map((question) => (
+              <QuestionItem key={question.id} question={question} />
+            ))}
+          </ol>
         ) : (
-          <EmptyState
-            icon={<FilePlus2 />}
-            title="هنوز سؤالی ندارد"
-            description={data.add_question_url ? "با «سؤال جدید» اولین سؤال را اضافه کنید." : undefined}
-          />
+          <SectionEmpty>
+            {data.add_question_url ? "هنوز سؤالی ندارد. با «سؤال جدید» اولین سؤال را اضافه کنید." : "هنوز سؤالی ندارد."}
+          </SectionEmpty>
         )}
       </Section>
     </article>

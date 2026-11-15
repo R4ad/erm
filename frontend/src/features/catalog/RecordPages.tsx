@@ -3,11 +3,10 @@ import type { ReactNode } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { Fact, Prose } from "@/features/records/dossier";
+import { DossierLayout, Fact, Facts, Prose, Section, SectionBody } from "@/features/records/dossier";
 import { useTitle } from "@/lib/hooks";
 import type { AssetDetail, SupplierDetail } from "@/lib/types";
 
@@ -30,27 +29,23 @@ function RecordLayout({
   header,
   facts,
   label,
+  navLabel,
+  sections,
   children,
 }: {
   header: ReactNode;
   facts: ReactNode;
   label: string;
+  navLabel: string;
+  sections: { id: string; label: string }[];
   children: ReactNode;
 }) {
   return (
     <article className="flex flex-col gap-6">
       {header}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-8">{children}</div>
-        <aside aria-label={label}>
-          <Card className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
-            <CardHeader title="مشخصات" />
-            <CardContent>
-              <dl className="grid grid-cols-[7.5rem_1fr] gap-x-4 gap-y-3 text-sm">{facts}</dl>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+      <DossierLayout navLabel={navLabel} factsLabel={label} sections={sections} facts={<Facts>{facts}</Facts>}>
+        {children}
+      </DossierLayout>
     </article>
   );
 }
@@ -92,6 +87,11 @@ export function SupplierDetailPage() {
     <RecordLayout
       header={<SupplierHeader data={data} />}
       label="مشخصات تأمین‌کننده"
+      navLabel="بخش‌های پرونده‌ی تأمین‌کننده"
+      sections={[
+        { id: "offering", label: "خدمت یا کالا" },
+        { id: "dependents", label: "خدمت‌های وابسته" },
+      ]}
       facts={
         <>
           <Fact label="مسئول قرارداد">{supplier.contract_owner?.name ?? <span className="text-muted">-</span>}</Fact>
@@ -102,12 +102,11 @@ export function SupplierDetailPage() {
         </>
       }
     >
-      <Card>
-        <CardHeader icon={<FileText />} title="خدمت یا کالا" />
-        <CardContent className="text-sm leading-8 text-fg/90">
+      <Section id="offering" title="خدمت یا کالا" icon={<FileText />}>
+        <SectionBody className="text-sm leading-8 text-fg/90">
           <Prose text={supplier.description} />
-        </CardContent>
-      </Card>
+        </SectionBody>
+      </Section>
       <DependentsSection dependents={data.dependents} />
     </RecordLayout>
   );
@@ -151,6 +150,8 @@ export function AssetDetailPage() {
     <RecordLayout
       header={<AssetHeader data={data} />}
       label="مشخصات دارایی"
+      navLabel="بخش‌های پرونده‌ی دارایی"
+      sections={[{ id: "dependents", label: "خدمت‌های وابسته" }]}
       facts={
         <>
           <Fact label="نوع">{asset.kind.label}</Fact>

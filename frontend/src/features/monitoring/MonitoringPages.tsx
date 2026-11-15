@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Deadline } from "@/components/ui/deadline";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSkeleton } from "@/components/ui/skeleton";
@@ -12,7 +12,18 @@ import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { useBridgeAction } from "@/features/forms/bridge-action";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { ActionError, Fact, NotesField, Prose, Reasons, Section } from "@/features/records/dossier";
+import {
+  ActionError,
+  DossierLayout,
+  Fact,
+  Facts,
+  NotesField,
+  Prose,
+  Reasons,
+  Section,
+  SectionBody,
+  SectionEmpty,
+} from "@/features/records/dossier";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { count, dateTime } from "@/lib/format";
@@ -115,29 +126,27 @@ function CompleteBox({ data }: { data: ReviewDetail }) {
   const fieldError = error?.errors.result?.join(" ");
   const general = error?.errors.__all__ ?? [];
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-5">
-        <Reasons tone="danger" items={general} />
-        {action.error && !error && <ActionError error={action.error} />}
-        <NotesField
-          field={complete.result}
-          value={result}
-          onChange={setResult}
-          disabled={action.isPending}
-          error={fieldError}
-        />
-        <div>
-          <Button
-            variant="primary"
-            loading={action.isPending}
-            onClick={() => action.mutate({ url: complete.url, values: { result } })}
-          >
-            {!action.isPending && <Check aria-hidden />}
-            ثبت نتیجه بررسی
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <SectionBody className="flex flex-col gap-4">
+      <Reasons tone="danger" items={general} />
+      {action.error && !error && <ActionError error={action.error} />}
+      <NotesField
+        field={complete.result}
+        value={result}
+        onChange={setResult}
+        disabled={action.isPending}
+        error={fieldError}
+      />
+      <div>
+        <Button
+          variant="primary"
+          loading={action.isPending}
+          onClick={() => action.mutate({ url: complete.url, values: { result } })}
+        >
+          {!action.isPending && <Check aria-hidden />}
+          ثبت نتیجه بررسی
+        </Button>
+      </div>
+    </SectionBody>
   );
 }
 
@@ -179,63 +188,63 @@ export function ReviewDetailPage() {
   return (
     <article className="flex flex-col gap-6">
       <ReviewHeader data={data} />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-8">
-          <Section id="reason" title="منبع، دامنه و دلیل" icon={<History />}>
-            <Card>
-              <CardContent className="pt-5 text-sm leading-7 text-fg/90">
-                <Prose text={review.reason} />
-              </CardContent>
-            </Card>
-          </Section>
-          <Section id="result" title="نتیجه" icon={<ClipboardCheck />}>
-            {review.completed_at ? (
+      <DossierLayout
+        navLabel="بخش‌های بازبینی"
+        factsLabel="مشخصات بازبینی"
+        sections={[
+          { id: "reason", label: "منبع و دلیل" },
+          { id: "result", label: "نتیجه" },
+        ]}
+        facts={
+          <Facts>
+            <Fact label="ریسک">
+              <AppLink href={review.risk.href}>
+                <bdi className="code">{review.risk.code}</bdi> {review.risk.title}
+              </AppLink>
+            </Fact>
+            <Fact label="محرک">{review.trigger.label}</Fact>
+            <Fact label="مهلت آغاز">
+              <Deadline value={review.due} label="مهلت آغاز بررسی" />
+            </Fact>
+            <Fact label="مسئول">{review.responsible?.name ?? "-"}</Fact>
+            {review.assessment && (
+              <Fact label="ارزیابی">
+                <AppLink href={review.assessment.href} className="code">
+                  {review.assessment.code}
+                </AppLink>
+              </Fact>
+            )}
+            <Fact label="ثبت">
+              {dateTime(review.created_at)}
+              {review.created_by && <span className="block text-xs text-muted">{review.created_by.name}</span>}
+            </Fact>
+          </Facts>
+        }
+      >
+        <Section id="reason" title="منبع، دامنه و دلیل" icon={<History />}>
+          <SectionBody className="text-sm leading-7 text-fg/90">
+            <Prose text={review.reason} />
+          </SectionBody>
+        </Section>
+        <Section id="result" title="نتیجه" icon={<ClipboardCheck />}>
+          {review.completed_at ? (
+            <SectionBody>
               <Alert
                 tone="success"
                 title={`ثبت در ${dateTime(review.completed_at)} توسط ${review.completed_by?.name ?? "-"}`}
               >
                 <p className="whitespace-pre-line">{review.result}</p>
               </Alert>
-            ) : data.complete ? (
-              <CompleteBox data={data} />
-            ) : (
-              <p className="text-sm text-muted">
-                نتیجه را مسئول بازبینی یا عضو GRC ثبت می‌کند. ثبت نتیجه ارزیابی تاریخی را بازنویسی نمی‌کند.
-              </p>
-            )}
-          </Section>
-        </div>
-        <aside aria-label="مشخصات بازبینی">
-          <Card className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
-            <CardHeader title="مشخصات" />
-            <CardContent>
-              <dl className="grid grid-cols-[6.5rem_1fr] gap-x-4 gap-y-3 text-sm">
-                <Fact label="ریسک">
-                  <AppLink href={review.risk.href}>
-                    <bdi className="code">{review.risk.code}</bdi> {review.risk.title}
-                  </AppLink>
-                </Fact>
-                <Fact label="محرک">{review.trigger.label}</Fact>
-                <Fact label="مهلت آغاز">
-                  <Deadline value={review.due} label="مهلت آغاز بررسی" />
-                </Fact>
-                <Fact label="مسئول">{review.responsible?.name ?? "-"}</Fact>
-                {review.assessment && (
-                  <Fact label="ارزیابی">
-                    <AppLink href={review.assessment.href} className="code">
-                      {review.assessment.code}
-                    </AppLink>
-                  </Fact>
-                )}
-                <Fact label="ثبت">
-                  {dateTime(review.created_at)}
-                  {review.created_by && <span className="block text-xs text-muted">{review.created_by.name}</span>}
-                </Fact>
-              </dl>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+            </SectionBody>
+          ) : data.complete ? (
+            <CompleteBox data={data} />
+          ) : (
+            <SectionEmpty>
+              نتیجه را مسئول بازبینی یا عضو GRC ثبت می‌کند. ثبت نتیجه ارزیابی تاریخی را بازنویسی نمی‌کند.
+            </SectionEmpty>
+          )}
+        </Section>
+      </DossierLayout>
     </article>
   );
 }
