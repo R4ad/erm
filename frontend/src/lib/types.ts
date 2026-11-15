@@ -39,16 +39,31 @@ export interface Choice {
 export type Errors = Record<string, string[]>;
 
 export interface NavLink {
-  /** نام ثابت صفحه در جنگو (risks:risk_list)؛ آیکون پیوند با آن انتخاب می‌شود. */
+  /** نام ثابت صفحه در جنگو (risks:risk_list)، یا module:… برای صفحه‌هایی که فقط در React هستند. */
   key: string;
   label: string;
   href: string;
   route: string | null;
+  /** شمار کارهای منتظر کنار نام؛ null یعنی شمارنده نشان داده نمی‌شود. */
+  count: number | null;
+  tone: "gold" | "red" | null;
 }
 
 export interface NavGroup {
   title: string;
   items: NavLink[];
+}
+
+export type NavModuleKey = "assessment" | "treatment" | "config";
+
+export interface NavModule extends NavGroup {
+  key: NavModuleKey;
+}
+
+/** منوی کناری فیگما: میز کار و سه ماژول یک چرخه. */
+export interface Navigation {
+  desk: NavGroup;
+  modules: NavModule[];
 }
 
 /** یک سطر جدول پیوندها (apps/api/routes.py): نشانی جنگو با این الگو در رابط React همین مسیر است. */
@@ -65,7 +80,11 @@ export interface RouteEntry {
 export interface Session {
   user: Person & { username: string; roles: string[]; job_title: string; org_unit: string | null };
   today: Today;
-  navigation: NavGroup[];
+  navigation: Navigation;
+  /** کارت «چرخه‌ی ارزیابی» پایین منو. */
+  cycle: { year: number; assessed: number; total: number };
+  /** نسخه‌ی فعال روش ارزیابی برای نشان نوار بالا؛ null وقتی هنوز نسخه‌ای فعال نشده است. */
+  method: { number: number; title: string; route: string | null } | null;
   routes: RouteEntry[];
   logout_url: string;
   classic_home: string;
@@ -103,8 +122,63 @@ export interface WorkSection {
   items: WorkItem[];
 }
 
+export type WorkCategory = "actions" | "signoff" | "assessments" | "questions" | "acceptances";
+export type WorkTone = "brand" | "danger" | "warning" | "success" | "info" | "gold" | "neutral";
+
+/** یک ردیف «صف کارها»ی فیگما. */
+export interface WorkTask {
+  key: string;
+  category: WorkCategory;
+  title: string;
+  kind: string;
+  context: string;
+  code: string;
+  href: string;
+  route: string | null;
+  icon: string;
+  tone: WorkTone;
+  cta: string;
+  cta_style: "primary" | "secondary" | "ghost";
+  level: Level | null;
+  due: Deadline | null;
+  due_text: string | null;
+  no_due: string;
+}
+
+export interface WorkKpi {
+  count: number;
+  note: string;
+}
+
+export interface WorkPlanRow {
+  key: string;
+  code: string;
+  title: string;
+  level: Level | null;
+  note: string;
+  state: string;
+  tone: WorkTone;
+  route: string | null;
+}
+
+export interface WorkAcceptanceRow {
+  key: string;
+  code: string;
+  risk_code: string;
+  owner: string | null;
+  label: string;
+  tone: WorkTone;
+  route: string | null;
+}
+
 export interface MyWork {
   today: Today;
+  first_name: string;
+  kpis: Record<"waiting" | "due_today" | "overdue" | "to_verify", WorkKpi>;
+  categories: { key: WorkCategory; label: string; count: number }[];
+  tasks: WorkTask[];
+  plans: WorkPlanRow[];
+  acceptances: WorkAcceptanceRow[];
   sections: WorkSection[];
 }
 

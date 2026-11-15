@@ -8,18 +8,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/toast";
+import { Avatar } from "@/components/ui/avatar";
 import { useLogout, useSession } from "@/features/session/session";
 import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-
-/** دو حرف اول نام برای نشان کاربر؛ نام فارسی بدون فاصله‌ی حرف. */
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("‌");
-}
 
 export function UserMenu() {
   const session = useSession();
@@ -32,15 +24,9 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={`${t("shell.account")}: ${user.name}`}
-        className="flex h-10 items-center gap-2.5 rounded-xl border border-transparent ps-1 pe-1 transition-colors hover:border-line hover:bg-surface sm:pe-3"
+        className="rounded-full focus-visible:shadow-focus focus-visible:outline-none"
       >
-        <span
-          aria-hidden
-          className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-hover text-xs font-bold text-accent-fg"
-        >
-          {initials(user.name)}
-        </span>
-        <span className="hidden max-w-36 truncate text-sm font-medium text-fg sm:block">{user.name}</span>
+        <Avatar name={user.name} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
         <div className="flex flex-col gap-1 px-2.5 py-2">
@@ -49,7 +35,7 @@ export function UserMenu() {
           {user.roles.length > 0 && (
             <ul className="flex flex-wrap gap-1 pt-1.5" aria-label="نقش‌ها">
               {user.roles.map((role) => (
-                <li key={role} className="rounded-md bg-accent-soft px-2 py-0.5 text-[0.6875rem] text-accent-text">
+                <li key={role} className="rounded-sm bg-brand-subtle px-2 py-0.5 text-xs text-brand">
                   {role}
                 </li>
               ))}

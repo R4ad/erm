@@ -1,87 +1,112 @@
 from django.middleware.csrf import get_token
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.response import Response
 
-from apps.controls.permissions import can_view_soa
+from apps.actions.models import MonitoringNotice
+from apps.assessments.models import Assessment
+from apps.core.jalali import jalali_year, jalali_year_range
+from apps.methodology.services import active_version
+from apps.risks.models import Risk
 
 from . import formatting as fmt
 from .base import ApiView
 from .routes import route_table, spa_route
 
 
-def link(label, url_name):
+def link(label, url_name, count=None, tone=None):
     """یک پیوند منو. route یعنی همین صفحه در رابط React هست (routes.py)؛ بقیه صفحه‌های جنگو‌اند و با بارگذاری کامل
-    باز می‌شوند. key نام ثابت همان صفحه است و رابط React آیکون پیوند را با آن انتخاب می‌کند."""
+    باز می‌شوند. key نام ثابت همان صفحه است و رابط React آیکون پیوند را با آن انتخاب می‌کند. count شمار کارهای
+    منتظر کنار نام است (فقط وقتی بیشتر از صفر است) و tone رنگ آن: gold برای صف عادی، red برای صف عقب‌افتاده."""
     href = reverse(url_name)
-    return {"key": url_name, "label": label, "href": href, "route": spa_route(href)}
+    return {"key": url_name, "label": label, "href": href, "route": spa_route(href), "count": count or None, "tone": tone}
+
+
+def spa_link(label, key, route, count=None, tone=None):
+    """پیوند صفحه‌ای که فقط در رابط React هست (صفحه‌های ماژول‌های منوی فیگما) و نشانی جنگو ندارد."""
+    return {"key": key, "label": label, "href": f"/app{route}", "route": route, "count": count or None, "tone": tone}
+
+
+def inbox_counts(user):
+    """شمارنده‌های منو: اعلان‌های پایش نخوانده، ریسک‌های منتظر طرح مواجهه و ریسک‌های در اجرای درمان."""
+    return {
+        "notices": MonitoringNotice.objects.filter(recipient=user, read_at__isnull=True).count(),
+        "action_required": Risk.objects.filter(status=Risk.Status.TREATMENT_PLAN, merged_into__isnull=True).count(),
+        "in_treatment": Risk.objects.filter(status=Risk.Status.TREATMENT, merged_into__isnull=True).count(),
+    }
 
 
 def navigation(user):
-    """منوی اصلی، با همان گروه‌ها و همان قاعده‌های دیدن که منوی صفحه‌های جنگو (templates/base.html) دارد."""
-    groups = [
-        {
-            "title": "کار روزانه",
+    """منوی کناری فیگما («Navigation 2.0»): «میز کار» و سه ماژول یک چرخه (ارزیابی ریسک، برطرف‌سازی ریسک،
+    پیکربندی سامانه)، هر ماژول با گام‌های شماره‌دار. صفحه‌های دیگر (کاتالوگ، کنترل‌ها، پرسشنامه‌ها، ...) از درون
+    همین صفحه‌ها و جست‌وجوی سراسری باز می‌شوند."""
+    counts = inbox_counts(user)
+    config = [link("تعریف متدولوژی", "methodology:active"), link("چارت سازمانی", "organization:unit_list")]
+    if user.is_system_admin:
+        config.append(link("تعریف کاربر و نقش", "accounts:user_list"))
+    return {
+        "desk": {
+            "title": "میز کار",
             "items": [
                 link("کارهای من", "actions:my_work"),
-                link("اعلان‌های پایش", "actions:notices"),
-                link("گزارش مدیریتی", "reports:management"),
-                link("پاسخ به سؤال‌ها", "questionnaires:answer_home"),
-            ],
-        },
-        {
-            "title": "ریسک‌ها",
-            "items": [
                 link("رجیستر ریسک", "risks:risk_list"),
-                link("ارزیابی ریسک", "assessments:assessment_list"),
-                link("کتابخانه‌ی سناریو", "risks:scenario_list"),
-                link("شواهد", "risks:evidence_list"),
-                link("ادغام و تفکیک", "workflow:change_request_list"),
-                link("جهان ریسک", "risks:coverage"),
-                link("دسته‌های ریسک", "risks:category_list"),
+                link("اعلان‌های پایش", "actions:notices", counts["notices"], "gold"),
+                link("گزارش مدیریتی", "reports:management"),
             ],
         },
-        {
-            "title": "پرسشنامه",
-            "items": [
-                link("پرسش‌های ریسک", "workflow:question_list"),
-                link("پاسخ‌ها و بررسی", "questionnaires:response_list"),
-                link("تعریف پرسشنامه‌ها", "questionnaires:questionnaire_list"),
-            ],
-        },
-        {
-            "title": "کنترل‌ها و اقدامات",
-            "items": [
-                link("کتابخانه‌ی کنترل", "controls:control_list"),
-                *([link("بیانیه‌ی کاربردپذیری", "controls:soa_list")] if can_view_soa(user) else []),
-                link("اقدام‌ها", "actions:action_list"),
-                link("پذیرش‌های ریسک", "actions:acceptance_list"),
-            ],
-        },
-        {
-            "title": "خدمات و سازمان",
-            "items": [
-                link("خدمات", "catalog:service_list"),
-                link("تعهدها", "catalog:commitment_list"),
-                link("دارایی‌ها", "catalog:asset_list"),
-                link("تأمین‌کنندگان", "catalog:supplier_list"),
-                link("بانک‌ها", "catalog:customer_list"),
-                link("روش ارزیابی", "methodology:active"),
-                link("ساختار سازمانی", "organization:unit_list"),
-            ],
-        },
-    ]
-    admin = []
-    if user.is_system_admin:
-        admin += [
-            link("کاربران", "accounts:user_list"),
-            link("ورود کارکنان", "accounts:staff_import"),
-            link("تعطیلات", "workcalendar:holiday_list"),
-        ]
-    if user.can_view_audit_log:
-        admin.append(link("سوابق ممیزی", "audit:event_list"))
-    if admin:
-        groups.append({"title": "مدیریت سامانه", "items": admin})
-    return groups
+        "modules": [
+            {
+                "key": "assessment",
+                "title": "ارزیابی ریسک",
+                "items": [
+                    spa_link("شناسایی ریسک", "module:identification", "/identification"),
+                    spa_link("آنالیز ریسک", "module:analysis", "/analysis"),
+                    spa_link("سنجش ریسک", "module:evaluation", "/evaluation"),
+                ],
+            },
+            {
+                "key": "treatment",
+                "title": "برطرف‌سازی ریسک",
+                "items": [
+                    spa_link(
+                        "ریسک‌های نیازمند اقدام",
+                        "module:action_required",
+                        "/treatment/required",
+                        counts["action_required"],
+                        "red",
+                    ),
+                    spa_link(
+                        "ریسک‌های در حال درمان", "module:in_treatment", "/treatment/board", counts["in_treatment"], "gold"
+                    ),
+                    spa_link("لیست ریسک‌های هدف", "module:targets", "/treatment/targets"),
+                ],
+            },
+            {"key": "config", "title": "پیکربندی سامانه", "items": config},
+        ],
+    }
+
+
+def assessment_cycle():
+    """کارت «چرخه‌ی ارزیابی» پایین منو: از ریسک‌های فعال رجیستر، چندتا در سال شمسی جاری ارزیابی جاری تأییدشده دارند."""
+    today = timezone.localdate()
+    year = jalali_year(today)
+    start, end = jalali_year_range(year)
+    active = Risk.objects.exclude(status__in=Risk.CLOSED_STATUSES).filter(merged_into__isnull=True)
+    assessed = active.filter(
+        assessments__kind=Assessment.Kind.CURRENT,
+        assessments__status=Assessment.Status.APPROVED,
+        assessments__approved_at__date__gte=start,
+        assessments__approved_at__date__lt=end,
+    ).distinct()
+    return {"year": year, "assessed": assessed.count(), "total": active.count()}
+
+
+def method_badge():
+    """نشان نسخه‌ی فعال روش ارزیابی در نوار بالا."""
+    version = active_version()
+    if version is None:
+        return None
+    return {"number": version.number, "title": version.title, "route": spa_route(reverse("methodology:active"))}
 
 
 class SessionView(ApiView):
@@ -100,6 +125,8 @@ class SessionView(ApiView):
                 },
                 "today": fmt.today(),
                 "navigation": navigation(user),
+                "cycle": assessment_cycle(),
+                "method": method_badge(),
                 # کدام نشانی‌های جنگو در رابط React هم هستند؛ رابط هر پیوند سرور را با این جدول به صفحه‌ی خودش می‌برد.
                 "routes": route_table(),
                 "logout_url": reverse("api:logout"),

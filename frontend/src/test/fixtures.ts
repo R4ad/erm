@@ -36,6 +36,7 @@ import type {
   Level,
   MethodPage,
   MyWork,
+  WorkTask,
   NoticeList,
   PlanDetail,
   QuestionnaireDetail,
@@ -522,57 +523,96 @@ export function session(): Session {
   return {
     user: { ...tester, username: "tester", roles: ["مدیر واحد"], job_title: "نقش آزمون", org_unit: "واحد آزمون" },
     today,
-    navigation: [
-      {
-        title: "کار روزانه",
+    navigation: {
+      desk: {
+        title: "میز کار",
         items: [
-          { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/" },
-          { key: "actions:notices", label: "اعلان‌های پایش", href: "/actions/notices/", route: "/actions/notices" },
-          { key: "reports:management", label: "گزارش مدیریتی", href: "/reports/", route: null },
+          { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/", count: null, tone: null },
+          { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks", count: null, tone: null },
           {
-            key: "questionnaires:answer_home",
-            label: "پاسخ به سؤال‌ها",
-            href: "/questionnaires/",
-            route: "/questionnaires",
+            key: "actions:notices",
+            label: "اعلان‌های پایش",
+            href: "/actions/notices/",
+            route: "/actions/notices",
+            count: 3,
+            tone: "gold",
           },
+          { key: "reports:management", label: "گزارش مدیریتی", href: "/reports/", route: null, count: null, tone: null },
         ],
       },
-      {
-        title: "پرسشنامه",
-        items: [
-          {
-            key: "questionnaires:response_list",
-            label: "پاسخ‌ها و بررسی",
-            href: "/questionnaires/responses/",
-            route: "/questionnaires/responses",
-          },
-          {
-            key: "questionnaires:questionnaire_list",
-            label: "تعریف پرسشنامه‌ها",
-            href: "/questionnaires/manage/",
-            route: "/questionnaires/manage",
-          },
-        ],
-      },
-      {
-        title: "ریسک‌ها",
-        items: [
-          { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks" },
-          { key: "assessments:assessment_list", label: "ارزیابی ریسک", href: "/assessments/", route: "/assessments" },
-          { key: "risks:evidence_list", label: "شواهد", href: "/risks/evidence/", route: "/risks/evidence" },
-          { key: "controls:control_list", label: "کتابخانه‌ی کنترل", href: "/controls/", route: "/controls" },
-          { key: "controls:soa_list", label: "بیانیه‌ی کاربردپذیری", href: "/controls/soa/", route: "/controls/soa" },
-        ],
-      },
-      {
-        title: "خدمات و سازمان",
-        items: [
-          { key: "catalog:service_list", label: "خدمات", href: "/catalog/services/", route: "/catalog/services" },
-          { key: "methodology:active", label: "روش ارزیابی", href: "/method/", route: "/method" },
-          { key: "organization:unit_list", label: "ساختار سازمانی", href: "/units/", route: "/units" },
-        ],
-      },
-    ],
+      modules: [
+        {
+          key: "assessment",
+          title: "ارزیابی ریسک",
+          items: [
+            {
+              key: "module:identification",
+              label: "شناسایی ریسک",
+              href: "/app/identification",
+              route: "/identification",
+              count: null,
+              tone: null,
+            },
+            {
+              key: "module:analysis",
+              label: "آنالیز ریسک",
+              href: "/app/analysis",
+              route: "/analysis",
+              count: null,
+              tone: null,
+            },
+            {
+              key: "module:evaluation",
+              label: "سنجش ریسک",
+              href: "/app/evaluation",
+              route: "/evaluation",
+              count: null,
+              tone: null,
+            },
+          ],
+        },
+        {
+          key: "treatment",
+          title: "برطرف‌سازی ریسک",
+          items: [
+            {
+              key: "module:action_required",
+              label: "ریسک‌های نیازمند اقدام",
+              href: "/app/treatment/required",
+              route: "/treatment/required",
+              count: 12,
+              tone: "red",
+            },
+            {
+              key: "module:in_treatment",
+              label: "ریسک‌های در حال درمان",
+              href: "/app/treatment/board",
+              route: "/treatment/board",
+              count: 8,
+              tone: "gold",
+            },
+            {
+              key: "module:targets",
+              label: "لیست ریسک‌های هدف",
+              href: "/app/treatment/targets",
+              route: "/treatment/targets",
+              count: null,
+              tone: null,
+            },
+          ],
+        },
+        {
+          key: "config",
+          title: "پیکربندی سامانه",
+          items: [
+            { key: "methodology:active", label: "تعریف متدولوژی", href: "/method/", route: "/method", count: null, tone: null },
+            { key: "organization:unit_list", label: "چارت سازمانی", href: "/units/", route: "/units", count: null, tone: null },
+          ],
+        },
+      ],
+    },
+    cycle: { year: 1405, assessed: 24, total: 35 },
+    method: { number: 1, title: "روش v5", route: "/method" },
     routes: routeTable,
     logout_url: "/api/auth/logout/",
     classic_home: "/",
@@ -583,8 +623,94 @@ export function session(): Session {
 /** API بخش خالی را نمی‌فرستد؛ پس این‌جا هم هر بخش دست‌کم یک مورد دارد. */
 export function myWork(): MyWork {
   const risk = { id: 2, code: "RK-1405-0002", title: "ریسک آزمون دوم" };
+  const task = (overrides: Partial<WorkTask> & Pick<WorkTask, "key" | "category" | "title">): WorkTask => ({
+    kind: "اقدام",
+    context: risk.title,
+    code: "TR-1405-0002",
+    href: "/actions/2/",
+    route: null,
+    icon: "check-square",
+    tone: "brand",
+    cta: "ثبت پیشرفت",
+    cta_style: "primary",
+    level: null,
+    due: null,
+    due_text: null,
+    no_due: "بدون مهلت",
+    ...overrides,
+  });
   return {
     today,
+    first_name: "کاربر",
+    kpis: {
+      waiting: { count: 3, note: "۲ اقدام · ۱ بررسی" },
+      due_today: { count: 0, note: "امروز سررسیدی ندارید" },
+      overdue: { count: 1, note: "قدیمی‌ترین: ۳ روز تأخیر" },
+      to_verify: { count: 0, note: "به‌عنوان تأییدکننده‌ی اقدام" },
+    },
+    categories: [
+      { key: "actions", label: "اقدام‌ها", count: 2 },
+      { key: "signoff", label: "امضا و تأیید", count: 0 },
+      { key: "assessments", label: "ارزیابی‌ها", count: 0 },
+      { key: "questions", label: "پرسش‌ها", count: 1 },
+      { key: "acceptances", label: "پذیرش‌ها", count: 0 },
+    ],
+    tasks: [
+      task({
+        key: "action-2",
+        category: "actions",
+        title: "اقدام آزمون عقب‌افتاده",
+        tone: "danger",
+        due: { iso: "2026-11-01", jalali: "1405/08/10", days_left: -3, overdue: true },
+      }),
+      task({
+        key: "question-4",
+        category: "questions",
+        title: "پاسخ به پرسش ریسک: پرسش آزمون درباره‌ی پایش",
+        kind: "پرسش ریسک",
+        context: "واحد آزمون",
+        code: "RK-1405-0003",
+        href: "/workflow/questions/4/answer/",
+        route: "/questionnaires/risk-questions",
+        icon: "chat",
+        tone: "neutral",
+        cta: "پاسخ",
+        cta_style: "secondary",
+        level: levels.high,
+        due: { iso: "2026-11-06", jalali: "1405/08/15", days_left: 2, overdue: false },
+      }),
+      task({
+        key: "action-3",
+        category: "actions",
+        title: "اقدام آزمون نزدیک مهلت",
+        code: "TR-1405-0003",
+        href: "/actions/3/",
+        due: { iso: "2026-11-09", jalali: "1405/08/18", days_left: 5, overdue: false },
+      }),
+    ],
+    plans: [
+      {
+        key: "plan-risk-2",
+        code: risk.code,
+        title: risk.title,
+        level: levels.high,
+        note: "مهلت طرح: ۱ روز کاری",
+        state: "بدون طرح",
+        tone: "danger",
+        route: "/risks/2",
+      },
+    ],
+    acceptances: [
+      {
+        key: "acc-1",
+        code: "AC-1405-0001",
+        risk_code: risk.code,
+        owner: "کاربر آزمون",
+        label: "منقضی‌شده",
+        tone: "danger",
+        route: "/actions/acceptances/1",
+      },
+    ],
     sections: [
       {
         key: "my_actions",

@@ -7,11 +7,12 @@ import { Count } from "./badge";
 
 export const Tabs = RadixTabs.Root;
 
+// «Tab» فیگما: ارتفاع ۴۰، متن ۱۳، شمارنده‌ی اختیاری؛ زبانه‌ی فعال متن برند SemiBold و خط زیرین ۲ پیکسل برند.
 export function TabsList({ className, ...props }: ComponentProps<typeof RadixTabs.List>) {
   return (
     <RadixTabs.List
       className={cn(
-        "flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex gap-4 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       {...props}
@@ -28,8 +29,8 @@ export function TabsTrigger({ className, children, count, icon, ...props }: Tabs
   return (
     <RadixTabs.Trigger
       className={cn(
-        "relative -mb-px inline-flex h-11 shrink-0 items-center gap-2 border-b-2 border-transparent px-3 text-sm text-muted transition-colors duration-150",
-        "hover:text-fg data-[state=active]:border-accent data-[state=active]:font-medium data-[state=active]:text-fg",
+        "group relative -mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-1 text-sm font-medium text-ink-2 transition-colors duration-150",
+        "hover:text-ink data-[state=active]:border-brand data-[state=active]:font-semibold data-[state=active]:text-brand",
         "focus-visible:outline-offset-[-2px] [&_svg]:size-4",
         className,
       )}
@@ -37,7 +38,12 @@ export function TabsTrigger({ className, children, count, icon, ...props }: Tabs
     >
       {icon}
       {children}
-      {count && <Count value={count} />}
+      {count && (
+        <Count
+          value={count}
+          className="group-data-[state=active]:bg-brand-subtle group-data-[state=active]:text-brand"
+        />
+      )}
     </RadixTabs.Trigger>
   );
 }

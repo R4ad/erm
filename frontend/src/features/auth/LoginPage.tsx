@@ -5,10 +5,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 
-import { BrandMark } from "@/components/layout/brand";
-import { ThemeMenu } from "@/components/layout/theme-menu";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { LogoMark } from "@/components/ui/icon";
 import { Alert } from "@/components/ui/states";
 import { ApiError, errorMessage, get, post } from "@/lib/api";
 import { safeNext } from "@/lib/format";
@@ -74,16 +73,15 @@ export function LoginPage() {
       </div>
 
       <header className="pad-safe relative flex h-16 items-center justify-end pt-[env(safe-area-inset-top)]">
-        <ThemeMenu />
       </header>
 
       <main className="pad-safe relative flex flex-1 items-center justify-center pb-16">
         <div className="w-full max-w-[25rem] animate-pop-in">
           <div className="mb-8 flex flex-col items-center gap-4 text-center">
-            <BrandMark className="size-12 rounded-2xl [&_svg]:size-6" />
+            <LogoMark size={40} />
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-display font-bold">ورود به سامانه</h1>
-              <p className="text-sm text-muted">{t("app.tagline")}</p>
+              <h1 className="text-h1 font-bold text-ink">ورود به سامانه</h1>
+              <p className="text-sm text-ink-2">{t("app.name")} · {t("app.tagline")}</p>
             </div>
           </div>
 

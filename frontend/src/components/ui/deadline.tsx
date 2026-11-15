@@ -1,10 +1,54 @@
-import { CalendarClock } from "lucide-react";
-
 import { cn } from "@/lib/cn";
-import { daysLeft, isDeadline, longDate } from "@/lib/format";
+import { fa, isDeadline, longDate, shortDate } from "@/lib/format";
 import type { Day, Deadline as DeadlineValue } from "@/lib/types";
 
-/** مهلت با کلمه («۳ روز مانده») و تاریخ کامل زیرش؛ مهلت گذشته قرمز و مهلت نزدیک کهربایی است. */
+import { Icon } from "./icon";
+
+/** متن مهلت مثل فیگما: «امروز»، «۲ روز دیگر»، «۳ روز تأخیر». */
+export function dueText(value: DeadlineValue): string {
+  const days = value.days_left;
+  if (days === 0) return "امروز";
+  if (days === 1) return "فردا";
+  if (days > 1) return `${fa(days)} روز دیگر`;
+  return `${fa(-days)} روز تأخیر`;
+}
+
+export function dueTone(value: DeadlineValue | null | undefined): string {
+  if (!value) return "text-ink-3";
+  if (value.overdue || value.days_left <= 0) return "text-danger";
+  if (value.days_left <= 1) return "text-warning";
+  return "text-ink-2";
+}
+
+/** مهلت فشرده با آیکون ساعت (ستون مهلت صف کارها): گذشته و امروز قرمز، فردا کهربایی، بقیه خاکستری. */
+export function DueLabel({
+  value,
+  text,
+  emptyText = "بدون مهلت",
+  className,
+}: {
+  value: DeadlineValue | null | undefined;
+  /** متن جایگزین وقتی مهلت به روز کاری شمرده می‌شود («۱ روز کاری»). */
+  text?: string | null;
+  emptyText?: string;
+  className?: string;
+}) {
+  const tone = dueTone(value);
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap", tone, className)}>
+      <Icon name="clock" size={14} />
+      {value ? (
+        <time dateTime={value.iso} title={longDate(value)}>
+          {text || dueText(value)}
+        </time>
+      ) : (
+        emptyText
+      )}
+    </span>
+  );
+}
+
+/** مهلت با کلمه و تاریخ شمسی زیرش؛ مهلت گذشته قرمز با آیکون ساعت. */
 export function Deadline({
   value,
   label = "مهلت",
@@ -17,20 +61,20 @@ export function Deadline({
   if (!value) return null;
   if (!isDeadline(value)) {
     return (
-      <time dateTime={value.iso} className={cn("text-xs text-muted", className)}>
-        {longDate(value)}
+      <time dateTime={value.iso} className={cn("text-xs text-ink-2", className)}>
+        {shortDate(value)}
       </time>
     );
   }
-  const tone = value.overdue ? "text-danger" : value.days_left <= 3 ? "text-warning" : "text-fg";
+  const tone = dueTone(value);
   return (
-    <span className={cn("inline-flex items-start gap-2 text-start", className)}>
-      <CalendarClock aria-hidden className={cn("mt-0.5 size-4 shrink-0", tone)} />
-      <span className="flex flex-col leading-5">
-        <span className={cn("text-sm font-medium whitespace-nowrap", tone)}>{daysLeft(value)}</span>
-        <span className="text-xs text-muted whitespace-nowrap">
+    <span className={cn("inline-flex items-start gap-1.5 text-start", className)}>
+      <Icon name="clock" size={14} className={cn("mt-[3px]", tone)} />
+      <span className="flex flex-col">
+        <span className={cn("text-sm font-medium whitespace-nowrap", tone)}>{dueText(value)}</span>
+        <span className="text-xs whitespace-nowrap text-ink-3">
           <span className="sr-only">{label}: </span>
-          <time dateTime={value.iso}>{longDate(value)}</time>
+          <time dateTime={value.iso}>{shortDate(value)}</time>
         </span>
       </span>
     </span>
