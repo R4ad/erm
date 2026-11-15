@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 
 // کارت صفحه‌های فیگما: زمینه‌ی سفید، حاشیه‌ی ۱ پیکسل border/default، گوشه‌ی ۱۰، بدون سایه.
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-lg border border-line bg-panel", className)} {...props} />;
+  return <div className={cn("relative rounded-lg border border-line bg-panel", className)} {...props} />;
 }
 
 interface CardHeaderProps extends Omit<ComponentProps<"div">, "title"> {

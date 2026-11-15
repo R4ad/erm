@@ -446,15 +446,15 @@ export function ManagementReportPage() {
         }
       />
       <Kpis data={data} />
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)]">
         <Distribution data={data} />
         <Matrix data={data} />
       </div>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Overdue data={data} />
         <Acceptances data={data} />
       </div>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,62fr)_minmax(0,38fr)]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,62fr)_minmax(0,38fr)]">
         <Changes data={data} />
         <Concentration data={data} />
       </div>
