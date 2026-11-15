@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, ErrorState } from "@/components/ui/states";
@@ -27,6 +27,7 @@ import { ago, fa, faText, formatNumber } from "@/lib/format";
 import { useNow, useTitle } from "@/lib/hooks";
 import { djangoPath } from "@/lib/routes";
 import type { AppHref, FormField, FormPageData, FormResult, ImpactGroup, ImpactOverview, ImpactRow } from "@/lib/types";
+import { MetaItem } from "@/features/records/dossier";
 
 // پروفایل پیامد به چیدمان فیگما ۰۶: ماتریس «بُعد × ذی‌نفع» که هر خانه‌اش با کلیک در ویرایشگر کناری باز می‌شود.
 // هر خانه همان فرم جنگو با پیشوند خودش است (datin-S، 12-F) و همه با هم به همان view فرستاده می‌شوند؛ پیشنهاد سامانه،
@@ -122,16 +123,6 @@ function LevelBox({ level }: { level: CellLevel }) {
 }
 
 // ─────────────────────────────── سرصفحه و خلاصه ───────────────────────────────
-
-function MetaItem({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-1">
-      <Icon name={icon} size={14} className="text-ink-3" />
-      <dt className="text-xs text-ink-3">{label}:</dt>
-      <dd className="text-xs font-medium text-ink">{children}</dd>
-    </div>
-  );
-}
 
 function SavedState({ data, dirty }: { data: FormPageData; dirty: boolean }) {
   const now = useNow();

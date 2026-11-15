@@ -1,12 +1,12 @@
 import { Send } from "lucide-react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import {
@@ -24,7 +24,7 @@ import { Alert } from "@/components/ui/states";
 import { useBridgeAction } from "@/features/forms/bridge-action";
 import { DetailState } from "@/features/pages/listing";
 import { usePageData } from "@/features/pages/page-data";
-import { ActionError, CodeLinks, Fact, MenuLink, Reasons } from "@/features/records/dossier";
+import { ActionError, CodeLinks, Fact, MenuLink, MetaItem, Panel, Reasons } from "@/features/records/dossier";
 import { useSession } from "@/features/session/session";
 import { cn } from "@/lib/cn";
 import { band, dateTime, fa, faText, longDate, shortDate } from "@/lib/format";
@@ -68,29 +68,6 @@ const E_CLASSES: Record<number, string> = {
 function compactTime(moment: Moment) {
   const time = moment.jalali.split(" ")[1];
   return time ? `${shortDate(moment)} · ${fa(time)}` : shortDate(moment);
-}
-
-/** کارتی که خودش یک ناحیه‌ی نام‌دار است تا با فهرست ناحیه‌ها پیدا شود. */
-function Panel({
-  title,
-  description,
-  actions,
-  className,
-  children,
-}: {
-  title: string;
-  description?: ReactNode;
-  actions?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  const id = useId();
-  return (
-    <Card role="region" aria-labelledby={id} className={className}>
-      <CardHeader as="h2" titleId={id} title={title} description={description} actions={actions} />
-      {children}
-    </Card>
-  );
 }
 
 // ─────────────────────────────── کار کنترل کیفیت ───────────────────────────────
@@ -139,16 +116,6 @@ function useDecision(data: AssessmentDetail) {
 type Decision = ReturnType<typeof useDecision>;
 
 // ─────────────────────────────── سرپرونده ───────────────────────────────
-
-function MetaItem({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-1">
-      <Icon name={icon} size={14} className="text-ink-3" />
-      <dt className="text-xs text-ink-3">{label}:</dt>
-      <dd className="text-xs font-medium text-ink">{children}</dd>
-    </div>
-  );
-}
 
 function HeaderActions({ data, decision }: { data: AssessmentDetail; decision: Decision }) {
   const { review, assessment, actions } = data;

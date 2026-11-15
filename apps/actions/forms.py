@@ -83,6 +83,7 @@ class ActionForm(BootstrapFormMixin, forms.ModelForm):
             "deliverable",
             "mechanism",
             "dimension",
+            "path",
             "owner",
             "assignee",
             "verifier",
@@ -117,6 +118,7 @@ class ActionForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["dimension"].queryset = Scale.objects.filter(
             version=plan.assessment.method_version, kind=Scale.Kind.IMPACT
         )
+        self.fields["path"].queryset = plan.assessment.paths.order_by("pk")
         others = TreatmentAction.objects.filter(plan__risk=plan.risk)
         if action.pk:
             others = others.exclude(pk=action.pk)
@@ -133,6 +135,8 @@ class ActionForm(BootstrapFormMixin, forms.ModelForm):
             self.add_error("dimension", "بُعد پیامدی را که اقدام تغییر می‌دهد انتخاب کنید.")
         elif mechanism and mechanism != TreatmentAction.Mechanism.IMPACT and dimension:
             self.add_error("dimension", "بُعد پیامد فقط برای سازوکار «یک بُعد پیامد» است.")
+        if data.get("path") and mechanism != TreatmentAction.Mechanism.B:
+            self.add_error("path", "مسیر تحقق فقط برای سازوکار B است.")
         start, due = data.get("start_date"), data.get("due_date")
         if start and due and due < start:
             self.add_error("due_date", "سررسید پیش از آغاز است.")

@@ -22,7 +22,7 @@ import { LevelBadge, RISK_CLASSES, riskKey, ScoreChip } from "@/components/ui/le
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MenuLink } from "@/features/records/dossier";
+import { MenuLink, MetaItem } from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
 import { useGoTo } from "@/features/session/links";
 import { get } from "@/lib/api";
@@ -71,16 +71,6 @@ const TAB_LABELS: Record<Tab, string> = {
 const SUMMARY_EVIDENCE = 4;
 
 // ─────────────────────────────── سرپرونده ───────────────────────────────
-
-function MetaItem({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-1">
-      <Icon name={icon} size={14} className="text-ink-3" />
-      <dt className="text-xs text-ink-3">{label}:</dt>
-      <dd className="text-xs font-medium text-ink">{children}</dd>
-    </div>
-  );
-}
 
 function Related({ risk }: { risk: RelatedRisk }) {
   return risk.href ? (

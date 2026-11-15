@@ -256,7 +256,7 @@ class Command(BaseCommand):
         plan.refresh_from_db()
         return plan
 
-    def action(self, plan, title, status, assignee, verifier, due_in, mechanism="b"):
+    def action(self, plan, title, status, assignee, verifier, due_in, mechanism="b", **fields):
         if verifier == plan.risk.owner:
             verifier = self.neda if plan.risk.owner != self.neda else self.ali
         action = TreatmentAction.objects.create(
@@ -267,10 +267,13 @@ class Command(BaseCommand):
             owner=plan.risk.owner,
             assignee=assignee,
             verifier=verifier,
-            start_date=self.today - timedelta(days=30),
-            due_date=self.today + timedelta(days=due_in),
-            acceptance_criteria="آزمون مسیر در ۳۰ نمونه بدون موفقیت دور زدن کنترل.",
             created_by=self.sara,
+            **{
+                "start_date": self.today - timedelta(days=30),
+                "due_date": self.today + timedelta(days=due_in),
+                "acceptance_criteria": "آزمون مسیر در ۳۰ نمونه بدون موفقیت دور زدن کنترل.",
+                **fields,
+            },
         )
         TreatmentAction.objects.filter(pk=action.pk).update(status=status)
         return action
@@ -404,11 +407,59 @@ class Command(BaseCommand):
         ]:
             Comment.objects.create(content_object=risk, text=text, created_by=by)
 
-        plan = self.plan(risk, current, approved=False)
-        self.action(plan, "تکثیر هم‌زمان پایگاه داده‌ی ساتنا به سایت دوم", AS.PLANNED, self.mehdi, self.sara, 60)
-        self.action(plan, "مانور بازیابی فصلی با سناریوی خرابی دیسک", AS.PLANNED, self.mehdi, self.sara, 30)
+        self.treatment_plan(risk, current, target)
         risk.refresh_from_db()
         return incident
+
+    def treatment_plan(self, risk, current, target):
+        """طرح نمونه‌ی صفحه‌ی ۰۷ فیگما: کاهش با ارزیابی هدف تأییدشده، منتظر تأیید مالک، با چهار اقدام روی مسیرهای
+        ارزیابی جاری و دو بُعد پیامد. هزینه‌ی اقدام آخر خالی است تا هشدار «هزینه ثبت نشده» دیده شود."""
+        paths = [
+            Path.objects.create(
+                assessment=current, name=name, description=name, b0=b0, b0_confidence=Confidence.MEDIUM,
+                b0_rationale="از گزارش رخداد مهر و آزمون بازیابی شهریور.",
+            )
+            for name, b0 in [
+                ("خرابی ذخیره‌ساز اصلی بدون تکثیر به‌روز", 4),
+                ("خطای انسانی در تغییر پیکربندی پایگاه داده", 3),
+                ("دورزدن رویه‌ی تغییر با حساب مدیر اضطراری مشترک", 4),
+            ]
+        ]
+        Assessment.objects.filter(pk=target.pk).update(
+            assumptions="B مسیر ۳ از ۴ به ۲ با حذف حساب مدیر اضطراری مشترک."
+        )
+        plan = self.plan(risk, current, approved=False)
+        TreatmentPlan.objects.filter(pk=plan.pk).update(
+            target_assessment=target,
+            rationale=(
+                "دو مسیر اصلی تحقق (خرابی ذخیره‌ساز و دورزدن رویه‌ی تغییر) با اقدام‌های فنی کاهش‌پذیرند و هزینه‌ی "
+                "آن‌ها از زیان برآوردی کمتر است.\n«انتقال» بررسی شد: بیمه‌ی سایبری قطعی خدمت ساتنا را پوشش "
+                "نمی‌دهد. «اجتناب» یعنی توقف خدمت، که ممکن نیست."
+            ),
+        )
+        start = self.today + timedelta(days=10)
+        rows = [
+            ("راه‌اندازی تکثیر هم‌زمان پایگاه داده به سایت پشتیبان", "RPO صفر و RTO کمتر از ۲ ساعت در آزمون failover",
+             "b", paths[0], None, self.mehdi, self.neda, 25, 65, 5_200_000_000, 300),
+            ("حذف حساب مدیر اضطراری مشترک و راه‌اندازی دسترسی اضطراری فردی", "صفر حساب مشترک در بازبینی دسترسی",
+             "b", paths[2], None, self.maryam, self.sara, 10, 60, 1_800_000_000, 180),
+            ("مانور بازیابی سه‌ماهه با سناریوی خرابی دیسک", "بازیابی کامل در مانور، وابسته به TR تکثیر",
+             "impact", None, "S", self.mehdi, self.neda, 0, 55, 1_400_000_000, 140),
+            ("به‌روزرسانی BIA و توافق RTO با بانک‌ها", "صورت‌جلسه‌ی امضاشده با دو بانک",
+             "impact", None, "C", self.neda, self.sara, 60, 30, None, None),
+        ]
+        for title, criteria, mechanism, path, scale, assignee, verifier, begin, length, cost, hours in rows:
+            self.action(
+                plan, title, AS.PLANNED, assignee, verifier, 0, mechanism=mechanism,
+                acceptance_criteria=criteria,
+                path=path,
+                dimension=self.version.scales.get(code=scale) if scale else None,
+                start_date=start + timedelta(days=begin),
+                due_date=start + timedelta(days=begin + length),
+                cost=cost,
+                person_hours=hours,
+            )
+        return plan
 
     def control(self, risk, title, kind, key, iso, e, proof):
         """کنترل وصل به ریسک با یک ارزیابی اثربخشی که شرط‌های E خودش را دارد (e خالی یعنی بدون ارزیابی)."""
@@ -555,7 +606,7 @@ class Command(BaseCommand):
         self.assessment(leak, 4, 20)
 
         satna = self.risk(
-            "قطع سرویس انتقال وجه ساتنا به‌دلیل خرابی پایگاه داده‌ی اصلی", "SRV-SATNA", self.sara, "T3",
+            "قطع سرویس انتقال وجه ساتنا به‌دلیل خرابی پایگاه داده‌ی اصلی", "SRV-SATNA", self.ali, "T3",
             S.TREATMENT_PLAN, channel=Risk.Channel.QUESTIONNAIRE,
         )
         self.record(satna)

@@ -160,6 +160,7 @@ POST_ONLY_PAGES = {
     "assessments:referral",
     "assessments:path_delete",
     "actions:plan_approve",
+    "actions:plan_remind",
     "actions:action_move",
     "actions:acceptance_submit",
     "actions:acceptance_sign",

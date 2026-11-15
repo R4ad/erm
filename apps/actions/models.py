@@ -144,6 +144,15 @@ class TreatmentAction(TimeStampedModel):
         related_name="+",
         help_text="فقط وقتی اقدام یک بُعد پیامد را تغییر می‌دهد.",
     )
+    path = models.ForeignKey(
+        "assessments.Path",
+        verbose_name="مسیر تحقق",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="treatment_actions",
+        help_text="برای سازوکار B: مسیری از ارزیابی مبنا که اقدام امکان تحققش را کم می‌کند.",
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="مالک اقدام", on_delete=models.PROTECT, related_name="owned_actions"
     )
@@ -196,6 +205,7 @@ class TreatmentAction(TimeStampedModel):
                 condition=Q(mechanism="impact", dimension__isnull=False) | (~Q(mechanism="impact") & Q(dimension=None)),
                 name="action_dimension_only_for_impact",
             ),
+            models.CheckConstraint(condition=Q(path=None) | Q(mechanism="b"), name="action_path_only_for_b"),
             models.CheckConstraint(condition=~Q(verifier=F("assignee")), name="action_verifier_not_assignee"),
             models.CheckConstraint(condition=~Q(verifier=F("owner")), name="action_verifier_not_owner"),
             models.CheckConstraint(condition=~Q(deliverable="") & ~Q(acceptance_criteria=""), name="action_testable"),

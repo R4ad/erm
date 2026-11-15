@@ -8,12 +8,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.assessments.services import decision_assessment
+from apps.core.jalali import to_jalali
 from apps.methodology.models import PeriodUnit, RiskLevel
 from apps.risks.models import Risk
 from apps.workcalendar.workdays import add_period
 
-from .models import ActionUpdate, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
-from .permissions import EXECUTION_STATUSES, can_approve_plan, is_action_worker
+from .models import ActionUpdate, MonitoringNotice, Reassessment, RiskAcceptance, TreatmentAction, TreatmentPlan
+from .permissions import EXECUTION_STATUSES, can_approve_plan, can_edit_plans, is_action_worker, is_current_plan
 
 ST = TreatmentAction.Status
 OPTION = TreatmentPlan.Option
@@ -264,3 +265,33 @@ def _set_status(action, status, user, note):
 
 def unverified_dependencies(action):
     return [item for item in action.depends_on.all() if item.status != ST.VERIFIED]
+
+
+def can_remind_owner(user, plan):
+    """یادآوری تأیید طرح به مالک ریسک (فیگما ۰۷): برای ویرایشگر طرح، وقتی طرح یا اقدام تازه‌اش منتظر مالک است."""
+    waiting = not plan.is_owner_approved or pending_actions(plan).exists()
+    return (
+        can_edit_plans(user)
+        and plan.risk.owner_id is not None
+        and plan.risk.owner_id != user.pk
+        and plan.risk.is_active
+        and is_current_plan(plan)
+        and waiting
+    )
+
+
+def remind_owner(plan, user):
+    """اعلان «منتظر تأیید شما» برای مالک ریسک، روزی یک بار؛ True اگر امروز تازه فرستاده شد."""
+    _, created = MonitoringNotice.objects.get_or_create(
+        recipient=plan.risk.owner,
+        event_key=f"plan-remind:{plan.pk}:{timezone.localdate().isoformat()}",
+        defaults={
+            "risk": plan.risk,
+            "message": (
+                f"یادآوری {user.get_full_name() or user.username}: طرح مواجهه‌ی ریسک {plan.risk.code} منتظر تأیید "
+                f"شماست (مهلت طرح: {to_jalali(plan.decision_due)})."
+            ),
+            "href": plan.get_absolute_url(),
+        },
+    )
+    return created

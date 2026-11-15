@@ -1163,6 +1163,40 @@ export interface PlanRisk {
   href: string | null;
 }
 
+export interface PlanOption {
+  value: string;
+  label: string;
+  hint: string;
+  selected: boolean;
+  disabled: boolean;
+}
+
+export interface PlanPoint extends CodeRef {
+  score: number | null;
+  level: Level | null;
+}
+
+export interface PlanCheck {
+  label: string;
+  /** fail تأیید را می‌بندد؛ warn فقط هشدار است. */
+  state: "ok" | "warn" | "fail";
+}
+
+export interface PlanActionRow extends ActionRow {
+  acceptance: string;
+  effect: { label: string; kind: "likelihood" | "impact"; title: string };
+  verifier: Person | null;
+  start: Day;
+  missing_cost: boolean;
+  /** جای میله در ستون زمان‌بندی، به درصد کل بازه. */
+  bar: { start: number; width: number } | null;
+}
+
+export interface PlanTimeline {
+  label: string;
+  months: { label: string; start: number; width: number }[];
+}
+
 export interface PlanDetail extends RecordParts {
   view: string;
   title: string;
@@ -1173,21 +1207,42 @@ export interface PlanDetail extends RecordParts {
     state: { value: "pending" | "approved" | "closed"; label: string };
     risk: PlanRisk;
     risk_owner: Person | null;
-    assessment: CodeRef & { score: number | null };
+    assessment: CodeRef & { score: number | null; kind: string };
     level: Level | null;
     plan_required: boolean;
     decision_due: Day | null;
+    /** روزهای کاری مانده تا مهلت طرح؛ بعد از تأیید مالک خالی است. */
+    deadline: { working_days: number; overdue: boolean } | null;
     overdue: boolean;
     containment_due: Moment | null;
+    author: (Person & { role: string }) | null;
+    created: Day;
     rationale: string;
     option_details: string;
     target: (CodeRef & { status: string; level: Level | null }) | null;
     approved_by: Person | null;
     approved_at: Moment | null;
   };
-  approval: { problems: string[]; approve_url: string | null; message: string; waiting_for_owner: boolean };
-  actions: ActionRow[];
+  options: { items: PlanOption[]; note: string };
+  compare: {
+    current: PlanPoint;
+    target: (PlanPoint & { status: Choice; is_approved: boolean; due: Day | null; assumptions: string }) | null;
+    needs_target: boolean;
+  };
+  approval: {
+    problems: string[];
+    approve_url: string | null;
+    message: string;
+    waiting_for_owner: boolean;
+    owner: (Person & { job_title: string }) | null;
+    owner_state: { value: "pending" | "approved"; label: string };
+    checks: PlanCheck[];
+    estimate: string | null;
+  };
+  actions: PlanActionRow[];
+  timeline: PlanTimeline | null;
   add_action_url: string | null;
+  remind_url: string | null;
   reassessment: {
     performed_on: Day;
     responsible: Person | null;

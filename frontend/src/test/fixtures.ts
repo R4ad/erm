@@ -39,6 +39,7 @@ import type {
   MyWork,
   WorkTask,
   NoticeList,
+  PlanActionRow,
   PlanDetail,
   QuestionnaireDetail,
   QuestionnaireList,
@@ -2166,37 +2167,114 @@ export function acceptanceList(overrides: Partial<AcceptanceList> = {}): Accepta
 }
 
 /** طرح کاهش منتظر تأیید مالک، از دید خود مالک ریسک. */
+/** ردیف جدول اقدام‌های طرح (فیگما ۰۷) با اثر، معیار قبولی و جای میله‌ی زمان‌بندی. */
+export function planActionRow(overrides: Partial<PlanActionRow> = {}): PlanActionRow {
+  return {
+    ...actionRow({ status: { value: "planned", label: "برنامه‌ریزی", overdue: false } }),
+    acceptance: "RPO صفر در آزمون failover",
+    effect: { label: "مسیر 1 · B", kind: "likelihood", title: "امکان تحقق مسیر 1: خرابی ذخیره‌ساز" },
+    verifier,
+    start: { iso: "2026-11-25", jalali: "1405/09/04" },
+    missing_cost: false,
+    bar: { start: 20, width: 40 },
+    ...overrides,
+  };
+}
+
 export function planDetail(overrides: Partial<PlanDetail> = {}): PlanDetail {
   return {
     view: "actions:plan_detail",
-    title: "طرح مواجهه: کاهش",
+    title: "طرح مواجهه — ریسک آزمون شماره‌ی ۱",
     messages: [],
     plan: {
       id: 1,
       option: { value: "reduce", label: "کاهش" },
-      state: { value: "pending", label: "منتظر تأیید مالک" },
+      state: { value: "pending", label: "منتظر تأیید مالک ریسک" },
       risk: { id: 1, code: "RK-1405-0001", title: "ریسک آزمون شماره‌ی ۱", href: "/risks/1/" },
       risk_owner: riskOwner,
-      assessment: { code: "AS-1405-0001", href: "/assessments/1/", score: 12 },
+      assessment: { code: "AS-1405-0001", href: "/assessments/1/", score: 12, kind: "جاری" },
       level: levels.high,
       plan_required: true,
       decision_due: { iso: "2026-11-18", jalali: "1405/08/27" },
+      deadline: { working_days: 3, overdue: false },
       overdue: false,
       containment_due: null,
+      author: { id: 9, name: "سارا محمدی", role: "عضو GRC" },
+      created: { iso: "2026-11-11", jalali: "1405/08/20" },
       rationale: "کاهش با PAM؛ پذیرش برای سطح بالا مجاز نیست",
       option_details: "",
       target: { code: "AS-1405-0002", href: "/assessments/2/", status: "تأییدشده", level: levels.medium },
       approved_by: null,
       approved_at: null,
     },
+    options: {
+      items: [
+        { value: "reduce", label: "کاهش", hint: "یک ارزیابی هدف تأییدشده لازم است", selected: true, disabled: false },
+        { value: "avoid", label: "اجتناب", hint: "شرط‌های اجتناب نوشته می‌شود", selected: false, disabled: false },
+        {
+          value: "transfer",
+          label: "انتقال یا اشتراک",
+          hint: "بیمه، قرارداد یا ارائه‌دهنده‌ی دیگر",
+          selected: false,
+          disabled: false,
+        },
+        { value: "accept", label: "پذیرش", hint: "برای سطح «بالا» گزینه‌ی طرح نیست", selected: false, disabled: true },
+      ],
+      note: "برای سطح «بالا» طرح الزامی است و گزینه‌ی «پذیرش» تأیید نمی‌شود",
+    },
+    compare: {
+      current: { code: "AS-1405-0001", href: "/assessments/1/", score: 12, level: levels.high },
+      target: {
+        code: "AS-1405-0002",
+        href: "/assessments/2/",
+        score: 6,
+        level: levels.medium,
+        status: { value: "approved", label: "تأییدشده" },
+        is_approved: true,
+        due: { iso: "2027-04-04", jalali: "1406/01/15" },
+        assumptions: "B مسیر ۳ از ۴ به ۲ با حذف حساب مدیر اضطراری مشترک.",
+      },
+      needs_target: true,
+    },
     approval: {
       problems: [],
       approve_url: "/actions/plans/1/approve/",
       message: "شما مالک این ریسک هستید. با تأیید، طرح و همه‌ی اقدام‌هایش مصوب می‌شوند.",
       waiting_for_owner: false,
+      owner: { ...riskOwner, job_title: "مدیر عملیات زیرساخت" },
+      owner_state: { value: "pending", label: "منتظر" },
+      checks: [
+        { label: "هر گزینه جز پذیرش دست‌کم یک اقدام دارد", state: "ok" },
+        { label: "گزینه‌ی کاهش: ارزیابی هدف تأییدشده دارد", state: "ok" },
+        { label: "هزینه و نفرساعت برای 1 از 2 اقدام", state: "warn" },
+      ],
+      estimate: "8٫4 میلیارد ریال · 620 نفرساعت",
     },
-    actions: [actionRow({ status: { value: "planned", label: "برنامه‌ریزی", overdue: false } })],
+    actions: [
+      planActionRow(),
+      planActionRow({
+        id: 2,
+        code: "TR-1405-0002",
+        title: "به‌روزرسانی BIA و توافق RTO با بانک‌ها",
+        href: "/actions/2/",
+        acceptance: "صورت‌جلسه‌ی امضاشده با دو بانک",
+        effect: { label: "پیامد C", kind: "impact", title: "پیامد: C - تعهدات" },
+        missing_cost: true,
+        bar: { start: 60, width: 25 },
+      }),
+    ],
+    timeline: {
+      label: "1405",
+      months: [
+        { label: "آبان", start: 0, width: 20 },
+        { label: "آذر", start: 20, width: 20 },
+        { label: "دی", start: 40, width: 20 },
+        { label: "بهمن", start: 60, width: 20 },
+        { label: "اسفند", start: 80, width: 20 },
+      ],
+    },
     add_action_url: "/actions/plans/1/actions/new/",
+    remind_url: null,
     reassessment: null,
     reassess_url: null,
     comparison: null,

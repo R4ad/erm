@@ -224,7 +224,7 @@ def rials(amount):
     amount = Decimal(amount)
     for size, name in ((10**12, "هزار میلیارد"), (10**9, "میلیارد"), (10**6, "میلیون")):
         if amount >= size:
-            shown = f"{amount / size:.2f}".rstrip("0").rstrip(".")
+            shown = f"{amount / size:.2f}".rstrip("0").rstrip(".").replace(".", "٫")  # ممیز فارسی
             return f"{shown} {name} ریال"
     return f"{int(amount):,} ریال"
 
