@@ -87,23 +87,26 @@ def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_ad
 
     assert data["user"]["name"] == "مریم کاظمی"
     assert "مدیر واحد" in " ".join(data["user"]["roles"])
-    titles = [group["title"] for group in data["navigation"]]
-    assert "مدیریت سامانه" not in titles
-    routes = {item["route"] for group in data["navigation"] for item in group["items"] if item["route"]}
-    assert {"/", "/risks", "/questionnaires", "/questionnaires/risk-questions", "/risks/evidence"} <= routes
-    assert {"/questionnaires/manage", "/questionnaires/responses", "/actions/notices", "/controls"} <= routes
-    assert {"/catalog/services", "/catalog/commitments", "/units", "/method"} <= routes
-    # صفحه‌ای که هنوز فقط در جنگو است پیوند جنگو می‌ماند.
-    classic = {item["key"] for group in data["navigation"] for item in group["items"] if not item["route"]}
-    assert "reports:management" in classic
-    keys = [item["key"] for group in data["navigation"] for item in group["items"]]
+    # منوی فیگما: «میز کار» و سه ماژول یک چرخه با گام‌های شماره‌دار.
+    nav = data["navigation"]
+    assert nav["desk"]["title"] == "میز کار"
+    assert [module["key"] for module in nav["modules"]] == ["assessment", "treatment", "config"]
+    links = nav["desk"]["items"] + [item for module in nav["modules"] for item in module["items"]]
+    routes = {item["route"] for item in links if item["route"]}
+    assert {"/", "/risks", "/actions/notices", "/identification", "/analysis", "/evaluation"} <= routes
+    assert {"/treatment/required", "/treatment/board", "/treatment/targets", "/units", "/method"} <= routes
+    notices = next(item for item in links if item["key"] == "actions:notices")
+    assert notices["tone"] == "gold" and notices["count"] is None  # بدون اعلان نخوانده شمارنده نمی‌آید
+    keys = [item["key"] for item in links]
     assert "risks:risk_list" in keys and len(keys) == len(set(keys))
+    assert "accounts:user_list" not in keys  # «تعریف کاربر و نقش» فقط برای مدیر سامانه
+    assert data["cycle"]["year"] >= 1405 and data["cycle"]["assessed"] <= data["cycle"]["total"]
     assert data["logout_url"] == reverse("api:logout")
     assert data["csrf_token"]
     assert data["today"]["weekday"]
 
-    admin_titles = [group["title"] for group in api(system_admin).get(reverse("api:session")).json()["navigation"]]
-    assert "مدیریت سامانه" in admin_titles
+    admin_nav = api(system_admin).get(reverse("api:session")).json()["navigation"]
+    assert "accounts:user_list" in [item["key"] for item in admin_nav["modules"][2]["items"]]
 
 
 def test_writes_need_the_csrf_token_like_django_forms(client, manager, unit):
@@ -204,6 +207,28 @@ def test_my_work_lists_the_risk_questions_waiting_for_the_unit_manager(api, grc,
 
     staff = make_user("staff")
     assert api(staff).get(reverse("api:my_work")).json()["sections"] == []
+
+
+def test_my_work_puts_every_task_in_one_queue_with_kpis(api, grc, manager, unit):
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.QUESTIONS)
+    RiskQuestion.objects.create(risk=risk, text="آخرین آزمون بازیابی کی بود؟", asked_by=grc, due=datetime.date(2026, 11, 9))
+
+    data = api(manager).get(reverse("api:my_work")).json()
+
+    [task] = data["tasks"]
+    assert task["category"] == "questions"
+    assert task["code"] == risk.code
+    assert task["cta"] == "پاسخ"
+    assert task["route"] == "/questionnaires/risk-questions"
+    assert {row["key"]: row["count"] for row in data["categories"]} == {
+        "actions": 0, "signoff": 0, "assessments": 0, "questions": 1, "acceptances": 0,
+    }
+    assert data["kpis"]["waiting"]["count"] == 1
+    assert data["kpis"]["to_verify"]["count"] == 0
+    assert data["plans"] == [] and data["acceptances"] == []
+
+    empty = api(make_user("staff")).get(reverse("api:my_work")).json()
+    assert empty["tasks"] == [] and empty["kpis"]["waiting"]["note"] == "کاری منتظر شما نیست"
 
 
 def test_a_unit_manager_answers_a_risk_question(api, grc, manager, unit):

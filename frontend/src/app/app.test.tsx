@@ -63,31 +63,38 @@ describe("app shell", () => {
     expect(await screen.findByRole("heading", { name: "کارهای من", level: 1 })).toBeInTheDocument();
     const [nav] = screen.getAllByRole("navigation", { name: "منوی اصلی" });
     expect(within(nav!).getByRole("link", { name: "کارهای من" })).toHaveAttribute("aria-current", "page");
-    // صفحه‌ای که در رابط تازه هست با مسیر خود رابط باز می‌شود و بقیه هنوز با صفحه‌ی کلاسیک جنگو.
-    expect(within(nav!).getByRole("link", { name: "شواهد" })).toHaveAttribute("href", "/risks/evidence");
-    expect(within(nav!).getByRole("link", { name: "خدمات" })).toHaveAttribute("href", "/catalog/services");
-    const classic = within(nav!).getByRole("link", { name: /گزارش مدیریتی/ });
-    expect(classic).toHaveAttribute("href", "/reports/");
-    expect(classic).toHaveAccessibleName(/در صفحه‌های فعلی سامانه باز می‌شود/);
+    // منوی فیگما: میز کار و سه ماژول با گام‌های شماره‌دار؛ پیوندها با مسیر خود رابط باز می‌شوند.
+    expect(within(nav!).getByRole("link", { name: "رجیستر ریسک" })).toHaveAttribute("href", "/risks");
+    expect(within(nav!).getByRole("link", { name: /اعلان‌های پایش/ })).toHaveAttribute("href", "/actions/notices");
     expect(screen.getByRole("link", { name: "رفتن به محتوای صفحه" })).toHaveAttribute("href", "#main");
     await expectNoAxeViolations();
   });
 
-  it("derives the summary from real work items", async () => {
+  it("shows the Figma task queue with the server's KPIs", async () => {
     api();
-    renderApp();
-    const stat = async (label: string) => (await screen.findByText(label)).nextElementSibling?.textContent;
-    expect(await stat("کارهای باز")).toBe("۳");
-    expect(await stat("مهلت گذشته")).toBe("۱");
-    expect(await stat("مهلت تا ۷ روز دیگر")).toBe("۲");
-    expect(screen.getByRole("region", { name: /اقدام‌های من/ })).toBeInTheDocument();
-    const questions = screen.getByRole("region", { name: /پرسش‌های ریسک منتظر جواب/ });
-    // موردی که صفحه‌ی React دارد درون برنامه باز می‌شود؛ بقیه در صفحه‌های فعلی.
-    expect(within(questions).getByRole("link", { name: "پرسش آزمون درباره‌ی پایش" })).toHaveAttribute(
+    const { user } = renderApp();
+    const stat = async (label: string) =>
+      (await screen.findByText(label)).parentElement?.nextElementSibling?.textContent;
+    expect(await stat("منتظر اقدام من")).toBe("۳");
+    expect(await stat("عقب‌افتاده")).toBe("۱");
+    expect(await stat("سررسید امروز")).toBe("۰");
+    expect(screen.getByText("سلام کاربر؛ ۳ کار منتظر اقدام شماست و ۰ مورد امروز سررسید دارد.")).toBeInTheDocument();
+
+    const queue = screen.getByRole("region", { name: "صف کارها" });
+    // کاری که صفحه‌ی React دارد درون برنامه باز می‌شود؛ بقیه در صفحه‌های فعلی.
+    expect(within(queue).getByRole("link", { name: /پاسخ به پرسش ریسک/ })).toHaveAttribute(
       "href",
       "/questionnaires/risk-questions",
     );
-    expect(screen.getByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).toHaveAttribute("href", "/actions/2/");
+    expect(within(queue).getByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).toHaveAttribute("href", "/actions/2/");
+
+    await user.click(within(queue).getByRole("tab", { name: /پرسش‌ها/ }));
+    expect(within(queue).queryByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).not.toBeInTheDocument();
+    expect(within(queue).getByText("نمایش ۱ از ۱ کار")).toBeInTheDocument();
+
+    expect(screen.getByRole("region", { name: "برنامه‌ی درمان — حال طرح‌ها" })).toHaveTextContent("بدون طرح");
+    expect(screen.getByRole("region", { name: "پذیرش‌های رو به انقضا" })).toHaveTextContent("منقضی‌شده");
+    await expectNoAxeViolations();
   });
 
   it("jumps to register search with the / key", async () => {
