@@ -313,7 +313,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: "accounts/users",
-            lazy: async () => ({ Component: (await import("@/features/admin/UserListPage")).UserListPage }),
+            lazy: async () => ({ Component: (await import("@/features/admin/UsersRolesPage")).UsersRolesPage }),
           },
           {
             path: "accounts/staff-import",

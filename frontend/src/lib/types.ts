@@ -2661,3 +2661,56 @@ export interface OrgChartPage {
   add_unit_url: string | null;
   add_member_url: string | null;
 }
+
+// ───────────── تعریف کاربر و نقش (فیگما ۱۹) ─────────────
+
+export type RoleTone = "brand" | "success" | "warning" | "info" | "neutral";
+
+export interface DirectoryUser {
+  id: number;
+  name: string;
+  username: string;
+  unit: string | null;
+  job_title: string;
+  roles: { key: string; label: string; tone: RoleTone }[];
+  customers: string[] | null;
+  source: { value: string; label: string };
+  last_login: { iso: string; label: string } | null;
+  status: { value: string; label: string; tone: "success" | "warning" | "info" | "neutral" | "danger" };
+  edit_url: string;
+}
+
+export interface DirectoryRole {
+  key: string;
+  label: string;
+  tone: RoleTone;
+  description: string;
+  kind: "group" | "derived";
+  kind_label: string;
+  scope: { value: "unit" | "assigned" | "all"; label: string };
+  count: number;
+  acceptance: { levels: string[]; label: string; text: string; tone: "success" | "neutral" | "warning" | "info" }[];
+  edit_url: string | null;
+}
+
+export interface UsersRolesPage {
+  summary: {
+    active: number;
+    units: number;
+    ad: number;
+    local: number;
+    temporary: number;
+    roles: number;
+    conflicts: number;
+  };
+  users: DirectoryUser[];
+  roles: DirectoryRole[];
+  matrix: { key: string; label: string; stage: string; access: Record<string, "F" | "L"> }[];
+  sod: {
+    conflicts: { key: string; user: Person; title: string; note: string; state: "open"; href: string }[];
+    rules: { text: string; where: string }[];
+  };
+  add_user_url: string;
+  login_report_url: string;
+  import_url: string;
+}

@@ -280,6 +280,9 @@ def record_approval(version, approval_ref, approved_on, by):
         raise ValidationError("تاریخ نامه‌ی تصویب نمی‌تواند بعد از امروز باشد.")
     if not version.can_record_approval:
         raise ValidationError("تصویب فقط برای پیش‌نویس، یا نسخه‌ی آزمایشی فعال، ثبت می‌شود.")
+    if version.submitted_by_id and version.submitted_by_id == by.pk:
+        # تفکیک وظایف (فیگما ۱۹): متولی روش نسخه‌ی پیشنهادی خودش را تصویب نمی‌کند
+        raise ValidationError("تصویب نسخه را کسی جز فرستنده‌ی آن برای تصویب ثبت می‌کند.")
     if version.is_draft:
         problems = check_version(version)
         if problems:

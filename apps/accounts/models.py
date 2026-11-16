@@ -27,6 +27,12 @@ class User(AbstractUser):
         default=Source.LOCAL,
         help_text="حساب محلی سامانه یا حسابی که از Active Directory همگام می‌شود.",
     )
+    access_expires = models.DateField(
+        "دسترسی موقت تا",
+        null=True,
+        blank=True,
+        help_text="برای ممیز یا مشاور بیرونی. پس از این روز ورود و نشست کاربر پذیرفته نمی‌شود؛ خالی یعنی دائمی.",
+    )
     org_unit = models.ForeignKey(
         "organization.OrgUnit",
         verbose_name="واحد سازمانی",

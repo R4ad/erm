@@ -7,7 +7,7 @@ from simple_history.admin import SimpleHistoryAdmin
 
 @admin.register(User)
 class CustomUserAdmin(SimpleHistoryAdmin, UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (("سازمان", {"fields": ("personnel_code", "job_title", "org_unit", "managed_units", "scope_units")}),)
+    fieldsets = UserAdmin.fieldsets + (("سازمان", {"fields": ("personnel_code", "job_title", "org_unit", "managed_units", "scope_units")}), ("حساب", {"fields": ("source", "access_expires")}))
     list_display = ("username", "personnel_code", "first_name", "last_name", "org_unit", "is_active")
     list_filter = UserAdmin.list_filter + ("org_unit",)
     search_fields = UserAdmin.search_fields + ("personnel_code",)

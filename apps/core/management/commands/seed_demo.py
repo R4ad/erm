@@ -66,7 +66,27 @@ class Command(BaseCommand):
         self.universe()
         self.questionnaire()
         self.method_draft()
+        self.access()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
+
+    def access(self):
+        """تعریف کاربر و نقش (فیگما ۱۹): ممیز بیرونی با دسترسی موقت، مدیر پروژه‌ای که مالک یک اقدام است و آخرین ورودها."""
+        auditor = self.user("auditor.ext", "ممیز", "بیرونی", Role.VIEWER, job="ممیزی مستقل")
+        auditor.set_unusable_password()
+        auditor.access_expires = self.today + timedelta(days=20)
+        auditor.save(update_fields=["password", "access_expires"])
+        karami = self.user("h.karami", "حمید", "کرمی", job="مدیر پروژه‌ی توسعه‌ی ساتنا و پایا")
+        karami.set_unusable_password()
+        karami.is_active = False
+        karami.org_unit = self.units["pay"]
+        karami.source = User.Source.AD
+        karami.save(update_fields=["password", "is_active", "org_unit", "source"])
+        action = TreatmentAction.objects.order_by("pk").first()
+        if action:
+            TreatmentAction.objects.filter(pk=action.pk).update(owner=karami)
+        now = timezone.now()
+        for user, ago in ((self.sara, 1), (self.mehdi, 2), (self.maryam, 26), (self.ali, 3), (self.reza, 30 * 24)):
+            User.objects.filter(pk=user.pk).update(last_login=now - timedelta(hours=ago))
 
     def method_draft(self):
         """تعریف متدولوژی (فیگما ۱۷): پیش‌نویس نسخه‌ی بعد با سه تغییر نسبت به نسخه‌ی فعال، هنوز فرستاده‌نشده."""
