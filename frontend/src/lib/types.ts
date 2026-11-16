@@ -2432,3 +2432,32 @@ export interface EvaluationPage {
   }[];
   sendable: number[];
 }
+
+// ───────────── ریسک‌های نیازمند اقدام (فیگما ۱۴) ─────────────
+
+export type RequiredTone = "danger" | "warning" | "info" | "success";
+
+export interface ActionRequiredRow {
+  key: string;
+  kind: "plan" | "failed" | "acceptance";
+  risk: { id: number; code: string; title: string; href: string; note: string };
+  level: Level;
+  score: number | null;
+  owner: { id: number; name: string } | null;
+  option: { value: "reduce" | "avoid" | "transfer" | "accept"; label: string; suggested: boolean };
+  reason: string;
+  deadline: { text: string; tone: RequiredTone; due: { iso: string; jalali: string } | null };
+  status: { label: string; tone: RequiredTone };
+  action: { kind: "escalate" | "create" | "open"; label: string; href: string | null };
+  overdue: boolean;
+  within_48h: boolean;
+  containment_overdue: boolean;
+}
+
+export interface ActionRequiredPage {
+  rows: ActionRequiredRow[];
+  counts: { no_plan: number; overdue: number; within_48h: number; failed: number; acceptance: number };
+  owners: { id: number; name: string }[];
+  containment_overdue: { id: number; code: string; title: string; href: string }[];
+  can_escalate: boolean;
+}

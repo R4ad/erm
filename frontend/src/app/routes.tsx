@@ -397,6 +397,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "treatment/required",
+            lazy: async () => ({
+              Component: (await import("@/features/treatment/ActionRequiredPage")).ActionRequiredPage,
+            }),
+          },
+          {
             path: "evaluation",
             lazy: async () => ({ Component: (await import("@/features/evaluation/EvaluationPage")).EvaluationPage }),
           },

@@ -12,6 +12,7 @@ from apps.risks.models import Risk
 from . import formatting as fmt
 from .base import ApiView
 from .routes import route_table, spa_route
+from .treatment import required_rows
 
 
 def link(label, url_name, count=None, tone=None):
@@ -28,10 +29,11 @@ def spa_link(label, key, route, count=None, tone=None):
 
 
 def inbox_counts(user):
-    """شمارنده‌های منو: اعلان‌های پایش نخوانده، ریسک‌های منتظر طرح مواجهه و ریسک‌های در اجرای درمان."""
+    """شمارنده‌های منو: اعلان‌های پایش نخوانده، ریسک‌های نیازمند اقدام و ریسک‌های در اجرای درمان."""
     return {
         "notices": MonitoringNotice.objects.filter(recipient=user, read_at__isnull=True).count(),
-        "action_required": Risk.objects.filter(status=Risk.Status.TREATMENT_PLAN, merged_into__isnull=True).count(),
+        # همان سطرهای صفحه‌ی «ریسک‌های نیازمند اقدام» (فیگما ۱۴)، تا عدد منو با صفحه یکی باشد.
+        "action_required": len(required_rows(user)),
         "in_treatment": Risk.objects.filter(status=Risk.Status.TREATMENT, merged_into__isnull=True).count(),
     }
 

@@ -1114,6 +1114,20 @@ class Command(BaseCommand):
         )
         self.record(satna)
 
+        # نیازمند اقدام (فیگما ۱۴): بحرانی با منع الزام‌آور که مهلت مهارش گذشته، و بالایی که هنوز در مهلت طرح است
+        licence = self.risk("ادامه‌ی پردازش بدون مجوز نظارتی به‌روز", "SRV-SATNA", self.hossein, "T8", S.TREATMENT_PLAN)
+        self.entered(licence, S.TREATMENT_PLAN, 1.1)
+        prohibited = self.assessment(licence, 4, 6, days_ago=2)
+        Assessment.objects.filter(pk=prohibited.pk).update(
+            base_level=self.levels[2],
+            binding_prohibition=True,
+            out_of_acceptance_authority=True,
+            escalation_reasons=["منع الزام‌آور: خارج از اختیار پذیرش"],
+        )
+        supplier = self.risk("قطع خدمت ارتباطی تأمین‌کننده", "SRV-SMS", self.ali, "T5", S.TREATMENT_PLAN)
+        self.entered(supplier, S.TREATMENT_PLAN, 3)
+        self.assessment(supplier, 3, 12, days_ago=4)
+
         sms = self.risk("وابستگی به ارائه‌دهنده‌ی پیامک", "SRV-SMS", self.sara, "T5", S.TREATMENT_PLAN)
         self.entered(sms, S.TREATMENT_PLAN, 10)
         sms_plan = self.plan(sms, self.assessment(sms, 2, 8))
