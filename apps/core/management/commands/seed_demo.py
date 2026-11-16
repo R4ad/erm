@@ -905,6 +905,155 @@ class Command(BaseCommand):
             AssessmentReview.objects.filter(pk=review.pk).update(created_at=now - timedelta(days=days_ago))
         return assessment
 
+    def analysis_assessment(self):
+        """ارزیابی پیش‌نویس صفحه‌ی ۱۲ فیگما («آنالیز ریسک»): A از نرخ ۲۰ بسته‌ی نامعتبر در ۱۲ ماه با پوشش ۹۸٪، دو مسیر
+        با کنترل‌های E۳ و E۲، یک کنترل کاهش پیامد بی‌اثر در Bc و پروفایل پیامد S۳ و بقیه ۲؛ ارزیابی ذاتی ۱۲ هم هست."""
+        risk = self.risk("اعمال بسته‌ی انتشار نامعتبر در تولید", "SRV-SATNA", self.hossein, "T2", S.ASSESSMENT)
+        risk.description = (
+            "بسته یا فرمان نامعتبر پیش از کنترل انتشار ممکن است به اعمال تنظیم نادرست در تولید و اختلال خدمت مشتری برسد"
+        )
+        risk.initiator = "ایجاد یک بسته یا فرمان انتشار نامعتبر و ارائه‌ی آن به فرایند کنترل انتشار"
+        risk.count_unit = "هر بسته‌ی نامعتبر یکتا، بدون توجه به تعداد هشدارها"
+        risk.scope = "ساتنا و پایا · محیط تولید · بانک ملت"
+        risk.count_exclusions = "کل ۱۰۰۰ بسته‌ی انتشار، هشدارهای تکراری، تغییرات عادی"
+        risk.scenario_snapshot = {"event": "اعمال بسته‌ی نامعتبر در محیط تولید"}
+        risk.realization_path = "انتشار از پایپ‌لاین رسمی یا فرمان دستی در پنجره‌ی اضطراری"
+        risk._history_user = self.sara
+        risk.save()
+        risk.customers.set([self.banks[0]])
+        self.assessment(risk, 3, 12, kind=Assessment.Kind.INHERENT, days_ago=40)
+
+        def evidence(title, kind, days_ago):
+            item = Evidence.objects.create(
+                title=title,
+                kind=kind,
+                reliability=Evidence.Reliability.HIGH,
+                summary=title,
+                source="واحد DevOps",
+                observed_on=self.today - timedelta(days=days_ago),
+                owner=self.sara,
+            )
+            item.risks.add(risk)
+            return item
+
+        cab = evidence("تیکت‌های CAB", Evidence.Kind.TEST, 10)
+        pipeline = evidence("لاگ پایپ‌لاین انتشار", Evidence.Kind.STATISTICS, 12)
+        incident = evidence("گزارش رخداد", Evidence.Kind.INCIDENT, 60)
+        sample = Thresholds.of(self.version).sample
+
+        def control(title, kind, key, iso, owner, **test):
+            item = Control.objects.create(
+                title=title, objective=title, kind=kind, owner=owner, operated_by=Responsibility.DATIN, is_key=key
+            )
+            item.iso_controls.add(IsoControl.objects.get(code=iso))
+            risk.controls.add(item)
+            if not test:
+                return item, None
+            proof = test.pop("proof")
+            assessment = ControlAssessment(
+                control=item,
+                method_version=self.version,
+                scope="بسته‌های انتشار ساتنا و پایا",
+                test_from=self.today - timedelta(days=45),
+                test_to=self.today - timedelta(days=15),
+                confidence=Confidence.MEDIUM,
+                created_by=self.sara,
+                exists=True,
+                **test,
+            )
+            assessment.save()
+            assessment.evidence.add(proof)
+            return item, assessment
+
+        _, validation = control(
+            "اعتبارسنجی خودکار بسته‌ی انتشار",
+            Control.Kind.PREVENTIVE,
+            True,
+            "8.32",
+            self.ali,
+            design_ok=True,
+            operating_ok=True,
+            coverage_pct=100,
+            critical_points_covered=True,
+            sample_size=max(sample, 40),
+            e=3,
+            rationale="شرط‌های E3 برقرار است؛ آزمون ۴۰ نمونه.",
+            verified_by=self.sara,
+            proof=pipeline,
+        )
+        _, dual = control(
+            "تأیید دوم انتشار (چهار چشم)",
+            Control.Kind.PREVENTIVE,
+            True,
+            "8.32",
+            self.hossein,
+            design_ok=True,
+            operating_ok=False,
+            limited_effect_proven=True,
+            coverage_pct=80,
+            critical_points_covered=False,
+            exceptions="۳ استثنای ثبت‌نشده",
+            sample_size=12,
+            e=2,
+            rationale="طراحی کافی است ولی سه انتشار بدون تأیید دوم ثبت شده است.",
+            proof=cab,
+        )
+        control("پایش و هشدار پس از اعمال", Control.Kind.DETECTIVE, False, "8.16", self.ali)
+
+        assessment = Assessment(
+            risk=risk,
+            kind=Assessment.Kind.CURRENT,
+            method_version=self.version,
+            created_by=self.sara,
+            horizon_months=12,
+            assumptions="پنجره‌ی اضطراری فقط با دسترسی اپراتور باز می‌شود.",
+            a_basis="rate",
+            a_count=20,
+            a_period_months=12,
+            a_denominator="۱۰۰۰ بسته‌ی انتشار",
+            a_coverage=98,
+            a=4,
+            a_confidence=Confidence.MEDIUM,
+            a_rationale="۲۰ بسته‌ی نامعتبر یکتا در ۱۲ ماه از لاگ پایپ‌لاین و تیکت‌های CAB.",
+        )
+        assessment._history_user = self.sara
+        assessment.save()
+        assessment.a_evidence.add(cab, pipeline, incident)
+        for name, description, b0, controls in [
+            ("انتشار از پایپ‌لاین رسمی", "CI/CD ← اعتبارسنجی ← تأیید دوم ← تولید", 4, [validation, dual]),
+            ("فرمان دستی در پنجره‌ی اضطراری", "دسترسی اپراتور ← تأیید دوم ← تولید", 3, [dual]),
+        ]:
+            path = Path.objects.create(
+                assessment=assessment,
+                name=name,
+                description=description,
+                b0=b0,
+                b0_confidence=Confidence.MEDIUM,
+                b0_rationale="از لاگ پایپ‌لاین و گزارش رخداد.",
+            )
+            path.evidence.add(pipeline)
+            path.control_assessments.add(*controls)
+        cells = {
+            "S": (3, "اختلال ۶۰ دقیقه · RTO دو ساعت"),
+            "D": (2, "تنظیم نادرست قابل اصلاح"),
+            "F": (2, "۰٫۰۵٪ درآمد مبنا"),
+            "C": (2, "نقض تعهد عادی قابل اصلاح"),
+            "R": (2, "یک شکایت رسمی"),
+        }
+        for scale in self.version.scales.filter(kind="impact"):
+            level, rationale = cells.get(scale.code, (1, scale.name))
+            for customer in [None, self.banks[0]]:
+                detail = ImpactDetail.objects.create(
+                    assessment=assessment,
+                    customer=customer,
+                    scale=scale,
+                    level=level if customer else level - 1,
+                    rationale=rationale,
+                    confidence=Confidence.MEDIUM,
+                )
+                detail.evidence.add(incident)
+        return assessment
+
     def impact_profile(self, risk, assessment):
         """پروفایل پیامد نیمه‌کاره‌ی یک ارزیابی پیش‌نویس برای صفحه‌ی ۰۶ فیگما: داتین و دو بانک، سطح ۵ داده برای بانک
         ملت، F بانک ملت با مبلغ زیان و پیشنهاد سامانه، یک خانه‌ی نامعلوم بی‌شاهد و یک خانه‌ی ثبت‌نشده."""
@@ -1017,6 +1166,7 @@ class Command(BaseCommand):
         self.qc_assessment(hsm)
         mb = self.risk("حمله‌ی credential stuffing به همراه‌بانک", "SRV-MB", self.hossein, "T1", S.ASSESSMENT)
         self.impact_profile(mb, self.assessment(mb, 3, 10, status=Assessment.Status.DRAFT))
+        self.analysis_assessment()
 
         # شناسایی: ثبت‌شده، ارسال‌شده، در پاسخ به پرسش‌ها
         self.risk("قطع برق مرکز داده‌ی اصلی", "SRV-CORE", self.ali, "T7", S.REGISTERED)

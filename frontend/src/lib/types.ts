@@ -2234,3 +2234,148 @@ export interface IdentificationPage {
   register_url: string;
   evidence_url: string;
 }
+
+// ───────────── آنالیز ریسک (فیگما ۱۲) ─────────────
+
+export type AnalysisBand = [number, number | null] | [number, number];
+
+export interface AnalysisInitiatorValues {
+  a_basis: string;
+  a_count: number | null;
+  a_period_months: number | null;
+  a_coverage: number | null;
+  a_level: string;
+  a_high: number | null;
+  a_confidence: string;
+  a_rationale: string;
+}
+
+export interface AnalysisScaleBand {
+  value: number;
+  name: string;
+  lower: number | null;
+  upper: number | null;
+  text: string;
+}
+
+export interface AnalysisInitiator {
+  locked: boolean;
+  rows: { label: string; value: string }[];
+  values: AnalysisInitiatorValues;
+  count_unit: string;
+  rate: number | null;
+  suggestion: number | null;
+  insufficient: string[];
+  coverage_min: number | null;
+  period_min: number | null;
+  bound_rule: "" | "lower_closed" | "upper_closed";
+  bands: AnalysisScaleBand[];
+  basis_choices: { value: string; label: string }[];
+  confidence_choices: { value: string; label: string }[];
+  evidence: { code: string; title: string; href: string }[];
+  evidence_count: number;
+  form_url: string;
+}
+
+export interface AnalysisPathControl {
+  code: string;
+  title: string;
+  e: number;
+  recorded_e: number;
+  note: string;
+}
+
+export interface AnalysisPath {
+  id: number;
+  name: string;
+  description: string;
+  b0: AnalysisBand | null;
+  controls: AnalysisPathControl[];
+  bc: AnalysisBand | null;
+  b: AnalysisBand | null;
+  determining: boolean;
+  notes: string[];
+  edit_url: string | null;
+}
+
+export interface AnalysisControl {
+  code: string;
+  title: string;
+  kind: { value: string; label: string };
+  owner: string;
+  preventive: boolean;
+  href: string;
+  test: {
+    code: string;
+    href: string;
+    exists: boolean;
+    design_ok: boolean;
+    coverage: "ok" | "partial" | null;
+    operating_ok: boolean;
+    e: number;
+    recorded_e: number;
+    problem: string;
+  } | null;
+  evidence: { code: string | null; href: string | null; note: string } | null;
+  test_url: string | null;
+}
+
+export interface AnalysisPage {
+  assessment: {
+    id: number;
+    code: string;
+    status: { value: string; label: string };
+    kind: { value: string; label: string };
+    horizon_months: number;
+    method_number: string;
+    href: string;
+    impact_url: string;
+    can_edit: boolean;
+  };
+  risk: {
+    id: number;
+    code: string;
+    title: string;
+    narrative: string;
+    status: { value: string; label: string };
+    category: { code: string; name: string };
+    href: string;
+  };
+  summary: {
+    a: { value: string | null; basis: string };
+    b: { value: string | null };
+    l: { value: string | null; a: number | null; b: number | null };
+    i: { value: string | null; source: string; dimensions: number };
+    score: { value: string | null; level: Level | null; inherent: { score: number; level: Level | null } | null };
+    paths: number;
+    determining: string[];
+  };
+  initiator: AnalysisInitiator;
+  paths: {
+    rows: AnalysisPath[];
+    b: AnalysisBand | null;
+    highs: number[];
+    problems: string[];
+    add_url: string | null;
+  };
+  controls: AnalysisControl[];
+  matrix: {
+    a: number | null;
+    b: number | null;
+    l: number | null;
+    rows: { a: number; cells: (number | null)[] }[];
+    names: Record<string, string>;
+  };
+  impacts: {
+    i: AnalysisBand | null;
+    rows: { code: string; name: string; level: number | null; note: string; unknown: boolean; missing: boolean }[];
+  };
+  uncertainty: {
+    confidence: string;
+    confidence_key: "" | "low" | "medium" | "high";
+    items: { ok: boolean; text: string }[];
+    l_range: AnalysisBand | null;
+  };
+  problems: string[];
+  submit: { can_submit: boolean; url: string | null; problems: string[] };
+}

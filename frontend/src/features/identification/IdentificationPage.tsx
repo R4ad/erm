@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, FieldError, Input, RequiredMark, Select } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { Chip, SectionPanel as Panel } from "@/components/ui/section-panel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProcessSteps, type StepState } from "@/components/ui/process-step";
 import { PageSkeleton } from "@/components/ui/skeleton";
@@ -70,64 +71,6 @@ const FIELD_LABELS: Partial<Record<keyof IdentificationValues, string>> = {
 const fieldId = (name: string) => `identification-${name}`;
 
 // ─────────────────────────────── قطعه‌های مشترک ───────────────────────────────
-
-/** کارت فیگما با سرکارت جداشده: عنوان H3، توضیح ۱۳ و نشان یا اقدام در سمت چپ. */
-function Panel({
-  title,
-  description,
-  aside,
-  children,
-  className,
-  bodyClassName,
-}: {
-  title: string;
-  description?: ReactNode;
-  aside?: ReactNode;
-  children: ReactNode;
-  className?: string;
-  bodyClassName?: string;
-}) {
-  const id = useId();
-  return (
-    <Card role="region" aria-labelledby={id} className={cn("overflow-hidden", className)}>
-      <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id={id} className="text-h3 font-semibold text-ink">
-            {title}
-          </h2>
-          {description && <p className="text-sm leading-[1.375rem] text-ink-3">{description}</p>}
-        </div>
-        {aside && <div className="flex shrink-0 items-center gap-2">{aside}</div>}
-      </div>
-      <div className={cn("px-5 py-4", bodyClassName)}>{children}</div>
-    </Card>
-  );
-}
-
-function Chip({
-  tone = "neutral",
-  children,
-}: {
-  tone?: "neutral" | "success" | "warning" | "info";
-  children: ReactNode;
-}) {
-  const tones = {
-    neutral: "bg-subtle text-ink-2",
-    success: "bg-success-subtle text-success",
-    warning: "bg-warning-subtle text-warning",
-    info: "bg-info-subtle text-info",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex h-[1.375rem] items-center gap-1 rounded-full px-2.5 text-xs font-medium whitespace-nowrap",
-        tones[tone],
-      )}
-    >
-      {children}
-    </span>
-  );
-}
 
 function TextField({
   name,

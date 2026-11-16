@@ -57,6 +57,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   tone?: ButtonVariant;
   loading?: boolean;
+  /** دکمه‌ی تأیید غیرفعال، مثلاً وقتی شرط کار هنوز برقرار نیست و دلیلش در description آمده است. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   children?: ReactNode;
 }
@@ -71,6 +73,7 @@ export function ConfirmDialog({
   cancelLabel = t("action.cancel"),
   tone = "primary",
   loading = false,
+  confirmDisabled = false,
   onConfirm,
   children,
 }: ConfirmDialogProps) {
@@ -92,6 +95,7 @@ export function ConfirmDialog({
             <Button
               variant={tone}
               loading={loading}
+              disabled={confirmDisabled}
               onClick={(event) => {
                 event.preventDefault();
                 onConfirm();
