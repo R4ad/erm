@@ -292,11 +292,21 @@ export const routes: RouteObject[] = [
           {
             path: "method",
             lazy: async () => ({
-              Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
+              Component: keyedByPath(
+                (await import("@/features/methodology/MethodDefinitionPage")).MethodDefinitionPage,
+              ),
             }),
           },
           {
             path: "method/:number",
+            lazy: async () => ({
+              Component: keyedByPath(
+                (await import("@/features/methodology/MethodDefinitionPage")).MethodDefinitionPage,
+              ),
+            }),
+          },
+          {
+            path: "method/:number/reference",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
             }),

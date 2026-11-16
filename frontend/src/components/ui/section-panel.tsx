@@ -11,6 +11,7 @@ export type ChipTone = "neutral" | "success" | "warning" | "info" | "brand" | "d
 
 /** کارت فیگما با سرکارت جداشده: عنوان H3، توضیح ۱۳ و نشان یا اقدام در سمت چپ. */
 export function SectionPanel({
+  id: anchor,
   title,
   description,
   aside,
@@ -18,6 +19,8 @@ export function SectionPanel({
   className,
   bodyClassName,
 }: {
+  /** شناسه‌ی پیوند درون صفحه، مثل #method-base. */
+  id?: string;
   title: string;
   description?: ReactNode;
   aside?: ReactNode;
@@ -27,7 +30,12 @@ export function SectionPanel({
 }) {
   const id = useId();
   return (
-    <Card role="region" aria-labelledby={id} className={cn("overflow-hidden", className)}>
+    <Card
+      id={anchor}
+      role="region"
+      aria-labelledby={id}
+      className={cn("overflow-hidden", anchor && "scroll-mt-20", className)}
+    >
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">
         <div className="flex min-w-[min(100%,15rem)] flex-1 flex-col gap-0.5">
           <h2 id={id} className="text-h3 font-semibold text-ink">

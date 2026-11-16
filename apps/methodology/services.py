@@ -211,6 +211,8 @@ def copy_version(version, by):
         approval_recorded_by=None,
         activated_at=None,
         activated_by=None,
+        submitted_at=None,
+        submitted_by=None,
     )
 
     for scale in version.scales.prefetch_related("levels"):
@@ -228,6 +230,41 @@ def copy_version(version, by):
     for row in [*version.likelihood_cells.all(), *version.bc_rules.all(), *version.parameters.all()]:
         save_as_copy(row, by, reason, version=copy)
     return copy
+
+
+@transaction.atomic
+def set_parameters(version, values, by):
+    """مقدار پارامترهای پیش‌نویسِ فرستاده‌نشده را عوض می‌کند. values: {کلید: Decimal}. خروجی: کلیدهای عوض‌شده."""
+    version = MethodVersion.objects.select_for_update().get(pk=version.pk)
+    if not version.is_editable_draft:
+        raise ValidationError("فقط پیش‌نویسی که هنوز برای تصویب فرستاده نشده ویرایش می‌شود.")
+    rows = {row.key: row for row in version.parameters.all()}
+    unknown = sorted(set(values) - set(rows))
+    if unknown:
+        raise ValidationError(f"پارامتر ناشناخته: {'، '.join(unknown)}")
+    changed = []
+    for key, value in values.items():
+        if value < 0:
+            raise ValidationError(f"{rows[key].get_key_display()} منفی نمی‌شود.")
+        if rows[key].value != value:
+            rows[key].value = value
+            save_with_reason(rows[key], by, "ویرایش پارامتر در تعریف متدولوژی")
+            changed.append(key)
+    return changed
+
+
+@transaction.atomic
+def submit_version(version, by):
+    """پیش‌نویس را برای بازبینی روش‌شناختی و تصویب مرجع مجاز می‌فرستد. پیش‌نویس ناقص فرستاده نمی‌شود."""
+    version = MethodVersion.objects.select_for_update().get(pk=version.pk)
+    if not version.is_editable_draft:
+        raise ValidationError("فقط پیش‌نویسی که هنوز فرستاده نشده برای تصویب فرستاده می‌شود.")
+    problems = check_version(version)
+    if problems:
+        raise ValidationError(problems)
+    version.submitted_at = timezone.now()
+    version.submitted_by = by
+    return save_with_reason(version, by, "ارسال برای تصویب")
 
 
 @transaction.atomic

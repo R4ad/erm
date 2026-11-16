@@ -29,7 +29,8 @@ from apps.controls.effectiveness import Thresholds
 from apps.controls.models import Control, ControlAssessment, IsoControl
 from apps.core.choices import Confidence
 from apps.core.models import Comment
-from apps.methodology.models import MethodVersion
+from apps.methodology.models import MethodParameter, MethodVersion
+from apps.methodology.services import copy_version, save_with_reason
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, Question, Questionnaire, Response
 from apps.risks.identification import narrative
@@ -64,7 +65,22 @@ class Command(BaseCommand):
         self.identification()
         self.universe()
         self.questionnaire()
+        self.method_draft()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
+
+    def method_draft(self):
+        """تعریف متدولوژی (فیگما ۱۷): پیش‌نویس نسخه‌ی بعد با سه تغییر نسبت به نسخه‌ی فعال، هنوز فرستاده‌نشده."""
+        draft = copy_version(self.version, self.sara)
+        MethodVersion.objects.filter(pk=draft.pk).update(
+            title="روش v5 · بازنگری ۱۴۰۵", change_notes="پوشش داده‌ی آغازگر، یادآوری دوم پذیرش و بازبینی سطح پایین"
+        )
+        changes = {MethodParameter.Key.A_DATA_COVERAGE: 98, MethodParameter.Key.REMINDER_SECOND: 14}
+        for row in draft.parameters.filter(key__in=list(changes)):
+            row.value = changes[row.key]
+            save_with_reason(row, self.sara, "بازنگری ۱۴۰۵")
+        low = draft.risk_levels.get(rank=1)
+        low.review_value = 4
+        save_with_reason(low, self.sara, "بازنگری ۱۴۰۵")
 
     # ───────────── افراد و سازمان ─────────────
 

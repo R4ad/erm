@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, mywork
+from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
 
 app_name = "api"
@@ -32,6 +32,14 @@ urlpatterns = [
     path("treatment/required/escalate/", treatment.EscalateView.as_view(), name="action_required_escalate"),
     path("treatment/board/", treatment_board.TreatmentBoardView.as_view(), name="treatment_board"),
     path("treatment/targets/", treatment_targets.TargetRisksView.as_view(), name="treatment_targets"),
+    path("method/definition/", method_definition.MethodDefinitionView.as_view(), name="method_definition"),
+    path(
+        "method/definition/<int:number>/parameters/",
+        method_definition.MethodParametersView.as_view(),
+        name="method_parameters",
+    ),
+    path("method/definition/<int:number>/submit/", method_definition.MethodSubmitView.as_view(), name="method_submit"),
+    path("method/definition/<int:number>/copy/", method_definition.MethodCopyView.as_view(), name="method_copy"),
     path("questionnaires/", questionnaires.AnswerHomeView.as_view(), name="answer_home"),
     path("questionnaires/<int:pk>/start/", questionnaires.ResponseStartView.as_view(), name="response_start"),
     path("responses/<int:pk>/", questionnaires.ResponseDetailView.as_view(), name="response_detail"),

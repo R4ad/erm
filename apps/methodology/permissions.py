@@ -7,6 +7,14 @@ from .models import MethodVersion
 SEE_DRAFTS_ROLES = [Role.GRC_MEMBER, Role.SECURITY_WORKGROUP, Role.SECURITY_COMMITTEE, Role.VIEWER]
 
 
+# متولی روش: پیش‌نویس می‌سازد، پارامترهایش را عوض می‌کند و برای تصویب می‌فرستد (فیگما ۱۷).
+MANAGE_ROLES = [Role.GRC_MEMBER]
+
+
+def can_manage_method(user):
+    return user.is_system_admin or user.has_role(*MANAGE_ROLES)
+
+
 def can_see_drafts(user):
     return user.is_system_admin or user.has_role(*SEE_DRAFTS_ROLES)
 

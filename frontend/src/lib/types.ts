@@ -2533,3 +2533,81 @@ export interface TargetRisksPage {
   counts: { with_target: number; within: number; above: number; retire: number };
   reassess: { code: string; title: string; step: string; href: string }[];
 }
+
+// ───────────── تعریف متدولوژی (فیگما ۱۷) ─────────────
+
+export interface MethodChange {
+  key: string;
+  group: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface MethodParam {
+  key: string;
+  label: string;
+  group: string;
+  value: string;
+  unit: string;
+  text: string;
+  note: string;
+  before: string | null;
+}
+
+export type ApprovalState = "done" | "current" | "locked" | "skipped";
+
+export interface MethodDefinition {
+  version: {
+    number: number;
+    name: string;
+    title: string;
+    status: { value: string; label: string };
+    is_trial: boolean;
+    based_on: string | null;
+    saved: { iso: string; jalali: string };
+    submitted: boolean;
+    editable: boolean;
+    reference: string;
+    change_notes: string;
+  };
+  can_submit: boolean;
+  can_copy: boolean;
+  copy_from: string | null;
+  versions: {
+    number: number;
+    name: string;
+    title: string;
+    status: { value: string; label: string };
+    date: { iso: string; jalali: string } | null;
+    note: string;
+    current: boolean;
+  }[];
+  changes: MethodChange[];
+  groups: { key: string; label: string; changes: number }[];
+  approval: { key: string; title: string; note: string; state: ApprovalState }[];
+  categories: { code: string; name: string; risks: number }[];
+  parameters: MethodParam[];
+  likelihood: {
+    rows: { a: number; cells: { b: number; l: number | null; changed: boolean }[] }[];
+    names: { value: number; name: string }[];
+    source: string;
+    changed: number;
+  };
+  levels: {
+    levels: { rank: number; name: string; min: number; max: number; color: string; text_color: string }[];
+    rules: { key: string; title: string; note: string; source: "version" | "system" }[];
+  };
+  appetite: {
+    rank: number;
+    level: { name: string; color: string; rank: number };
+    authority: string;
+    plan: string | null;
+    acceptance: string | null;
+    review: string | null;
+    reminder: string;
+    changed: string[];
+  }[];
+  impact_scales: { code: string; name: string; scope: string; stakeholders: string[]; levels: number }[];
+  admin_url: string | null;
+}

@@ -130,4 +130,5 @@ def version_detail(context, request):
 METHODOLOGY_PAGES = {
     "methodology:active": version_detail,
     "methodology:version_detail": version_detail,
+    "methodology:version_reference": version_detail,
 }

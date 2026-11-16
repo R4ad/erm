@@ -84,6 +84,16 @@ class MethodVersion(TimeStampedModel):
         blank=True,
         related_name="+",
     )
+    # ارسال پیش‌نویس برای بازبینی و تصویب (فیگما ۱۷): پس از ارسال، پیش‌نویس در رابط ویرایش نمی‌شود.
+    submitted_at = models.DateTimeField("زمان ارسال برای تصویب", null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="ارسال‌کننده",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     activated_at = models.DateTimeField("زمان فعال شدن", null=True, blank=True)
     activated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -151,6 +161,11 @@ class MethodVersion(TimeStampedModel):
     def is_trial(self):
         """نسخه‌ای که بدون تصویب به کار رفته است. فقط نسخه‌ی ۱ می‌تواند چنین باشد (س۱۲ قدم ۸)."""
         return self.status in (self.Status.ACTIVE, self.Status.ARCHIVED) and self.approved_on is None
+
+    @property
+    def is_editable_draft(self):
+        """پیش‌نویسی که هنوز برای تصویب فرستاده نشده است."""
+        return self.is_draft and self.submitted_at is None
 
     @property
     def can_record_approval(self):
