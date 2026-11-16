@@ -11,7 +11,9 @@ import jdatetime
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.actions import acceptance as acc
 from apps.actions.models import RiskAcceptance, TreatmentAction, TreatmentPlan
+from apps.actions.monitoring import reminder_days
 from apps.actions.services import can_remind_owner, has_valid_acceptance
 from apps.assessments.services import rials
 from apps.workcalendar.workdays import working_days_between
@@ -493,6 +495,41 @@ SIGN_INTRO = {
 }
 
 
+# چهار گام امضای فیگما ۰۸، به ترتیب امضا: عنوان گام، نام در زیرعنوان کارت و توضیح گامی که این پذیرش لازمش ندارد.
+STEPS = {
+    "owner": ("مالک ریسک", "مالک ریسک", ""),
+    "unit_manager": ("مدیر واحد ریسک", "یکی از مدیران خود واحد ریسک", "برای سطح متوسط یا پذیرش غیرعادی"),
+    "committee": ("تصمیم کمیته امنیت", "تصمیم کمیته امنیت", "فقط برای سطح بالا و بحرانی"),
+    "senior_management": (
+        "مجوز مدیریت ارشد",
+        "مجوز مدیریت ارشد",
+        "برای عبور از حد تحمل مشتری یا ارزیابی ناقص خدمت حیاتی",
+    ),
+}
+CHANNELS = {
+    "owner": "خودش در سامانه",
+    "unit_manager": "خودش در سامانه",
+    "committee": "ثبت از روی صورت‌جلسه",
+    "senior_management": "ثبت از روی نامه",
+}
+
+
+def _who(authority, acceptance, user, managers, mine):
+    """سطر «چه کسی» زیر گامی که هنوز امضا نشده است."""
+    risk = acceptance.risk
+    if authority == "owner":
+        name = fmt.person(risk.owner)["name"] if risk.owner_id else "-"
+        return f"{name} (شما)" if mine else name
+    if authority == "unit_manager":
+        if mine:
+            return f"{user.get_full_name() or user.username} (شما) · {risk.org_unit} · نه واحد بالادست"
+        names = "، ".join(managers) or "هیچ‌کس"
+        return f"مدیران واحد «{risk.org_unit}»: {names} · نه واحد بالادست"
+    if authority == "committee":
+        return "عضو کمیته امنیت با شماره یا تاریخ صورت‌جلسه ثبت می‌کند"
+    return "عضو GRC با شماره، تاریخ و فایل نامه ثبت می‌کند"
+
+
 def _signature(row, acceptance):
     signature = row["signature"]
     authority = row["authority"]
@@ -502,6 +539,7 @@ def _signature(row, acceptance):
             "approved": signature.is_approval,
             "by": fmt.person(signature.created_by),
             "at": fmt.moment(signature.created_at),
+            "channel": CHANNELS[authority],
             "reference_kind": "صورت‌جلسه" if authority == "committee" else "نامه",
             "reference": signature.reference,
             "reference_date": fmt.day(signature.reference_date),
@@ -512,6 +550,73 @@ def _signature(row, acceptance):
     return item
 
 
+def _steps(context, acceptance, user):
+    """همه‌ی چهار گام امضا (فیگما ۰۸): گام لازم با امضا یا انتظارش، و گام لازم‌نشده با «لازم نیست»."""
+    required = {row["authority"]: row for row in context["rows"]}
+    mine = {form.initial["authority"] for form in context["sign_forms"]}
+    managers = [fmt.person(person)["name"] for person in context["unit_managers"]]
+    steps = []
+    for authority, (title, _, hint) in STEPS.items():
+        row = required.get(authority)
+        if row is None:
+            steps.append(
+                {
+                    "authority": authority,
+                    "label": title,
+                    "required": False,
+                    "reason": hint,
+                    "signature": None,
+                    "waiting": False,
+                    "mine": False,
+                    "who": "",
+                }
+            )
+            continue
+        item = {**_signature({**row, "label": title}, acceptance), "required": True, "mine": authority in mine}
+        item["who"] = "" if item["signature"] else _who(authority, acceptance, user, managers, item["mine"])
+        if authority == "unit_manager" and item["signature"] is None:
+            item["candidates"] = {"unit": str(acceptance.risk.org_unit), "names": managers}
+        steps.append(item)
+    return steps
+
+
+def _validity(acceptance, cap, level):
+    """کارت «دوره‌ی اعتبار»: آغاز، امروز، دو یادآوری و پایان روی یک خط، به درصد از آغاز تا پایان."""
+    start, end = acceptance.start_date, acceptance.end_date
+    total = max(1, (end - start).days)
+    today = timezone.localdate()
+    first, second = reminder_days(acceptance)
+
+    def at(day):
+        return round(min(max((day - start).days / total, 0), 1) * 100, 2)
+
+    marks = [
+        {"key": "start", "label": "آغاز", "day": fmt.day(start), "at": 0},
+        {
+            "key": "first",
+            "label": f"یادآوری {first} روزه",
+            "day": fmt.day(end - timedelta(days=first)),
+            "at": at(end - timedelta(days=first)),
+        },
+        {
+            "key": "second",
+            "label": f"یادآوری {second} روزه",
+            "day": fmt.day(end - timedelta(days=second)),
+            "at": at(end - timedelta(days=second)),
+        },
+        {"key": "end", "label": "پایان اعتبار", "day": fmt.day(end), "at": 100},
+    ]
+    if start <= today <= end:
+        marks.insert(1, {"key": "today", "label": "امروز", "day": fmt.day(today), "at": at(today)})
+    return {
+        "note": f"سقف سطح {level.name} {level.acceptance_value} {level.get_acceptance_unit_display()} از آغاز · تمدید "
+        "خودکار ندارد؛ ادامه یعنی پذیرش تازه با همه‌ی امضاها",
+        "progress": at(today),
+        "marks": marks,
+        "cap": fmt.day(cap),
+    }
+
+
 def acceptance_detail(context, request):
     acceptance, risk, assessment, level = (
         context["acceptance"],
@@ -520,18 +625,26 @@ def acceptance_detail(context, request):
         context["level"],
     )
     closed = acceptance.status in (AS.REJECTED, AS.REVOKED)
-    managers = [fmt.person(user)["name"] for user in context["unit_managers"]]
-    signatures = [_signature(row, acceptance) for row in context["rows"]]
-    for item in signatures:
-        if item["authority"] == "unit_manager" and item["signature"] is None:
-            item["candidates"] = {"unit": str(risk.org_unit), "names": managers}
+    steps = _steps(context, acceptance, request.user)
+    required = [step for step in steps if step["required"]]
     problems = list(context["problems"])
+    if context["temporary"]:
+        kind = "پذیرش موقت"
+    elif context["non_normal"]:
+        kind = "پذیرش غیرعادی"
+    else:
+        kind = "پذیرش عادی"
     return {
-        "title": f"پذیرش {acceptance.code}",
+        "title": f"پذیرش ریسک باقیمانده — {risk.title}",
         "acceptance": {
             "id": acceptance.pk,
             "code": acceptance.code,
             "state": acceptance_state(acceptance),
+            "kind": kind,
+            "approvals": sum(bool(step["signature"] and step["signature"]["approved"]) for step in required),
+            "required": len(required),
+            "locked": acceptance.status != AS.DRAFT,
+            "decision_preview": acc.decision_text(acceptance) if not acceptance.decision_text else "",
             "days_left": acceptance.days_left if acceptance.status == AS.ACTIVE else None,
             "decision_text": acceptance.decision_text,
             "closed": {
@@ -559,6 +672,8 @@ def acceptance_detail(context, request):
         "risk": {**_risk(risk), "owner": fmt.person(risk.owner)},
         "assessment": {
             **_ref(assessment),
+            "kind": assessment.get_kind_display(),
+            "status": assessment.get_status_display(),
             "method_version": assessment.method_version.number,
             "score": assessment.score_high,
             "confidence": assessment.get_confidence_display() or None,
@@ -586,7 +701,9 @@ def acceptance_detail(context, request):
         "submit_url": reverse("actions:acceptance_submit", args=[acceptance.pk])
         if context["can_submit"] and not problems
         else None,
-        "signatures": signatures,
+        "signatures": steps,
+        "signers": f"سطح {level.name}: " + " + ".join(STEPS[step["authority"]][1] for step in required),
+        "validity": _validity(acceptance, context["cap"], level),
         "sign_url": reverse("actions:acceptance_sign", args=[acceptance.pk]),
         "sign_forms": [
             {

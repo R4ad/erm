@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.accounts.roles import Role
+from apps.actions.acceptance import required_authorities, unit_managers
 from apps.actions.models import (
     AcceptanceSignature,
     MonitoringNotice,
@@ -278,21 +279,24 @@ class Command(BaseCommand):
         TreatmentAction.objects.filter(pk=action.pk).update(status=status)
         return action
 
-    def acceptance(self, risk, assessment, status, days_left, signatures=0):
-        start = self.today - timedelta(days=60)
+    def acceptance(self, risk, assessment, status, days_left, signatures=0, start_ago=60, **fields):
+        start = self.today - timedelta(days=start_ago)
         acceptance = RiskAcceptance.objects.create(
             risk=risk,
             assessment=assessment,
-            scope=f"خدمت {risk.service.name} برای بانک‌های متأثر",
-            reason="هزینه‌ی کاهش بیش از زیان مورد انتظار است.",
-            conditions="پایش ماهانه‌ی شاخص و گزارش به کمیته.",
-            customer_constraints="—",
-            monitoring="تعداد رخدادهای قطع در ماه",
-            revocation_triggers="بیش از یک رخداد بحرانی در فصل",
-            start_date=start,
-            end_date=self.today + timedelta(days=days_left),
             follow_up_by=self.sara,
             created_by=self.sara,
+            **{
+                "scope": f"خدمت {risk.service.name} برای بانک‌های متأثر",
+                "reason": "هزینه‌ی کاهش بیش از زیان مورد انتظار است.",
+                "conditions": "پایش ماهانه‌ی شاخص و گزارش به کمیته.",
+                "customer_constraints": "—",
+                "monitoring": "تعداد رخدادهای قطع در ماه",
+                "revocation_triggers": "بیش از یک رخداد بحرانی در فصل",
+                "start_date": start,
+                "end_date": self.today + timedelta(days=days_left),
+                **fields,
+            },
         )
         decided = status not in (RiskAcceptance.Status.DRAFT, RiskAcceptance.Status.PENDING)
         RiskAcceptance.objects.filter(pk=acceptance.pk).update(
@@ -301,16 +305,25 @@ class Command(BaseCommand):
             decided_at=timezone.now() - timedelta(days=60) if decided else None,
             decision_text="ریسک باقیمانده تا پایان اعتبار با شروط بالا پذیرفته شد." if decided else "",
         )
-        for authority, signer in [
-            (AcceptanceSignature.Authority.OWNER, risk.owner),
-            (AcceptanceSignature.Authority.COMMITTEE, self.reza),
-        ][:signatures]:
-            AcceptanceSignature.objects.create(
+        # امضاها به ترتیب صاحبان اختیاری که همین پذیرش لازم دارد (مالک، و برای متوسط مدیر خود واحد ریسک)
+        auth = AcceptanceSignature.Authority
+        signers = {
+            auth.OWNER: risk.owner,
+            auth.UNIT_MANAGER: unit_managers(risk).first(),
+            auth.COMMITTEE: self.reza,
+            auth.SENIOR_MANAGEMENT: self.sara,
+        }
+        for authority in required_authorities(acceptance)[:signatures]:
+            signature = AcceptanceSignature.objects.create(
                 acceptance=acceptance,
                 authority=authority,
                 decision=AcceptanceSignature.Decision.APPROVE,
-                reference="صورت‌جلسه‌ی ۱۴۰۵/۰۸/۱۰" if authority == AcceptanceSignature.Authority.COMMITTEE else "",
-                created_by=signer,
+                note="شروط را می‌پذیرم؛ پایش روزانه با تیم پیام است." if authority == auth.OWNER else "",
+                reference="صورت‌جلسه‌ی ۱۴۰۵/۰۸/۱۰" if authority == auth.COMMITTEE else "",
+                created_by=signers[authority],
+            )
+            AcceptanceSignature.objects.filter(pk=signature.pk).update(
+                created_at=timezone.now() - timedelta(hours=26)
             )
         return acceptance
 
@@ -639,11 +652,24 @@ class Command(BaseCommand):
         archive_current = self.assessment(archive, 1, 4)
         self.acceptance(archive, archive_current, RiskAcceptance.Status.EXPIRED, -2, signatures=2)
 
-        portal = self.risk("کندی پرتال پشتیبانی در ساعات اوج", "SRV-PORTAL", self.ali, "T4", S.REVIEW)
+        portal = self.risk("کندی پرتال پشتیبانی در ساعات اوج", "SRV-PORTAL", self.hossein, "T4", S.REVIEW)
         self.acceptance(portal, self.assessment(portal, 2, 6), RiskAcceptance.Status.ACTIVE, 7, signatures=2)
 
-        sms2 = self.risk("تأخیر ارسال پیامک تأیید تراکنش", "SRV-SMS", self.sara, "T5", S.REVIEW)
-        self.acceptance(sms2, self.assessment(sms2, 2, 7), RiskAcceptance.Status.PENDING, 30, signatures=1)
+        # نمونه‌ی صفحه‌ی ۰۸ فیگما: مالک ریسک امضا کرده و امضای مدیر واحد عملیات زیرساخت مانده است.
+        sms2 = self.risk("وابستگی به ارائه‌دهنده‌ی واحد پیامک", "SRV-SMS", self.hossein, "T5", S.REVIEW)
+        self.acceptance(
+            sms2, self.assessment(sms2, 2, 7), RiskAcceptance.Status.PENDING, 178, signatures=1, start_ago=1,
+            scope="ارسال پیامک تراکنش و رمز یک‌بارمصرف برای بانک ملت و بانک تجارت از طریق یک ارائه‌دهنده.",
+            reason="قرارداد ارائه‌دهنده‌ی دوم تا اسفند نهایی می‌شود؛ راه‌اندازی موازی پیش از آن هزینه‌ای بیش از زیان "
+            "برآوردی دارد.",
+            alternatives="کاهش با ارائه‌دهنده‌ی دوم (در اجرا) و انتقال از راه بند جریمه‌ی SLA.",
+            compensating_controls="پایش لحظه‌ای نرخ تحویل پیامک و مسیر جایگزین اعلان درون‌برنامه‌ای برای رمز "
+            "یک‌بارمصرف.",
+            conditions="نرخ تحویل بالای ۹۸٪؛ هر قطعی بیش از ۳۰ دقیقه به کارگروه امنیت گزارش شود.",
+            customer_constraints="حد تحمل اعلام‌شده‌ی بانک ملت (قطعی کمتر از ۱ ساعت) با این پذیرش نقض نمی‌شود.",
+            monitoring="نرخ تحویل روزانه، تأخیر میانگین تحویل و تعداد قطعی ماهانه.",
+            revocation_triggers="دو قطعی بیش از ۱ ساعت در یک ماه، یا تغییر مالکیت ارائه‌دهنده.",
+        )
 
         # در ارزیابی: یکی در کنترل کیفیت، یکی پیش‌نویس
         hsm = self.risk("خرابی HSM و توقف امضای تراکنش", "SRV-HSM", self.maryam, "T3", S.ASSESSMENT)

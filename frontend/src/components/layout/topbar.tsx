@@ -140,7 +140,10 @@ function Notifications() {
     >
       <Icon name="bell" size={18} />
       {unread > 0 && (
-        <span aria-hidden className="absolute top-[7px] right-[8px] size-2 rounded-full border-2 border-white bg-danger-solid" />
+        <span
+          aria-hidden
+          className="absolute top-[7px] right-[8px] size-2 rounded-full border-2 border-white bg-danger-solid"
+        />
       )}
     </Link>
   );
@@ -150,7 +153,7 @@ function Notifications() {
 export function Topbar({ onOpenMenu, menuOpen }: { onOpenMenu: () => void; menuOpen: boolean }) {
   const { method } = useSession();
   return (
-    <header className="glass sticky top-0 z-40 border-b border-line pt-[env(safe-area-inset-top)]">
+    <header className="glass sticky top-0 z-40 border-b border-line pt-[env(safe-area-inset-top)] print:hidden">
       <div className="pad-safe flex h-(--topbar-h) items-center justify-between gap-3 py-2.5 lg:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <button

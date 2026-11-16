@@ -1319,14 +1319,22 @@ export interface SignForm extends FormSchema {
   intro: string;
 }
 
+/** یک گام امضا (فیگما ۰۸). گامی که این پذیرش لازم ندارد required=false دارد و «لازم نیست» نشان داده می‌شود. */
 export interface AcceptanceSignature {
   authority: string;
   label: string;
   reason: string;
+  required: boolean;
+  /** این کاربر همین گام را امضا می‌کند (فرمش در sign_forms هست). */
+  mine: boolean;
+  /** چه کسی امضا می‌کند، برای گامی که هنوز امضا نشده است. */
+  who: string;
   signature: {
     approved: boolean;
     by: Person | null;
     at: Moment;
+    /** «خودش در سامانه»، «ثبت از روی صورت‌جلسه» یا «ثبت از روی نامه». */
+    channel: string;
     reference_kind: string;
     reference: string;
     reference_date: Day | null;
@@ -1345,8 +1353,15 @@ export interface AcceptanceDetail extends RecordParts {
     id: number;
     code: string;
     state: AcceptanceState;
+    /** «پذیرش عادی»، «پذیرش موقت» یا «پذیرش غیرعادی». */
+    kind: string;
+    approvals: number;
+    required: number;
+    locked: boolean;
     days_left: number | null;
     decision_text: string;
+    /** متنی که با آخرین تأیید نوشته می‌شود، تا وقتی متن تصمیم نوشته نشده است. */
+    decision_preview: string;
     closed: { label: string; by: Person | null; at: Moment | null; reason: string } | null;
     start: Day;
     end: Day;
@@ -1364,6 +1379,8 @@ export interface AcceptanceDetail extends RecordParts {
   };
   risk: PlanRisk & { owner: Person | null };
   assessment: CodeRef & {
+    kind: string;
+    status: string;
     method_version: number;
     score: number | null;
     confidence: string | null;
@@ -1382,6 +1399,14 @@ export interface AcceptanceDetail extends RecordParts {
   problems_title: string;
   submit_url: string | null;
   signatures: AcceptanceSignature[];
+  /** زیرعنوان کارت امضاها: «سطح متوسط: مالک ریسک + یکی از مدیران خود واحد ریسک». */
+  signers: string;
+  validity: {
+    note: string;
+    progress: number;
+    marks: { key: string; label: string; day: Day; at: number }[];
+    cap: Day | null;
+  };
   sign_url: string;
   sign_forms: SignForm[];
   revoke: (FormSchema & { url: string }) | null;

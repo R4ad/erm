@@ -323,12 +323,26 @@ def test_an_acceptance_is_submitted_signed_and_revoked_through_its_views(api, gr
     assert data["acceptance"]["state"]["value"] == "draft" and data["problems"] == []
     assert data["submit_url"] == reverse("actions:acceptance_submit", args=[acceptance.pk])
     assert data["cap"]["until"] is not None and data["level"]["name"] == "پایین"
-    assert [row["authority"] for row in data["signatures"]] == ["owner"]
+    steps = data["signatures"]
+    assert [row["authority"] for row in steps] == ["owner", "unit_manager", "committee", "senior_management"]
+    assert [row["required"] for row in steps] == [True, False, False, False]
+    assert steps[2]["reason"] == "فقط برای سطح بالا و بحرانی" and steps[0]["who"] == "رضا مالکی"
+    assert data["signers"] == "سطح پایین: مالک ریسک"
+    assert data["acceptance"]["kind"] == "پذیرش عادی" and data["acceptance"]["locked"] is False
+    assert data["acceptance"]["approvals"] == 0 and data["acceptance"]["required"] == 1
+    assert data["acceptance"]["decision_preview"].startswith(f"ریسک باقیمانده‌ی {risk.code}")
+    marks = data["validity"]["marks"]
+    assert [mark["key"] for mark in marks][0] == "start" and marks[-1]["key"] == "end"
+    assert {"first", "second"} <= {mark["key"] for mark in marks}
+    assert all(0 <= mark["at"] <= 100 for mark in marks)
+    assert data["title"] == f"پذیرش ریسک باقیمانده — {risk.title}"
     assert data["sign_forms"] == [] and data["revoke"] is None
 
     assert send(api(grc), data["submit_url"], {}).status_code == 200
     data = page(api(owner), acceptance.get_absolute_url()).json()
     assert data["signatures"][0]["waiting"] and data["submit_url"] is None
+    assert data["signatures"][0]["mine"] and data["signatures"][0]["who"] == "رضا مالکی (شما)"
+    assert data["acceptance"]["locked"] is True
     sign = data["sign_forms"][0]
     assert sign["authority"] == "owner" and sign["label"] == "مالک ریسک"
     assert [field["name"] for field in sign["fields"]] == ["authority", "note"]
@@ -344,6 +358,8 @@ def test_an_acceptance_is_submitted_signed_and_revoked_through_its_views(api, gr
     data = page(api(grc), acceptance.get_absolute_url()).json()
     assert data["acceptance"]["state"]["value"] == "active" and data["acceptance"]["decision_text"]
     assert data["signatures"][0]["signature"]["approved"] and data["signatures"][0]["signature"]["by"]["name"]
+    assert data["signatures"][0]["signature"]["channel"] == "خودش در سامانه"
+    assert data["acceptance"]["approvals"] == 1 and data["acceptance"]["decision_preview"] == ""
     assert data["revoke"]["url"] == reverse("actions:acceptance_revoke", args=[acceptance.pk])
     assert [field["name"] for field in data["revoke"]["fields"]] == ["reason"]
 
@@ -384,8 +400,26 @@ def test_the_senior_management_letter_is_sent_as_multipart(client, grc, owner, u
     assert response.status_code == 200, response.json()
     signature = acceptance.signatures.get()
     assert signature.letter.original_name == "letter.pdf"
-    row = next(item for item in page(client, acceptance.get_absolute_url()).json()["signatures"] if item["signature"])
+    data = page(client, acceptance.get_absolute_url()).json()
+    row = next(item for item in data["signatures"] if item["signature"])
     assert row["signature"]["reference_kind"] == "نامه" and row["signature"]["letter"]
+    assert row["signature"]["channel"] == "ثبت از روی نامه"
+    assert data["signers"] == "سطح متوسط: مالک ریسک + یکی از مدیران خود واحد ریسک + مجوز مدیریت ارشد"
+    manager = next(item for item in data["signatures"] if item["authority"] == "unit_manager")
+    assert manager["who"].startswith("مدیران واحد") and "مینا مدیر" in manager["who"]
+    assert manager["candidates"]["names"] == ["مینا مدیر"]
+
+
+def test_the_unit_manager_signs_in_their_own_step(api, grc, owner, unit_manager):
+    risk = acceptance_tests.risk_at(owner, grc, "متوسط", 6)
+    unit_manager.managed_units.add(risk.org_unit)
+    acceptance = acceptance_tests.make_acceptance(risk, grc)
+    acc.submit_acceptance(acceptance, grc)
+    data = page(api(unit_manager), acceptance.get_absolute_url()).json()
+    step = next(item for item in data["signatures"] if item["authority"] == "unit_manager")
+    assert step["mine"] and step["waiting"] and step["who"] == f"مینا مدیر (شما) · {risk.org_unit} · نه واحد بالادست"
+    assert [form["authority"] for form in data["sign_forms"]] == ["unit_manager"]
+    assert data["acceptance"]["state"]["value"] == "pending" and data["acceptance"]["required"] == 2
 
 
 def test_the_plan_and_acceptance_forms_open_through_the_bridge(api, grc, owner, plan):

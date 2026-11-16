@@ -95,7 +95,7 @@ export function AppShell() {
         <div className="flex min-h-dvh">
           <aside
             className={cn(
-              "sticky top-0 hidden h-dvh shrink-0 border-e border-white/7 transition-[width] duration-300 ease-out lg:block",
+              "sticky top-0 hidden h-dvh shrink-0 border-e border-white/7 transition-[width] duration-300 ease-out lg:block print:hidden",
               collapsed ? "w-[4.5rem]" : "w-(--sidebar-w)",
             )}
           >

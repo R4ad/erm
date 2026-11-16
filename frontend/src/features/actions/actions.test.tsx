@@ -265,27 +265,58 @@ describe("ActionDetailPage", () => {
 });
 
 describe("AcceptanceDetailPage", () => {
-  it("signs as senior management with the letter file sent as multipart", async () => {
+  it("shows the locked sheet, the four signature steps and the validity period (Figma 08)", async () => {
+    pageAt("/actions/acceptances/2/", acceptanceDetail());
+    renderPage(<AcceptanceDetailPage />, { path: "/actions/acceptances/2", route: "/actions/acceptances/:pk" });
+    expect(
+      await screen.findByRole("heading", { name: "پذیرش ریسک باقیمانده — ریسک آزمون متوسط", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("منتظر امضا · ۱ از ۳")).toBeInTheDocument();
+    expect(screen.getByText("پذیرش عادی")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "مشاهده‌ی ارزیابی" })).toHaveAttribute("href", "/assessments/4");
+    expect(screen.getByText(/متن پذیرش پس از ارسال برای امضا قفل است/)).toBeInTheDocument();
+
+    const sheet = screen.getByRole("region", { name: "برگه‌ی پذیرش" });
+    expect(sheet).toHaveTextContent("قفل‌شده");
+    expect(sheet).toHaveTextContent("محدودیت مشتری بررسی‌شده");
+    expect(sheet).toHaveTextContent("متن تصمیم — پس از آخرین تأیید نوشته می‌شود");
+    expect(sheet).toHaveTextContent("عبور از حد تحمل مشتری اختیار پذیرش عمومی را محدود کرده است.");
+
+    const steps = within(screen.getByRole("region", { name: "امضاها" })).getAllByRole("listitem");
+    expect(steps).toHaveLength(4);
+    expect(steps[0]).toHaveTextContent("تأیید شد");
+    expect(steps[0]).toHaveTextContent("خودش در سامانه");
+    expect(steps[0]).toHaveTextContent("«شروط را می‌پذیرم.»");
+    expect(steps[1]).toHaveTextContent("مدیران واحد «واحد آزمون»: مدیر آزمون");
+    expect(steps[1]).toHaveTextContent("منتظر امضا");
+    expect(steps[2]).toHaveTextContent("لازم نیست");
+    expect(steps[3]).toHaveTextContent("منتظر امضای شما");
+
+    const validity = screen.getByRole("region", { name: "دوره‌ی اعتبار" });
+    const marks = within(validity).getAllByRole("listitem");
+    expect(marks.map((mark) => mark.textContent)).toEqual([
+      "آغاز۱۴۰۵/۰۸/۱۳",
+      "امروز۱۴۰۵/۰۸/۲۱",
+      "یادآوری ۱۰ روزه۱۴۰۵/۰۸/۲۳",
+      "یادآوری ۵ روزه۱۴۰۵/۰۸/۲۸",
+      "پایان اعتبار۱۴۰۵/۰۹/۰۳",
+    ]);
+    await expectNoAxeViolations();
+  });
+
+  it("signs as senior management inside its step, with the letter file sent as multipart", async () => {
     const api = pageAt("/actions/acceptances/2/", acceptanceDetail());
     const { user } = renderPage(<AcceptanceDetailPage />, {
       path: "/actions/acceptances/2",
       route: "/actions/acceptances/:pk",
     });
-    expect(await screen.findByRole("heading", { name: "پذیرش AC-1405-0002", level: 1 })).toBeInTheDocument();
-    expect(screen.getByText("عبور از حد تحمل مشتری اختیار پذیرش عمومی را محدود کرده است.")).toBeInTheDocument();
-    const signatures = screen.getByRole("list", { name: "امضاهای لازم" });
-    const rows = within(signatures).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("تأیید");
-    expect(rows[1]).toHaveTextContent("مدیران واحد «واحد آزمون»: مدیر آزمون");
-    expect(rows[2]).toHaveTextContent("منتظر");
-    await expectNoAxeViolations();
-
-    const box = screen.getByRole("region", { name: "امضای شما به‌عنوان مدیریت ارشد" });
+    const box = await screen.findByRole("group", { name: "امضای شما به‌عنوان مدیریت ارشد" });
     expect(box).toHaveTextContent("تصمیم مدیریت ارشد را از روی نامه‌ی رسمی ثبت می‌کنید.");
+    expect(within(box).getByRole("radio", { name: "تأیید پذیرش با شروط بالا" })).toBeChecked();
     await user.type(within(box).getByRole("textbox", { name: "شماره‌ی نامه" }), "۱۲/۳۴۵");
     const letter = new File(["%PDF-1.4"], "letter.pdf", { type: "application/pdf" });
     await user.upload(within(box).getByLabelText("فایل نامه"), letter);
-    await user.click(within(box).getByRole("button", { name: "تأیید پذیرش" }));
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
     const dialog = await screen.findByRole("alertdialog", { name: "پذیرش AC-1405-0002 را تأیید می‌کنید؟" });
     await user.click(within(dialog).getByRole("button", { name: "تأیید پذیرش" }));
     await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
@@ -297,6 +328,33 @@ describe("AcceptanceDetailPage", () => {
     expect(body.get("decision")).toBe("approve");
     expect(body.get("reference")).toBe("۱۲/۳۴۵");
     expect((body.get("letter") as File).name).toBe("letter.pdf");
+  });
+
+  it("asks for a reason before a rejection is sent", async () => {
+    const api = pageAt("/actions/acceptances/2/", acceptanceDetail());
+    const { user } = renderPage(<AcceptanceDetailPage />, {
+      path: "/actions/acceptances/2",
+      route: "/actions/acceptances/:pk",
+    });
+    const box = await screen.findByRole("group", { name: "امضای شما به‌عنوان مدیریت ارشد" });
+    await user.click(within(box).getByRole("radio", { name: "رد با دلیل (پذیرش بسته می‌شود)" }));
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
+    const note = within(box).getByRole("textbox", { name: /توضیح \(برای رد الزامی است\)/ });
+    expect(note).toHaveFocus();
+    expect(box).toHaveTextContent("برای رد پذیرش دلیل را بنویسید.");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await user.type(note, "نامه‌ی مدیریت نرسیده است");
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "پذیرش AC-1405-0002 رد شود؟" });
+    await user.click(within(dialog).getByRole("button", { name: "رد پذیرش" }));
+    await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
+    // بی‌فایل، بدنه JSON است و همان مقدارهای فرم را می‌برد.
+    const { values } = api.callsTo("POST forms/")[0]!.body as { values: Record<string, unknown> };
+    expect(values).toMatchObject({
+      authority: "senior_management",
+      decision: "reject",
+      note: "نامه‌ی مدیریت نرسیده است",
+    });
   });
 
   it("revokes with a reason after a confirmation", async () => {
@@ -325,6 +383,7 @@ describe("AcceptanceDetailPage", () => {
           ...acceptanceDetail().acceptance,
           state: { value: "active", label: "معتبر" },
           decision_text: "ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.",
+          decision_preview: "",
           days_left: 12,
         },
         sign_forms: [],
@@ -332,7 +391,9 @@ describe("AcceptanceDetailPage", () => {
       }),
     );
     renderPage(<AcceptanceDetailPage />, { path: "/actions/acceptances/2", route: "/actions/acceptances/:pk" });
-    expect(await screen.findByText("ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.")).toBeInTheDocument();
+    const sheet = await screen.findByRole("region", { name: "برگه‌ی پذیرش" });
+    expect(sheet).toHaveTextContent("«ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.»");
+    expect(sheet).not.toHaveTextContent("پس از آخرین تأیید");
     expect(screen.getByText("۱۲ روز تا پایان اعتبار مانده است.")).toBeInTheDocument();
     expect(screen.queryByText("لغو پذیرش")).not.toBeInTheDocument();
   });
