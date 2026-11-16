@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, mywork
-from . import questionnaires, reports, risks, session, treatment
+from . import questionnaires, reports, risks, session, treatment, treatment_board
 
 app_name = "api"
 
@@ -30,6 +30,7 @@ urlpatterns = [
     path("evaluation/", evaluation.EvaluationView.as_view(), name="evaluation"),
     path("treatment/required/", treatment.ActionRequiredView.as_view(), name="action_required"),
     path("treatment/required/escalate/", treatment.EscalateView.as_view(), name="action_required_escalate"),
+    path("treatment/board/", treatment_board.TreatmentBoardView.as_view(), name="treatment_board"),
     path("questionnaires/", questionnaires.AnswerHomeView.as_view(), name="answer_home"),
     path("questionnaires/<int:pk>/start/", questionnaires.ResponseStartView.as_view(), name="response_start"),
     path("responses/<int:pk>/", questionnaires.ResponseDetailView.as_view(), name="response_detail"),

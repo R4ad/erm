@@ -16,8 +16,10 @@ from apps.accounts.roles import Role
 from apps.actions.acceptance import required_authorities, unit_managers
 from apps.actions.models import (
     AcceptanceSignature,
+    ActionUpdate,
     MonitoringNotice,
     RiskAcceptance,
+    RiskReview,
     TreatmentAction,
     TreatmentPlan,
 )
@@ -579,6 +581,43 @@ class Command(BaseCommand):
             risk=risk, from_status=S.ASSESSMENT, to_status=to_status, created_by=self.sara
         )
         StatusTransition.objects.filter(pk=record.pk).update(created_at=timezone.now() - timedelta(days=days_ago))
+
+    def board_history(self, *plans):
+        """تابلوی درمان (فیگما ۱۵): ریسک هدف هر طرح، یادداشت مسدود و ناموفق، روز تأیید خروجی، و بازبینی‌های پیش رو."""
+        for plan in plans:
+            current = plan.assessment
+            target = self.assessment(
+                plan.risk,
+                max(current.decision_level.rank - 1, 1),
+                max(current.score_high // 2, 2),
+                kind=Assessment.Kind.TARGET,
+            )
+            TreatmentPlan.objects.filter(pk=plan.pk).update(target_assessment=target)
+        notes = {
+            AS.BLOCKED: "منتظر بودجه",
+            AS.FAILED: "کنترل هنوز E2 ماند",
+            AS.VERIFIED: "خروجی با شاهد آزمون تأیید شد",
+        }
+        for action in TreatmentAction.objects.filter(plan__in=plans, status__in=list(notes)):
+            update = ActionUpdate.objects.create(
+                action=action,
+                from_status=AS.IN_PROGRESS,
+                to_status=action.status,
+                note=notes[action.status],
+                created_by=self.sara,
+            )
+            ActionUpdate.objects.filter(pk=update.pk).update(created_at=timezone.now() - timedelta(days=4))
+        reviews = ((plans[1], 5, RiskReview.Trigger.PERIODIC), (plans[0], 12, RiskReview.Trigger.CHANGE))
+        for plan, days, trigger in reviews:
+            RiskReview.objects.create(
+                risk=plan.risk,
+                assessment=plan.assessment,
+                trigger=trigger,
+                reason="ارزیابی جاری جدید پس از اقدام با شواهد واقعی",
+                due=self.today + timedelta(days=days),
+                responsible=plan.risk.owner,
+                created_by=self.sara,
+            )
 
     def plan(self, risk, assessment, approved=True, option=TreatmentPlan.Option.REDUCE):
         plan = TreatmentPlan(
@@ -1150,6 +1189,8 @@ class Command(BaseCommand):
         self.action(pam_plan, "دو مانع مستقل روی مسیر دسترسی ممتاز", AS.IN_PROGRESS, self.mehdi, self.maryam, 12)
         self.action(pam_plan, "پوشش همه‌ی حساب‌های ممتاز با PAM", AS.PLANNED, self.mehdi, self.maryam, 40)
         self.action(pam_plan, "ثبت جلسه‌های ممتاز و بازبینی هفتگی", AS.FAILED, self.mehdi, self.maryam, -3)
+
+        self.board_history(tls_plan, db_plan, pam_plan)
 
         # پذیرش‌ها: منقضی، منتظر امضا (۱ از ۲)، معتبر رو به انقضا
         archive = self.risk("ناسازگاری بایگانی اسناد با الزام نگهداری", "SRV-ARC", self.hossein, "T8", S.REVIEW)

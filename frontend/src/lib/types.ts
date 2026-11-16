@@ -2461,3 +2461,49 @@ export interface ActionRequiredPage {
   containment_overdue: { id: number; code: string; title: string; href: string }[];
   can_escalate: boolean;
 }
+
+// ───────────── ریسک‌های در حال درمان (فیگما ۱۵) ─────────────
+
+export type BoardTone = "neutral" | "success" | "danger" | "warning";
+
+export interface BoardCard {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  status: { value: string; label: string };
+  level: Level;
+  risk: { id: number; code: string; title: string; href: string };
+  note: string;
+  assignee: { id: number; name: string } | null;
+  owner_id: number;
+  verifier_id: number;
+  due: { iso: string; jalali: string };
+  overdue: boolean;
+  progress: number;
+  footer: { text: string; tone: BoardTone; icon: "clock" | "check-circle" | "warning" };
+  alert: boolean;
+}
+
+export interface BoardReview {
+  key: string;
+  risk: { code: string; title: string; href: string };
+  note: string;
+  current: number | null;
+  target: number | null;
+  due: { iso: string; jalali: string };
+  responsible: { id: number; name: string } | null;
+  notice: { text: string; tone: BoardTone | "neutral" };
+  href: string;
+}
+
+export interface TreatmentBoardPage {
+  columns: { value: string; label: string }[];
+  cards: BoardCard[];
+  counts: { active: number; blocked: number; ready: number; verified: number; reviews: number };
+  blocked_note: string;
+  reviews: BoardReview[];
+  creatable: { code: string; title: string; href: string | null }[];
+  can_create: boolean;
+  me: number;
+}
