@@ -31,7 +31,7 @@ from apps.controls.models import Control, ControlAssessment, ControlTestSample, 
 from apps.core.choices import Confidence
 from apps.core.models import Comment
 from apps.methodology.models import MethodParameter, MethodVersion
-from apps.methodology.services import copy_version, save_with_reason
+from apps.methodology.services import MethodTables, copy_version, save_with_reason
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, Question, Questionnaire, Response
 from apps.risks.identification import narrative
@@ -75,6 +75,7 @@ class Command(BaseCommand):
         self.control_test()
         self.committee()
         self.verification()
+        self.post_action()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -329,6 +330,156 @@ class Command(BaseCommand):
         gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
         if gateway:
             gateway.controls.add(test.control)
+
+    def post_action(self):
+        """ارزیابی پس از اقدام (فیگما ۲۵): ریسک انتشار ساتنا با ارزیابی ذاتی، جاری قبلی (پیامد ۳)، هدف طرح (B۲ و پیامد ۲)
+        و ارزیابی جاری تازه با شواهد واقعی که با موتور محاسبه تأیید شده است. کنترل انتشار اضطراری در آزمون اخیر از E۳
+        به E۲ افت کرد و B روی ۳ ماند، ولی پروفایل پیامد پایین آمد. اقدام‌های طرح تأیید شده‌اند و تصمیم مالک مانده است."""
+        from apps.assessments.review import review
+
+        tables = MethodTables(self.version)
+        risk = self.risk("انتشار ساتنا", "SRV-SATNA", self.hossein, "T2", S.ASSESSMENT)
+        risk.description = "بسته‌ی انتشار یا تغییر نادرست در ساتنا ممکن است به اختلال تسویه‌ی بین‌بانکی برسد."
+        risk.initiator = "ارائه‌ی بسته یا تغییر نادرست به فرایند انتشار ساتنا"
+        risk.count_unit = "هر انتشار یا تغییر نادرست یکتا"
+        risk._history_user = self.sara
+        risk.save()
+        risk.customers.set(self.banks[:2])
+
+        def evidence(title, kind, days_ago):
+            item = Evidence.objects.create(
+                title=title, kind=kind, reliability=Evidence.Reliability.HIGH, summary=title,
+                source="واحد DevOps", observed_on=self.today - timedelta(days=days_ago), owner=self.maryam,
+            )
+            item.risks.add(risk)
+            return item
+
+        history = evidence("سوابق انتشار و رخدادهای ساتنا در ۱۲ ماه", Evidence.Kind.INCIDENT, 150)
+        pipeline = evidence("آزمون کنترل انتشار پایپ‌لاین", Evidence.Kind.TEST, 140)
+        _, gate = self.control(risk, "کنترل انتشار پایپ‌لاین رسمی", Control.Kind.PREVENTIVE, True, "8.32", 3, pipeline)
+        emergency, approval = self.control(
+            risk, "تأیید دومرحله‌ای انتشار اضطراری", Control.Kind.PREVENTIVE, True, "8.32", 3, pipeline
+        )
+        _, lock = self.control(risk, "قفل تغییر مستقیم پایگاه داده", Control.Kind.PREVENTIVE, True, "8.15", 4, pipeline)
+        ControlAssessment.objects.filter(pk__in=[gate.pk, approval.pk, lock.pk]).update(
+            test_from=self.today - timedelta(days=160), test_to=self.today - timedelta(days=140)
+        )
+
+        def level_rank(likelihood, impact):
+            return tables.decision_level(likelihood, impact).rank
+
+        inherent = self.assessment(risk, level_rank(4, 3), 12, kind=Assessment.Kind.INHERENT, days_ago=130)
+        Assessment.objects.filter(pk=inherent.pk).update(
+            a=4, a_basis="forward", a_rationale="انتشارهای ماهانه بدون کنترل انتشار.", b_low=4, b_high=4,
+            likelihood_low=4, likelihood_high=4, impact_low=3, impact_high=3,
+            assumptions="محیط بدون کنترل انتشار و بازگردانی فرض شد.",
+        )
+
+        def approved_assessment(paths, levels, proofs, days_ago):
+            assessment = Assessment(
+                risk=risk, kind=Assessment.Kind.CURRENT, method_version=self.version, created_by=self.maryam,
+                horizon_months=12, a=4, a_basis="forward", a_confidence=Confidence.MEDIUM,
+                a_rationale="انتشارهای ماهانه و دو انتشار اضطراری در سال، با سابقه‌ی یک بسته‌ی نادرست.",
+            )
+            assessment._history_user = self.maryam
+            assessment.save()
+            assessment.a_evidence.add(history)
+            for name, b0, controls in paths:
+                path = Path.objects.create(
+                    assessment=assessment, name=name, description=name, b0=b0, b0_confidence=Confidence.MEDIUM,
+                    b0_rationale="از سوابق انتشار و آزمون‌های کنترل.",
+                )
+                path.evidence.add(proofs[0])
+                path.control_assessments.add(*controls)
+            columns = [None, *risk.customers.order_by("name")]
+            for scale in self.version.scales.filter(kind="impact"):
+                level, rationale = levels[scale.code]
+                for customer in columns:
+                    detail = ImpactDetail.objects.create(
+                        assessment=assessment, customer=customer, scale=scale, level=level, rationale=rationale,
+                        confidence=Confidence.MEDIUM,
+                    )
+                    detail.evidence.add(proofs[-1])
+            Assessment.objects.filter(pk=assessment.pk).update(status=Assessment.Status.IN_QC)
+            AssessmentReview.objects.create(
+                assessment=assessment, action=AssessmentReview.Action.SUBMIT, created_by=self.maryam
+            )
+            assessment.refresh_from_db()
+            review(assessment, self.neda, AssessmentReview.Action.APPROVE)
+            moment = timezone.now() - timedelta(days=days_ago)
+            Assessment.objects.filter(pk=assessment.pk).update(approved_at=moment)
+            assessment.reviews.update(created_at=moment)
+            assessment.refresh_from_db()
+            return assessment
+
+        before = approved_assessment(
+            [
+                ("مسیر ۱ · انتشار عادی", 4, [gate, approval]),
+                ("مسیر ۲ · انتشار اضطراری", 4, [approval]),
+                ("مسیر ۳ · تغییر مستقیم در پایگاه داده", 3, []),
+            ],
+            {
+                "S": (3, "اختلال تسویه تا یک چرخه با بازگردانی دستی"),
+                "D": (2, "ناسازگاری محدود داده‌ی تراکنش"),
+                "F": (2, "جبران مشتری برای دو چرخه‌ی تسویه"),
+                "C": (2, "گزارش به بانک مرکزی"),
+                "R": (2, "شکایت بانک‌های عضو"),
+            },
+            [history],
+            100,
+        )
+        Risk.objects.filter(pk=risk.pk).update(status=S.TREATMENT_PLAN)
+        target = self.assessment(risk, level_rank(3, 2), 6, kind=Assessment.Kind.TARGET, days_ago=95)
+        Assessment.objects.filter(pk=target.pk).update(
+            a=4, a_basis="forward", a_rationale="همان A جاری؛ طرح فقط B و پیامد را کم می‌کند.", b_low=2, b_high=2,
+            likelihood_low=3, likelihood_high=3, impact_low=2, impact_high=2,
+        )
+        plan = self.plan(risk, before)
+        TreatmentPlan.objects.filter(pk=plan.pk).update(
+            target_assessment=target, rationale="انتشار تدریجی با بازگردانی خودکار و قفل تغییر مستقیم پایگاه داده."
+        )
+        plan.refresh_from_db()
+        Risk.objects.filter(pk=risk.pk).update(status=S.TREATMENT)
+        for title in ("انتشار تدریجی با بازگردانی خودکار", "قفل تغییر مستقیم پایگاه داده‌ی ساتنا"):
+            self.action(plan, title, TreatmentAction.Status.VERIFIED, self.mehdi, self.ali, -20)
+
+        # کنترل انتشار اضطراری در آزمون نمونه‌ای اخیر E۲ گرفت: محرک بازبینی و آزمون تازه.
+        sample = evidence("آزمون نمونه‌ای انتشار اضطراری · نتیجه E2", Evidence.Kind.TEST, 25)
+        retest = ControlAssessment(
+            control=emergency, method_version=self.version, scope=f"دامنه‌ی {risk.service.name}", exists=True,
+            design_ok=False, operating_ok=True, coverage_pct=60, critical_points_covered=False, sample_size=5,
+            test_from=self.today - timedelta(days=40), test_to=self.today - timedelta(days=25), sustained=False, e=2,
+            confidence=Confidence.MEDIUM, rationale="دو انتشار اضطراری بدون تأیید دوم اجرا شد.", created_by=self.sara,
+        )
+        retest.save()
+        retest.evidence.add(sample)
+        trigger = RiskReview.objects.create(
+            risk=risk, assessment=before, trigger=RiskReview.Trigger.CONTROL,
+            reason=f"افت E کنترل {emergency.code} در آزمون نمونه‌ای انتشار اضطراری", due=self.today - timedelta(days=20),
+            responsible=self.hossein, created_by=self.sara, result="در ارزیابی پس از اقدام دیده شد.",
+            completed_at=timezone.now() - timedelta(days=12), completed_by=self.hossein,
+        )
+        RiskReview.objects.filter(pk=trigger.pk).update(created_at=timezone.now() - timedelta(days=24))
+
+        Risk.objects.filter(pk=risk.pk).update(status=S.ASSESSMENT)
+        report = evidence("گزارش تأیید نتیجه‌ی اقدام‌های طرح", Evidence.Kind.TEST, 20)
+        rollback = evidence("لاگ بازگردانی خودکار · ۱۲ انتشار", Evidence.Kind.TEST, 15)
+        approved_assessment(
+            [
+                ("مسیر ۱ · انتشار عادی", 4, [gate, retest]),
+                ("مسیر ۲ · انتشار اضطراری", 4, [gate]),
+                ("مسیر ۳ · تغییر مستقیم در پایگاه داده", 3, [lock]),
+            ],
+            {
+                "S": (2, "انتشار تدریجی و بازگردانی خودکار ۵ دقیقه‌ای؛ اختلال کمتر از یک‌چهارم RTO"),
+                "D": (2, "ناسازگاری محدود داده‌ی تراکنش"),
+                "F": (1, "جبران مشتری به یک چرخه‌ی تسویه محدود شد"),
+                "C": (2, "گزارش به بانک مرکزی"),
+                "R": (1, "اختلال کوتاه‌تر؛ واکنش مستند مشتری در حد پرسش عملیاتی ماند"),
+            },
+            [report, sample, rollback],
+            10,
+        )
 
     def verification(self):
         """آزمون و تأیید نتیجه‌ی اقدام (فیگما ۲۴): اقدام «آزمون بازیابی نسخه‌ی پشتیبان ماهانه» آماده‌ی آزمون است؛ اجرای

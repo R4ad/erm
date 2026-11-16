@@ -3071,3 +3071,65 @@ export interface ActionVerification {
   } | null;
   result?: { follow_ups: { code: string; href: string }[]; notified: number };
 }
+
+// «ارزیابی پس از اقدام» (فیگما ۲۵): ارزیابی جاری تازه کنار ذاتی، جاری قبلی و هدف طرح، و تصمیم مالک ریسک.
+export type PostActionTone = "neutral" | "success" | "warning" | "info" | "brand" | "danger";
+
+export interface PostActionCard {
+  key: "inherent" | "before" | "target" | "after";
+  title: string;
+  hint: string;
+  chip: { label: string; tone: PostActionTone } | null;
+  current: boolean;
+  a: string;
+  b: string;
+  l: string;
+  i: string;
+  score: string;
+  level: Level | null;
+}
+
+export interface PostActionDecision {
+  subtitle: string;
+  can_decide: boolean;
+  can_ask: boolean;
+  owner: Person | null;
+  options: { value: "monitor" | "continue" | "accept"; label: string; problems: string[] }[];
+  corrective: { label: string; count: number } | null;
+  problems: string[];
+  waiting: string | null;
+  last: { label: string; by: string; on: string | null; note: string; next: string | null } | null;
+}
+
+export interface PostAction {
+  plan: { id: number; label: string; href: string };
+  risk: { code: string; title: string; href: string };
+  title: string;
+  status: { label: string; tone: PostActionTone } | null;
+  subtitle: string;
+  cards: PostActionCard[];
+  compare_href: string | null;
+  waiting: string | null;
+  summary: { title: string; text: string; reached: boolean; rows: { label: string; value: string }[] } | null;
+  paths: {
+    subtitle: string;
+    rows: {
+      id: number;
+      name: string;
+      b0: string;
+      controls: { code: string; e: number; label: string; tone: PostActionTone }[];
+      bc: string;
+      b: string;
+    }[];
+    total: string;
+    note: string | null;
+  } | null;
+  profile: {
+    subtitle: string;
+    rows: { code: string; name: string; note: string; before: number | null; after: number | null; max: number }[];
+  } | null;
+  decision: PostActionDecision | null;
+  evidence: { id: number; code: string; title: string; observed_on: string | null; href: string }[];
+  rules: string[];
+  result?: { asked?: boolean; corrective?: number };
+}

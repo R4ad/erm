@@ -570,7 +570,7 @@ class ReassessmentCreateView(CreateView):
         )
 
     def dispatch(self, request, *args, **kwargs):
-        if not can_edit_plans(request.user):
+        if not reassess.can_record(request.user, self.plan):
             raise PermissionDenied
         problems = reassess.reassessment_problems(self.plan)
         if problems:

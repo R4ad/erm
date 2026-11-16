@@ -92,8 +92,9 @@ def reassessment_option_problem(risk, option):
     reassessment = last_reassessment(risk)
     if reassessment is None or not option:
         return None
-    if reassessment.decision == Reassessment.Decision.ACCEPT and option != OPTION.ACCEPT:
-        return "تصمیم بازسنجی طرح قبلی «پذیرش ریسک باقیمانده» بود، پس گزینه‌ی این طرح پذیرش است."
+    retained = (Reassessment.Decision.ACCEPT, Reassessment.Decision.MONITOR)
+    if reassessment.decision in retained and option != OPTION.ACCEPT:
+        return f"تصمیم بازسنجی طرح قبلی «{reassessment.get_decision_display()}» بود، پس گزینه‌ی این طرح پذیرش است."
     if reassessment.decision == Reassessment.Decision.CONTINUE and option == OPTION.ACCEPT:
         return "تصمیم بازسنجی طرح قبلی «ادامه‌ی اصلاح» بود، پس گزینه‌ی این طرح پذیرش نیست."
     return None

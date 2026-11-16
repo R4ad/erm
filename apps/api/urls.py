@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
-from . import action_verification, committee, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
+from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
 
 app_name = "api"
@@ -46,6 +46,7 @@ urlpatterns = [
         action_verification.ActionVerificationView.as_view(),
         name="action_verification",
     ),
+    path("actions/plans/<int:pk>/post-action/", post_action.PostActionView.as_view(), name="post_action"),
     path("committee/meetings/current/", committee.MeetingView.as_view(), name="committee_current"),
     path("committee/meetings/<int:pk>/", committee.MeetingView.as_view(), name="committee_meeting"),
     path("committee/meetings/<int:pk>/close/", committee.MeetingCloseView.as_view(), name="committee_close"),

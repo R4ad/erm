@@ -59,10 +59,12 @@ const MODULES: Record<
 
 /**
  * صفحه‌هایی که نشانی‌شان زیر پیوند منوی خودشان نیست: پرونده‌ی ارزیابی و پروفایل پیامد زیر «آنالیز ریسک»، طرح مواجهه
- * زیر «ریسک‌های در حال درمان»، پذیرش زیر «نیازمند اقدام»، کار بازبینی پایش زیر «کارهای من».
+ * زیر «ریسک‌های در حال درمان» و ارزیابی پس از اقدامش زیر «لیست ریسک‌های هدف»، پذیرش زیر «نیازمند اقدام»، کار بازبینی
+ * پایش زیر «کارهای من». الگوی RegExp برای نشانی‌ای است که پیشوند ساده ندارد.
  */
-const NAV_ALIASES: [prefix: string, route: string][] = [
+const NAV_ALIASES: [prefix: string | RegExp, route: string][] = [
   ["/assessments", "/analysis"],
+  [/^\/actions\/plans\/\d+\/reassess\/?$/u, "/treatment/targets"],
   ["/actions/plans/", "/treatment/board"],
   ["/actions/acceptances", "/treatment/required"],
   ["/actions/reviews/", "/"],
@@ -89,8 +91,12 @@ export function activeRoute(pathname: string, navigation: Navigation): string | 
   const direct = match(pathname);
   // جایگزین وقتی برنده است که از پیوند مستقیم دقیق‌تر باشد؛ مثلاً جهان ریسک (/risks/coverage) زیر «شناسایی ریسک»
   // می‌آید، نه زیر رجیستر (/risks).
-  const alias = NAV_ALIASES.find(([prefix]) => pathname.startsWith(prefix));
-  if (alias && routes.includes(alias[1]) && (!direct || direct === "/" || alias[0].length > direct.length)) {
+  const alias = NAV_ALIASES.find(([prefix]) =>
+    typeof prefix === "string" ? pathname.startsWith(prefix) : prefix.test(pathname),
+  );
+  // الگوی RegExp کل نشانی را می‌پوشاند، پس از هر پیوند مستقیمی دقیق‌تر است.
+  const specificity = alias && (typeof alias[0] === "string" ? alias[0].length : pathname.length);
+  if (alias && routes.includes(alias[1]) && (!direct || direct === "/" || (specificity ?? 0) > direct.length)) {
     return alias[1];
   }
   return direct;

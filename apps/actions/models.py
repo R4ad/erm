@@ -538,6 +538,9 @@ class Reassessment(TimeStampedModel):
     می‌کند. بازسنجی ویرایش و حذف نمی‌شود."""
 
     class Decision(models.TextChoices):
+        # پایش فعال (فیگما ۲۵): هدف طرح محقق شده و ریسک در سطح هدف با بازبینی دوره‌ای سطحش پایش می‌شود؛ مثل
+        # پذیرش، طرح دور تازه گزینه‌ی پذیرش دارد.
+        MONITOR = "monitor", "پایش فعال"
         ACCEPT = "accept", "پذیرش ریسک باقیمانده"
         CONTINUE = "continue", "ادامه‌ی اصلاح"
 

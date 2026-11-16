@@ -18,7 +18,6 @@ import { AcceptanceDetailPage } from "./AcceptanceDetailPage";
 import { ActionDetailPage } from "./ActionDetailPage";
 import { AcceptanceListPage, ActionListPage } from "./ListPages";
 import { PlanDetailPage } from "./PlanDetailPage";
-import { ReassessmentPage } from "./ReassessmentPage";
 
 const done = { message: "انجام شد.", redirect: null };
 
@@ -396,28 +395,5 @@ describe("AcceptanceDetailPage", () => {
     expect(sheet).not.toHaveTextContent("پس از آخرین تأیید");
     expect(screen.getByText("۱۲ روز تا پایان اعتبار مانده است.")).toBeInTheDocument();
     expect(screen.queryByText("لغو پذیرش")).not.toBeInTheDocument();
-  });
-});
-
-describe("ReassessmentPage", () => {
-  it("shows the comparison and the open actions next to the decision form", async () => {
-    mockApi({ "GET forms/": reassessmentForm(), "POST forms/": done });
-    renderPage(<ReassessmentPage />, {
-      path: "/actions/plans/1/reassess",
-      route: "/actions/plans/:plan_pk/reassess",
-    });
-    expect(
-      await screen.findByRole("heading", { name: "بازسنجی طرح مواجهه‌ی RK-1405-0001 (کاهش)", level: 1 }),
-    ).toBeInTheDocument();
-    const table = screen.getByRole("table", { name: /مقایسه‌ی ارزیابی مبنا، ارزیابی تازه و هدف ریسک RK-1405-0001/ });
-    expect(
-      within(table)
-        .getAllByRole("columnheader")
-        .map((cell) => cell.textContent?.slice(0, 12)),
-    ).toHaveLength(4);
-    expect(screen.getByText(/این اقدام‌ها هنوز تأیید نشده‌اند/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "TR-1405-0001" })).toHaveAttribute("href", "/actions/1");
-    expect(screen.getByRole("button", { name: "ثبت بازسنجی" })).toBeInTheDocument();
-    await expectNoAxeViolations();
   });
 });

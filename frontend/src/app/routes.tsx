@@ -214,7 +214,7 @@ export const routes: RouteObject[] = [
           {
             path: "actions/plans/:plan_pk/reassess",
             lazy: async () => ({
-              Component: keyedByPath((await import("@/features/actions/ReassessmentPage")).ReassessmentPage),
+              Component: keyedByPath((await import("@/features/actions/PostActionPage")).PostActionPage),
             }),
           },
           {
