@@ -57,6 +57,7 @@ class Command(BaseCommand):
         self.risks()
         self.report_history()
         self.dependencies()
+        self.universe()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     # ───────────── افراد و سازمان ─────────────
@@ -139,7 +140,7 @@ class Command(BaseCommand):
             self.services[code] = service
 
     def dependencies(self):
-        """وابستگی‌های مشترک برای کارت «تمرکز وابستگی و نقطه‌ی شکست مشترک» و پوشش بررسی‌شده‌ی چند خدمت حیاتی."""
+        """وابستگی‌های مشترک برای کارت «تمرکز وابستگی و نقطه‌ی شکست مشترک»."""
         dc = Supplier.objects.create(name="مرکز داده‌ی اصلی (آسیاتک)", is_critical=True, contract_owner=self.ali)
         sms = Supplier.objects.create(name="ارائه‌دهنده‌ی پیامک", is_critical=False, contract_owner=self.ali)
         links = [
@@ -157,11 +158,50 @@ class Command(BaseCommand):
                     is_shared_point=supplier is dc,
                     description="وابستگی عملیاتی روزانه",
                 )
-        for code in ["SRV-HSM", "SRV-PAYA"]:
-            for category in RiskCategory.objects.filter(is_active=True):
-                Coverage.objects.create(
-                    service=self.services[code], category=category, status=Coverage.Status.REVIEWED,
-                    reviewed_by=self.sara,
+
+    # جهان ریسک فیگما ۰۹، به ترتیب T1 تا T8: R بررسی‌شده، N نامرتبط با دلیل، P در انتظار. تعداد ریسک هر خانه از
+    # ریسک‌های واقعی می‌آید؛ خانه‌ای که ریسک فعال دارد نامرتبط یا در انتظار نمی‌شود.
+    UNIVERSE = {
+        "SRV-SATNA": "RRRRNRRR",
+        "SRV-PAYA": "RRRRRPRR",
+        "SRV-IPG": "RRRRRRPR",
+        "SRV-MB": "RPRPRNPR",
+        "SRV-SMS": "RRRRRNRN",
+        "SRV-CORE": "RRRRRRRN",
+        "SRV-HSM": "RRRRRRPR",
+        "SRV-ARC": "RRRRNNRR",
+        "SRV-PORTAL": "PPPPPPPP",
+    }
+    NOT_RELEVANT = {
+        "T5": "همه‌ی اجزای این خدمت داخلی است و به ارائه‌دهنده یا پیمانکار بیرونی وابسته نیست.",
+        "T6": "اجرای این خدمت خودکار است و به نیروی انسانی کلیدی یا جابه‌جایی کارکنان وابسته نیست.",
+        "T8": "این خدمت داده‌ی مشتری نگه نمی‌دارد و الزام انطباق مستقیمی ندارد.",
+    }
+
+    def universe(self):
+        categories = list(RiskCategory.objects.filter(is_active=True).order_by("code"))
+        with_risks = set(
+            Risk.objects.exclude(status__in=Risk.CLOSED_STATUSES)
+            .filter(service__isnull=False)
+            .values_list("service_id", "category_id")
+        )
+        for index, (code, pattern) in enumerate(self.UNIVERSE.items()):
+            service = self.services[code]
+            for category, mark in zip(categories, pattern, strict=True):
+                busy = (service.pk, category.pk) in with_risks
+                if mark == "P" and not busy:
+                    Coverage.objects.filter(service=service, category=category).delete()
+                    continue
+                relevant = mark != "N" or busy
+                Coverage.objects.update_or_create(
+                    service=service,
+                    category=category,
+                    defaults={
+                        "status": Coverage.Status.REVIEWED if relevant else Coverage.Status.NOT_RELEVANT,
+                        "reason": "" if relevant else self.NOT_RELEVANT[category.code],
+                        "reviewed_by": self.sara,
+                        "reviewed_on": self.today - timedelta(days=12 + 3 * index),
+                    },
                 )
 
     def report_history(self):

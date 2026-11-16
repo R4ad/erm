@@ -577,3 +577,54 @@ class RiskDetailView(ApiView):
                 },
             }
         )
+
+
+class CoverageExportView(ApiView):
+    """«خروجی Excel» جهان ریسک (فیگما ۰۹): همه‌ی خدمت‌های فیلترشده، بی‌صفحه‌بندی، با وضعیت هر دسته و پوشش خدمت."""
+
+    def get(self, request):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+
+        from apps.risks.forms import CoverageFilterForm
+        from apps.risks.services import active_categories, coverage_rows
+
+        form = CoverageFilterForm(request.query_params)
+        if not form.is_valid():
+            return Response({"errors": fmt.form_errors(form)}, status=status.HTTP_400_BAD_REQUEST)
+        categories = active_categories()
+        services = form.filter(visible_services(request.user).filter(is_active=True).select_related("org_unit"))
+        rows = coverage_rows(services.order_by("code"), categories, visible_risks(request.user))
+        book = Workbook()
+        sheet = book.active
+        sheet.title = "جهان ریسک"
+        sheet.sheet_view.rightToLeft = True
+        sheet.append(
+            ["کد خدمت", "خدمت یا فرایند", "واحد", "حیاتی"]
+            + [f"{category.code} {category.name}" for category in categories]
+            + ["پوشش"]
+        )
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
+        for service, cells in rows:
+            labels = []
+            for cell in cells:
+                label = cell.get_status_display()
+                if cell.status == cell.Status.REVIEWED:
+                    label += f" · {cell.risk_count} ریسک" if cell.risk_count else " · بدون ریسک"
+                elif cell.reason:
+                    label += f": {cell.reason}"
+                labels.append(label)
+            done = sum(1 for cell in cells if not cell.is_pending)
+            sheet.append(
+                [service.code, service.name, str(service.org_unit), "بله" if service.is_critical else "خیر"]
+                + labels
+                + [f"{done} از {len(cells)}"]
+            )
+        buffer = BytesIO()
+        book.save(buffer)
+        response = HttpResponse(
+            buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="risk-universe.xlsx"'
+        return response

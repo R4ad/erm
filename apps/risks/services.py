@@ -3,7 +3,7 @@ import re
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from .models import Coverage, Risk, RiskCategory, Tag
+from .models import Coverage, Risk, RiskCategory, RiskScenario, Tag
 
 
 def active_categories():
@@ -51,6 +51,26 @@ def complete_services(services, categories):
 
 def incomplete_services(services, categories):
     return services.annotate(done_cells=done_cells_count(categories)).filter(done_cells__lt=len(categories))
+
+
+def coverage_tabs(services, categories):
+    """شمارنده‌ی زبانه‌های جدول جهان ریسک (فیگما ۰۹): همه‌ی خدمت‌های فعالی که کاربر می‌بیند، حیاتی‌ها، و آن‌هایی که
+    دست‌کم یک خانه‌ی «در انتظار» دارند."""
+    return {
+        "all": services.count(),
+        "critical": services.filter(is_critical=True).count(),
+        "incomplete": incomplete_services(services, categories).count(),
+    }
+
+
+def scenario_index(services, categories):
+    """سناریوهای فعال هر «خدمت × دسته». ثبت ریسک همیشه از یک سناریو است؛ خانه‌ای که یک سناریو دارد مستقیم به ثبت
+    ریسک از همان سناریو می‌رود و بقیه به کتابخانه‌ی سناریو با همان خدمت و دسته."""
+    index = {}
+    scenarios = RiskScenario.objects.filter(is_active=True, service__in=services, category__in=categories)
+    for pk, service, category in scenarios.values_list("pk", "service_id", "category_id").order_by("code"):
+        index.setdefault((service, category), []).append(pk)
+    return index
 
 
 def critical_coverage(services, categories):

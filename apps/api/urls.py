@@ -17,6 +17,7 @@ urlpatterns = [
     path("risks/", risks.RiskListView.as_view(), name="risk_list"),
     path("risks/filters/", risks.RiskFiltersView.as_view(), name="risk_filters"),
     path("risks/export/", risks.RiskExportView.as_view(), name="risk_export"),
+    path("risks/coverage/export/", risks.CoverageExportView.as_view(), name="coverage_export"),
     path("risks/bulk-transition/", risks.RiskBulkTransitionView.as_view(), name="risk_bulk_transition"),
     path("risks/<int:pk>/", risks.RiskDetailView.as_view(), name="risk_detail"),
     path("assessments/", assessment_workspace.AssessmentListView.as_view(), name="assessment_list"),

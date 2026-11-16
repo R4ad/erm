@@ -196,6 +196,10 @@ class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
         label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد، عنوان یا رویداد"})
     )
     category = forms.ModelChoiceField(RiskCategory.objects.all(), label="دسته", required=False, empty_label="همه")
+    # «ثبت ریسک برای این خانه»ی جهان ریسک کتابخانه را با همان خدمت و دسته باز می‌کند.
+    service = forms.ModelChoiceField(
+        Service.objects.filter(is_active=True), label="خدمت", required=False, empty_label="همه"
+    )
     status = forms.ChoiceField(label="وضعیت", required=False, choices=STATUS_CHOICES)
 
     def filter(self, scenarios):
@@ -204,6 +208,8 @@ class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
             scenarios = scenarios.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(event__icontains=word))
         if data["category"]:
             scenarios = scenarios.filter(category=data["category"])
+        if data["service"]:
+            scenarios = scenarios.filter(service=data["service"])
         if data["status"]:
             scenarios = scenarios.filter(is_active=data["status"] == "active")
         return scenarios

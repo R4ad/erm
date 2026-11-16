@@ -109,18 +109,78 @@ describe("evidence dossier", () => {
 });
 
 describe("risk universe", () => {
-  it("is a table with a header per service and links each cell to its review form", async () => {
+  it("shows the counts, the tabs and a chip per cell with its coverage (Figma 09)", async () => {
     mockApi({ "GET pages/": coverage() });
     renderPage(<CoveragePage />, { path: "/risks/coverage" });
     const table = await screen.findByRole("table", { name: "پوشش خدمت‌ها در دسته‌های ریسک" });
+    expect(screen.getByText("۱ خدمت دست‌کم یک خانه‌ی باز دارند")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /همه‌ی خدمات/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("link", { name: "خروجی Excel" })).toHaveAttribute("href", "/api/risks/coverage/export/");
     const row = within(table)
       .getByRole("rowheader", { name: /خدمت آزمون/ })
       .closest("tr")!;
-    const review = within(row).getByRole("link", { name: /بررسی‌شده، ثبت وضعیت T1 برای خدمت آزمون/ });
-    expect(review).toHaveAttribute("href", "/risks/coverage/1/1?next=%2Frisks%2Fcoverage%2F");
-    expect(within(row).getByRole("link", { name: "۲ ریسک" })).toHaveAttribute("href", "/risks?service=1&category=1");
-    expect(within(row).getByRole("link", { name: /در انتظار بررسی، ثبت وضعیت T2/ })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "خدمت آزمون × T1 دسته‌ی آزمون: ۲ ریسک" })).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: "خدمت آزمون × T2 دسته‌ی آزمون دوم: در انتظار" }),
+    ).toBeInTheDocument();
+    expect(row).toHaveTextContent("۱ از ۲");
+    expect(screen.getByText("نمایش ۱ از ۱ خدمت · خدمت غیرفعال در جدول نمی‌آید")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /نمایش بیشتر/ })).not.toBeInTheDocument();
     await expectNoAxeViolations();
+  });
+
+  it("opens a pending cell and marks it reviewed without a risk", async () => {
+    const api = mockApi({
+      "GET pages/": coverage(),
+      "POST forms/": { message: "وضعیت ثبت شد.", redirect: { href: "/risks/coverage/", route: "/risks/coverage" } },
+    });
+    const { user } = renderPage(<CoveragePage />, { path: "/risks/coverage" });
+    await user.click(await screen.findByRole("button", { name: /× T2 دسته‌ی آزمون دوم: در انتظار/ }));
+    const card = await screen.findByRole("dialog", { name: "خدمت آزمون × T2 دسته‌ی آزمون دوم" });
+    expect(card).toHaveTextContent("این خانه هنوز بررسی نشده است.");
+    expect(within(card).getByRole("link", { name: "ثبت ریسک برای این خانه" })).toHaveAttribute(
+      "href",
+      "/risks/scenarios?service=1&category=2",
+    );
+    await user.click(within(card).getByRole("button", { name: "بررسی‌شده، بدون ریسک" }));
+    await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
+    const call = api.callsTo("POST forms/")[0]!;
+    expect(call.query.get("path")).toBe("/risks/coverage/1/2/?next=%2Frisks%2Fcoverage%2F");
+    expect(call.body).toEqual({ values: { status: "reviewed", reason: "" } });
+  });
+
+  it("needs a reason before a cell is marked not relevant", async () => {
+    const api = mockApi({
+      "GET pages/": coverage(),
+      "POST forms/": { message: "وضعیت ثبت شد.", redirect: { href: "/risks/coverage/", route: "/risks/coverage" } },
+    });
+    const { user } = renderPage(<CoveragePage />, { path: "/risks/coverage" });
+    await user.click(await screen.findByRole("button", { name: /× T2 دسته‌ی آزمون دوم: در انتظار/ }));
+    const card = await screen.findByRole("dialog", { name: "خدمت آزمون × T2 دسته‌ی آزمون دوم" });
+    await user.click(within(card).getByRole("button", { name: "نامرتبط با دلیل" }));
+    await user.click(within(card).getByRole("button", { name: "ثبت «نامرتبط»" }));
+    expect(card).toHaveTextContent("بنویسید چرا این دسته به این خدمت مربوط نیست.");
+    expect(api.callsTo("POST forms/")).toHaveLength(0);
+    await user.type(within(card).getByRole("textbox", { name: /دلیل نامرتبط بودن/ }), "داده‌ی مشتری ندارد");
+    await user.click(within(card).getByRole("button", { name: "ثبت «نامرتبط»" }));
+    await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
+    expect(api.callsTo("POST forms/")[0]!.body).toEqual({
+      values: { status: "not_relevant", reason: "داده‌ی مشتری ندارد" },
+    });
+  });
+
+  it("does not offer not-relevant for a cell that has active risks", async () => {
+    mockApi({ "GET pages/": coverage() });
+    const { user } = renderPage(<CoveragePage />, { path: "/risks/coverage" });
+    await user.click(await screen.findByRole("button", { name: /× T1 دسته‌ی آزمون: ۲ ریسک/ }));
+    const card = await screen.findByRole("dialog", { name: "خدمت آزمون × T1 دسته‌ی آزمون" });
+    expect(card).toHaveTextContent("۲ ریسک فعال در این خانه ثبت شده است.");
+    expect(within(card).getByRole("link", { name: "مشاهده‌ی ریسک‌های این خانه" })).toHaveAttribute(
+      "href",
+      "/risks?service=1&category=1",
+    );
+    expect(within(card).queryByRole("button", { name: "نامرتبط با دلیل" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "بررسی‌شده، بدون ریسک" })).not.toBeInTheDocument();
   });
 });
 

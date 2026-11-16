@@ -86,9 +86,13 @@ export function activeRoute(pathname: string, navigation: Navigation): string | 
       .filter((route) => (route === "/" ? path === "/" : path === route || path.startsWith(`${route}/`)))
       .sort((a, b) => b.length - a.length)[0] ?? null;
   const direct = match(pathname);
-  if (direct && direct !== "/") return direct;
-  const alias = NAV_ALIASES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
-  return (alias && routes.includes(alias) ? alias : null) ?? direct;
+  // جایگزین وقتی برنده است که از پیوند مستقیم دقیق‌تر باشد؛ مثلاً جهان ریسک (/risks/coverage) زیر «شناسایی ریسک»
+  // می‌آید، نه زیر رجیستر (/risks).
+  const alias = NAV_ALIASES.find(([prefix]) => pathname.startsWith(prefix));
+  if (alias && routes.includes(alias[1]) && (!direct || direct === "/" || alias[0].length > direct.length)) {
+    return alias[1];
+  }
+  return direct;
 }
 
 /** پیوند فعال و گروهش، برای مسیر صفحه در نوار بالا. */

@@ -828,22 +828,34 @@ export interface CoverageCell {
   category_name?: string;
   status: Choice;
   summary: string;
+  reason: string;
+  reviewed_by: Person | null;
+  reviewed_on: Day | null;
   risk_count: number;
   risks_url: string | null;
   edit_url: string | null;
+  /** «ثبت ریسک برای این خانه»؛ برای خانه‌ی «نامرتبط» یا کسی که ریسک ثبت نمی‌کند خالی است. */
+  create_risk_url: string | null;
 }
 
 export interface CoverageRow {
   service: { id: number; code: string; name: string; is_critical: boolean; org_unit: string; href: string };
   cells: CoverageCell[];
+  /** خانه‌های غیر «در انتظار» از همه‌ی دسته‌های فعال. */
+  done: number;
+  total: number;
 }
 
 export interface CoveragePage extends Listing<CoverageRow> {
   categories: { id: number; code: string; name: string }[];
   critical: { total: number; complete: number; percent: number | null };
   counts: { reviewed: number; not_relevant: number; pending: number };
+  tabs: { all: number; critical: number; incomplete: number };
+  /** اندازه‌ی صفحه؛ «نمایش بیشتر» آن را با ?size= بزرگ می‌کند. */
+  size: number;
   can_edit: boolean;
   categories_url: string;
+  export_url: string;
 }
 
 export interface ChangeRiskRef {
