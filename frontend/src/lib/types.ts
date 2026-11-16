@@ -526,6 +526,14 @@ export interface TextItem {
   value: string;
 }
 
+/** پرسش ثابت پاسخ (فیگما ۱۰): کارکردها گام اول است و بقیه «هشت پرسش جلسه‌ی شناسایی». */
+export interface FixedItem extends TextItem {
+  required: boolean;
+  /** خروجی مورد انتظار، مثل «رویداد مخل». */
+  expected: string;
+  section: "functions" | "session";
+}
+
 export type AnswerValue = string | number | number[] | null;
 
 export interface QuestionItem {
@@ -538,19 +546,27 @@ export interface QuestionItem {
   value: AnswerValue;
 }
 
-export interface ResponseDetail extends Omit<ResponseRow, "questionnaire"> {
+export interface ResponseDetail extends Omit<ResponseRow, "questionnaire">, RecordParts {
   is_structured: boolean;
   structured_data: unknown[];
   structured_questions: { id: number; text: string; stage: string; required: boolean; help: string }[];
   questionnaire: { id: number; title: string; description: string };
   recorded_by: Person | null;
+  respondent_title: string;
+  service_name: string | null;
+  /** پیش‌نویس پنج روز کاری از آغاز؛ برگشت‌خورده همان مهلت برگشت. */
+  due: Deadline | null;
+  saved_at: Moment;
+  function_slots: number;
+  text_limit: number;
+  attach_limit_mb: number;
   can_edit: boolean;
   submitted_at: Moment | null;
   return_question: string;
   return_due: Deadline | null;
   reviewed_by: Person | null;
   reviewed_at: Moment | null;
-  fixed: TextItem[];
+  fixed: FixedItem[];
   new_item: TextItem;
   questions: QuestionItem[];
   pending_risks: { description: string; status: Choice; source: string }[];

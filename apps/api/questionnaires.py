@@ -1,6 +1,7 @@
 """«پاسخ به سؤال‌ها» در رابط React: پرسشنامه‌های فعال، پاسخ‌های من، شروع، پر کردن و ارسال پاسخ، و جواب پرسش‌های
 ریسک. همه‌چیز از همان فرم‌ها و services صفحه‌های جنگوی پرسشنامه می‌گذرد."""
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -13,7 +14,7 @@ from rest_framework.response import Response as ApiResponse
 from apps.questionnaires.forms import ResponseAnswerForm, ResponseStartForm
 from apps.questionnaires.models import PendingRisk, Question, Questionnaire, Response
 from apps.questionnaires.permissions import answerable_units, can_edit_response, visible_responses
-from apps.questionnaires.services import missing_required, save_answer, submit_response
+from apps.questionnaires.services import missing_fixed, missing_required, response_due, save_answer, submit_response
 from apps.questionnaires.structured import save_structured
 from apps.workflow.forms import AnswerForm
 from apps.workflow.permissions import answerable_questions
@@ -21,6 +22,7 @@ from apps.workflow.services import answer_question
 
 from . import formatting as fmt
 from .base import ApiView
+from .records import record_parts
 
 
 def response_row(response):
@@ -55,7 +57,7 @@ class AnswerHomeView(ApiView):
                         "description": questionnaire.description,
                         "question_count": questionnaire.questions.filter(is_active=True).count(),
                     }
-                    for questionnaire in Questionnaire.objects.filter(is_active=True, is_structured=True)
+                    for questionnaire in Questionnaire.objects.filter(is_active=True)
                 ],
                 "can_answer": answerable_units(user).exists(),
                 "my_responses": [response_row(response) for response in mine],
@@ -131,6 +133,10 @@ def response_detail(response, user):
             "label": str(field_meta.get_field(name).verbose_name),
             "help": str(field_meta.get_field(name).help_text),
             "value": getattr(response, name),
+            "required": name in Response.REQUIRED_FIXED,
+            "expected": Response.EXPECTED[name],
+            # گام اول فیگما ۱۰ کارکردهاست و بقیه «هشت پرسش جلسه‌ی شناسایی».
+            "section": "functions" if name == "functions" else "session",
         }
         for name in Response.FIXED_ITEMS
     ]
@@ -148,6 +154,14 @@ def response_detail(response, user):
             "description": response.questionnaire.description,
         },
         "recorded_by": fmt.person(response.recorded_by),
+        "respondent_title": response.respondent.job_title,
+        "service_name": response.service.name if response.service_id else None,
+        "due": fmt.deadline(response_due(response)),
+        "saved_at": fmt.moment(response.updated_at),
+        "function_slots": Response.FUNCTION_SLOTS,
+        "text_limit": Response.TEXT_LIMIT,
+        "attach_limit_mb": settings.ATTACHMENT_MAX_SIZE // (1024 * 1024),
+        **record_parts(response, user),
         "can_edit": can_edit,
         "submitted_at": fmt.moment(response.submitted_at),
         "return_question": response.return_question if response.status == Response.Status.RETURNED else "",
@@ -246,8 +260,10 @@ class ResponseDetailView(ApiView):
         if not request.data.get("submit"):
             return ApiResponse({"message": "پاسخ ذخیره شد.", "response": response_detail(response, request.user)})
         missing = missing_required(response)
-        if missing:
-            errors = {
+        fixed = missing_fixed(response)
+        if missing or fixed:
+            errors = {name: ["این پرسش اجباری است."] for name in fixed}
+            errors |= {
                 ResponseAnswerForm.question_field_name(question): ["این سؤال اجباری است."] for question in missing
             }
             return ApiResponse(

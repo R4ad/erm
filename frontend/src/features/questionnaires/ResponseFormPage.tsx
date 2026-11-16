@@ -1,129 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleDot, ClipboardList, FilePlus2, Hourglass, ListChecks, Save, Send } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useForm, useFormState, useWatch, type FieldPath, type UseFormReturn } from "react-hook-form";
-import { useBlocker, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { CircleDot, ClipboardList, FilePlus2, Hourglass, ListChecks } from "lucide-react";
+import type { ReactNode } from "react";
+import { useParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Deadline } from "@/components/ui/deadline";
-import { ConfirmDialog } from "@/components/ui/dialog";
-import { Checkbox, Field, FieldError, Radio, RequiredMark, Textarea } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, ErrorState } from "@/components/ui/states";
-import { useToast } from "@/components/ui/toast";
-import { ApiError, get, put } from "@/lib/api";
-import { cn } from "@/lib/cn";
-import { dateTime, faText, formatNumber } from "@/lib/format";
+import { get } from "@/lib/api";
+import { dateTime, formatNumber } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
-import type { QuestionItem, ResponseDetail, TextItem } from "@/lib/types";
+import type { QuestionItem, ResponseDetail } from "@/lib/types";
 
-import {
-  answerField,
-  answerKey,
-  fieldErrors,
-  isAnswered,
-  payloadFrom,
-  submitSchema,
-  valuesFrom,
-  type ResponseValues,
-} from "./response-form";
+import { ResponseWizard } from "./ResponseWizard";
 import { ResponseStatus } from "./status";
 import { StructuredResponse } from "./StructuredResponse";
 
-interface SaveResult {
-  message: string;
-  response: ResponseDetail;
-}
-
-type Form = UseFormReturn<ResponseValues>;
-
-// بخش‌های فرم کامپوننت جدا هستند و همان شیء form را می‌گیرند که هیچ‌وقت عوض نمی‌شود، و react-hook-form شیء
-// خطاها را درجا تغییر می‌دهد؛ React Compiler با این دو، خطا و مقدار قبلی را از حافظه نشان می‌داد. پس هر بخش
-// به خطای فیلد خودش با useFormState مشترک می‌شود و آن را با getFieldState می‌خواند، و مقدار را با useWatch.
-
-function QuestionField({ question, number, form }: { question: QuestionItem; number: number; form: Form }) {
-  const name = answerField(question);
-  const id = `question-${question.id}`;
-  const formState = useFormState({ control: form.control, name });
-  const error = form.getFieldState(name, formState).error?.message;
-  const value = useWatch({ control: form.control, name });
-  const label = (
-    <span className="flex items-start gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-xs font-semibold text-muted tabular"
-      >
-        {formatNumber(number)}
-      </span>
-      <span className="flex-1 text-sm leading-7 font-medium text-fg">
-        <span className="sr-only">سؤال {formatNumber(number)}: </span>
-        {question.text}
-      </span>
-      {question.required && <RequiredMark />}
-    </span>
-  );
-
-  if (question.kind === "text") {
-    return (
-      <div id={id} className="scroll-mt-28">
-        <Field label={label} hint={question.help || undefined} error={error} required={false} id={`${id}-input`}>
-          <Textarea rows={3} {...form.register(name)} />
-        </Field>
-      </div>
-    );
-  }
-
-  const multiple = question.kind === "multiple";
-  const helpId = question.help ? `${id}-help` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
-  return (
-    <div
-      id={id}
-      role={multiple ? "group" : "radiogroup"}
-      aria-labelledby={`${id}-label`}
-      aria-describedby={[helpId, errorId].filter(Boolean).join(" ") || undefined}
-      aria-required={!multiple && question.required ? true : undefined}
-      aria-invalid={error ? true : undefined}
-      className="flex scroll-mt-28 flex-col gap-2.5"
-    >
-      <div id={`${id}-label`}>{label}</div>
-      {question.help && (
-        <p id={helpId} className="ps-10 text-xs text-muted">
-          {question.help}
-        </p>
-      )}
-      {multiple && <p className="ps-10 text-xs text-muted">هر چند گزینه که درست است را انتخاب کنید.</p>}
-      <div className="grid gap-2 ps-10 sm:grid-cols-2">
-        {question.options.map((option) =>
-          multiple ? (
-            <Checkbox key={option.id} card label={option.text} value={String(option.id)} {...form.register(name)} />
-          ) : (
-            <Radio key={option.id} card label={option.text} value={String(option.id)} {...form.register(name)} />
-          ),
-        )}
-      </div>
-      {!multiple && !question.required && value && (
-        <div className="ps-10">
-          <Button
-            variant="link"
-            size="sm"
-            className="text-xs"
-            onClick={() => form.setValue(name, "", { shouldDirty: true })}
-          >
-            پاک کردن جواب
-          </Button>
-        </div>
-      )}
-      <div className="ps-10">
-        <FieldError id={errorId} messages={error ? [error] : undefined} />
-      </div>
-    </div>
-  );
-}
+// پاسخ قابل ویرایش کلاسیک گام‌به‌گام در ResponseWizard است (فیگما ۱۰)؛ این صفحه پاسخ ارسال‌شده را فقط‌خواندنی و
+// پرسشنامه‌ی شاخه‌ای را با StructuredResponse نشان می‌دهد.
 
 function ReadonlyAnswer({ question }: { question: QuestionItem }) {
   let text: string;
@@ -139,19 +36,6 @@ function ReadonlyAnswer({ question }: { question: QuestionItem }) {
     <p className="text-sm leading-7 whitespace-pre-line text-fg/90">{text}</p>
   ) : (
     <p className="text-sm text-muted">بی‌جواب</p>
-  );
-}
-
-function TextItemField({ item, form, rows = 3, label }: { item: TextItem; form: Form; rows?: number; label?: string }) {
-  const name: FieldPath<ResponseValues> = item.name === "new_item" ? "new_item" : `fixed.${item.name}`;
-  const formState = useFormState({ control: form.control, name });
-  const error = form.getFieldState(name, formState).error?.message;
-  return (
-    <div id={`field-${item.name}`} className="scroll-mt-28">
-      <Field label={label ?? item.label} hint={item.help || undefined} error={error}>
-        <Textarea rows={rows} {...form.register(name)} />
-      </Field>
-    </div>
   );
 }
 
@@ -193,298 +77,6 @@ function Meta({ response }: { response: ResponseDetail }) {
         ))}
       </dl>
     </Card>
-  );
-}
-
-function Progress({ questions, form }: { questions: QuestionItem[]; form: Form }) {
-  const answers = useWatch({ control: form.control, name: "answers" });
-  const answered = questions.filter((question) => isAnswered(answers?.[answerKey(question)])).length;
-  const required = questions.filter((question) => question.required);
-  const missing = required.filter((question) => !isAnswered(answers?.[answerKey(question)])).length;
-  const percent = questions.length ? Math.round((answered / questions.length) * 100) : 0;
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-        <span className="text-fg">
-          {formatNumber(answered)} از {formatNumber(questions.length)} سؤال جواب دارد
-        </span>
-        {missing > 0 && <span className="text-muted">{formatNumber(missing)} سؤال اجباری مانده</span>}
-      </div>
-      <div
-        role="progressbar"
-        aria-label="پیشرفت پاسخ"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-surface"
-      >
-        <div
-          className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function EditableResponse({ response, id }: { response: ResponseDetail; id: string }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const form = useForm<ResponseValues>({ defaultValues: valuesFrom(response) });
-  const [confirming, setConfirming] = useState(false);
-  const [summary, setSummary] = useState<{ label: string; target: string; message: string }[]>([]);
-  const [general, setGeneral] = useState<string | null>(null);
-  const summaryRef = useRef<HTMLDivElement>(null);
-  const dirty = form.formState.isDirty;
-
-  const save = useMutation({
-    mutationFn: ({ values, submit }: { values: ResponseValues; submit: boolean }) =>
-      put<SaveResult>(`responses/${id}/`, payloadFrom(values, response.questions, submit)),
-    onSuccess: (result, { submit }) => {
-      queryClient.setQueryData(["response", id], result.response);
-      void queryClient.invalidateQueries({ queryKey: ["answer-home"] });
-      void queryClient.invalidateQueries({ queryKey: ["my-work"] });
-      form.reset(valuesFrom(result.response));
-      setSummary([]);
-      setGeneral(null);
-      setConfirming(false);
-      toast({ title: faText(result.message), description: submit ? "عضو GRC پاسخ را بررسی می‌کند." : undefined });
-    },
-    onError: (error) => {
-      setConfirming(false);
-      if (!(error instanceof ApiError)) {
-        setGeneral(error.message);
-        return;
-      }
-      if (error.data.response) {
-        // جواب‌ها ذخیره شد ولی ارسال نشد (سؤال اجباری مانده)؛ همین مقدارها حالا ذخیره‌شده‌اند.
-        queryClient.setQueryData(["response", id], error.data.response as ResponseDetail);
-        form.reset(form.getValues());
-      }
-      const mapped = fieldErrors(error.errors, response);
-      for (const [name, message] of mapped)
-        form.setError(name as FieldPath<ResponseValues>, { type: "server", message });
-      setGeneral(error.errors.__all__?.join(" ") ?? (mapped.length ? null : error.message));
-      showSummary(mapped.map(([name, message]) => ({ name, message })));
-    },
-  });
-
-  function labelFor(name: string) {
-    const index = response.questions.findIndex((question) => answerField(question) === name);
-    if (index >= 0) return `سؤال ${formatNumber(index + 1)}`;
-    if (name === "new_item") return "ریسک تازه";
-    return response.fixed.find((item) => `fixed.${item.name}` === name)?.label ?? name;
-  }
-
-  function targetFor(name: string) {
-    const question = response.questions.find((item) => answerField(item) === name);
-    if (question) return `question-${question.id}`;
-    return `field-${name.replace(/^fixed\./, "")}`;
-  }
-
-  function showSummary(items: { name: string; message: string }[]) {
-    setSummary(items.map(({ name, message }) => ({ label: labelFor(name), target: targetFor(name), message })));
-    requestAnimationFrame(() => summaryRef.current?.focus());
-  }
-
-  function saveDraft() {
-    form.clearErrors();
-    setSummary([]);
-    save.mutate({ values: form.getValues(), submit: false });
-  }
-
-  function requestSubmit() {
-    form.clearErrors();
-    const result = submitSchema(response.questions).safeParse(form.getValues());
-    if (!result.success) {
-      const items = result.error.issues.map((issue) => ({ name: issue.path.join("."), message: issue.message }));
-      for (const item of items)
-        form.setError(item.name as FieldPath<ResponseValues>, { type: "required", message: item.message });
-      setGeneral(null);
-      showSummary(items);
-      return;
-    }
-    setSummary([]);
-    setConfirming(true);
-  }
-
-  // Ctrl+S پیش‌نویس را ذخیره می‌کند، مثل هر ویرایشگری.
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        if (!save.isPending) saveDraft();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  // پیش از بستن برگه یا رفتن به صفحه‌ی دیگر با تغییر ذخیره‌نشده، می‌پرسیم.
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      dirty && !save.isPending && currentLocation.pathname !== nextLocation.pathname,
-  );
-
-  function focusTarget(target: string) {
-    const element = document.getElementById(target);
-    element?.scrollIntoView({ block: "center" });
-    element?.querySelector<HTMLElement>("input, textarea, select")?.focus({ preventScroll: true });
-  }
-
-  return (
-    <>
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          requestSubmit();
-        }}
-        className="flex flex-col gap-6"
-      >
-        {summary.length > 0 && (
-          <Alert
-            ref={summaryRef}
-            tabIndex={-1}
-            role="alert"
-            tone="danger"
-            className="outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
-            title={`${formatNumber(summary.length)} مورد پیش از ارسال درست شود:`}
-          >
-            <ul className="mt-1 flex flex-col gap-1">
-              {summary.map((item) => (
-                <li key={item.target}>
-                  <a
-                    href={`#${item.target}`}
-                    className="text-fg underline underline-offset-4 hover:text-danger"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      focusTarget(item.target);
-                    }}
-                  >
-                    {item.label}
-                  </a>
-                  : {item.message}
-                </li>
-              ))}
-            </ul>
-          </Alert>
-        )}
-        {general && (
-          <Alert tone="danger" role="alert">
-            {faText(general)}
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader
-            icon={<ListChecks />}
-            title="کارکردها و پرسش‌های جلسه"
-            description="همان پرسش‌های ثابت جلسه‌ی شناسایی؛ هر کدام را که برای این واحد معنا دارد پر کنید."
-          />
-          <CardContent className="flex flex-col gap-5">
-            {response.fixed.map((item) => (
-              <TextItemField key={item.name} item={item} form={form} />
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader
-            icon={<ClipboardList />}
-            title={
-              <span className="flex items-center gap-2">
-                سؤال‌ها
-                <span className="rounded-full bg-surface px-2 text-xs font-medium text-muted tabular">
-                  {formatNumber(response.questions.length)}
-                </span>
-              </span>
-            }
-            description="پیش‌نویس را هر وقت خواستید ذخیره کنید؛ فقط هنگام ارسال، سؤال‌های اجباری باید جواب داشته باشند."
-          />
-          <CardContent>
-            {response.questions.length === 0 ? (
-              <p className="text-sm text-muted">این پاسخ جواب سؤالی ندارد.</p>
-            ) : (
-              <ol className="flex flex-col divide-y divide-line">
-                {response.questions.map((question, index) => (
-                  <li key={question.id} className="py-5 first:pt-1 last:pb-0">
-                    <QuestionField question={question} number={index + 1} form={form} />
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader icon={<FilePlus2 />} title={response.new_item.label} />
-          <CardContent>
-            <TextItemField
-              item={{ ...response.new_item, name: "new_item" }}
-              form={form}
-              rows={5}
-              label="شرح ریسک تازه"
-            />
-          </CardContent>
-        </Card>
-
-        <PendingRisks response={response} />
-
-        <div className="glass sticky bottom-0 z-30 sm:bottom-4 -mx-(--gutter) border-t border-line px-(--gutter) pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-2xl sm:border sm:px-5 sm:shadow-pop">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Progress questions={response.questions} form={form} />
-            <p aria-live="polite" className={cn("text-xs", dirty ? "text-warning" : "text-muted")}>
-              {save.isPending ? "در حال ذخیره" : dirty ? "تغییرات ذخیره نشده است" : "همه‌ی تغییرات ذخیره شده است"}
-            </p>
-            <div className="flex w-full gap-2 sm:w-auto">
-              <Button
-                variant="secondary"
-                className="flex-1 sm:flex-none"
-                loading={save.isPending && !save.variables?.submit}
-                disabled={save.isPending}
-                onClick={saveDraft}
-                title="Ctrl+S"
-              >
-                {!(save.isPending && !save.variables?.submit) && <Save aria-hidden />}
-                ذخیره‌ی پیش‌نویس
-              </Button>
-              <Button type="submit" variant="primary" className="flex-1 sm:flex-none" disabled={save.isPending}>
-                <Send aria-hidden className="rtl:-scale-x-100" />
-                ارسال برای بررسی
-              </Button>
-            </div>
-          </div>
-        </div>
-      </form>
-
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title="پاسخ برای بررسی فرستاده شود؟"
-        description="بعد از ارسال، پاسخ تا وقتی عضو GRC آن را برای تکمیل برنگرداند قابل ویرایش نیست. ریسک‌های در انتظار از گزینه‌های «نشانه‌ی ریسک» و «مورد جدید» ساخته می‌شوند."
-        confirmLabel="ارسال برای بررسی"
-        loading={save.isPending}
-        onConfirm={() => save.mutate({ values: form.getValues(), submit: true })}
-      />
-
-      <ConfirmDialog
-        open={blocker.state === "blocked"}
-        onOpenChange={(open) => !open && blocker.reset?.()}
-        title="تغییرات ذخیره نشده است"
-        description="اگر از این صفحه بروید، جواب‌هایی که بعد از آخرین ذخیره نوشته‌اید از دست می‌رود."
-        cancelLabel="ماندن در صفحه"
-        confirmLabel="رفتن بدون ذخیره"
-        tone="danger"
-        onConfirm={() => blocker.proceed?.()}
-      />
-    </>
   );
 }
 
@@ -581,6 +173,10 @@ export function ResponseFormPage() {
   if (query.isError || !response) {
     return <ErrorState error={query.error} retry={() => query.refetch()} />;
   }
+  // پاسخ کلاسیک قابل ویرایش، گام‌به‌گام به چیدمان فیگما ۱۰.
+  if (!response.is_structured && response.can_edit) {
+    return <ResponseWizard key={`edit-${response.id}`} response={response} id={id} />;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -607,8 +203,6 @@ export function ResponseFormPage() {
       {/* با هر بار ذخیره یا ارسال، پاسخ تازه‌ی سرور جای قبلی را می‌گیرد؛ کلید فرم را با وضعیت ویرایش نگه می‌داریم. */}
       {response.is_structured ? (
         <StructuredResponse key={`structured-${response.id}-${response.can_edit}`} response={response} id={id} />
-      ) : response.can_edit ? (
-        <EditableResponse key={`edit-${response.id}`} response={response} id={id} />
       ) : (
         <ReadonlyResponse response={response} />
       )}

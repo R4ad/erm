@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
@@ -214,6 +215,24 @@ class Response(TimeStampedModel):
         "مختل کند؛ پیامد قابل مشاهده‌ی آن [نوع و دامنه‌ی پیامد] است.»",
     )
 
+    # فیگما ۱۰: کارکردها (سه تا پنج خط) گام اول است و هشت قلم بعدی «هشت پرسش جلسه‌ی شناسایی». پرسش‌هایی که جمله‌ی
+    # ریسک بی‌آن‌ها ساخته نمی‌شود (کارکرد، رویداد، شرایط، پیامد) پیش از ارسال جواب لازم دارند. EXPECTED خروجی مورد
+    # انتظار هر پرسش است که کنار آن نشان داده می‌شود.
+    FUNCTION_SLOTS = 5
+    REQUIRED_FIXED = ["functions", "disruptive_event", "conditions", "consequence"]
+    EXPECTED = {
+        "functions": "کارکرد و تعهد قابل مشاهده",
+        "mission": "نتیجه و ذی‌نفع",
+        "commitments": "تعهد زمانی یا کیفی",
+        "disruptive_event": "رویداد مخل",
+        "conditions": "شرایط",
+        "consequence": "پیامد",
+        "dependencies": "وابستگی",
+        "evidence": "شاهد یا تجربه",
+        "current_controls": "کنترل فعلی",
+    }
+    TEXT_LIMIT = 1000
+
     FIXED_ITEMS = [
         "functions",
         "mission",
@@ -239,6 +258,9 @@ class Response(TimeStampedModel):
         related_name="+",
     )
     reviewed_at = models.DateTimeField("زمان بررسی", null=True, blank=True)
+
+    attachments = GenericRelation("core.Attachment")
+    comments = GenericRelation("core.Comment")
 
     history = HistoricalRecords()
 

@@ -62,6 +62,15 @@ def make_risk(title, unit, **fields):
     return Risk.objects.create(title=title, **values)
 
 
+# کارکرد، رویداد، شرایط و پیامد پیش از ارسال پاسخ کلاسیک لازم‌اند (فیگما ۱۰).
+REQUIRED_FIXED = {
+    "functions": "تسویه‌ی روزانه",
+    "disruptive_event": "قطع شبکه",
+    "conditions": "خرابی سوئیچ",
+    "consequence": "توقف تسویه",
+}
+
+
 def make_questionnaire():
     questionnaire = Questionnaire.objects.create(title="شناسایی ریسک عملیات", is_active=True)
     text = Question.objects.create(
@@ -384,9 +393,11 @@ def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
 
     blocked = client.put(url, {**payload, "submit": True}, content_type="application/json")
     assert blocked.status_code == 400
-    assert list(blocked.json()["errors"]) == [f"question_{text.pk}"]
+    # کارکرد، رویداد، شرایط و پیامد (فیگما ۱۰) و سؤال‌های اجباری پیش از ارسال جواب لازم دارند.
+    assert set(blocked.json()["errors"]) == {"disruptive_event", "conditions", "consequence", f"question_{text.pk}"}
     assert Response.objects.get(pk=response.pk).status == Response.Status.DRAFT
 
+    payload["fixed"] |= REQUIRED_FIXED
     payload["answers"][str(text.pk)] = "تسویه با بانک‌ها"
     submitted = client.put(url, {**payload, "submit": True}, content_type="application/json")
     assert submitted.status_code == 200
@@ -396,6 +407,38 @@ def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
     assert response.pending_risks.get().status == PendingRisk.Status.PENDING
     assert submitted.json()["response"]["can_edit"] is False
     assert client.put(url, payload, content_type="application/json").status_code == 403
+
+
+def test_the_response_has_figma_sections_deadline_limit_and_attachments(api, manager, unit):
+    from django.utils import timezone
+
+    from apps.questionnaires.services import response_due
+    from apps.workcalendar.workdays import add_working_days
+
+    questionnaire, *_ = make_questionnaire()
+    client = api(manager)
+    created = client.post(
+        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
+    )
+    url = reverse("api:response_detail", args=[created.json()["id"]])
+    data = client.get(url).json()
+    sections = [(item["name"], item["section"], item["required"]) for item in data["fixed"]]
+    assert sections[0] == ("functions", "functions", True)
+    assert [name for name, section, _ in sections if section == "session"] == Response.FIXED_ITEMS[1:]
+    assert len(sections) - 1 == 8
+    assert {name for name, _, required in sections if required} == set(Response.REQUIRED_FIXED)
+    assert next(item for item in data["fixed"] if item["name"] == "disruptive_event")["expected"] == "رویداد مخل"
+    assert (data["function_slots"], data["text_limit"], data["attach_limit_mb"]) == (5, 1000, 20)
+    due = add_working_days(timezone.localdate(), 5)
+    assert data["due"]["iso"] == due.isoformat() and data["due"]["days_left"] == (due - timezone.localdate()).days
+    assert data["saved_at"]["iso"] and data["attach_url"] and data["attachments"] == []
+
+    too_long = client.put(url, {"fixed": {"mission": "ا" * 1001}}, content_type="application/json")
+    assert too_long.status_code == 400 and "mission" in too_long.json()["errors"]
+
+    response = Response.objects.get(pk=created.json()["id"])
+    response.status = Response.Status.SUBMITTED
+    assert response_due(response) is None
 
 
 def test_the_start_form_refuses_a_second_open_response_for_the_same_unit(api, manager, unit):
@@ -417,7 +460,7 @@ def test_a_submitted_response_keeps_showing_an_option_deactivated_later(api, man
         reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
     )
     url = reverse("api:response_detail", args=[created.json()["id"]])
-    payload = {"answers": {str(text.pk): "تسویه", str(single.pk): risky.pk}}
+    payload = {"fixed": REQUIRED_FIXED, "answers": {str(text.pk): "تسویه", str(single.pk): risky.pk}}
 
     Option.objects.filter(pk=safe.pk).update(is_active=False)
     editable = client.get(url).json()

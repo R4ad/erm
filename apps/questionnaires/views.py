@@ -53,7 +53,8 @@ class AnswerHomeView(ListView):
     context_object_name = "questionnaires"
 
     def get_queryset(self):
-        return Questionnaire.objects.filter(is_active=True, is_structured=True)
+        # پرسشنامه‌ی کلاسیک فیگما ۱۰ و پرسشنامه‌ی شاخه‌ای هر دو پاسخ می‌گیرند.
+        return Questionnaire.objects.filter(is_active=True)
 
     def get_context_data(self, **kwargs):
         user = self.request.user
