@@ -351,6 +351,14 @@ export const routes: RouteObject[] = [
               Component: keyedByPath((await import("@/features/actions/ActionDetailPage")).ActionDetailPage),
             }),
           },
+          {
+            path: "actions/:pk/verify",
+            lazy: async () => ({
+              Component: keyedByPath(
+                (await import("@/features/actions/ActionVerificationPage")).ActionVerificationPage,
+              ),
+            }),
+          },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),
           {
             path: "questionnaires",

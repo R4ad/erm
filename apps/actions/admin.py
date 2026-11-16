@@ -3,6 +3,8 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
     AcceptanceSignature,
+    ActionCriterion,
+    ActionTestRun,
     ActionUpdate,
     MonitoringNotice,
     Reassessment,
@@ -37,6 +39,24 @@ class TreatmentPlanAdmin(SimpleHistoryAdmin):
         return False  # طرح حذف نمی‌شود
 
 
+class ActionCriterionInline(admin.TabularInline):
+    """معیارهای قبولی سنجش‌پذیر و نتیجه‌ی اندازه‌گیری آن‌ها (فیگما ۲۴)."""
+
+    model = ActionCriterion
+    extra = 0
+    fields = ("title", "target", "result", "status", "measures_effect", "baseline", "note")
+
+
+class ActionTestRunInline(admin.StackedInline):
+    """اجراهای آزمون یا مانور؛ اجرای ناموفق هم می‌ماند."""
+
+    model = ActionTestRun
+    extra = 0
+    can_delete = False
+    fields = ("performed_on", "passed", "outcome", "description", "evidence", "created_by")
+    raw_id_fields = ("evidence", "created_by")
+
+
 @admin.register(TreatmentAction)
 class TreatmentActionAdmin(SimpleHistoryAdmin):
     list_display = ("code", "title", "plan", "owner", "assignee", "due_date", "status")
@@ -45,7 +65,7 @@ class TreatmentActionAdmin(SimpleHistoryAdmin):
     raw_id_fields = ("plan", "owner", "assignee", "verifier")
     filter_horizontal = ("depends_on", "controls", "evidence")
     readonly_fields = ("status",)
-    inlines = [ActionUpdateInline]
+    inlines = [ActionCriterionInline, ActionTestRunInline, ActionUpdateInline]
 
     def has_delete_permission(self, request, obj=None):
         return False  # اقدام حذف نمی‌شود

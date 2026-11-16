@@ -74,6 +74,7 @@ class Command(BaseCommand):
         self.monitoring()
         self.control_test()
         self.committee()
+        self.verification()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -328,6 +329,97 @@ class Command(BaseCommand):
         gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
         if gateway:
             gateway.controls.add(test.control)
+
+    def verification(self):
+        """آزمون و تأیید نتیجه‌ی اقدام (فیگما ۲۴): اقدام «آزمون بازیابی نسخه‌ی پشتیبان ماهانه» آماده‌ی آزمون است؛ اجرای
+        اول ناموفق بود و اقدام به «در اجرا» برگشت، اجرای دوم همه‌ی معیارهای دامنه را برآورد و یک معیار خارج از دامنه
+        ماند. تأییدکننده‌ی مستقل سارا محمدی است."""
+        from apps.actions.models import ActionCriterion, ActionTestRun
+
+        action = TreatmentAction.objects.get(title="آزمون بازیابی نسخه‌ی پشتیبان ماهانه")
+        risk = action.plan.risk
+        action.test_setting = "مانور در پنجره‌ی تغییر شبانه · محیط تولید با ترافیک کنترل‌شده"
+        action.save(update_fields=["test_setting"])
+
+        def evidence(title, days_ago):
+            item = Evidence.objects.create(
+                title=title,
+                kind=Evidence.Kind.TEST,
+                reliability=Evidence.Reliability.HIGH,
+                summary=title,
+                source="واحد عملیات زیرساخت",
+                observed_on=self.today - timedelta(days=days_ago),
+                owner=self.ali,
+            )
+            item.risks.add(risk)
+            return item
+
+        failed_report = evidence("گزارش اجرای اول مانور بازیابی", 12)
+        log = evidence("لاگ زمان‌بندی مانور بازیابی", 4)
+        evidence("گزارش تطبیق تراکنش‌ها پس از بازیابی", 4)
+        evidence("صورت‌جلسه و ضبط مانور بازیابی", 3)
+        action.evidence.add(
+            *Evidence.objects.filter(
+                risks=risk, kind=Evidence.Kind.TEST, observed_on__gte=self.today - timedelta(days=4)
+            )
+        )
+        C = ActionCriterion.Status
+        for title, target, result, status, extra in [
+            (
+                "زمان بازیابی پایگاه داده‌ی تراکنش",
+                "حداکثر ۴ ساعت",
+                "۲ ساعت و ۴۰ دقیقه",
+                C.PASSED,
+                {"measures_effect": True, "baseline": "۹ ساعت"},
+            ),
+            ("صحت داده پس از بازیابی", "تطبیق ۱۰۰٪ تراکنش‌ها", "۱۰۰٪ · ۴۸٬۲۱۰ تراکنش", C.PASSED, {}),
+            ("از دست رفتن داده (RPO)", "حداکثر ۵ دقیقه", "۲ دقیقه", C.PASSED, {}),
+            ("شواهد اجرا", "لاگ، صورت‌جلسه و ضبط", "کامل · ۳ شاهد", C.PASSED, {}),
+            (
+                "پایگاه داده‌ی گزارش‌گیری",
+                "",
+                "",
+                C.OUT_OF_SCOPE,
+                {
+                    "note": "پایگاه داده‌ی گزارش‌گیری در دامنه‌ی این اقدام نبود؛ برای آن اقدام پیگیری جداگانه ایجاد "
+                    "می‌شود و نتیجه‌ی این اقدام را مخدوش نمی‌کند."
+                },
+            ),
+        ]:
+            ActionCriterion.objects.create(
+                action=action, title=title, target=target, result=result, status=status, **extra
+            )
+        ActionTestRun.objects.create(
+            action=action,
+            performed_on=self.today - timedelta(days=12),
+            passed=False,
+            outcome="۶ ساعت و ۱۰ دقیقه",
+            description="اسکریپت بازیابی، جدول‌های تسویه را پوشش نمی‌داد؛ زمان از ۴ ساعت گذشت و اقدام اصلاحی ثبت شد.",
+            evidence=failed_report,
+            created_by=self.mehdi,
+        )
+        ActionTestRun.objects.create(
+            action=action,
+            performed_on=self.today - timedelta(days=4),
+            passed=True,
+            outcome="۲ ساعت و ۴۰ دقیقه",
+            description="اسکریپت اصلاح‌شده‌ی بازیابی؛ بازگردانی نسخه‌ی پشتیبان و تطبیق خودکار تراکنش‌ها. ناظر: الهام توکلی.",
+            evidence=log,
+            created_by=self.mehdi,
+        )
+        S = TreatmentAction.Status
+        now = timezone.now()
+        for source, target, by, days, note in [
+            (S.APPROVED, S.IN_PROGRESS, self.mehdi, 30, "اجرا شروع شد."),
+            (S.IN_PROGRESS, S.READY, self.mehdi, 12, "اجرای اول مانور انجام شد."),
+            (S.READY, S.FAILED, self.sara, 11, "زمان بازیابی از ۴ ساعت گذشت و جدول‌های تسویه بازیابی نشدند."),
+            (S.FAILED, S.IN_PROGRESS, self.mehdi, 10, "اسکریپت بازیابی برای جدول‌های تسویه اصلاح می‌شود."),
+            (S.IN_PROGRESS, S.READY, self.mehdi, 3, "اجرای دوم مانور با اسکریپت اصلاح‌شده انجام شد."),
+        ]:
+            update = ActionUpdate.objects.create(
+                action=action, from_status=source, to_status=target, note=note, created_by=by
+            )
+            ActionUpdate.objects.filter(pk=update.pk).update(created_at=now - timedelta(days=days))
 
     def committee(self):
         """جلسه‌ی کمیته‌ی امنیت (فیگما ۲۳): جلسه‌ی فوق‌العاده‌ی امروز در حال برگزاری با هفت حاضر و یک ناظر، شش مورد
@@ -1075,11 +1167,11 @@ class Command(BaseCommand):
         """تابلوی درمان (فیگما ۱۵): ریسک هدف هر طرح، یادداشت مسدود و ناموفق، روز تأیید خروجی، و بازبینی‌های پیش رو."""
         for plan in plans:
             current = plan.assessment
+            # نیمه‌ی امتیاز جاری، به نزدیک‌ترین امتیازی که از L × I ساخته می‌شود (۷ از هیچ L و I تا ۵ ساخته نمی‌شود).
+            half = max(current.score_high // 2, 2)
+            score = max(value for value in {lk * im for lk in range(1, 6) for im in range(1, 6)} if value <= half)
             target = self.assessment(
-                plan.risk,
-                max(current.decision_level.rank - 1, 1),
-                max(current.score_high // 2, 2),
-                kind=Assessment.Kind.TARGET,
+                plan.risk, max(current.decision_level.rank - 1, 1), score, kind=Assessment.Kind.TARGET
             )
             TreatmentPlan.objects.filter(pk=plan.pk).update(target_assessment=target)
         notes = {

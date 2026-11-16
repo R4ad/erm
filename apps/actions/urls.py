@@ -26,6 +26,7 @@ urlpatterns = [
     path("acceptances/<int:pk>/sign/", views.AcceptanceSignView.as_view(), name="acceptance_sign"),
     path("acceptances/<int:pk>/revoke/", views.AcceptanceRevokeView.as_view(), name="acceptance_revoke"),
     path("<int:pk>/", views.ActionDetailView.as_view(), name="action_detail"),
+    path("<int:pk>/verify/", views.ActionVerifyView.as_view(), name="action_verify"),
     path("<int:pk>/edit/", views.ActionUpdateView.as_view(), name="action_update"),
     path("<int:pk>/move/", views.ActionMoveView.as_view(), name="action_move"),
 ]

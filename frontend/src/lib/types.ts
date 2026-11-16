@@ -2999,3 +2999,75 @@ export interface CommitteeMeeting {
   candidates: { id: number; code: string; title: string }[];
   kinds: { value: string; label: string }[];
 }
+
+// ───────────── آزمون و تأیید نتیجه‌ی اقدام (فیگما ۲۴) ─────────────
+
+export interface VerificationCard {
+  title: string;
+  hint: string;
+  l: number | null;
+  i: number | null;
+  score: string | null;
+  level: Level | null;
+}
+
+export interface ActionVerification {
+  id: number;
+  code: string;
+  title: string;
+  status: { value: string; label: string };
+  subtitle: string;
+  risk: { code: string; href: string | null };
+  action_href: string;
+  steps: { value: string; label: string; state: "done" | "current" | "upcoming" }[];
+  side: { items: { value: string; label: string; active: boolean }[]; note: string | null };
+  report: { code: string; href: string } | null;
+  criteria: {
+    summary: string;
+    met: boolean;
+    rows: {
+      id: number;
+      title: string;
+      target: string;
+      result: string;
+      status: { value: string; label: string; tone: "success" | "danger" | "neutral" };
+    }[];
+    notes: string[];
+    text: string;
+  };
+  runs: {
+    setting: string;
+    rows: {
+      id: number;
+      number: number;
+      title: string;
+      passed: boolean;
+      outcome: string;
+      description: string;
+      evidence: { code: string; href: string } | null;
+    }[];
+  };
+  people: { sod: boolean; rows: { label: string; value: string | null }[] };
+  decision: {
+    can_decide: boolean;
+    options: { value: "verify" | "fail"; label: string; problems: string[] }[];
+    follow_up: string | null;
+    closing: string;
+    submit: string;
+    waiting: string | null;
+    last: { label: string; tone: "success" | "danger"; by: string | null; at: Moment | null; note: string } | null;
+  };
+  evidence: { id: number; code: string; title: string; observed_on: string | null; href: string }[];
+  effect: {
+    title: string;
+    subtitle: string;
+    before: VerificationCard;
+    after: VerificationCard | null;
+    rows: { label: string; before: string; after: string }[];
+    profile: string[];
+    changed: string | null;
+    note: string | null;
+    reached: boolean;
+  } | null;
+  result?: { follow_ups: { code: string; href: string }[]; notified: number };
+}

@@ -603,3 +603,11 @@ class ReassessmentCreateView(CreateView):
             **compare(reassess.comparison_assessments(plan)),
             **kwargs,
         )
+
+
+class ActionVerifyView(View):
+    """«آزمون و تأیید نتیجه» فقط در رابط React است (فیگما ۲۴)؛ پیوند سرور به همان صفحه می‌رود."""
+
+    def get(self, request, pk):
+        get_object_or_404(visible_actions(request.user), pk=pk)
+        return redirect(f"/app/actions/{pk}/verify")

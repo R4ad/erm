@@ -35,13 +35,13 @@ def item(key, label, href, risk=None, level=None, due=None, status=None, meta=No
     }
 
 
-def action_item(action):
+def action_item(action, href=None):
     owner, assignee = fmt.person(action.owner)["name"], fmt.person(action.assignee)["name"]
     meta = f"مالک {owner}" if owner == assignee else f"مالک {owner}، مجری {assignee}"
     return item(
         f"action-{action.pk}",
         f"{action.code} {action.title}",
-        action.get_absolute_url(),
+        href or action.get_absolute_url(),
         risk=action.plan.risk,
         due=action.due_date if action.is_open else None,
         status=action.get_status_display(),
@@ -85,7 +85,7 @@ def sections(user):
             "to_verify",
             "منتظر تأیید نتیجه‌ی شما",
             "مجری کار را آماده‌ی آزمون اعلام کرده است؛ نتیجه را با معیار پذیرش بسنجید.",
-            [action_item(action) for action in work["to_verify"]],
+            [action_item(action, reverse("actions:action_verify", args=[action.pk])) for action in work["to_verify"]],
         ),
         (
             "plans_to_approve",
@@ -252,7 +252,7 @@ def action_task(action, verify=False):
     if verify:
         return task(
             f"verify-{action.pk}", "signoff", f"تأیید نتیجه‌ی اقدام: {action.title}", "تأیید نتیجه",
-            risk.title, action.code, action.get_absolute_url(),
+            risk.title, action.code, reverse("actions:action_verify", args=[action.pk]),
             icon="check-circle", tone="success", cta="تأیید یا رد", level=level, due=action.due_date,
         )
     blocked = action.status == TreatmentAction.Status.BLOCKED

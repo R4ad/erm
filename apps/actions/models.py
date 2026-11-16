@@ -183,6 +183,12 @@ class TreatmentAction(TimeStampedModel):
     acceptance_criteria = models.TextField(
         "معیار قبولی", help_text="گزارش اجرا، آزمون پوشش، نتیجه‌ی مانور یا تست مسیر، و آستانه‌ی قبول."
     )
+    test_setting = models.CharField(
+        "شرایط آزمون",
+        max_length=300,
+        blank=True,
+        help_text="محیط و پنجره‌ی آزمون یا مانور، مثلاً «مانور در پنجره‌ی تغییر شبانه · محیط تولید با ترافیک کنترل‌شده».",
+    )
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.PLANNED, editable=False)
     evidence = models.ManyToManyField(
         "risks.Evidence", verbose_name="شاهد اجرا", blank=True, related_name="treatment_actions"
@@ -257,6 +263,67 @@ class ActionUpdate(TimeStampedModel):
     @property
     def changes_status(self):
         return self.from_status != self.to_status
+
+
+class ActionCriterion(models.Model):
+    """یک معیار قبولی سنجش‌پذیر اقدام (فیگما ۲۴): هدف، نتیجه‌ی اندازه‌گیری و وضعیت. معیار «خارج از دامنه» نتیجه‌ی
+    اقدام را مخدوش نمی‌کند و برایش اقدام پیگیری جدا ساخته می‌شود. معیاری که «سنجه‌ی اثر» است (مثل زمان بازگردانی)
+    مقدار پیش از اقدام را هم دارد تا اثر اقدام بر بُعد پیامد کنار ارزیابی مبنا دیده شود."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "سنجیده نشده"
+        PASSED = "passed", "قبول"
+        FAILED = "failed", "رد"
+        OUT_OF_SCOPE = "out_of_scope", "خارج از دامنه"
+
+    action = models.ForeignKey(TreatmentAction, verbose_name="اقدام", on_delete=models.CASCADE, related_name="criteria")
+    title = models.CharField("معیار قبولی", max_length=200)
+    target = models.CharField("هدف", max_length=200, blank=True, help_text="مثلاً «حداکثر ۲۰ دقیقه».")
+    result = models.CharField("نتیجه‌ی اندازه‌گیری", max_length=200, blank=True)
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.PENDING)
+    note = models.TextField("توضیح", blank=True, help_text="برای «خارج از دامنه»: چرا، و پیگیری‌اش چیست.")
+    measures_effect = models.BooleanField(
+        "سنجه‌ی اثر", default=False, help_text="سنجه‌ای که اثر اقدام بر بُعد پیامد را نشان می‌دهد."
+    )
+    baseline = models.CharField("مقدار پیش از اقدام", max_length=100, blank=True, help_text="مثلاً «۷۵ دقیقه».")
+
+    class Meta:
+        verbose_name = "معیار قبولی اقدام"
+        verbose_name_plural = "معیارهای قبولی اقدام"
+        ordering = ["action", "pk"]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def in_scope(self):
+        return self.status != self.Status.OUT_OF_SCOPE
+
+
+class ActionTestRun(TimeStampedModel):
+    """یک اجرای آزمون یا مانور اقدام. اجرای ناموفق پاک نمی‌شود تا تاریخچه‌ی آزمون و اقدام اصلاحی دیده شود."""
+
+    action = models.ForeignKey(
+        TreatmentAction, verbose_name="اقدام", on_delete=models.CASCADE, related_name="test_runs"
+    )
+    performed_on = models.DateField("تاریخ اجرا")
+    passed = models.BooleanField("موفق")
+    outcome = models.CharField("نتیجه", max_length=100, blank=True, help_text="مثلاً «۱۷ دقیقه».")
+    description = models.TextField("شرح", help_text="چه اجرا شد، چه دیده شد و ناظر.")
+    evidence = models.ForeignKey(
+        "risks.Evidence", verbose_name="گزارش اجرا", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = "اجرای آزمون اقدام"
+        verbose_name_plural = "اجراهای آزمون اقدام"
+        ordering = ["action", "performed_on", "pk"]
+
+    def __str__(self):
+        return f"{self.action.code} · {self.performed_on}"
 
 
 class RiskAcceptance(TimeStampedModel):
