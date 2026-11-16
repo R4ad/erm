@@ -2507,3 +2507,29 @@ export interface TreatmentBoardPage {
   can_create: boolean;
   me: number;
 }
+
+// ───────────── لیست ریسک‌های هدف (فیگما ۱۶) ─────────────
+
+export interface TargetPoint {
+  score: number;
+  level: Level | null;
+  profile: string | null;
+}
+
+export interface TargetRow {
+  id: number;
+  risk: { id: number; code: string; title: string; href: string; category: string; scope: string };
+  current: TargetPoint;
+  target: TargetPoint | null;
+  retire: boolean;
+  mechanisms: string[];
+  criteria: string;
+  plan: { href: string; action: string | null; due: { iso: string; jalali: string } | null };
+  status: { value: string; label: string; tone: "info" | "warning" | "success" | "danger" | "neutral" };
+}
+
+export interface TargetRisksPage {
+  rows: TargetRow[];
+  counts: { with_target: number; within: number; above: number; retire: number };
+  reassess: { code: string; title: string; step: string; href: string }[];
+}

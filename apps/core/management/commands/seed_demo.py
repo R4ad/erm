@@ -619,6 +619,27 @@ class Command(BaseCommand):
                 created_by=self.sara,
             )
 
+    def target_profiles(self, *rows):
+        """لیست ریسک‌های هدف (فیگما ۱۶): پروفایل پیامد داتین (S D F C R) و B جاری و هدف هر طرح."""
+        scales = {scale.code: scale for scale in self.version.scales.filter(code__in=list("SDFCR"))}
+        for plan, current, target, b in rows:
+            plan.refresh_from_db()
+            for assessment, text in ((plan.assessment, current), (plan.target_assessment, target)):
+                if assessment is None or text is None:
+                    continue
+                for item in text.split():
+                    level = int(item[1:])
+                    ImpactDetail.objects.create(
+                        assessment=assessment,
+                        scale=scales[item[0]],
+                        level=level,
+                        rationale="" if level else "این بُعد در سناریو درگیر نیست.",
+                        confidence=Confidence.MEDIUM,
+                    )
+            if b:
+                Assessment.objects.filter(pk=plan.assessment_id).update(b_low=b[0], b_high=b[0])
+                Assessment.objects.filter(pk=plan.target_assessment_id).update(b_low=b[1], b_high=b[1])
+
     def plan(self, risk, assessment, approved=True, option=TreatmentPlan.Option.REDUCE):
         plan = TreatmentPlan(
             risk=risk,
@@ -1175,22 +1196,55 @@ class Command(BaseCommand):
         # در اجرای درمان: اقدام‌ها در وضعیت‌های مختلف (تابلوی درمان)
         tls = self.risk("انقضای گواهی‌های TLS درگاه‌ها", "SRV-IPG", self.sara, "T3", S.TREATMENT)
         tls_plan = self.plan(tls, self.assessment(tls, 2, 9))
-        self.action(tls_plan, "پایش خودکار انقضای گواهی‌ها", AS.VERIFIED, self.mehdi, self.sara, -5)
-        self.action(tls_plan, "تمدید خودکار گواهی‌ها با ACME", AS.VERIFIED, self.mehdi, self.sara, -2)
+        tls_check = "هشدار ۳۰ روز پیش از انقضا برای همه‌ی گواهی‌ها و تمدید بدون توقف در آزمون"
+        for title, due_in in (("پایش خودکار انقضای گواهی‌ها", -5), ("تمدید خودکار گواهی‌ها با ACME", -2)):
+            self.action(tls_plan, title, AS.VERIFIED, self.mehdi, self.sara, due_in, acceptance_criteria=tls_check)
 
         db = self.risk("از دست رفتن داده‌ی پایگاه داده‌ی تراکنش", "SRV-CORE", self.ali, "T3", S.TREATMENT)
         db_plan = self.plan(db, self.assessment(db, 3, 15))
-        self.action(db_plan, "تکثیر هم‌زمان پایگاه داده به سایت پشتیبان", AS.IN_PROGRESS, self.sara, self.ali, 0)
-        self.action(db_plan, "آزمون بازیابی نسخه‌ی پشتیبان ماهانه", AS.READY, self.mehdi, self.sara, 5)
-        self.action(db_plan, "خرید مجوز ابزار پایش پایگاه داده", AS.BLOCKED, self.sara, self.ali, -8)
+        db_check = "بازیابی کامل در مانور با از دست رفتن داده‌ی کمتر از ۵ دقیقه و آزمون صحت تراکنش"
+        for title, status, assignee, verifier, due_in in (
+            ("تکثیر هم‌زمان پایگاه داده به سایت پشتیبان", AS.IN_PROGRESS, self.sara, self.ali, 0),
+            ("آزمون بازیابی نسخه‌ی پشتیبان ماهانه", AS.READY, self.mehdi, self.sara, 5),
+            ("خرید مجوز ابزار پایش پایگاه داده", AS.BLOCKED, self.sara, self.ali, -8),
+        ):
+            self.action(db_plan, title, status, assignee, verifier, due_in, acceptance_criteria=db_check)
 
         pam = self.risk("دسترسی ممتاز بدون کنترل به سرورهای تولید", "SRV-HSM", self.maryam, "T1", S.TREATMENT)
         pam_plan = self.plan(pam, self.assessment(pam, 4, 18))
-        self.action(pam_plan, "دو مانع مستقل روی مسیر دسترسی ممتاز", AS.IN_PROGRESS, self.mehdi, self.maryam, 12)
-        self.action(pam_plan, "پوشش همه‌ی حساب‌های ممتاز با PAM", AS.PLANNED, self.mehdi, self.maryam, 40)
-        self.action(pam_plan, "ثبت جلسه‌های ممتاز و بازبینی هفتگی", AS.FAILED, self.mehdi, self.maryam, -3)
+        pam_check = "دو مانع مستقل E3 روی همه‌ی مسیرهای ممتاز و آزمون دور زدن در ۳۰ نمونه"
+        for title, status, due_in in (
+            ("دو مانع مستقل روی مسیر دسترسی ممتاز", AS.IN_PROGRESS, 12),
+            ("پوشش همه‌ی حساب‌های ممتاز با PAM", AS.PLANNED, 40),
+            ("ثبت جلسه‌های ممتاز و بازبینی هفتگی", AS.FAILED, -3),
+        ):
+            self.action(pam_plan, title, status, self.mehdi, self.maryam, due_in, acceptance_criteria=pam_check)
+
+        # اجتناب (فیگما ۱۶): مسیر حذف می‌شود و ریسک پس از اثبات بازنشسته می‌شود، بدون امتیاز صفر ساختگی
+        exploit = self.risk(
+            "آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی", "SRV-IPG", self.maryam, "T1", S.TREATMENT
+        )
+        exploit_plan = self.plan(exploit, self.assessment(exploit, 4, 20), option=TreatmentPlan.Option.AVOID)
+        TreatmentPlan.objects.filter(pk=exploit_plan.pk).update(
+            rationale="حذف مسیر آسیب‌پذیر؛ ریسک پس از اثبات حذف بازنشسته می‌شود."
+        )
+        self.action(
+            exploit_plan,
+            "وصله یا حذف سرویس آسیب‌پذیر درگاه",
+            AS.IN_PROGRESS,
+            self.mehdi,
+            self.maryam,
+            4,
+            acceptance_criteria="وصله یا حذف مسیر، آزمون همه‌ی مصادیق و عارضه‌ی تغییر",
+        )
 
         self.board_history(tls_plan, db_plan, pam_plan)
+        self.target_profiles(
+            (tls_plan, "S3 D2 F2 C2 R2", "S2 D2 F1 C2 R1", (3, 2)),
+            (db_plan, "S4 D0 F3 C3 R2", "S3 D0 F2 C3 R2", (5, 2)),
+            (pam_plan, "S2 D4 F3 C3 R2", "S2 D4 F3 C3 R2", (5, 2)),
+            (exploit_plan, "S4 D4 F3 C3 R3", None, None),
+        )
 
         # پذیرش‌ها: منقضی، منتظر امضا (۱ از ۲)، معتبر رو به انقضا
         archive = self.risk("ناسازگاری بایگانی اسناد با الزام نگهداری", "SRV-ARC", self.hossein, "T8", S.REVIEW)

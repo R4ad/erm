@@ -403,6 +403,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "treatment/targets",
+            lazy: async () => ({
+              Component: (await import("@/features/treatment/TargetRisksPage")).TargetRisksPage,
+            }),
+          },
+          {
             path: "treatment/required",
             lazy: async () => ({
               Component: (await import("@/features/treatment/ActionRequiredPage")).ActionRequiredPage,
