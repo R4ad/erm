@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Avatar } from "@/components/ui/avatar";
@@ -404,10 +404,19 @@ export function OrgChartPage() {
                 <Icon name="download" />
                 خروجی
               </Button>
-              <Button variant="outline" disabled title="اتصال Active Directory هنوز پیکربندی نشده است">
-                <Icon name="merge" />
-                همگام‌سازی با AD
-              </Button>
+              {data.ad_sync_url ? (
+                <Button asChild variant="outline">
+                  <Link to={data.ad_sync_url}>
+                    <Icon name="merge" />
+                    همگام‌سازی با AD
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled title="همگام‌سازی AD برای مدیر سامانه و پس از پیکربندی اتصال است">
+                  <Icon name="merge" />
+                  همگام‌سازی با AD
+                </Button>
+              )}
               {data.add_unit_url && (
                 <Button asChild variant="primary">
                   <AppLink href={data.add_unit_url}>

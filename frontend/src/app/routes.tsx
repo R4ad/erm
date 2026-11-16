@@ -292,6 +292,10 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import("@/features/organization/OrgChartPage")).OrgChartPage }),
           },
           {
+            path: "units/ad-sync",
+            lazy: async () => ({ Component: (await import("@/features/organization/AdSyncPage")).AdSyncPage }),
+          },
+          {
             path: "method",
             lazy: async () => ({
               Component: keyedByPath(

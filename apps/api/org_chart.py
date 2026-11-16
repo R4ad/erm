@@ -18,6 +18,7 @@ from apps.organization.models import OrgUnit
 from apps.risks.models import Risk
 from apps.risks.permissions import visible_risks
 
+from . import ad_sync
 from . import formatting as fmt
 from .base import ApiView
 
@@ -203,6 +204,7 @@ class OrgChartView(ApiView):
                 "members": members(selected) if selected else [],
                 "can_edit": user.is_system_admin,
                 "add_unit_url": reverse("organization:unit_create") if user.is_system_admin else None,
+                "ad_sync_url": ad_sync.sync_url(user),
                 "add_member_url": reverse("admin:accounts_user_add") if user.is_system_admin else None,
             }
         )

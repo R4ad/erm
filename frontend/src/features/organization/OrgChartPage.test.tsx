@@ -86,6 +86,7 @@ function page(changes: Partial<PageData> = {}): PageData {
     ],
     can_edit: true,
     add_unit_url: "/units/new/",
+    ad_sync_url: "/units/ad-sync",
     add_member_url: "/admin/accounts/user/add/",
     ...changes,
   };
@@ -122,7 +123,7 @@ describe("OrgChartPage", () => {
     expect(rows[0]).toHaveTextContent("مالک ریسک");
     expect(rows[1]).toHaveTextContent("محلی");
     expect(rows[1]).toHaveTextContent("غیرفعال");
-    expect(screen.getByRole("button", { name: /همگام‌سازی با AD/ })).toBeDisabled();
+    expect(screen.getByRole("link", { name: /همگام‌سازی با AD/ })).toHaveAttribute("href", "/units/ad-sync");
     await expectNoAxeViolations(container);
   });
 
@@ -147,6 +148,7 @@ describe("OrgChartPage", () => {
       "GET org/chart/": page({
         can_edit: false,
         add_unit_url: null,
+        ad_sync_url: null,
         add_member_url: null,
         selected: { ...page().selected!, edit_url: null, add_child_url: null },
       }),
@@ -156,6 +158,7 @@ describe("OrgChartPage", () => {
     expect(screen.queryByRole("link", { name: "افزودن واحد" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "ویرایش واحد" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "افزودن عضو" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /همگام‌سازی با AD/ })).toBeDisabled();
   });
 
   it("shows an error state", async () => {

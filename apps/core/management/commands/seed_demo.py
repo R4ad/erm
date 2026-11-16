@@ -4,14 +4,15 @@
 با --force. نام‌ها و عنوان‌ها همان نمونه‌های فایل فیگما هستند تا صفحه‌ها را بشود کنار طرح مقایسه کرد.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.accounts.models import User
+from apps.accounts import directory
+from apps.accounts.models import DirectoryConnection, DirectoryEntry, DirectorySync, User
 from apps.accounts.roles import Role
 from apps.actions.acceptance import required_authorities, unit_managers
 from apps.actions.monitoring import record_trigger, run_monitoring
@@ -76,6 +77,7 @@ class Command(BaseCommand):
         self.committee()
         self.verification()
         self.post_action()
+        self.directory()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -330,6 +332,90 @@ class Command(BaseCommand):
         gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
         if gateway:
             gateway.controls.add(test.control)
+
+    def directory(self):
+        """همگام‌سازی AD (فیگما ۲۸): اتصال، برداشت حساب‌ها و چند اجرای پیشین. برداشت از کاربران AD همین داده است با
+        دو جابه‌جایی واحد، دو حساب غیرفعال، چهار حساب تازه، یک شاخه‌ی نگاشت‌نشده و یک شاخه‌ی مستثنا."""
+        conn = DirectoryConnection.objects.create(
+            server="ldaps://dc01.datin.local:636",
+            base_dn="OU=Datin,DC=datin,DC=local",
+            service_account="svc-erm-sync",
+            excluded=["OU=Contractors"],
+            state=DirectoryConnection.State.CONNECTED,
+            state_note="dc01.datin.local:636 در دسترس است.",
+            tested_at=timezone.now(),
+        )
+        base = "OU=Datin,DC=datin,DC=local"
+        moved = {"mehdi": "OU=Infra", "n.sharifi": "OU=Sec"}
+        disabled = {"h.karami", "e.tavakoli"}
+        rows = []
+        for user in User.objects.filter(source=User.Source.AD).select_related("org_unit").order_by("pk"):
+            ou = moved.get(user.username) or directory.ou_label(user.org_unit.ad_group if user.org_unit else "")
+            rows.append(
+                DirectoryEntry(
+                    username=user.username,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    email=user.email,
+                    personnel_code=user.personnel_code or "",
+                    job_title=user.job_title,
+                    ou=f"{ou},{base}",
+                    enabled=user.username not in disabled,
+                )
+            )
+        accounts = [
+            ("s.karimi", "سارا", "کریمی", "OU=Infra", "کارشناس زیرساخت"),
+            ("p.naderi", "پویا", "نادری", "OU=Pay", "کارشناس پرداخت"),
+            ("m.rahmani", "مینو", "رحمانی", "OU=Sec", "کارشناس امنیت"),
+            ("a.moghaddam", "آرش", "مقدم", "OU=Ops", "کارشناس عملیات"),
+            ("d.rostami", "داوود", "رستمی", "OU=DataPlatform", "مهندس داده"),
+            ("f.jafari", "فرزانه", "جعفری", "OU=DataPlatform", "مهندس داده"),
+            ("s.moradi", "سینا", "مرادی", "OU=DataPlatform", "تحلیلگر داده"),
+            ("c.ahmadi", "کامران", "احمدی", "OU=Contractors", "پیمانکار"),
+            ("t.bagheri", "تینا", "باقری", "OU=Contractors", "پیمانکار"),
+        ]
+        for number, (username, first, last, ou, title) in enumerate(accounts, start=1):
+            rows.append(
+                DirectoryEntry(
+                    username=username,
+                    first_name=first,
+                    last_name=last,
+                    email=f"{username}@datin.local",
+                    personnel_code=f"990{number:03d}",
+                    job_title=title,
+                    ou=f"{ou},{base}",
+                )
+            )
+        DirectoryEntry.objects.bulk_create(rows)
+
+        now = timezone.now()
+        morning = timezone.make_aware(datetime(self.today.year, self.today.month, self.today.day, 8, 30))
+        morning = min(morning, now)
+        history = [
+            (3, DirectorySync.Status.APPLIED, 0, "", []),
+            (2, DirectorySync.Status.FAILED, 0, "خطای گواهی LDAPS · رفع شد", []),
+            (
+                1,
+                DirectorySync.Status.APPLIED,
+                2,
+                "",
+                [
+                    {"kind": "new", "username": "e.tavakoli", "name": "الهام توکلی"},
+                    {"kind": "moved", "username": "k.akbari", "name": "کیان اکبری"},
+                ],
+            ),
+        ]
+        for days, status, applied, note, changes in history:
+            DirectorySync.objects.create(
+                status=status,
+                run_at=morning - timedelta(days=days),
+                run_by=self.sara if status == DirectorySync.Status.APPLIED else None,
+                applied=applied,
+                note=note,
+                changes=changes,
+            )
+        directory.preview(conn)
+        DirectorySync.objects.filter(status=DirectorySync.Status.PREVIEW).update(run_at=morning)
 
     def post_action(self):
         """ارزیابی پس از اقدام (فیگما ۲۵): ریسک انتشار ساتنا با ارزیابی ذاتی، جاری قبلی (پیامد ۳)، هدف طرح (B۲ و پیامد ۲)

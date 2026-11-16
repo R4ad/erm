@@ -2659,6 +2659,7 @@ export interface OrgChartPage {
   members: OrgMember[];
   can_edit: boolean;
   add_unit_url: string | null;
+  ad_sync_url: string | null;
   add_member_url: string | null;
 }
 
@@ -3192,4 +3193,50 @@ export interface ImpactLevels {
     services: { id: number; label: string; critical: boolean; rto: number | null; mtpd: number | null }[];
   } | null;
   definition: string;
+}
+
+// «همگام‌سازی با Active Directory» (فیگما ۲۸).
+export interface AdSync {
+  title: string;
+  subtitle: string;
+  pending: number;
+  applicable: number;
+  connection: {
+    server: string;
+    base_dn: string;
+    service_account: string;
+    schedule: string;
+    state: { label: string; tone: PostActionTone };
+    note: string;
+    tested: string | null;
+  };
+  tiles: { key: string; label: string; value: number; note: string }[];
+  branches: {
+    key: string;
+    ou: string;
+    users: number;
+    state: "mapped" | "unmapped" | "excluded";
+    status: { label: string; tone: PostActionTone };
+    unit: string | null;
+  }[];
+  unit_options: { id: number; name: string }[];
+  changes: {
+    key: string;
+    kind: "new" | "moved" | "disabled";
+    label: string;
+    tone: PostActionTone;
+    user: { id: number | null; name: string; username: string };
+    unit: string;
+    impact: { text: string; tone: "danger" | "warning" | "neutral" };
+    action: { kind: "successor" | "delegate" | "review" | "none"; label: string; href: string | null };
+    apply: boolean;
+    attention: boolean;
+    inactive: boolean;
+  }[];
+  unchanged: number;
+  rules: { key: string; label: string; note: string; on: boolean; locked: boolean }[];
+  rules_note: string;
+  history: { id: number; title: string; note: string; status: string; tone: string }[];
+  successors: { id: number; name: string; unit: string }[];
+  org_chart: string;
 }
