@@ -206,6 +206,7 @@ def copy_version(version, by):
         status=MethodVersion.Status.DRAFT,
         based_on=version,
         change_notes="",
+        effective_from=None,
         approval_ref="",
         approved_on=None,
         approval_recorded_by=None,

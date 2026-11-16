@@ -74,6 +74,12 @@ class MethodVersion(TimeStampedModel):
     impact_guidance = models.TextField("اصول ارزیابی پیامد", blank=True, help_text=PARAGRAPHS_HELP)
     decision_guidance = models.TextField("قواعد امتیاز و سطح تصمیم", blank=True, help_text=PARAGRAPHS_HELP)
     acceptance_guidance = models.TextField("اشتهای ریسک و پذیرش", blank=True, help_text=PARAGRAPHS_HELP)
+    effective_from = models.DateField(
+        "تاریخ اجرای پیشنهادی",
+        null=True,
+        blank=True,
+        help_text="روزی که متولی روش برای اجرای این نسخه پیشنهاد می‌کند؛ اجرا همچنان با فعال‌سازی است.",
+    )
     approval_ref = models.CharField("شماره‌ی نامه‌ی تصویب", max_length=100, blank=True)
     approved_on = models.DateField("تاریخ نامه‌ی تصویب", null=True, blank=True)
     approval_recorded_by = models.ForeignKey(
@@ -567,3 +573,27 @@ PARAMETER_UNITS = {
     MethodParameter.Key.CALIBRATION_EXACT: "درصد",
     MethodParameter.Key.CALIBRATION_WITHIN_ONE: "درصد",
 }
+
+
+class MethodSimulation(models.Model):
+    """یک اجرای «شبیه‌سازی اثر» نسخه‌ی پیشنهادی روی ارزیابی‌های جاری (فیگما ۲۶). رکورد ارزیابی‌ها عوض نمی‌شود؛ فقط
+    زمان، اجراکننده و خلاصه‌ی شمارش‌ها برای گردش تصویب ثبت می‌شود."""
+
+    version = models.ForeignKey(
+        MethodVersion, verbose_name="نسخه‌ی پیشنهادی", on_delete=models.CASCADE, related_name="simulations"
+    )
+    base = models.ForeignKey(MethodVersion, verbose_name="نسخه‌ی مبنا", on_delete=models.PROTECT, related_name="+")
+    run_at = models.DateTimeField("زمان اجرا", auto_now_add=True)
+    run_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="اجراکننده", on_delete=models.PROTECT, related_name="+"
+    )
+    assessments = models.PositiveIntegerField("ارزیابی‌های شبیه‌سازی‌شده")
+    summary = models.JSONField("خلاصه", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "شبیه‌سازی اثر نسخه"
+        verbose_name_plural = "شبیه‌سازی‌های اثر نسخه"
+        ordering = ["-run_at", "-pk"]
+
+    def __str__(self):
+        return f"شبیه‌سازی v{self.version.number} روی v{self.base.number}"

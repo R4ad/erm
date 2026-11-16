@@ -3133,3 +3133,45 @@ export interface PostAction {
   rules: string[];
   result?: { asked?: boolean; corrective?: number };
 }
+
+// «مقایسه‌ی نسخه‌ها»ی روش (فیگما ۲۶): پارامترهای کلیدی، شبیه‌سازی اثر، یادداشت تغییر و گردش تصویب.
+export interface MethodDiff {
+  title: string;
+  subtitle: string;
+  version: {
+    number: number;
+    name: string;
+    chip: { label: string; tone: PostActionTone };
+    note: string;
+    hint: string;
+  };
+  base: { number: number; name: string; note: string; hint: string };
+  rows: {
+    key: string;
+    label: string;
+    before: string;
+    after: string;
+    changed: boolean;
+    status: { label: string; tone: PostActionTone };
+  }[];
+  changed: number;
+  simulation: {
+    count: number;
+    subtitle: string;
+    tiles: { key: "count" | "data" | "levels" | "review"; label: string; value: number; note: string }[];
+    reminders: number;
+    rows: {
+      assessment: { code: string; href: string };
+      risk: { code: string; title: string; href: string };
+      effect: string;
+      action: string;
+    }[];
+  };
+  last_run: { at: string; by: string } | null;
+  notes: { author: string | null; date: string; text: string; groups: string[] };
+  steps: { key: string; title: string; note: string; state: "done" | "current" | "locked" | "skipped" }[];
+  rules: string[];
+  can_submit: boolean;
+  can_simulate: boolean;
+  definition: string;
+}

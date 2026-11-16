@@ -800,10 +800,10 @@ export function MethodDefinitionPage() {
           data && (
             <>
               {data.version.based_on && data.changes.length > 0 && (
-                <Button variant="outline" onClick={() => scrollTo("method-changes")}>
+                <AppLink href={`/method/${data.version.number}/diff`} button={{ variant: "outline" }}>
                   <Icon name="merge" />
                   مقایسه با {data.version.based_on}
-                </Button>
+                </AppLink>
               )}
               {data.can_copy && (
                 <Button variant="outline" onClick={() => setConfirm("copy")}>

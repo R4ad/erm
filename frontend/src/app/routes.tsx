@@ -308,6 +308,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "method/:number/diff",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/MethodDiffPage")).MethodDiffPage),
+            }),
+          },
+          {
             path: "method/:number/reference",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),

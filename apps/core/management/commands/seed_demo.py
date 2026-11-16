@@ -758,7 +758,12 @@ class Command(BaseCommand):
         """تعریف متدولوژی (فیگما ۱۷): پیش‌نویس نسخه‌ی بعد با سه تغییر نسبت به نسخه‌ی فعال، هنوز فرستاده‌نشده."""
         draft = copy_version(self.version, self.sara)
         MethodVersion.objects.filter(pk=draft.pk).update(
-            title="روش v5 · بازنگری ۱۴۰۵", change_notes="پوشش داده‌ی آغازگر، یادآوری دوم پذیرش و بازبینی سطح پایین"
+            title="روش v5 · بازنگری ۱۴۰۵",
+            change_notes=(
+                "هم‌ترازی با بخش کفایت داده (پوشش ۹۸٪)، افزودن یادآوری دوم پیش از انقضای پذیرش تا هیچ پذیرشی بدون "
+                "تصمیم منقضی نشود، و کوتاه‌کردن بازبینی سطح پایین برای کشف زودتر تغییر شرایط."
+            ),
+            effective_from=self.today + timedelta(days=15),
         )
         changes = {MethodParameter.Key.A_DATA_COVERAGE: 98, MethodParameter.Key.REMINDER_SECOND: 14}
         for row in draft.parameters.filter(key__in=list(changes)):
