@@ -36,6 +36,8 @@ from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, Question, Questionnaire, Response
 from apps.risks.identification import narrative
 from apps.risks.models import Coverage, Evidence, ExternalLink, IdentificationDraft, Risk, RiskCategory, RiskScenario
+from apps.risks.models import ScenarioProposal
+from apps.risks.scenario_proposals import propose
 from apps.workcalendar.workdays import add_working_days
 from apps.workflow.models import RiskQuestion, StatusTransition
 
@@ -68,8 +70,169 @@ class Command(BaseCommand):
         self.questionnaire()
         self.method_draft()
         self.access()
+        self.scenario_library()
         self.monitoring()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
+
+    SCENARIOS = [
+        # عنوان، دسته، خدمت، رویداد، عامل آغازگر، پیامد، هدف یا تعهد، مشتری، نمونه‌های ریسک (با عنوان)
+        (
+            "نشت داده‌ی تراکنش در محیط غیرتولید",
+            "T1",
+            "SRV-IPG",
+            "خروج داده‌ی واقعی مشتری از محیط آزمون",
+            "کپی داده‌ی تولید بدون پوشاندن در محیط آزمون",
+            "افشای داده‌ی کارت و تراکنش",
+            "حفظ محرمانگی داده",
+            "بانک‌های مشتری",
+            ["نشت داده‌ی مشتریان از محیط آزمون"],
+        ),
+        (
+            "نفوذ از طریق آسیب‌پذیری یا اعتبارنامه‌ی درگاه‌های اینترنتی",
+            "T1",
+            "SRV-IPG",
+            "نفوذ به درگاه بانکی",
+            "آسیب‌پذیری وصله‌نشده یا اعتبارنامه‌ی لورفته",
+            "تراکنش غیرمجاز و توقف درگاه",
+            "پرداخت اینترنتی امن",
+            "بانک‌های مشتری",
+            ["آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی", "حمله‌ی credential stuffing به همراه‌بانک"],
+        ),
+        (
+            "باج‌افزار در خدمت بانکی",
+            "T1",
+            "SRV-IPG",
+            "رمزگذاری داده و سرورهای خدمت",
+            "ورود بدافزار از ایستگاه کاری یا سرور آسیب‌پذیر",
+            "توقف خدمت تا بازیابی از پشتیبان",
+            "تداوم خدمت",
+            "بانک‌های مشتری",
+            ["حمله‌ی باج‌افزاری به خدمت بانکی"],
+        ),
+        (
+            "باج‌افزار در ایستگاه‌های کاری اپراتور",
+            "T1",
+            "SRV-PORTAL",
+            "رمزگذاری ایستگاه‌های کاری پشتیبانی",
+            "پیوست آلوده‌ی ایمیل",
+            "توقف پاسخ‌گویی به بانک‌ها",
+            "پشتیبانی بانک‌ها",
+            "بانک‌های مشتری",
+            [],
+        ),
+        (
+            "خرابی HSM و توقف امضای تراکنش",
+            "T3",
+            "SRV-HSM",
+            "توقف امضای تراکنش",
+            "خرابی ماژول HSM بدون جایگزین گرم",
+            "توقف تراکنش در همه‌ی بانک‌ها",
+            "امضای تراکنش",
+            "همه‌ی بانک‌ها",
+            ["خرابی HSM و توقف امضای تراکنش"],
+        ),
+        (
+            "انقضای گواهی دیجیتال درگاه‌ها",
+            "T3",
+            "SRV-IPG",
+            "قطع ارتباط امن درگاه",
+            "نبود پایش انقضای گواهی",
+            "خطای اتصال مشتریان",
+            "ارتباط امن",
+            "بانک‌های مشتری",
+            ["انقضای گواهی‌های TLS درگاه‌ها", "از دست رفتن داده‌ی پایگاه داده‌ی تراکنش"],
+        ),
+        (
+            "از دست رفتن مرکز داده‌ی اصلی",
+            "T7",
+            "SRV-CORE",
+            "توقف هم‌زمان خدمات مرکز داده",
+            "قطع برق یا حادثه‌ی محیطی بدون سایت پشتیبان آماده",
+            "توقف همه‌ی خدمات تا بازیابی",
+            "تداوم خدمت",
+            "همه‌ی بانک‌ها",
+            [
+                "خرابی هم‌زمان مرکز داده‌ی اصلی و پشتیبان",
+                "قطع برق مرکز داده‌ی اصلی",
+                "نبود سایت پشتیبان فعال برای سرویس پیامک",
+            ],
+        ),
+        (
+            "وابستگی به دانش کلیدی یک نفر در پشتیبانی",
+            "T6",
+            "SRV-PAYA",
+            "توقف پشتیبانی تخصصی",
+            "نبود جانشین آموزش‌دیده",
+            "تأخیر رفع حادثه",
+            "پشتیبانی خدمت",
+            "بانک‌های مشتری",
+            ["وابستگی پایا به یک نیروی کلیدی"],
+        ),
+        (
+            "عدم انطباق با الزام نظارتی یا نگهداری اسناد",
+            "T8",
+            "SRV-SATNA",
+            "ادامه‌ی پردازش خارج از الزام",
+            "پیگیری‌نشدن تغییر الزام بانک مرکزی",
+            "جریمه و توقف مجوز",
+            "انطباق نظارتی",
+            "بانک مرکزی",
+            ["ادامه‌ی پردازش بدون مجوز نظارتی به‌روز", "ناسازگاری بایگانی اسناد با الزام نگهداری"],
+        ),
+        (
+            "نقض SLA پاسخ‌گویی در اوج بار",
+            "T4",
+            "SRV-PORTAL",
+            "کندی پاسخ‌گویی خدمت",
+            "ظرفیت ناکافی در ساعات اوج",
+            "نقض SLA مشتری",
+            "پاسخ‌گویی در مهلت SLA",
+            "بانک‌های مشتری",
+            ["کندی پرتال پشتیبانی در ساعات اوج"],
+        ),
+    ]
+    # نمونه‌هایی که به سناریوهای قبلی همین داده‌ی نمایشی وصل می‌شوند
+    LINKS = {
+        "استفاده‌ی نامجاز از دسترسی ممتاز باقی‌مانده": ["دسترسی ممتاز بدون کنترل به سرورهای تولید"],
+        "اعمال بسته‌ی انتشار نامعتبر در تولید": ["اعمال بسته‌ی انتشار نامعتبر در تولید"],
+        "خطای پیکربندی در پنجره‌ی تغییر": ["خطای پیکربندی فایروال شبکه‌ی مرکزی"],
+        "قطع خدمت پرداخت به‌دلیل خرابی پایگاه داده": ["ادغام‌شدنی: قطع ساتنا در ساعات تسویه"],
+        "قطع خدمت ارتباطی تأمین‌کننده": [
+            "قطع خدمت ارتباطی تأمین‌کننده",
+            "وابستگی به ارائه‌دهنده‌ی پیامک",
+            "وابستگی به ارائه‌دهنده‌ی واحد پیامک",
+        ],
+    }
+
+    def scenario_library(self):
+        """کتابخانه‌ی سناریو (فیگما ۲۱): سناریوهای مرجع بیشتر در دسته‌های T1 تا T8، نمونه‌های ریسک موجود زیر آن‌ها، یک
+        سناریوی بی‌نمونه و دو پیشنهاد ادغام در انتظار تصمیم که با همان سرویس پیشنهاد ثبت می‌شوند."""
+        scenarios = {scenario.title: scenario for scenario in RiskScenario.objects.all()}
+        for title, category, service, event, conditions, consequence, objective, customer, _ in self.SCENARIOS:
+            scenarios[title] = RiskScenario.objects.create(
+                title=title,
+                category=RiskCategory.objects.get(code=category),
+                service=self.services[service],
+                service_name_snapshot=self.services[service].name,
+                event=event,
+                conditions=conditions,
+                consequence=consequence,
+                objective=objective,
+                customer_text=customer,
+            )
+        links = {**self.LINKS, **{row[0]: row[-1] for row in self.SCENARIOS}}
+        for title, risk_titles in links.items():
+            scenario = scenarios[title]
+            Risk.objects.filter(title__in=risk_titles, scenario__isnull=True).update(
+                scenario=scenario, scenario_version=scenario.version
+            )
+        release, config = scenarios["اعمال بسته‌ی انتشار نامعتبر در تولید"], scenarios["خطای پیکربندی در پنجره‌ی تغییر"]
+        reason = "عامل آغازگر مشابه، اما دامنه و کنترل‌ها متفاوت‌اند؛ ممکن است تفکیک مناسب‌تر باشد."
+        propose(release, self.neda, ScenarioProposal.Kind.MERGE, reason, target=config)
+        satna = scenarios["توقف پردازش ساتنا"]
+        reason = "هر دو توقف پردازش ساتنا با خرابی پایگاه داده‌اند و کنترل و مالک یکسانی دارند."
+        target = scenarios["قطع خدمت پرداخت به‌دلیل خرابی پایگاه داده"]
+        propose(satna, self.neda, ScenarioProposal.Kind.MERGE, reason, target=target)
 
     def monitoring(self):
         """اعلان‌های پایش (فیگما ۲۰): شکست یک کنترل کلیدی، یک رخداد مهم و یک الزام تازه با همان ثبت محرک سامانه، و

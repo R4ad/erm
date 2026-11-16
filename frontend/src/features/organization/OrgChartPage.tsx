@@ -409,7 +409,7 @@ export function OrgChartPage() {
                 همگام‌سازی با AD
               </Button>
               {data.add_unit_url && (
-                <Button asChild>
+                <Button asChild variant="primary">
                   <AppLink href={data.add_unit_url}>
                     <Icon name="plus" />
                     افزودن واحد

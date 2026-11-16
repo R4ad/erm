@@ -149,6 +149,16 @@ class RiskScenario(TimeStampedModel):
     is_active = models.BooleanField(
         "فعال", default=True, help_text="از سناریوی غیرفعال ریسک تازه ساخته نمی‌شود، ولی ریسک‌های قبلی می‌مانند."
     )
+    # کتابخانه‌ی سناریو (فیگما ۲۱): سناریوی ادغام‌شده غیرفعال می‌ماند و به سناریوی مقصد اشاره می‌کند؛ حذف فیزیکی ممنوع است
+    merged_into = models.ForeignKey(
+        "self",
+        verbose_name="ادغام‌شده در",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="merged_from",
+    )
 
     history = HistoricalRecords()
 
@@ -174,6 +184,57 @@ class RiskScenario(TimeStampedModel):
         if not self.code:
             self.code = next_code("SC")
         super().save(*args, **kwargs)
+
+
+class ScenarioProposal(TimeStampedModel):
+    """پیشنهاد ادغام یا تفکیک سناریوی مرجع (بخش ۶ روش، فیگما ۲۱): با دلیل ثبت و با دلیل تصمیم‌گیری می‌شود."""
+
+    class Kind(models.TextChoices):
+        MERGE = "merge", "ادغام"
+        SPLIT = "split", "تفکیک"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "در انتظار تصمیم"
+        ACCEPTED = "accepted", "پذیرفته"
+        REJECTED = "rejected", "ردشده"
+
+    kind = models.CharField("نوع", max_length=10, choices=Kind.choices)
+    scenario = models.ForeignKey(
+        RiskScenario, verbose_name="سناریو", on_delete=models.PROTECT, related_name="proposals"
+    )
+    target = models.ForeignKey(
+        RiskScenario,
+        verbose_name="سناریوی مقصد",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="incoming_proposals",
+    )
+    similarity = models.PositiveSmallIntegerField("شباهت (درصد)", null=True, blank=True)
+    reason = models.TextField("دلیل پیشنهاد")
+    status = models.CharField("وضعیت", max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    decided_at = models.DateTimeField("زمان تصمیم", null=True, blank=True)
+    decision_reason = models.TextField("دلیل تصمیم", blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "پیشنهاد ادغام یا تفکیک سناریو"
+        verbose_name_plural = "پیشنهادهای ادغام یا تفکیک سناریو"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(kind="merge") | models.Q(target__isnull=False), name="merge_proposal_has_target"
+            ),
+            models.CheckConstraint(condition=~models.Q(target=models.F("scenario")), name="proposal_target_differs"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} {self.scenario.code}"
 
 
 class Risk(TimeStampedModel):

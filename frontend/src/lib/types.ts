@@ -2758,3 +2758,72 @@ export interface MonitoringInbox {
   triggers: { key: string; label: string; rule: string }[];
   channels: NoticeChannels;
 }
+
+// ───────────── کتابخانه‌ی سناریو (فیگما ۲۱) ─────────────
+
+export interface ScenarioProposalRow {
+  id: number;
+  kind: { value: "merge" | "split"; label: string };
+  scenario: { id: number; code: string };
+  target: { id: number; code: string; title: string } | null;
+  similarity: number | null;
+  reason: string;
+  created_by: string;
+  can_decide: boolean;
+}
+
+export interface LibraryScenario {
+  id: number;
+  code: string;
+  title: string;
+  category: { code: string; name: string };
+  instances: number;
+  level: { rank: number; name: string } | null;
+  reviewed: string | null;
+  active: boolean;
+  note: { tone: "warning" | "neutral"; text: string } | null;
+}
+
+export interface ScenarioLibrary {
+  summary: {
+    scenarios: number;
+    categories: number;
+    instances: number;
+    average: string;
+    empty: number;
+    proposals: number;
+  };
+  categories: { code: string; name: string; count: number }[];
+  rows: LibraryScenario[];
+  selected: {
+    id: number;
+    code: string;
+    title: string;
+    version: number;
+    active: boolean;
+    merged_into: { code: string; href: string } | null;
+    author: string | null;
+    narrative: string;
+    conditions: string;
+    event: string;
+    consequence: string;
+    category: { code: string; name: string };
+    service: string | null;
+    href: string;
+    edit_url: string | null;
+    instances: {
+      id: number;
+      code: string;
+      title: string;
+      href: string;
+      scope: string;
+      score: number | null;
+      level: { rank: number; name: string } | null;
+    }[];
+    proposal: ScenarioProposalRow | null;
+  } | null;
+  options: { id: number; code: string; title: string }[];
+  rules: { title: string; text: string }[];
+  create_url: string | null;
+  can_propose: boolean;
+}

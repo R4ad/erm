@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
-from . import monitoring_inbox, org_chart, user_roles
+from . import monitoring_inbox, org_chart, scenario_library, user_roles
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
 
 app_name = "api"
@@ -39,6 +39,11 @@ urlpatterns = [
     path("monitoring/inbox/read/", monitoring_inbox.NoticeReadView.as_view(), name="notices_read_all"),
     path("monitoring/inbox/<int:pk>/read/", monitoring_inbox.NoticeReadView.as_view(), name="notice_read"),
     path("monitoring/channels/", monitoring_inbox.NoticeChannelsView.as_view(), name="notice_channels"),
+    path("scenarios/library/", scenario_library.ScenarioLibraryView.as_view(), name="scenario_library"),
+    path("scenarios/proposals/", scenario_library.ScenarioProposalView.as_view(), name="scenario_proposals"),
+    path(
+        "scenarios/proposals/<int:pk>/decide/", scenario_library.ScenarioDecisionView.as_view(), name="scenario_decide"
+    ),
     path("method/definition/", method_definition.MethodDefinitionView.as_view(), name="method_definition"),
     path(
         "method/definition/<int:number>/parameters/",

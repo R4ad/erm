@@ -499,7 +499,7 @@ export function UsersRolesPage() {
                 <Icon name="merge" />
                 همگام‌سازی AD
               </Button>
-              <Button asChild>
+              <Button asChild variant="primary">
                 <a href={data.add_user_url}>
                   <Icon name="plus" />
                   کاربر جدید

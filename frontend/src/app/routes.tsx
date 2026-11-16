@@ -133,7 +133,9 @@ export const routes: RouteObject[] = [
           },
           {
             path: "risks/scenarios",
-            lazy: async () => ({ Component: (await import("@/features/scenarios/ScenarioPages")).ScenarioListPage }),
+            lazy: async () => ({
+              Component: (await import("@/features/scenarios/ScenarioLibraryPage")).ScenarioLibraryPage,
+            }),
           },
           {
             path: "risks/scenarios/:id",
