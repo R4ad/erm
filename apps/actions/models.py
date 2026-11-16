@@ -567,3 +567,22 @@ class MonitoringNotice(TimeStampedModel):
         verbose_name_plural = "اعلان‌های پایش"
         ordering = ["-created_at", "-pk"]
         constraints = [models.UniqueConstraint(fields=["recipient", "event_key"], name="monitor_notice_once")]
+
+
+class NoticePreference(models.Model):
+    """کانال‌های دریافت اعلان پایش هر کاربر (فیگما ۲۰). اعلان درون سامانه همیشه ثبت می‌شود؛ ایمیل و پیامک و یادآوری
+    به جانشین ترجیح کاربر است و با پیکربندی درگاه ارسال به کار می‌رود."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notice_preference", verbose_name="کاربر"
+    )
+    email = models.BooleanField("ایمیل سازمانی (خلاصه‌ی روزانه)", default=True)
+    sms = models.BooleanField("پیامک (فقط محرک فوری و بحرانی)", default=True)
+    delegate = models.BooleanField("یادآوری به جانشین هنگام تفویض", default=False)
+
+    class Meta:
+        verbose_name = "ترجیح اعلان"
+        verbose_name_plural = "ترجیح‌های اعلان"
+
+    def __str__(self):
+        return f"ترجیح اعلان {self.user}"

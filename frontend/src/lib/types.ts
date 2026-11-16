@@ -2714,3 +2714,47 @@ export interface UsersRolesPage {
   login_report_url: string;
   import_url: string;
 }
+
+// ───────────── اعلان‌های پایش (فیگما ۲۰) ─────────────
+
+export type NoticeTone = "danger" | "warning" | "info" | "neutral";
+
+export interface InboxNotice {
+  id: number;
+  tab: "trigger" | "periodic" | "acceptance" | "evidence" | "other";
+  icon: string;
+  tone: NoticeTone;
+  title: string;
+  body: string;
+  chips: string[];
+  group: { key: string; label: string };
+  created: { iso: string; ago: string | null };
+  unread: boolean;
+  mine: boolean;
+  cta: { label: string; href: string; icon: string; primary: boolean };
+}
+
+export interface NoticeChannels {
+  in_app: boolean;
+  email: boolean;
+  sms: boolean;
+  delegate: boolean;
+}
+
+export interface MonitoringInbox {
+  unread: number;
+  summary: {
+    urgent: number;
+    urgent_days: number;
+    reviews: number;
+    review_days: number;
+    acceptances: number;
+    reminders: number[];
+    evidence: number;
+  };
+  tabs: { key: string; label: string; count: number }[];
+  notices: InboxNotice[];
+  calendar: { rank: number; name: string; cycle: string; count: number; next: string | null; overdue: boolean }[];
+  triggers: { key: string; label: string; rule: string }[];
+  channels: NoticeChannels;
+}

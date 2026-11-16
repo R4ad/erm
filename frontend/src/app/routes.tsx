@@ -333,7 +333,9 @@ export const routes: RouteObject[] = [
           },
           {
             path: "actions/notices",
-            lazy: async () => ({ Component: (await import("@/features/monitoring/MonitoringPages")).NoticeListPage }),
+            lazy: async () => ({
+              Component: (await import("@/features/monitoring/MonitoringInboxPage")).MonitoringInboxPage,
+            }),
           },
           {
             path: "actions/reviews/:pk",

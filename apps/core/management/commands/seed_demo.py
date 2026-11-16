@@ -14,6 +14,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.actions.acceptance import required_authorities, unit_managers
+from apps.actions.monitoring import record_trigger, run_monitoring
 from apps.actions.models import (
     AcceptanceSignature,
     ActionUpdate,
@@ -67,7 +68,35 @@ class Command(BaseCommand):
         self.questionnaire()
         self.method_draft()
         self.access()
+        self.monitoring()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
+
+    def monitoring(self):
+        """اعلان‌های پایش (فیگما ۲۰): شکست یک کنترل کلیدی، یک رخداد مهم و یک الزام تازه با همان ثبت محرک سامانه، و
+        سپس اجرای زمان‌بند پایش که بازبینی دوره‌ای، انقضای پذیرش و سررسید اقدام را اعلان می‌کند."""
+        T = RiskReview.Trigger
+        open_risks = Risk.objects.exclude(status__in=Risk.CLOSED_STATUSES).filter(merged_into__isnull=True)
+        risk = open_risks.filter(controls__is_key=True).distinct().order_by("pk").first()
+        if risk:
+            control = risk.controls.filter(is_key=True).first()
+            failure = f"شکست کنترل کلیدی {control.code} در آزمون دوره‌ای؛ تأیید دوم انتشار."
+            record_trigger(risk, self.sara, T.CONTROL, failure, control=control)
+        incident = open_risks.exclude(pk=risk.pk if risk else None).order_by("-pk").first()
+        reason = "رخداد مهم INC-20457؛ ارجاع فوری به پاسخ رخداد. امتیازدهی اقدام فوری را به تأخیر نمی‌اندازد."
+        record_trigger(incident, self.sara, T.INCIDENT, reason)
+        requirement = open_risks.filter(category__code="T8").first() or open_risks.order_by("pk").first()
+        review = record_trigger(
+            requirement, self.sara, T.REQUIREMENT, "بخشنامه‌ی رمز یک‌بارمصرف تراکنش؛ ثبت منبع و دامنه."
+        )
+        with transaction.atomic():
+            run_monitoring(self.today)
+        # پیش از امروز: الزام تازه دیروز آمده و دو اعلان قدیمی‌تر این هفته‌اند؛ یکی هم خوانده شده است
+        yesterday, earlier = timezone.now() - timedelta(days=1), timezone.now() - timedelta(days=3)
+        MonitoringNotice.objects.filter(event_key=f"trigger:{review.pk}").update(created_at=yesterday)
+        older = MonitoringNotice.objects.filter(recipient=self.sara, event_key__startswith="action:").order_by("pk")
+        MonitoringNotice.objects.filter(pk__in=list(older.values_list("pk", flat=True)[:2])).update(
+            created_at=earlier, read_at=earlier
+        )
 
     def access(self):
         """تعریف کاربر و نقش (فیگما ۱۹): ممیز بیرونی با دسترسی موقت، مدیر پروژه‌ای که مالک یک اقدام است و آخرین ورودها."""
@@ -1360,9 +1389,7 @@ class Command(BaseCommand):
         # شناسایی: ثبت‌شده، ارسال‌شده، در پاسخ به پرسش‌ها
         self.risk("قطع برق مرکز داده‌ی اصلی", "SRV-CORE", self.ali, "T7", S.REGISTERED)
         self.risk("وابستگی پایا به یک نیروی کلیدی", "SRV-PAYA", self.hossein, "T6", S.SUBMITTED)
-        question = self.risk(
-            "نبود سایت پشتیبان فعال برای سرویس پیامک", "SRV-SMS", self.ali, "T7", S.QUESTIONS, ready=False
-        )
+        self.risk("نبود سایت پشتیبان فعال برای سرویس پیامک", "SRV-SMS", self.ali, "T7", S.QUESTIONS, ready=False)
         self.risk("خطای پیکربندی فایروال شبکه‌ی مرکزی", "SRV-CORE", self.ali, "T1", S.REGISTERED, ready=False)
         self.risk("ادغام‌شدنی: قطع ساتنا در ساعات تسویه", "SRV-SATNA", self.hossein, "T3", S.SUBMITTED)
 
@@ -1370,19 +1397,3 @@ class Command(BaseCommand):
         closed = self.risk("انقضای مجوز نرم‌افزار پشتیبان‌گیری", "SRV-ARC", self.ali, "T2", S.CLOSED)
         self.assessment(closed, 1, 2, days_ago=200)
         self.risk("کپی تکراری ریسک قطع ساتنا", "SRV-SATNA", self.hossein, "T3", S.REJECTED)
-
-        # اعلان‌های پایش نخوانده‌ی سارا
-        for index, (risk, message) in enumerate(
-            [
-                (leak, "مهلت طرح مواجهه‌ی ریسک بحرانی فردا تمام می‌شود."),
-                (archive, "پذیرش ریسک منقضی شد؛ ادامه یعنی پذیرش تازه."),
-                (question, "پرسش ریسک سه روز است بی‌پاسخ مانده است."),
-            ]
-        ):
-            MonitoringNotice.objects.create(
-                recipient=self.sara,
-                risk=risk,
-                event_key=f"demo-{index}",
-                message=message,
-                href=risk.get_absolute_url(),
-            )
