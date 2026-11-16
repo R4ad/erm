@@ -2827,3 +2827,85 @@ export interface ScenarioLibrary {
   create_url: string | null;
   can_propose: boolean;
 }
+
+// ───────────── آزمون اثربخشی کنترل (فیگما ۲۲) ─────────────
+
+export type ControlTestState = "met" | "partial" | "unmet";
+
+export interface ControlTestRisk {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  assessment: { code: string; href: string };
+  approved: boolean;
+  paths: { id: number; name: string; b0: string | null; bc: string | null; bc_before: string | null; note: string }[];
+  b: string | null;
+  b_change: string | null;
+  l: string | null;
+  score: string | null;
+  level: Level | null;
+  alert: string | null;
+}
+
+export interface ControlTest {
+  id: number;
+  code: string;
+  control: {
+    id: number;
+    code: string;
+    title: string;
+    is_key: boolean;
+    owner: { id: number; name: string } | null;
+    href: string;
+  };
+  e: { value: number; name: string };
+  previous: { e: number; code: string; href: string } | null;
+  tester: { id: number; name: string } | null;
+  period: { from: Day | null; to: Day | null };
+  valid_until: (Day & { days_left: number; overdue: boolean }) | null;
+  evidence_age: string;
+  suspended: boolean;
+  cards: { key: string; label: string; state: ControlTestState; state_label: string; text: string }[];
+  plan: {
+    kind: string | null;
+    rows: { label: string; value: string }[];
+    paths: { name: string; passed: boolean }[];
+  };
+  results: {
+    summary: string | null;
+    rate: string | null;
+    rows: {
+      id: number;
+      reference: string;
+      date: Day;
+      path: string;
+      performer: string | null;
+      passed: boolean;
+      note: string | null;
+    }[];
+  };
+  ladder: {
+    current: number;
+    previous: number | null;
+    target: number | null;
+    levels: { value: number; name: string; text: string; criteria: string }[];
+    conditions: { key: string; label: string; met: boolean; note: string | null }[];
+    rationale: string;
+  };
+  risks: ControlTestRisk[];
+  others: { id: number; code: string; href: string; scope: string; state: string; tone: "warning" | "neutral" }[];
+  evidence: {
+    id: number;
+    code: string;
+    title: string;
+    kind: string;
+    observed_on: Day;
+    state: "current" | "stale" | "superseded";
+    state_label: string;
+    href: string;
+  }[];
+  rules: string[];
+  new_test_url: string | null;
+  edit_url: string | null;
+}

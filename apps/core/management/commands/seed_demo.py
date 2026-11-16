@@ -27,7 +27,7 @@ from apps.actions.models import (
 from apps.assessments.models import Assessment, AssessmentReview, ImpactDetail, Path
 from apps.catalog.models import Commitment, Customer, Dependency, Responsibility, Service, Supplier
 from apps.controls.effectiveness import Thresholds
-from apps.controls.models import Control, ControlAssessment, IsoControl
+from apps.controls.models import Control, ControlAssessment, ControlTestSample, IsoControl
 from apps.core.choices import Confidence
 from apps.core.models import Comment
 from apps.methodology.models import MethodParameter, MethodVersion
@@ -72,6 +72,7 @@ class Command(BaseCommand):
         self.access()
         self.scenario_library()
         self.monitoring()
+        self.control_test()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -233,6 +234,99 @@ class Command(BaseCommand):
         reason = "هر دو توقف پردازش ساتنا با خرابی پایگاه داده‌اند و کنترل و مالک یکسانی دارند."
         target = scenarios["قطع خدمت پرداخت به‌دلیل خرابی پایگاه داده"]
         propose(satna, self.neda, ScenarioProposal.Kind.MERGE, reason, target=target)
+
+    FAILED_SAMPLES = {
+        6: "تأیید دوم پس از انتشار ثبت شد",
+        18: "گام تأیید با نقش اضطراری دور زده شد",
+        34: "تأییدکننده‌ی دوم همان مجری بود",
+    }
+
+    def control_test(self):
+        """برگه‌ی آزمون کنترل (فیگما ۲۲): آزمون تأیید دوم انتشار با ۴۰ نمونه از سه مسیر و سه استثنا در مسیر اضطراری،
+        شکاف شناخته‌شده‌ای که E3 سال گذشته را به E2 رسانده، آزمون سال گذشته با شاهد منسوخ، و ریسک دیگری که همین
+        کنترل را دارد و در بازسنجی است. بعد از زمان‌بند پایش می‌آید تا اعلان‌های صفحه‌ی ۲۰ عوض نشوند."""
+        test = ControlAssessment.objects.filter(control__title="تأیید دوم انتشار (چهار چشم)").order_by("-pk").first()
+        if test is None:
+            return
+        ControlAssessment.objects.filter(pk=test.pk).update(
+            population="۳۱۲ انتشار در دوره · ۲۸۹ عادی و ۲۳ اضطراری",
+            test_method="بازبینی نمونه‌ای سوابق انتشار + اجرای عملی در محیط پیش‌تولید",
+            sample_size=40,
+            sample_rationale="اهمیت بالای کنترل؛ مسیر اضطراری عمداً بیش‌نمونه‌گیری شد",
+            critical_points="انتشار عادی، انتشار اضطراری و بازگردانی نسخه",
+            critical_points_covered=True,
+            known_gap=True,
+            failures="مسیر انتشار اضطراری از گام تأیید دوم عبور نمی‌کند",
+            rationale="استثناها مسیر اضطراری را کاملاً باز می‌گذارند؛ کنترل تا رفع شکاف در سطح E2 می‌ماند.",
+            verified_by=self.neda,
+        )
+        Control.objects.filter(pk=test.control_id).update(
+            objective="در صورت اجرا، تغییر نامعتبر را پیش از رسیدن به تولید متوقف می‌کند."
+        )
+        # شواهد آزمون پیش از تیکت‌های CAB دیده شده‌اند تا شاهد اول این کنترل در صفحه‌ی ۱۲ همان بماند
+        for title, summary, days_ago in [
+            ("گزارش آزمون نمونه‌ای انتشار", "۴۰ نمونه از سه مسیر انتشار", 14),
+            ("لاگ خط لوله‌ی انتشار · ۳۱۲ رکورد", "سوابق همه‌ی انتشارهای دوره", 14),
+            ("صورت‌جلسه‌ی بررسی استثناها", "بررسی سه استثنای مسیر اضطراری", 13),
+        ]:
+            item = Evidence.objects.create(
+                title=title,
+                kind=Evidence.Kind.TEST,
+                reliability=Evidence.Reliability.HIGH,
+                summary=summary,
+                source="واحد DevOps",
+                observed_on=self.today - timedelta(days=days_ago),
+                owner=self.sara,
+            )
+            test.evidence.add(item)
+        emergency = {2, 6, 10, 14, 18, 22, 26, 30, 34, 38}
+        rollback = {12, 25, 37}
+        people = [self.ali.get_full_name(), self.maryam.get_full_name(), self.sara.get_full_name()]
+        for index in range(40):
+            path = "انتشار اضطراری" if index in emergency else "بازگردانی نسخه" if index in rollback else "انتشار عادی"
+            note = self.FAILED_SAMPLES.get(index, "")
+            ControlTestSample.objects.create(
+                assessment=test,
+                reference=f"REL-1405-{2231 + index * 4}",
+                occurred_on=test.test_from + timedelta(days=index * 30 // 39),
+                path=path,
+                performer="" if note else people[index % len(people)],
+                passed=not note,
+                note=note,
+            )
+        proof = Evidence.objects.create(
+            title="آزمون سال گذشته",
+            kind=Evidence.Kind.TEST,
+            reliability=Evidence.Reliability.HIGH,
+            summary="آزمون ۴۰ انتشار در سال ۱۴۰۴",
+            source="واحد DevOps",
+            observed_on=self.today - timedelta(days=380),
+            owner=self.sara,
+        )
+        previous = ControlAssessment(
+            control=test.control,
+            method_version=self.version,
+            scope=test.scope,
+            exists=True,
+            design_ok=True,
+            operating_ok=True,
+            coverage_pct=100,
+            critical_points_covered=True,
+            sample_size=40,
+            test_from=self.today - timedelta(days=410),
+            test_to=self.today - timedelta(days=380),
+            e=3,
+            confidence=Confidence.MEDIUM,
+            rationale="شرط‌های E3 در آزمون سال گذشته برقرار بود.",
+            verified_by=self.neda,
+            created_by=self.sara,
+        )
+        previous.save()
+        previous.evidence.add(proof)
+        ControlAssessment.objects.filter(pk=previous.pk).update(created_at=timezone.now() - timedelta(days=380))
+        gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
+        if gateway:
+            gateway.controls.add(test.control)
 
     def monitoring(self):
         """اعلان‌های پایش (فیگما ۲۰): شکست یک کنترل کلیدی، یک رخداد مهم و یک الزام تازه با همان ثبت محرک سامانه، و
