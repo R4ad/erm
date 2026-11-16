@@ -2379,3 +2379,56 @@ export interface AnalysisPage {
   problems: string[];
   submit: { can_submit: boolean; url: string | null; problems: string[] };
 }
+
+// ───────────── سنجش ریسک (فیگما ۱۳) ─────────────
+
+export interface EvaluationRow {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  category: string;
+  scope: string;
+  status: { value: string; label: string };
+  l: number | null;
+  i: number | null;
+  score: number;
+  base_level: Level;
+  decision_level: Level;
+  raised: boolean;
+  reasons: string[];
+  authority: string;
+  deadline: {
+    kind: "awaiting" | "done" | "containment" | "plan";
+    text: string;
+    due: { iso: string; jalali: string } | null;
+    overdue: boolean;
+  };
+  sendable: boolean;
+  assessment_href: string;
+}
+
+export interface EvaluationLevel extends Level {
+  min_score: number;
+  max_score: number;
+  note: string;
+  decision_rule: string;
+  plan: string;
+  acceptance: string;
+  review: string;
+  count: number;
+}
+
+export interface EvaluationPage {
+  method: { number: number; status: { value: string; label: string }; href: string } | null;
+  levels: EvaluationLevel[];
+  raised: { count: number; reasons: string[] };
+  floors: { impact: number; level: string }[];
+  example: { code: string; score: number; level: string } | null;
+  rows: EvaluationRow[];
+  matrix: {
+    l: number;
+    cells: { i: number; score: number; level: Level | null; raised: boolean; count: number }[];
+  }[];
+  sendable: number[];
+}

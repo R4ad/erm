@@ -1168,6 +1168,20 @@ class Command(BaseCommand):
         self.impact_profile(mb, self.assessment(mb, 3, 10, status=Assessment.Status.DRAFT))
         self.analysis_assessment()
 
+        # سنجش‌شده و منتظر «ارسال به تصمیم» (فیگما ۱۳): یکی بحرانی، یکی با کف پیامد از امتیاز ۵ به «بالا»
+        ransom = self.risk("حمله‌ی باج‌افزاری به خدمت بانکی", "SRV-IPG", self.sara, "T1", S.ASSESSMENT)
+        self.assessment(ransom, 4, 25, days_ago=1)
+        outage = self.risk("خرابی هم‌زمان مرکز داده‌ی اصلی و پشتیبان", "SRV-CORE", self.ali, "T7", S.ASSESSMENT)
+        floor = self.assessment(outage, 3, 5, days_ago=2)
+        Assessment.objects.filter(pk=floor.pk).update(
+            base_level=self.levels[2],
+            likelihood_low=1,
+            likelihood_high=1,
+            impact_low=5,
+            impact_high=5,
+            escalation_reasons=["کف پیامد ۵: حداقل «بالا»"],
+        )
+
         # شناسایی: ثبت‌شده، ارسال‌شده، در پاسخ به پرسش‌ها
         self.risk("قطع برق مرکز داده‌ی اصلی", "SRV-CORE", self.ali, "T7", S.REGISTERED)
         self.risk("وابستگی پایا به یک نیروی کلیدی", "SRV-PAYA", self.hossein, "T6", S.SUBMITTED)

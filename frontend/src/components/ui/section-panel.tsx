@@ -28,8 +28,8 @@ export function SectionPanel({
   const id = useId();
   return (
     <Card role="region" aria-labelledby={id} className={cn("overflow-hidden", className)}>
-      <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">
+        <div className="flex min-w-[min(100%,15rem)] flex-1 flex-col gap-0.5">
           <h2 id={id} className="text-h3 font-semibold text-ink">
             {title}
           </h2>
