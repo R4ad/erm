@@ -334,6 +334,12 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import("@/features/admin/UsersRolesPage")).UsersRolesPage }),
           },
           {
+            path: "accounts/users/:id",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/admin/UserProfilePage")).UserProfilePage),
+            }),
+          },
+          {
             path: "accounts/staff-import",
             lazy: async () => ({ Component: (await import("@/features/admin/StaffImportPage")).StaffImportPage }),
           },

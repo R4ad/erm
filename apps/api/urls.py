@@ -3,7 +3,7 @@ from django.urls import path
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
-from . import ad_sync, impact_levels, method_diff
+from . import ad_sync, impact_levels, method_diff, user_profile
 
 app_name = "api"
 
@@ -37,6 +37,7 @@ urlpatterns = [
     path("org/chart/", org_chart.OrgChartView.as_view(), name="org_chart"),
     path("org/ad-sync/", ad_sync.AdSyncView.as_view(), name="ad_sync"),
     path("accounts/roles/", user_roles.UsersRolesView.as_view(), name="users_roles"),
+    path("accounts/users/<int:pk>/", user_profile.UserProfileView.as_view(), name="user_profile"),
     path("monitoring/inbox/", monitoring_inbox.MonitoringInboxView.as_view(), name="monitoring_inbox"),
     path("monitoring/inbox/read/", monitoring_inbox.NoticeReadView.as_view(), name="notices_read_all"),
     path("monitoring/inbox/<int:pk>/read/", monitoring_inbox.NoticeReadView.as_view(), name="notice_read"),

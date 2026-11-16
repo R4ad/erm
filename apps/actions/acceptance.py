@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.delegation import acts_for, current
 from apps.accounts.roles import Role
 from apps.assessments.services import decision_assessment
 from apps.core.choices import Confidence
@@ -25,7 +26,7 @@ from apps.methodology.models import RiskLevel
 from apps.risks.models import Risk
 from apps.workcalendar.workdays import add_period
 
-from .models import AcceptanceSignature, RiskAcceptance, TreatmentPlan
+from .models import AcceptanceSignature, MonitoringNotice, RiskAcceptance, TreatmentPlan
 from .permissions import EXECUTION_STATUSES, can_edit_plans
 from .services import PlanError, current_plan, plan_required
 
@@ -187,14 +188,33 @@ def can_sign(user, acceptance, authority):
         return False
     owner_id = acceptance.risk.owner_id
     if authority == AUTH.OWNER:
-        return user.pk == owner_id
-    if user.pk == owner_id:
+        # جانشین تفویض برقرار تا سطح تفویض به جای مالک امضا می‌کند (فیگما ۲۹)
+        return user.pk == owner_id or acts_for(user, acceptance.risk.owner, acceptance.assessment.decision_level)
+    owner_signature = signature_of(acceptance, AUTH.OWNER)
+    if user.pk == owner_id or (owner_signature and owner_signature.created_by_id == user.pk):
         return False
     if authority == AUTH.UNIT_MANAGER:
         return unit_managers(acceptance.risk).filter(pk=user.pk).exists()
     if authority == AUTH.COMMITTEE:
         return user.has_role(Role.SECURITY_COMMITTEE)
     return can_edit_plans(user)  # مدیریت ارشد: عضو GRC تصمیم را با نامه ثبت می‌کند (جواب س۵)
+
+
+def copy_to_owner(acceptance, signature):
+    """رونوشت تصمیم جانشین برای مالک، اگر تفویض آن را خواسته است."""
+    owner = acceptance.risk.owner
+    found = current(owner)
+    if found and found.copy_owner:
+        MonitoringNotice.objects.get_or_create(
+            recipient=owner,
+            event_key=f"delegate-sign-{signature.pk}",
+            defaults={
+                "risk": acceptance.risk,
+                "message": f"{signature.created_by.get_full_name() or signature.created_by.username} به جانشینی شما "
+                f"پذیرش {acceptance.code} را {signature.get_decision_display()} کرد.",
+                "href": acceptance.get_absolute_url(),
+            },
+        )
 
 
 def signable_authorities(user, acceptance):
@@ -255,6 +275,8 @@ def sign_acceptance(acceptance, user, authority, decision, note="", reference=""
         created_by=user,
     )
     acceptance._history_user = user
+    if authority == AUTH.OWNER and user.pk != acceptance.risk.owner_id:
+        copy_to_owner(acceptance, signature)
     if not signature.is_approval:
         acceptance.status = STATUS.REJECTED
         acceptance.closed_at = timezone.now()

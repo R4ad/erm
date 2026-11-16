@@ -12,7 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts import directory
-from apps.accounts.models import DirectoryConnection, DirectoryEntry, DirectorySync, User
+from apps.accounts.models import Delegation, DirectoryConnection, DirectoryEntry, DirectorySync, User
 from apps.accounts.roles import Role
 from apps.actions.acceptance import required_authorities, unit_managers
 from apps.actions.monitoring import record_trigger, run_monitoring
@@ -78,6 +78,7 @@ class Command(BaseCommand):
         self.verification()
         self.post_action()
         self.directory()
+        self.delegation()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -332,6 +333,17 @@ class Command(BaseCommand):
         gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
         if gateway:
             gateway.controls.add(test.control)
+
+    def delegation(self):
+        """تفویض اختیار زمان‌بندی‌شده (فیگما ۲۹): مدیر پرداخت در مرخصی، تصمیم تا سطح متوسط با کارشناس همان واحد."""
+        Delegation.objects.create(
+            user=User.objects.get(username="hossein"),
+            successor=User.objects.get(username="k.akbari"),
+            starts_on=self.today + timedelta(days=4),
+            ends_on=self.today + timedelta(days=18),
+            max_rank=2,
+            created_by=self.sara,
+        )
 
     def directory(self):
         """همگام‌سازی AD (فیگما ۲۸): اتصال، برداشت حساب‌ها و چند اجرای پیشین. برداشت از کاربران AD همین داده است با

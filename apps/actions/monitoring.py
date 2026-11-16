@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.accounts.delegation import forwarded
 from apps.accounts.roles import Role
 from apps.assessments.models import Assessment
 from apps.controls.models import ControlAssessment
@@ -51,6 +52,7 @@ def escalation_users(risk):
 
 def notify(risk, key, message, href, recipients):
     count = 0
+    recipients = [*recipients, *forwarded(recipients)]  # جانشین تفویض برقرار هم اعلان را می‌گیرد (فیگما ۲۹)
     for person in {
         user.pk: user for user in recipients if user and user.is_active
     }.values():

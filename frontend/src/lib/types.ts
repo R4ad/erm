@@ -3240,3 +3240,67 @@ export interface AdSync {
   successors: { id: number; name: string; unit: string }[];
   org_chart: string;
 }
+
+// «پروفایل کاربر» (فیگما ۲۹).
+export interface UserProfile {
+  id: number;
+  name: string;
+  initials: string;
+  username: string;
+  status: { value: string; label: string; tone: PostActionTone };
+  source: { value: "ad" | "local"; label: string };
+  subtitle: string;
+  identity: {
+    locked: boolean;
+    fields: { key: string; label: string; value: string; code?: boolean }[];
+    edit_url: string;
+  };
+  roles: {
+    key: string;
+    label: string;
+    tone: PostActionTone;
+    description: string;
+    scope: string;
+    origin: string;
+    since: string | null;
+    removable: boolean;
+  }[];
+  available_roles: { key: string; label: string }[];
+  sod: {
+    chip: { label: string; tone: PostActionTone };
+    checks: { text: string; tone: "success" | "warning" | "danger" }[];
+  };
+  delegation: {
+    id: number;
+    chip: { label: string; tone: PostActionTone };
+    successor: { id: number; name: string };
+    created: string;
+    period: string;
+    starts_on: string;
+    ends_on: string;
+    scope: string;
+    escalation: string;
+    max_rank: number;
+    notify_successor: boolean;
+    copy_owner: boolean;
+  } | null;
+  levels: { rank: number; name: string; color: string; text_color: string; delegable: boolean }[];
+  successors: { id: number; name: string; unit: string }[];
+  escalation: string;
+  duties: {
+    tiles: { key: string; label: string; value: number }[];
+    risks: {
+      id: number;
+      code: string;
+      title: string;
+      href: string;
+      score: number | null;
+      level: { rank: number; name: string; color: string; text_color: string } | null;
+    }[];
+    more: number;
+  };
+  activity: { key: string; icon: string; tone: string; title: string; note: string }[];
+  can_deactivate: boolean;
+  open_duties: string;
+  users_page: string;
+}

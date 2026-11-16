@@ -170,3 +170,32 @@ class DirectorySync(models.Model):
     def __str__(self):
         return f"{self.get_status_display()} {self.run_at:%Y-%m-%d %H:%M}"
 
+
+class Delegation(models.Model):
+    """تفویض اختیار موقت (فیگما ۲۹): در یک دوره‌ی مرخصی، جانشین به جای کاربر تصمیم مالک ریسک را تا سطح تعیین‌شده
+    ثبت می‌کند. سطوحی که پذیرششان با کمیته‌ی امنیت است (بالا و بحرانی) هرگز تفویض نمی‌شوند و در غیاب مالک به مدیر
+    بالادست ارجاع می‌شوند. تفویض پاسخ‌گویی مالک را حذف نمی‌کند."""
+
+    user = models.ForeignKey(User, verbose_name="تفویض‌کننده", on_delete=models.CASCADE, related_name="delegations")
+    successor = models.ForeignKey(User, verbose_name="جانشین", on_delete=models.PROTECT, related_name="acting_for")
+    starts_on = models.DateField("از تاریخ")
+    ends_on = models.DateField("تا تاریخ")
+    max_rank = models.PositiveSmallIntegerField("بالاترین رتبه‌ی سطح قابل تصمیم")
+    notify_successor = models.BooleanField("دریافت اعلان‌های پایش توسط جانشین", default=True)
+    copy_owner = models.BooleanField("رونوشت تصمیم‌های جانشین برای مالک", default=True)
+    created_by = models.ForeignKey(User, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField("زمان ثبت", default=timezone.now)
+    cancelled_at = models.DateTimeField("زمان لغو", null=True, blank=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "تفویض اختیار"
+        verbose_name_plural = "تفویض‌های اختیار"
+        ordering = ["-starts_on", "-pk"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(ends_on__gte=models.F("starts_on")), name="delegation_period"),
+            models.CheckConstraint(condition=~models.Q(successor=models.F("user")), name="delegation_not_to_self"),
+        ]
+
+    def __str__(self):
+        return f"تفویض {self.user} به {self.successor}"

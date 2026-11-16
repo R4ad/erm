@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Avatar } from "@/components/ui/avatar";
@@ -84,7 +85,9 @@ function UsersTable({ users }: { users: DirectoryUser[] }) {
                 <span className="flex items-center gap-2.5">
                   <Avatar name={user.name} />
                   <span className="flex min-w-0 flex-col">
-                    <span className="font-medium text-ink">{user.name}</span>
+                    <Link to={`/accounts/users/${user.id}`} className="font-medium text-ink hover:text-brand">
+                      {user.name}
+                    </Link>
                     <bdi className="code text-xs text-ink-3">{user.username}</bdi>
                   </span>
                 </span>
