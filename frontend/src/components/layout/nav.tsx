@@ -70,6 +70,7 @@ const NAV_ALIASES: [prefix: string, route: string][] = [
   ["/accounts/", "/accounts/users"],
   ["/risks/coverage", "/identification"],
   ["/risks/scenarios", "/identification"],
+  ["/committee", "/evaluation"],
 ];
 
 function allLinks(navigation: Navigation): NavLink[] {
@@ -134,7 +135,9 @@ function DeskItem({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  const icon = <Icon name={DESK_ICONS[link.key] ?? "file-text"} size={18} className={active ? "text-gold-bright" : ""} />;
+  const icon = (
+    <Icon name={DESK_ICONS[link.key] ?? "file-text"} size={18} className={active ? "text-gold-bright" : ""} />
+  );
   const content = (
     <>
       {active && (
@@ -219,7 +222,13 @@ function StepItem({
       {content}
     </a>
   ) : (
-    <Link to={link.route} viewTransition aria-current={active ? "page" : undefined} className={classes} onClick={onNavigate}>
+    <Link
+      to={link.route}
+      viewTransition
+      aria-current={active ? "page" : undefined}
+      className={classes}
+      onClick={onNavigate}
+    >
       {content}
     </Link>
   );
@@ -358,9 +367,7 @@ function CycleCard() {
         <div className="flex flex-col">
           <span className="text-xs font-medium text-on-dark">چرخه‌ی ارزیابی {fa(cycle.year)}</span>
           <span className="text-xs text-on-dark-muted">
-            {cycle.total
-              ? `${fa(cycle.assessed)} از ${fa(cycle.total)} ریسک سنجیده شد`
-              : "هنوز ریسکی در رجیستر نیست"}
+            {cycle.total ? `${fa(cycle.assessed)} از ${fa(cycle.total)} ریسک سنجیده شد` : "هنوز ریسکی در رجیستر نیست"}
           </span>
         </div>
         <span className="text-stat font-bold text-on-dark">{fa(percent)}٪</span>
@@ -437,9 +444,18 @@ export function Sidebar({
       )}
     >
       {/* نور ملایم پشت منو (Aurora)؛ فقط تزئین است. */}
-      <span aria-hidden className="pointer-events-none absolute -top-[110px] left-[70px] -z-10 size-[230px] rounded-full bg-[#6366f1]/45 blur-[60px]" />
-      <span aria-hidden className="pointer-events-none absolute top-[420px] -left-[110px] -z-10 size-[200px] rounded-full bg-[#a855f7]/22 blur-[60px]" />
-      <span aria-hidden className="pointer-events-none absolute top-[834px] left-[110px] -z-10 size-[200px] rounded-full bg-[#eab308]/12 blur-[60px]" />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -top-[110px] left-[70px] -z-10 size-[230px] rounded-full bg-[#6366f1]/45 blur-[60px]"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-[420px] -left-[110px] -z-10 size-[200px] rounded-full bg-[#a855f7]/22 blur-[60px]"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-[834px] left-[110px] -z-10 size-[200px] rounded-full bg-[#eab308]/12 blur-[60px]"
+      />
 
       <div className={cn("flex items-center gap-2.5 px-2 pt-1 pb-4", collapsed && "flex-col px-0")}>
         <Brand compact={collapsed} />
@@ -458,7 +474,10 @@ export function Sidebar({
         )}
       </div>
 
-      <nav aria-label={t("shell.mainNav")} className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1 [scrollbar-width:none]">
+      <nav
+        aria-label={t("shell.mainNav")}
+        className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1 [scrollbar-width:none]"
+      >
         <SectionTitle collapsed={collapsed}>{navigation.desk.title}</SectionTitle>
         <ul className="flex flex-col gap-0.5">
           {navigation.desk.items.map((link) => (

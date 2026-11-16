@@ -73,6 +73,7 @@ class Command(BaseCommand):
         self.scenario_library()
         self.monitoring()
         self.control_test()
+        self.committee()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
 
     SCENARIOS = [
@@ -327,6 +328,142 @@ class Command(BaseCommand):
         gateway = Risk.objects.filter(title="آسیب‌پذیری بحرانی قابل بهره‌برداری در درگاه اینترنتی").first()
         if gateway:
             gateway.controls.add(test.control)
+
+    def committee(self):
+        """جلسه‌ی کمیته‌ی امنیت (فیگما ۲۳): جلسه‌ی فوق‌العاده‌ی امروز در حال برگزاری با هفت حاضر و یک ناظر، شش مورد
+        دستور جلسه (دو بحرانی، سه بالا و یک تغییر روش) که دو مصوبه‌اش با همان سرویس ثبت و امضا شده‌اند، پرونده‌ی تصمیم
+        مورد در حال بررسی با سه گزینه، و جلسه‌ی قبلی با سه مصوبه‌ی باز که یکی از مهلت گذشته است."""
+        from apps.committee import services as committee
+        from apps.committee.models import AgendaItem, AgendaOption, Attendee, Meeting
+
+        users = {user.username: user for user in User.objects.all()}
+        risks = {
+            risk.code: risk
+            for risk in Risk.objects.filter(code__in=[f"RK-1405-{n:04d}" for n in (1, 2, 3, 4, 7, 8, 9, 17)])
+        }
+        privileged = risks["RK-1405-0008"]
+        record_trigger(
+            privileged,
+            self.sara,
+            RiskReview.Trigger.INCIDENT,
+            "رخداد INC-20462؛ نشست مشکوک با حساب ممتاز مشترک پیمانکار روی سرورهای تولید. ارجاع فوری به کمیته.",
+        )
+        now = timezone.localtime()
+        start = (now - timedelta(minutes=45)).replace(second=0, microsecond=0)
+        start = start.replace(minute=start.minute - start.minute % 15)
+        if start.date() != now.date():
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = min(start + timedelta(minutes=90), now.replace(hour=23, minute=59, second=0, microsecond=0))
+        meeting = Meeting.objects.create(
+            kind=Meeting.Kind.EXTRAORDINARY,
+            reason=f"ریسک بحرانی {privileged.code}",
+            date=self.today,
+            starts_at=start.time(),
+            ends_at=end.time(),
+            location="اتاق جلسات طبقه‌ی ۴",
+            secretary=self.neda,
+            quorum=4,
+            status=Meeting.Status.OPEN,
+            created_by=self.neda,
+        )
+        R = Attendee.Role
+        for username, role, position, present in [
+            ("reza", R.CHAIR, "معاون فناوری", True),
+            ("neda", R.SECRETARY, "متولی روش", True),
+            ("maryam", R.MEMBER, "مدیر امنیت اطلاعات", True),
+            ("mehdi", R.MEMBER, "کارگروه امنیت", True),
+            ("e.tavakoli", R.OBSERVER, "ممیزی داخلی", True),
+            ("ali", R.MEMBER, "مدیر عملیات", False),
+            ("n.sharifi", R.MEMBER, "امور مشتریان", False),
+        ]:
+            Attendee.objects.create(
+                meeting=meeting, user=users[username], role=role, position=position, present=present
+            )
+        K = AgendaItem.Kind
+        items = {}
+        for code, kind, detail in [
+            ("RK-1405-0008", K.EXPOSURE, "فوری"),
+            ("RK-1405-0009", K.PLAN, "بازبینی هفتگی"),
+            ("RK-1405-0002", K.EXCEPTION, "عبور از حد تحمل مشتری"),
+            ("RK-1405-0004", K.PROGRESS, ""),
+            ("RK-1405-0007", K.ACCEPTANCE, "۹۰ روزه"),
+        ]:
+            items[code] = AgendaItem.objects.create(meeting=meeting, risk=risks[code], kind=kind, detail=detail)
+        AgendaItem.objects.create(
+            meeting=meeting, title="تصویب ۳ تغییر روش", reference="ParameterSet v6", kind=K.METHOD, presenter=self.neda
+        )
+        high = self.version.risk_levels.get(rank=3)
+        review = items["RK-1405-0008"]
+        AgendaOption.objects.create(
+            item=review,
+            title="کاهش + مهار فوری",
+            description="حذف حساب‌های ممتاز مشترک، استقرار PAM با تأیید دوگانه و ضبط جلسه، پایش رفتاری حساب‌ها. هدف: "
+            "احتمال ۲ و پیامد ۵ با امتیاز ۱۰؛ پیامد ۵ حداقل در سطح «بالا» می‌ماند.",
+            owner_proposal=True,
+            cost="۲٫۸ میلیارد ریال",
+            target_level=high,
+            target_score=10,
+            due=self.today + timedelta(days=3),
+        )
+        AgendaOption.objects.create(
+            item=review,
+            title="پذیرش موقت ۳۰ روزه",
+            description="فقط با ضرورت مستند و اختیار رسمی؛ کنترل جبرانی: پایش ۲۴×۷ مرکز عملیات امنیت. تمدید خودکار "
+            "ممنوع است.",
+            expires=self.today + timedelta(days=30),
+            notes=[{"text": "یادآوری ۷ روزه", "tone": "neutral"}],
+        )
+        AgendaOption.objects.create(
+            item=review,
+            title="اجتناب",
+            description="قطع دسترسی راه دور پیمانکار به سرورهای تولید تا استقرار PAM؛ پشتیبانی شبانه با تیم داخلی "
+            "انجام می‌شود.",
+            notes=[
+                {"text": "نیازمند تأیید عملیات", "tone": "neutral"},
+                {"text": "اثر بر SLA پشتیبانی", "tone": "danger"},
+            ],
+        )
+        committee.start_review(review, self.neda)
+        committee.record_resolution(
+            items["RK-1405-0007"], self.neda, votes=(4, 0, 0), text="پذیرش موقت ۹۰ روزه با پایش ماهانه‌ی پشتیبان‌گیری"
+        )
+        plan = committee.record_resolution(
+            items["RK-1405-0009"], self.neda, votes=(3, 0, 0), text="تأیید طرح وصله‌ی درگاه با بازبینی هفتگی پیشرفت"
+        )
+        for signer, minutes in ((users["reza"], 24), (self.neda, 25)):
+            committee.sign(plan, signer)
+            plan.signatures.filter(user=signer).update(signed_at=start + timedelta(minutes=minutes))
+        AgendaItem.objects.filter(pk=plan.pk).update(decided_at=start + timedelta(minutes=23))
+        AgendaItem.objects.filter(pk=items["RK-1405-0007"].pk).update(decided_at=start + timedelta(minutes=15))
+        # جلسه‌ی عادی دو هفته پیش با سه مصوبه که هنوز انجام نشده‌اند
+        before = Meeting.objects.create(
+            date=self.today - timedelta(days=14),
+            starts_at=start.time(),
+            ends_at=end.time(),
+            location="اتاق جلسات طبقه‌ی ۴",
+            secretary=self.neda,
+            status=Meeting.Status.CLOSED,
+            created_by=self.neda,
+        )
+        Meeting.objects.filter(pk=before.pk).update(closed_at=timezone.now() - timedelta(days=14), closed_by=self.neda)
+        for subject, days in [
+            (risks["RK-1405-0003"], -2),
+            (risks["RK-1405-0017"], 10),
+            ("بازنگری حد تحمل بانک ملت", 20),
+        ]:
+            AgendaItem.objects.create(
+                meeting=before,
+                risk=subject if isinstance(subject, Risk) else None,
+                title="" if isinstance(subject, Risk) else subject,
+                kind=K.PLAN if isinstance(subject, Risk) else K.METHOD,
+                presenter=None if isinstance(subject, Risk) else self.neda,
+                status=AgendaItem.Status.APPROVED,
+                votes_for=4,
+                resolution="مصوب شد",
+                decided_at=timezone.now() - timedelta(days=14),
+                decided_by=self.neda,
+                follow_up_due=self.today + timedelta(days=days),
+            )
 
     def monitoring(self):
         """اعلان‌های پایش (فیگما ۲۰): شکست یک کنترل کلیدی، یک رخداد مهم و یک الزام تازه با همان ثبت محرک سامانه، و

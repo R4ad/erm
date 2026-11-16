@@ -2909,3 +2909,93 @@ export interface ControlTest {
   new_test_url: string | null;
   edit_url: string | null;
 }
+
+// ───────────── جلسه‌ی کمیته‌ی امنیت (فیگما ۲۳) ─────────────
+
+export type AgendaStatus = "pending" | "review" | "approved" | "deferred";
+
+export interface CommitteeOption {
+  id: number;
+  title: string;
+  description: string;
+  owner_proposal: boolean;
+  chips: { text: string; tone: "neutral" | "warning" | "danger"; level?: Level }[];
+}
+
+export interface CommitteeCase {
+  id: number;
+  subject: string;
+  kind: { value: string; label: string };
+  status: { value: AgendaStatus; label: string };
+  owner: { id: number; name: string } | null;
+  voters: number;
+  conflict: string | null;
+  options: CommitteeOption[];
+  decision: {
+    chosen: number | null;
+    votes: [number, number, number];
+    text: string;
+    at: Moment | null;
+    by: { id: number; name: string } | null;
+  } | null;
+  risk: { id: number; code: string; href: string } | null;
+  reference?: string | null;
+  assessment?: { code: string; href: string; confidence: string | null } | null;
+  scenario?: string | null;
+  score?: string | null;
+  level?: Level | null;
+  facts?: { label: string; value: string }[];
+  policy?: string | null;
+}
+
+export interface CommitteeMeeting {
+  id: number;
+  code: string;
+  title: string;
+  status: { value: "scheduled" | "open" | "closed"; label: string };
+  subtitle: string;
+  stats: {
+    agenda: { count: string; note: string };
+    quorum: { present: string; total: string; met: boolean; note: string };
+    previous: { count: string; note: string; meeting: { id: number; code: string; href: string } | null };
+    remaining: { value: string; note: string };
+  };
+  attendees: {
+    id: number;
+    name: string;
+    line: string;
+    state: "present" | "absent" | "observer" | "conflict";
+    state_label: string;
+  }[];
+  quorum: { text: string; met: boolean };
+  agenda: {
+    id: number;
+    number: number;
+    subject: string;
+    reference: string | null;
+    href: string | null;
+    level: Level | null;
+    kind: string;
+    owner: string | null;
+    status: { value: AgendaStatus; label: string };
+  }[];
+  selected: CommitteeCase | null;
+  signatures: {
+    item: number;
+    title: string;
+    rows: { id: number; name: string; role: string; signed_at: string | null; mine: boolean }[];
+    owner_note: boolean;
+  } | null;
+  authority: { level: Level; rule: string; deadline: string }[];
+  restricted: string | null;
+  minutes: {
+    number: number;
+    subject: string;
+    status: string;
+    text: string | null;
+    votes: [number, number, number] | null;
+  }[];
+  can_run: boolean;
+  candidates: { id: number; code: string; title: string }[];
+  kinds: { value: string; label: string }[];
+}

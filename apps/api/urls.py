@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
-from . import control_test, monitoring_inbox, org_chart, scenario_library, user_roles
+from . import committee, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
 
 app_name = "api"
@@ -41,6 +41,11 @@ urlpatterns = [
     path("monitoring/channels/", monitoring_inbox.NoticeChannelsView.as_view(), name="notice_channels"),
     path("scenarios/library/", scenario_library.ScenarioLibraryView.as_view(), name="scenario_library"),
     path("controls/effectiveness/<int:pk>/test/", control_test.ControlTestView.as_view(), name="control_test"),
+    path("committee/meetings/current/", committee.MeetingView.as_view(), name="committee_current"),
+    path("committee/meetings/<int:pk>/", committee.MeetingView.as_view(), name="committee_meeting"),
+    path("committee/meetings/<int:pk>/close/", committee.MeetingCloseView.as_view(), name="committee_close"),
+    path("committee/meetings/<int:pk>/items/", committee.MeetingItemsView.as_view(), name="committee_items"),
+    path("committee/items/<int:pk>/<str:action>/", committee.ItemActionView.as_view(), name="committee_item_action"),
     path("scenarios/proposals/", scenario_library.ScenarioProposalView.as_view(), name="scenario_proposals"),
     path(
         "scenarios/proposals/<int:pk>/decide/", scenario_library.ScenarioDecisionView.as_view(), name="scenario_decide"

@@ -433,6 +433,16 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import("@/features/evaluation/EvaluationPage")).EvaluationPage }),
           },
           {
+            path: "committee",
+            lazy: async () => ({ Component: (await import("@/features/committee/CommitteePage")).CommitteePage }),
+          },
+          {
+            path: "committee/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/committee/CommitteePage")).CommitteePage),
+            }),
+          },
+          {
             path: "analysis",
             lazy: async () => ({ Component: (await import("@/features/analysis/AnalysisPage")).AnalysisIndexPage }),
           },
