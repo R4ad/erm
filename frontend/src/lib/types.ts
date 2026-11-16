@@ -3175,3 +3175,21 @@ export interface MethodDiff {
   can_simulate: boolean;
   definition: string;
 }
+
+// «ویرایش بُعد پیامد» (فیگما ۲۷): سطوح یک بُعد با معیار و برچسب، ذی‌نفعان، قواعد، تاریخچه و ماشین‌حساب S.
+export interface ImpactLevels {
+  version: { number: number; name: string; chip: { label: string; tone: PostActionTone }; editable: boolean };
+  scale: { code: string; name: string; title: string; subtitle: string };
+  tabs: { code: string; name: string }[];
+  levels: { id: number; value: number; criteria: string; tags: string[] }[];
+  base: { name: string; levels: { id: number; value: number; criteria: string; tags: string[] }[] } | null;
+  stakeholders: { key: string; label: string; note: string; on: boolean }[];
+  stakeholder_note: string;
+  rules: string[];
+  history: { version: string; title: string; note: string; current: boolean }[];
+  calculator: {
+    fraction: number;
+    services: { id: number; label: string; critical: boolean; rto: number | null; mtpd: number | null }[];
+  } | null;
+  definition: string;
+}

@@ -314,6 +314,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "method/:number/impact/:code",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/ImpactLevelsPage")).ImpactLevelsPage),
+            }),
+          },
+          {
             path: "method/:number/reference",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),

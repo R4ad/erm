@@ -772,6 +772,19 @@ class Command(BaseCommand):
         low = draft.risk_levels.get(rank=1)
         low.review_value = 4
         save_with_reason(low, self.sara, "بازنگری ۱۴۰۵")
+        # برچسب‌های نمایشی سطوح S (فیگما ۲۷)؛ معیارها همان نسخه‌ی فعال‌اند.
+        tags = {
+            0: "بدون اثر",
+            1: "غیرحیاتی · داخلی؛ تا یک‌چهارم RTO",
+            2: "حیاتی · تا یک‌چهارم RTO؛ غیرحیاتی · تا RTO",
+            3: "حیاتی · تا RTO؛ غیرحیاتی · عبور از RTO",
+            4: "حیاتی · بین RTO و MTPD؛ ازدست‌رفتن ظرفیت",
+            5: "حیاتی · از MTPD به بالا؛ علت مشترک در دو بانک؛ توقف زنجیره‌ای",
+        }
+        for level in draft.scales.get(code="S").levels.all():
+            if level.value in tags:
+                level.tags = tags[level.value]
+                save_with_reason(level, self.sara, "برچسب‌های سطوح S")
 
     # ───────────── افراد و سازمان ─────────────
 

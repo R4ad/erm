@@ -248,6 +248,9 @@ class ScaleLevel(models.Model):
     value = models.PositiveSmallIntegerField("سطح")
     name = models.CharField("نام", max_length=200, blank=True)
     criteria = models.TextField("معیار", blank=True)
+    tags = models.CharField(
+        "برچسب‌ها", max_length=300, blank=True, help_text="برچسب‌های کوتاه نمایش سطح، جدا با «؛»؛ معیار را عوض نمی‌کنند."
+    )
     lower = models.DecimalField("کران پایین", max_digits=12, decimal_places=4, null=True, blank=True)
     upper = models.DecimalField("کران بالا", max_digits=12, decimal_places=4, null=True, blank=True)
 

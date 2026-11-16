@@ -3,7 +3,7 @@ from django.urls import path
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
 from . import questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
-from . import method_diff
+from . import impact_levels, method_diff
 
 app_name = "api"
 
@@ -66,6 +66,11 @@ urlpatterns = [
     path("method/definition/<int:number>/submit/", method_definition.MethodSubmitView.as_view(), name="method_submit"),
     path("method/definition/<int:number>/copy/", method_definition.MethodCopyView.as_view(), name="method_copy"),
     path("method/definition/<int:number>/diff/", method_diff.MethodDiffView.as_view(), name="method_diff"),
+    path(
+        "method/definition/<int:number>/impact/<str:code>/",
+        impact_levels.ImpactLevelsView.as_view(),
+        name="impact_levels",
+    ),
     path("questionnaires/", questionnaires.AnswerHomeView.as_view(), name="answer_home"),
     path("questionnaires/<int:pk>/start/", questionnaires.ResponseStartView.as_view(), name="response_start"),
     path("responses/<int:pk>/", questionnaires.ResponseDetailView.as_view(), name="response_detail"),

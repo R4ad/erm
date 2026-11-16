@@ -437,7 +437,13 @@ function ImpactPanel({ data }: { data: MethodDefinition }) {
                   {scale.stakeholders.join(" · ")}
                 </td>
                 <td data-label="سطوح">
-                  <Chip tone="success">{fa(scale.levels)} سطح تعریف‌شده</Chip>
+                  <Link
+                    to={`/method/${data.version.number}/impact/${scale.code}`}
+                    aria-label={`سطوح بُعد ${scale.name}`}
+                    className="inline-flex"
+                  >
+                    <Chip tone="success">{fa(scale.levels)} سطح تعریف‌شده</Chip>
+                  </Link>
                 </td>
               </tr>
             ))}
