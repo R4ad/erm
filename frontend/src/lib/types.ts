@@ -2149,3 +2149,88 @@ export interface AuditChangeRow {
 export interface AuditChangeList extends Listing<AuditChangeRow> {
   tabs: AuditTab[];
 }
+
+// ───────────── شناسایی ریسک (فیگما ۱۱) ─────────────
+
+export type IdentificationTextField =
+  | "mission"
+  | "subject"
+  | "objective"
+  | "conditions"
+  | "customer"
+  | "event"
+  | "harm"
+  | "impact"
+  | "dependencies"
+  | "evidence";
+
+export interface IdentificationValues extends Record<IdentificationTextField, string> {
+  org_unit: string;
+  target: string;
+  category: string;
+  tags: string[];
+  source: string;
+  scenario: string;
+  evidence_items: string[];
+}
+
+export interface IdentificationPart {
+  name: Extract<IdentificationTextField, "subject" | "objective" | "conditions" | "customer" | "event" | "harm">;
+  label: string;
+  token: string;
+}
+
+export interface IdentificationScenario {
+  id: number;
+  code: string;
+  title: string;
+  text: string;
+  service_id: number | null;
+  category: { id: number; code: string; name: string };
+  risk_count: number;
+}
+
+export interface IdentificationRow {
+  key: string;
+  code: string | null;
+  title: string;
+  category: string | null;
+  scenario: string | null;
+  service: string | null;
+  customer: string | null;
+  source: string;
+  stage: { value: string; label: string; tone: "neutral" | "info" | "warning" | "brand" };
+  owner: Person | null;
+  due: Deadline | null;
+  /** نشانی جنگوی پرونده‌ی ریسک، یا برای پیش‌نویس مسیر همین صفحه (route). */
+  href: string | null;
+  route: string | null;
+}
+
+export interface IdentificationChoices {
+  org_unit: { value: string; label: string; owner: Person | null }[];
+  target: {
+    value: string;
+    label: string;
+    service: { id: number; name: string; environment: string };
+    customer: string | null;
+    commitment: string | null;
+  }[];
+  category: { value: string; code: string; label: string }[];
+  source: { value: string; label: string }[];
+  evidence: { value: string; code: string; label: string }[];
+}
+
+export interface IdentificationPage {
+  can_identify: boolean;
+  parts: IdentificationPart[];
+  choices: IdentificationChoices | null;
+  scenarios: IdentificationScenario[];
+  values: IdentificationValues;
+  draft: { id: number; saved_at: Moment } | null;
+  text_limit: number;
+  recent: IdentificationRow[];
+  scenarios_url: string;
+  register_url: string;
+  evidence_url: string;
+}

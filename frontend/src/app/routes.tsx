@@ -397,6 +397,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "identification",
+            lazy: async () => ({
+              Component: (await import("@/features/identification/IdentificationPage")).IdentificationPage,
+            }),
+          },
+          {
             path: "responses/:id",
             lazy: async () => ({
               Component: keyedById((await import("@/features/questionnaires/ResponseFormPage")).ResponseFormPage),

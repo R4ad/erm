@@ -201,6 +201,17 @@ class Risk(TimeStampedModel):
         CHANGE = "change", "تغییر"
         SCAN = "scan", "اسکن"
         AUDIT = "audit", "ممیزی"
+        IDENTIFICATION = "identification", "فرم شناسایی"
+
+    class Source(models.TextChoices):
+        # «منبع شناسایی» فیگما ۱۱: ریسک از چه مجرایی اعلام شده است.
+        PERIODIC = "periodic", "ارزیابی دوره‌ای ریسک امنیت اطلاعات"
+        CHANGE = "change", "ثبت تغییرات نرمال"
+        NEW_ASSET = "new_asset", "اضافه شدن دارایی جدید"
+        NONCONFORMITY = "nonconformity", "مشاهده‌ی عدم انطباق"
+        ENVIRONMENT = "environment", "تغییر شرایط محیطی"
+        BEHAVIOR = "behavior", "تحلیل رفتار کاربر"
+        THREAT = "threat", "مشاهده‌ی تهدید"
 
     # ریسک ردشده یا بسته‌شده فقط سابقه است.
     CLOSED_STATUSES = [Status.REJECTED, Status.CLOSED]
@@ -271,6 +282,9 @@ class Risk(TimeStampedModel):
         help_text="کنترل‌هایی که این ریسک به آن‌ها تکیه دارد؛ ردیابی رجیستر به بیانیه‌ی کاربردپذیری از همین‌جاست.",
     )
     channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
+    source = models.CharField("منبع شناسایی", max_length=20, choices=Source.choices, blank=True)
+    # جواب‌های فرم شناسایی (فیگما ۱۱): مأموریت، اجزای الگوی سناریو، پیامد، وابستگی و شاهد، همان‌طور که واحد نوشت.
+    intake = models.JSONField("ورودی شناسایی", default=dict, blank=True)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False)
     needs_completion = models.BooleanField(
         "نیازمند تکمیل",
@@ -359,6 +373,27 @@ class Risk(TimeStampedModel):
         else:
             self.needs_completion = not (self.initiator.strip() and self.count_unit.strip() and self.scope.strip())
         super().save(*args, **kwargs)
+
+
+class IdentificationDraft(TimeStampedModel):
+    """پیش‌نویس فرم شناسایی (فیگما ۱۱). ریسک فقط با «ارسال برای شناسایی» ساخته می‌شود، تا پیش‌نویس نیمه‌کاره در
+    رجیستر، جهان ریسک و گزارش‌ها شمرده نشود. مقدارها همان فیلدهای فرم‌اند و با ارسال، پیش‌نویس پاک می‌شود."""
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.CASCADE, related_name="+"
+    )
+    org_unit = models.ForeignKey(
+        "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    data = models.JSONField("مقدارهای فرم", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "پیش‌نویس شناسایی"
+        verbose_name_plural = "پیش‌نویس‌های شناسایی"
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return self.data.get("event") or f"پیش‌نویس {self.pk}"
 
 
 class ExternalLink(TimeStampedModel):

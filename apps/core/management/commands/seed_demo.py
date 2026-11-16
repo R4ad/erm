@@ -22,7 +22,7 @@ from apps.actions.models import (
     TreatmentPlan,
 )
 from apps.assessments.models import Assessment, AssessmentReview, ImpactDetail, Path
-from apps.catalog.models import Customer, Dependency, Responsibility, Service, Supplier
+from apps.catalog.models import Commitment, Customer, Dependency, Responsibility, Service, Supplier
 from apps.controls.effectiveness import Thresholds
 from apps.controls.models import Control, ControlAssessment, IsoControl
 from apps.core.choices import Confidence
@@ -30,7 +30,8 @@ from apps.core.models import Comment
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, Question, Questionnaire, Response
-from apps.risks.models import Coverage, Evidence, ExternalLink, Risk, RiskCategory, RiskScenario
+from apps.risks.identification import narrative
+from apps.risks.models import Coverage, Evidence, ExternalLink, IdentificationDraft, Risk, RiskCategory, RiskScenario
 from apps.workcalendar.workdays import add_working_days
 from apps.workflow.models import RiskQuestion, StatusTransition
 
@@ -58,6 +59,7 @@ class Command(BaseCommand):
         self.risks()
         self.report_history()
         self.dependencies()
+        self.identification()
         self.universe()
         self.questionnaire()
         self.stdout.write(self.style.SUCCESS(f"{Risk.objects.count()} ریسک و {User.objects.count()} کاربر ساخته شد."))
@@ -310,6 +312,197 @@ class Command(BaseCommand):
         Response.objects.filter(pk=response.pk).update(
             created_at=timezone.now() - timedelta(days=(self.today - created).days),
             updated_at=timezone.now() - timedelta(minutes=10),
+        )
+
+    # ───────────── شناسایی ریسک (فیگما ۱۱) ─────────────
+
+    # سناریوهای کتابخانه: عنوان، خدمت، دسته، رویداد، شرایط، هدف یا تعهد، ذی‌نفع، پیامد.
+    LIBRARY = [
+        (
+            "اعمال بسته‌ی انتشار نامعتبر در تولید",
+            "SRV-SATNA",
+            "T2",
+            "اعمال تغییر نامعتبر در تولید",
+            "ثبت اشتباه تنظیمات مقصد در بسته‌ی انتشار",
+            "پردازش دستورهای پرداخت در پنجره‌ی SLA",
+            "بانک‌ها و داتین",
+            "توقف پردازش تا بازگردانی نسخه",
+        ),
+        (
+            "خطای پیکربندی در پنجره‌ی تغییر",
+            "SRV-CORE",
+            "T4",
+            "اعمال پیکربندی اشتباه روی تجهیزات شبکه",
+            "تغییر بدون بازبینی همتا در پنجره‌ی شبانه",
+            "دسترس‌پذیری شبکه‌ی مرکزی",
+            "داتین",
+            "قطع ارتباط خدمات وابسته",
+        ),
+        (
+            "توقف پردازش ساتنا",
+            "SRV-SATNA",
+            "T3",
+            "توقف پردازش دستورهای ساتنا",
+            "خرابی سرور پردازش بدون جایگزین گرم",
+            "تسویه‌ی بین‌بانکی روزانه",
+            "بانک‌ها",
+            "تأخیر تسویه و جریمه‌ی SLA",
+        ),
+        (
+            "قطع خدمت ارتباطی تأمین‌کننده",
+            "SRV-CORE",
+            "T5",
+            "قطع لینک ارتباطی تأمین‌کننده",
+            "وابستگی به یک تأمین‌کننده بدون مسیر جایگزین",
+            "ارتباط پایدار با بانک‌ها",
+            "همه‌ی بانک‌ها",
+            "قطع خدمات بین‌بانکی",
+        ),
+        (
+            "خروج اطلاعات از مسیر پشتیبانی",
+            "SRV-PORTAL",
+            "T1",
+            "خروج اطلاعات مشتری از مسیر پشتیبانی",
+            "دسترسی گسترده‌ی کارشناسان پشتیبانی به داده",
+            "محرمانگی اطلاعات بانک‌ها",
+            "بانک‌ها",
+            "افشای اطلاعات و شکایت رسمی",
+        ),
+        (
+            "استفاده‌ی نامجاز از دسترسی ممتاز باقی‌مانده",
+            "SRV-IPG",
+            "T1",
+            "استفاده‌ی نامجاز از حساب ممتاز",
+            "باقی ماندن دسترسی ممتاز پس از جابه‌جایی کارکنان",
+            "صحت تراکنش‌های پرداخت اینترنتی",
+            "بانک‌ها",
+            "دستکاری تراکنش",
+        ),
+    ]
+
+    def identification(self):
+        """کتابخانه‌ی سناریو، تعهدهای خدمت و ورودی‌های اخیر شناسایی در هر مرحله، به‌اضافه‌ی یک پیش‌نویس سارا."""
+        library = {}
+        for title, service, category, event, conditions, objective, customer, consequence in self.LIBRARY:
+            service = self.services[service]
+            scenario = RiskScenario(
+                title=title,
+                service=service,
+                service_name_snapshot=service.name,
+                event=event,
+                conditions=conditions,
+                objective=objective,
+                customer_text=customer,
+                consequence=consequence,
+                category=RiskCategory.objects.get(code=category),
+            )
+            scenario.narrative = scenario.build_narrative()
+            scenario.save()
+            library[title] = scenario
+        sla = Commitment.objects.create(
+            title="SLA پردازش ۹۹٫۵٪",
+            kind=Commitment.Kind.SLA,
+            customer=self.banks[0],
+            owner=self.hossein,
+            description="پردازش دستورهای پرداخت در پنجره‌ی زمانی مصوب",
+        )
+        sla.services.set([self.services["SRV-SATNA"], self.services["SRV-PAYA"]])
+        Commitment.objects.create(title="SLA دسترس‌پذیری ۹۹٫۹٪", kind=Commitment.Kind.SLA, owner=self.ali).services.set(
+            [self.services["SRV-CORE"]]
+        )
+        Commitment.objects.create(
+            title="گزارش رخداد امنیتی در ۴ ساعت", kind=Commitment.Kind.REGULATORY, owner=self.maryam
+        ).services.set([self.services["SRV-PORTAL"], self.services["SRV-IPG"]])
+
+        entries = [
+            # جدیدترین آخر ساخته می‌شود تا در «ورودی‌های اخیر» بالاتر بیاید.
+            (None, "SRV-PAYA", self.hossein, S.REGISTERED, Risk.Source.NEW_ASSET),
+            (
+                "استفاده‌ی نامجاز از دسترسی ممتاز باقی‌مانده",
+                "SRV-IPG",
+                self.hossein,
+                S.ASSESSMENT,
+                Risk.Source.NONCONFORMITY,
+            ),
+            ("خروج اطلاعات از مسیر پشتیبانی", "SRV-PORTAL", self.ali, S.QUESTIONS, Risk.Source.THREAT),
+            ("قطع خدمت ارتباطی تأمین‌کننده", "SRV-CORE", self.ali, S.REGISTERED, Risk.Source.PERIODIC),
+        ]
+        for title, code, owner, status, source in entries:
+            scenario = library.get(title)
+            service = self.services[code]
+            intake = (
+                {
+                    "mission": service.description or f"ارائه‌ی پایدار {service.name}",
+                    "subject": f"{service.name} · محیط تولید",
+                    "objective": scenario.objective,
+                    "conditions": scenario.conditions,
+                    "customer": scenario.customer_text,
+                    "event": scenario.event,
+                    "harm": scenario.consequence,
+                    "impact": "",
+                    "dependencies": "",
+                    "evidence": "گزارش رخداد مشابه",
+                }
+                if scenario
+                else {
+                    "mission": "تسویه‌ی دسته‌ای پایا",
+                    "subject": "پایا · کلاستر پایگاه داده‌ی تازه",
+                    "objective": "تسویه‌ی چرخه‌های پایا",
+                    "conditions": "راه‌اندازی کلاستر بدون آزمون بازیابی",
+                    "customer": "همه‌ی بانک‌ها",
+                    "event": "از دست رفتن داده‌ی چرخه‌ی جاری",
+                    "harm": "تکرار چرخه‌ی تسویه",
+                    "impact": "",
+                    "dependencies": "",
+                    "evidence": "فرض قابل آزمون: آزمون بازیابی انجام نشده است",
+                }
+            )
+            risk = Risk.objects.create(
+                title=title or "دارایی جدید: کلاستر پایگاه داده‌ی پایا",
+                description=narrative(intake),
+                channel=Risk.Channel.IDENTIFICATION,
+                source=source,
+                intake=intake,
+                category=scenario.category if scenario else RiskCategory.objects.get(code="T3"),
+                org_unit=service.org_unit,
+                service=service,
+                owner=owner,
+                scope=intake["subject"],
+                scenario=scenario,
+            )
+            risk.customers.set(service.customers.all())
+            Risk.objects.filter(pk=risk.pk).update(status=status)
+            if status == S.QUESTIONS:
+                RiskQuestion.objects.create(
+                    risk=risk,
+                    text="«دسترسی گسترده» دقیقاً کدام نقش‌ها و چه داده‌ای است؟ نمونه‌ی یک تیکت را پیوست کنید.",
+                    asked_by=self.sara,
+                    due=add_working_days(self.today, 5),
+                )
+
+        satna = self.services["SRV-SATNA"]
+        IdentificationDraft.objects.create(
+            created_by=self.sara,
+            org_unit=self.units["pay"],
+            data={
+                "org_unit": self.units["pay"].pk,
+                "target": f"{satna.pk}:{sla.pk}",
+                "mission": "پردازش و تسویه‌ی دستورهای پرداخت بین‌بانکی در پنجره‌ی زمانی مصوب",
+                "subject": "ساتنا · محیط تولید",
+                "objective": "پردازش دستورهای پرداخت در پنجره‌ی SLA",
+                "conditions": "ثبت اشتباه تنظیمات مقصد در بسته‌ی انتشار",
+                "customer": "بانک ملت و داتین",
+                "event": "اعمال تغییر نامعتبر در محیط تولید",
+                "harm": "",
+                "impact": "جبران SLA و یک شکایت رسمی بانک ملت",
+                "dependencies": "پایپ‌لاین انتشار · بدون مسیر جایگزین خودکار",
+                "evidence": "۲۰ بسته‌ی نامعتبر یکتا از ۱۰۰۰ بسته در ۱۲ ماه؛ پوشش ثبت ۹۸٪",
+                "category": RiskCategory.objects.get(code="T2").pk,
+                "tags": ["ساخت و انتشار", "غیرسایبری"],
+                "source": Risk.Source.CHANGE,
+                "scenario": None,
+                "evidence_items": [],
+            },
         )
 
     def report_history(self):
