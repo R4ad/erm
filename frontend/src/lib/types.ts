@@ -2611,3 +2611,53 @@ export interface MethodDefinition {
   impact_scales: { code: string; name: string; scope: string; stakeholders: string[]; levels: number }[];
   admin_url: string | null;
 }
+
+// ───────────── چارت سازمانی (فیگما ۱۸) ─────────────
+
+export interface OrgNode {
+  id: number;
+  code: string | null;
+  name: string;
+  depth: number;
+  manager: Person | null;
+  manager_title: string;
+  risks: number;
+  critical: number;
+  children: OrgNode[];
+}
+
+export interface OrgMember {
+  id: number;
+  name: string;
+  username: string;
+  initials: string;
+  job_title: string;
+  roles: { label: string; tone: "info" | "warning" | "success" | "neutral" }[];
+  source: { value: string; label: string };
+  active: boolean;
+}
+
+export interface OrgChartPage {
+  summary: { units: number; levels: number; users: number };
+  tree: OrgNode[];
+  selected: {
+    id: number;
+    code: string | null;
+    name: string;
+    active: boolean;
+    ad_group: string;
+    parent: string | null;
+    manager: Person | null;
+    deputy: Person | null;
+    services: string[];
+    customers: string[];
+    acceptance: string | null;
+    levels: { rank: number; name: string; count: number }[];
+    edit_url: string | null;
+    add_child_url: string | null;
+  } | null;
+  members: OrgMember[];
+  can_edit: boolean;
+  add_unit_url: string | null;
+  add_member_url: string | null;
+}

@@ -24,6 +24,18 @@ class OrgUnit(TimeStampedModel):
         related_name="children",
     )
     is_active = models.BooleanField("فعال", default=True)
+    # چارت سازمانی (فیگما ۱۸): جانشین مدیر و گروه Active Directory همین واحد
+    deputy = models.ForeignKey(
+        "accounts.User",
+        verbose_name="جانشین مدیر",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deputy_units",
+    )
+    ad_group = models.CharField(
+        "گروه AD", max_length=200, blank=True, help_text="مسیر گروه یا OU در Active Directory، مثل OU=BankOps,DC=datin."
+    )
 
     history = HistoricalRecords()
 

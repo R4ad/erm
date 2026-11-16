@@ -29,6 +29,11 @@ class OrgUnitCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, C
     success_url = reverse_lazy("organization:unit_list")
     success_message = "واحد «%(name)s» اضافه شد."
 
+    def get_initial(self):
+        # «افزودن زیرواحد» در چارت سازمانی (فیگما ۱۸) واحد بالادست را از نشانی می‌فرستد.
+        parent = self.request.GET.get("parent")
+        return {"parent": parent} if parent and parent.isdigit() else {}
+
 
 class OrgUnitUpdateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, UpdateView):
     model = OrgUnit

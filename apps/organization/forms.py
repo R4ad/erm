@@ -31,7 +31,7 @@ class UnitChoiceField(forms.ModelChoiceField):
 class OrgUnitForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = OrgUnit
-        fields = ["name", "parent", "code", "is_active"]
+        fields = ["name", "parent", "code", "deputy", "ad_group", "is_active"]
         field_classes = {"parent": UnitChoiceField}
 
     def __init__(self, *args, **kwargs):

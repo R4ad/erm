@@ -7,6 +7,10 @@ from .roles import Role
 from simple_history.models import HistoricalRecords
 
 class User(AbstractUser):
+    class Source(models.TextChoices):
+        LOCAL = "local", "محلی"
+        AD = "ad", "AD"
+
     personnel_code = models.CharField(
         "کد پرسنلی",
         max_length=20,
@@ -16,6 +20,13 @@ class User(AbstractUser):
         validators=[RegexValidator(r"^\d+$", "کد پرسنلی فقط باید رقم باشد.")],
     )
     job_title = models.CharField("عنوان شغلی", max_length=200, blank=True)
+    source = models.CharField(
+        "منبع حساب",
+        max_length=10,
+        choices=Source.choices,
+        default=Source.LOCAL,
+        help_text="حساب محلی سامانه یا حسابی که از Active Directory همگام می‌شود.",
+    )
     org_unit = models.ForeignKey(
         "organization.OrgUnit",
         verbose_name="واحد سازمانی",

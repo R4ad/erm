@@ -105,19 +105,46 @@ class Command(BaseCommand):
         self.mehdi = self.user("mehdi", "مهدی", "فرهادی", Role.SECURITY_WORKGROUP, job="کارشناس عملیات")
         self.reza = self.user("reza", "رضا", "کریمی", Role.SECURITY_COMMITTEE, job="عضو کمیته امنیت")
         self.neda = self.user("neda", "ندا", "احمدی", Role.GRC_MEMBER, job="کارشناس ریسک")
+        # اعضای بی‌نقش سامانه‌ای که فقط از AD می‌آیند (چارت سازمانی، فیگما ۱۸)
+        self.kian = self.user("k.akbari", "کیان", "اکبری", job="جانشین مدیر پرداخت")
+        self.nima = self.user("n.sharifi", "نیما", "شریفی", job="کارشناس عملیات پرداخت")
+        self.elham = self.user("e.tavakoli", "الهام", "توکلی", job="کارشناس کنترل")
+        for member in (self.kian, self.nima, self.elham):
+            member.set_unusable_password()
+            member.save(update_fields=["password"])
 
     def organization(self):
-        root = OrgUnit.objects.create(name="داتین", code="DTN")
+        # چارت سازمانی (فیگما ۱۸): سه سطح، با معاونت‌هایی که واحدهای فنی و امنیت زیرشان است
+        root = OrgUnit.objects.create(name="داتین", code="DTN", ad_group="DC=datin")
+        tech = OrgUnit.objects.create(
+            name="معاونت فناوری و عملیات", code="TEC", parent=root, ad_group="OU=Tech · DC=datin"
+        )
+        guard = OrgUnit.objects.create(
+            name="معاونت امنیت و ریسک", code="SCR", parent=root, ad_group="OU=SecRisk · DC=datin"
+        )
         self.units = {
-            "infra": OrgUnit.objects.create(name="زیرساخت", code="INF", parent=root),
-            "ops": OrgUnit.objects.create(name="عملیات زیرساخت", code="OPS", parent=root),
-            "sec": OrgUnit.objects.create(name="امنیت اطلاعات", code="SEC", parent=root),
-            "risk": OrgUnit.objects.create(name="واحد ریسک", code="RSK", parent=root),
-            "pay": OrgUnit.objects.create(name="پرداخت", code="PAY", parent=root),
+            "tech": tech,
+            "guard": guard,
+            "infra": OrgUnit.objects.create(name="زیرساخت", code="INF", parent=tech, ad_group="OU=Infra · DC=datin"),
+            "ops": OrgUnit.objects.create(name="عملیات زیرساخت", code="OPS", parent=tech, ad_group="OU=Ops · DC=datin"),
+            "sec": OrgUnit.objects.create(name="امنیت اطلاعات", code="SEC", parent=guard, ad_group="OU=Sec · DC=datin"),
+            "risk": OrgUnit.objects.create(name="واحد ریسک", code="RSK", parent=guard),
+            "pay": OrgUnit.objects.create(name="پرداخت", code="PAY", parent=root, ad_group="OU=Pay · DC=datin"),
             "proc": OrgUnit.objects.create(name="تدارکات", code="PRC", parent=root),
         }
-        for user, unit in [(self.ali, "infra"), (self.ali, "ops"), (self.maryam, "sec"), (self.hossein, "pay")]:
+        for user, unit in [
+            (self.ali, "tech"),
+            (self.ali, "infra"),
+            (self.ali, "ops"),
+            (self.maryam, "guard"),
+            (self.maryam, "sec"),
+            (self.hossein, "pay"),
+        ]:
             user.managed_units.add(self.units[unit])
+        for unit, deputy in (("infra", self.mehdi), ("sec", self.reza), ("pay", self.kian)):
+            OrgUnit.objects.filter(pk=self.units[unit].pk).update(deputy=deputy)
+        # کاربرهای همگام با AD؛ کاربرهای GRC حساب محلی سامانه‌اند
+        User.objects.exclude(pk__in=[self.sara.pk, self.neda.pk]).update(source=User.Source.AD)
         for user, unit in [
             (self.sara, "risk"),
             (self.neda, "risk"),
@@ -126,6 +153,9 @@ class Command(BaseCommand):
             (self.hossein, "pay"),
             (self.mehdi, "ops"),
             (self.reza, "sec"),
+            (self.kian, "pay"),
+            (self.nima, "pay"),
+            (self.elham, "sec"),
         ]:
             user.org_unit = self.units[unit]
             user.save(update_fields=["org_unit"])
