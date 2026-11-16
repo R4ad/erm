@@ -79,7 +79,7 @@ function AssessmentCard({ card }: { card: PostActionCard }) {
           </Chip>
         )}
       </div>
-      <dl className="grid grid-cols-4 gap-1.5" dir="ltr">
+      <dl className="grid grid-cols-4 gap-1.5">
         {factors.map(([label, value]) => (
           <div key={label} className="flex flex-col items-center gap-0.5 rounded-md border border-line bg-panel py-1.5">
             <dt className="text-[0.6875rem] text-ink-3">{label}</dt>
