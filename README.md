@@ -41,6 +41,28 @@ docker compose --profile prod up -d --build
 docker compose exec web python manage.py createsuperuser
 ```
 
+### پشت nginx دیگر (HTTPS مشترک)
+
+اگر روی سرور پروژه‌ی دیگری پورت‌های 80 و 443 را دارد، nginx همان پروژه با نام دامنه‌ی جدا درخواست‌های سامانه را
+به nginx سامانه می‌فرستد. در ‎`.env` سامانه:
+
+```dotenv
+COMPOSE_FILE=docker-compose.yml:docker/behind-proxy.yml
+FRONT_PROXY_NETWORK=<شبکه‌ی Docker آن nginx، مثلاً other-project_default>
+HTTP_BIND=127.0.0.1:8081
+BEHIND_HTTPS_PROXY=True
+CSRF_TRUSTED_ORIGINS=https://erm.example.local
+ALLOWED_HOSTS=erm.example.local,localhost,127.0.0.1
+```
+
+این کارها را می‌کند:
+- nginx سامانه پورت 80 سرور را نمی‌گیرد و فقط روی `127.0.0.1:8081` باز است.
+- nginx سامانه به شبکه‌ی آن پروژه وصل می‌شود و آن‌جا با نام `erm-nginx` پیدا می‌شود.
+- نشانی کاربر و HTTPS بودن درخواست از سرآیندهای پروکسی جلویی خوانده می‌شود (`docker/nginx/nginx-behind-proxy.conf`).
+
+در nginx جلویی یک `server` با `server_name` همان نام و `proxy_pass http://erm-nginx:80` لازم است که
+`X-Forwarded-Proto https` و `X-Forwarded-For` را بفرستد.
+
 ## توسعه روی سیستم خودتان
 
 فقط پایگاه داده را با Docker بالا بیاورید (بدون پروفایل prod فقط `db` اجرا می‌شود):
