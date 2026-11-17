@@ -99,3 +99,12 @@ def test_add_child_unit_presets_the_parent(client, admin, org):
     client.force_login(admin)
     response = client.get(f"/units/new/?parent={org['tech'].pk}")
     assert response.context["form"].initial["parent"] == str(org["tech"].pk)
+
+
+def test_add_member_opens_the_new_user_form_with_the_selected_unit(client, admin, org):
+    client.force_login(admin)
+    data = client.get(f"{URL}?unit={org['infra'].pk}").json()
+    assert data["add_member_url"] == f"/accounts/users/new/?org_unit={org['infra'].pk}"
+    response = client.get(data["add_member_url"])
+    assert response.status_code == 200
+    assert response.context["form"].initial["org_unit"] == str(org["infra"].pk)

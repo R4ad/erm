@@ -78,6 +78,7 @@ const FORM_ROUTES = [
   "units/:pk/edit",
   "holidays/new",
   "holidays/:pk/edit",
+  "accounts/users/new",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });

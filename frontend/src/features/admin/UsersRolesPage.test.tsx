@@ -88,7 +88,7 @@ function page(): PageData {
       ],
       rules: [{ text: "مجری اقدام نمی‌تواند تأییدکننده‌ی اثربخشی همان اقدام باشد.", where: "قید پایگاه داده" }],
     },
-    add_user_url: "/admin/accounts/user/add/",
+    add_user_url: "/accounts/users/new/",
     login_report_url: "/audit/?event=login",
     import_url: "/accounts/staff-import/",
   };
@@ -126,6 +126,8 @@ describe("UsersRolesPage", () => {
     expect(within(card).getByText("واحد خود و زیرواحدها").closest("li")).toHaveAttribute("aria-current", "true");
     expect(within(card).getByText("فقط پیشنهاد به کمیته امنیت")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "گزارش ورود" })).toHaveAttribute("href", "/audit?event=login");
+    // کاربر جدید در فرم خود سامانه ساخته می‌شود، نه پنل ادمین جنگو که مدیر سامانه‌ی غیر staff را راه نمی‌دهد.
+    expect(screen.getByRole("link", { name: "کاربر جدید" })).toHaveAttribute("href", "/accounts/users/new");
     await expectNoAxeViolations(container);
   });
 

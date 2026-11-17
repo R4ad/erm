@@ -141,6 +141,7 @@ FORM_PAGES = {
     "organization:unit_update": None,
     "workcalendar:holiday_create": None,
     "workcalendar:holiday_update": None,
+    "accounts:user_create": None,
     "accounts:staff_import": staff_import_form,
 }
 

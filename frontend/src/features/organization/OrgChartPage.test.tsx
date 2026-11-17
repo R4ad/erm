@@ -87,7 +87,7 @@ function page(changes: Partial<PageData> = {}): PageData {
     can_edit: true,
     add_unit_url: "/units/new/",
     ad_sync_url: "/units/ad-sync",
-    add_member_url: "/admin/accounts/user/add/",
+    add_member_url: "/accounts/users/new/?org_unit=2",
     ...changes,
   };
 }
@@ -116,6 +116,7 @@ describe("OrgChartPage", () => {
     expect(within(detail).getByText("همگام با AD")).toBeInTheDocument();
     expect(within(detail).getByRole("link", { name: "ویرایش واحد" })).toHaveAttribute("href", "/units/2/edit");
     expect(within(detail).getByRole("link", { name: "افزودن زیرواحد" })).toHaveAttribute("href", "/units/new?parent=2");
+    expect(screen.getByRole("link", { name: "افزودن عضو" })).toHaveAttribute("href", "/accounts/users/new?org_unit=2");
 
     const members = screen.getByRole("table", { name: "اعضای واحد معاونت فناوری" });
     const rows = within(members).getAllByRole("row").slice(1);

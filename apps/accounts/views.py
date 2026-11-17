@@ -5,14 +5,23 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
+from django.contrib.messages.views import SuccessMessageMixin
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
+from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
+from django.views.generic import CreateView
 
 from apps.api.spa import spa_login_url, spa_ready
-from apps.core.views import FilteredListView
+from apps.core.views import FilteredListView, FormPageMixin
 
-from .forms import LoginForm, StaffFileForm, StaffImportConfirmForm, UserFilterForm
+from .forms import (
+    LoginForm,
+    StaffFileForm,
+    StaffImportConfirmForm,
+    UserCreateForm,
+    UserFilterForm,
+)
 from .models import User
 from .permissions import RoleRequiredMixin, role_required
 from .roles import Role
@@ -101,3 +110,19 @@ class UserListView(RoleRequiredMixin, FilteredListView):
     filter_form_class = UserFilterForm
     template_name = "accounts/user_list.html"
     context_object_name = "users"
+
+
+class UserCreateView(RoleRequiredMixin, SuccessMessageMixin, FormPageMixin, CreateView):
+    """«کاربر جدید» در تعریف کاربر و نقش و «افزودن عضو» در چارت سازمانی. پیش‌تر به پنل ادمین جنگو می‌رفت که فقط
+    کاربر staff را راه می‌دهد و مدیر سامانه (که staff نیست) پیام «اجازه‌ی مشاهده ندارید» می‌گرفت."""
+
+    roles = (Role.SYSTEM_ADMIN,)
+    model = User
+    form_class = UserCreateForm
+    success_url = reverse_lazy("accounts:user_list")
+    success_message = "کاربر «%(username)s» تعریف شد."
+
+    def get_initial(self):
+        # «افزودن عضو» در چارت سازمانی واحد انتخاب‌شده را از نشانی می‌فرستد.
+        unit = self.request.GET.get("org_unit")
+        return {"org_unit": unit} if unit and unit.isdigit() else {}

@@ -280,12 +280,10 @@ function Members({ data }: { data: PageData }) {
       description="نقش در سامانه مستقل از سمت سازمانی تخصیص می‌یابد"
       aside={
         data.add_member_url && (
-          <Button asChild variant="outline" size="sm">
-            <a href={data.add_member_url}>
-              <Icon name="plus" />
-              افزودن عضو
-            </a>
-          </Button>
+          <AppLink href={data.add_member_url} button={{ variant: "outline", size: "sm" }}>
+            <Icon name="plus" />
+            افزودن عضو
+          </AppLink>
         )
       }
       bodyClassName="p-0"

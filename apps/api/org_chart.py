@@ -134,6 +134,12 @@ def unit_detail(unit, children, risk_ranks, levels, user):
     }
 
 
+def add_member_url(unit):
+    """«افزودن عضو» فرم کاربر جدید را با واحد انتخاب‌شده (اگر فعال باشد) باز می‌کند."""
+    url = reverse("accounts:user_create")
+    return f"{url}?org_unit={unit.pk}" if unit and unit.is_active else url
+
+
 def members(unit):
     users = (
         User.objects.filter(Q(org_unit=unit) | Q(managed_units=unit))
@@ -205,6 +211,6 @@ class OrgChartView(ApiView):
                 "can_edit": user.is_system_admin,
                 "add_unit_url": reverse("organization:unit_create") if user.is_system_admin else None,
                 "ad_sync_url": ad_sync.sync_url(user),
-                "add_member_url": reverse("admin:accounts_user_add") if user.is_system_admin else None,
+                "add_member_url": add_member_url(selected) if user.is_system_admin else None,
             }
         )

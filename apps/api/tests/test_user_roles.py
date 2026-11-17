@@ -50,6 +50,8 @@ def test_roles_come_from_groups_and_records_and_owner_control_overlap_is_a_confl
     )
     assert rows["gone"]["status"]["value"] == "inactive"
     assert data["users"][-1]["username"] == "gone"
+    # فرم کاربر جدید خود سامانه، نه /admin/ که مدیر سامانه‌ی غیر staff را راه نمی‌دهد.
+    assert data["add_user_url"] == "/accounts/users/new/"
 
     summary = data["summary"]
     assert summary["roles"] == 11 and summary["conflicts"] == 1 and summary["temporary"] == 1

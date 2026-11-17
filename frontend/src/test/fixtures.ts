@@ -515,6 +515,7 @@ export const routeTable: RouteEntry[] = [
     route: "/holidays/:pk/edit",
     form: true,
   },
+  { name: "accounts:user_create", pattern: "^/accounts/users/new/$", route: "/accounts/users/new", form: true },
   { name: "accounts:staff_import", pattern: "^/accounts/staff-import/$", route: "/accounts/staff-import", form: true },
 ];
 

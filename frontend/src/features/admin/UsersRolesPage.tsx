@@ -502,12 +502,10 @@ export function UsersRolesPage() {
                 <Icon name="merge" />
                 همگام‌سازی AD
               </Button>
-              <Button asChild variant="primary">
-                <a href={data.add_user_url}>
-                  <Icon name="plus" />
-                  کاربر جدید
-                </a>
-              </Button>
+              <AppLink href={data.add_user_url} button={{ variant: "primary" }}>
+                <Icon name="plus" />
+                کاربر جدید
+              </AppLink>
             </>
           )
         }

@@ -374,7 +374,7 @@ class UsersRolesView(ApiView):
                     for key, label, stage, access in MATRIX
                 ],
                 "sod": {"conflicts": found, "rules": [{"text": text, "where": where} for text, where in SOD_RULES]},
-                "add_user_url": reverse("admin:accounts_user_add"),
+                "add_user_url": reverse("accounts:user_create"),
                 "login_report_url": f"{reverse('audit:event_list')}?event=login",
                 "import_url": reverse("accounts:staff_import"),
             }

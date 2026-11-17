@@ -235,7 +235,7 @@ def test_only_listed_pages_open_through_the_bridge(api, grc, system_admin):
     client = api(system_admin)
 
     # صفحه‌ای که در فهرست فرم‌ها نیست (حتی برای مدیر سامانه) انگار وجود ندارد.
-    assert form(client, "/accounts/users/new/").status_code == 404
+    assert form(client, "/accounts/login/").status_code == 404
     assert form(client, "/risks/").status_code == 404
     assert page(client, "/risks/new/").status_code == 404
     assert form(client, "/no-such-page/").status_code == 404
