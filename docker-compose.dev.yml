@@ -1,0 +1,55 @@
+# محیط توسعه روی سرور: Django با runserver و رابط با Vite، هر دو روی کد همین پوشه و با بارگذاری خودکار بعد از هر
+# تغییر. پروژه، پایگاه داده و volumeهای خودش را دارد و به نسخه‌ی تستی (docker-compose.yml) کاری ندارد.
+# در ‎.env همین پوشه: COMPOSE_FILE=docker-compose.dev.yml، تا دستورهای docker compose همین فایل را بخوانند.
+# رابط فقط روی 127.0.0.1 سرور باز است و از راه تونل SSH باز می‌شود (README، «توسعه روی سرور»).
+name: erm-dev
+
+services:
+  db:
+    image: postgres:17
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    image: erm-web:dev
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app/frontend
+    # node_modules داخل مخزن برای مک نصب شده (بسته‌های native فرق دارند)؛ این‌جا در volume جدا برای لینوکس نصب می‌شود
+    # و به فایل‌های مخزن دست نمی‌زند.
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
+    environment:
+      DJANGO_URL: http://web:8000
+    volumes:
+      - .:/app
+      - node_modules:/app/frontend/node_modules
+    ports:
+      - "127.0.0.1:${DEV_PORT:-5173}:5173"
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  node_modules:
