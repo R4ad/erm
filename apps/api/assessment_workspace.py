@@ -87,7 +87,7 @@ class AssessmentCandidatesView(ApiView):
                         "title": risk.title,
                         "service": risk.service.name if risk.service_id else "",
                         "unit": risk.org_unit.name,
-                        "category": risk.category.name,
+                        "category": risk.category.name if risk.category_id else fmt.NO_CATEGORY,
                         "owner": fmt.person(risk.owner),
                         "status": fmt.choice(risk, "status"),
                     }

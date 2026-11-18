@@ -385,3 +385,40 @@ def test_the_database_refuses_a_duplicate_external_link():
 
     with pytest.raises(IntegrityError), transaction.atomic():
         ExternalLink.objects.create(risk=risk, kind="change", ref="CHG-1")
+
+
+def test_a_risk_may_have_no_category_and_every_page_says_so(client, grc):
+    """ریسکی که از فرم شناسایی آمده تا تعیین دسته بی‌دسته است؛ رجیستر، پرونده و API به‌جای «None» یا خطا «بدون
+    دسته» و خط تیره نشان می‌دهند و جهان ریسک آن را در هیچ خانه‌ای نمی‌شمارد."""
+    service = make_service("SRV-1")
+    risk = make_risk("ریسک بی‌دسته", service=service, category=None)
+    client.force_login(grc)
+
+    assert Risk.objects.get(pk=risk.pk).category is None
+    register = client.get(reverse("risks:risk_list"))
+    detail = client.get(risk.get_absolute_url())
+    assert register.status_code == detail.status_code == 200
+    assert "None" not in register.content.decode() and "None" not in detail.content.decode()
+    assert "هنوز تعیین نشده" in detail.content.decode()
+
+    row = next(item for item in client.get("/api/risks/").json()["results"] if item["id"] == risk.pk)
+    assert row["category"] is None
+    assert client.get(f"/api/risks/{risk.pk}/").json()["category"] is None
+    assert client.get("/api/risks/export/").status_code == 200
+    assert mark_covered_by_risk(risk, grc) is None
+    [(_, cells)] = coverage_rows([service], RiskCategory.objects.filter(is_active=True), Risk.objects.all())
+    assert not any(cell.risk_count for cell in cells)
+
+
+def test_grc_saves_a_risk_without_a_category_and_sets_it_later(client, grc):
+    risk = make_risk(category=None)
+    client.force_login(grc)
+    url = reverse("risks:risk_update", args=[risk.pk])
+
+    kept = client.post(url, risk_data(org_unit=risk.org_unit.pk, category=""))
+    risk.refresh_from_db()
+    assert kept.status_code == 302 and risk.category is None
+
+    client.post(url, risk_data(org_unit=risk.org_unit.pk, category=category("T2").pk))
+    risk.refresh_from_db()
+    assert risk.category == category("T2")

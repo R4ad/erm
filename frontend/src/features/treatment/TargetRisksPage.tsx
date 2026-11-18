@@ -12,7 +12,7 @@ import {
 import { Checkbox } from "@/components/ui/field";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { IconChip, type ChipTone as IconTone } from "@/components/ui/icon-chip";
-import { RISK_CLASSES } from "@/components/ui/level-badge";
+import { RISK_CLASSES } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Chip, SectionPanel } from "@/components/ui/section-panel";

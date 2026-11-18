@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { IconChip } from "@/components/ui/icon-chip";
-import { LevelBadge, RISK_CLASSES, riskKey, type RiskKey } from "@/components/ui/level-badge";
+import { LevelBadge } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey, type RiskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";

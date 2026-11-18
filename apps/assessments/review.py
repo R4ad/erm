@@ -161,7 +161,12 @@ def _approve(assessment, user):
         "scope": risk.scope,
         "initiator": risk.initiator,
         "count_unit": risk.count_unit,
-        "category": {"id": risk.category_id, "code": risk.category.code, "name": risk.category.name},
+        # دسته پیش از ارزیابی اجباری است؛ ریسک قدیمی بی‌دسته هم خطا نمی‌دهد.
+        "category": {
+            "id": risk.category_id,
+            "code": risk.category.code if risk.category_id else "",
+            "name": risk.category.name if risk.category_id else "بدون دسته",
+        },
         "horizon_months": assessment.horizon_months,
     }
     assessment.approved_at = timezone.now()

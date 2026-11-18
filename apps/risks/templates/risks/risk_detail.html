@@ -55,7 +55,7 @@
   <dd class="col-sm-9">{% if risk.owner %}{{ risk.owner.get_full_name|default:risk.owner.username }}{% else %}هنوز تعیین نشده{% endif %}</dd>
 
   <dt class="col-sm-3">دسته‌ی اصلی</dt>
-  <dd class="col-sm-9">{{ risk.category }}</dd>
+  <dd class="col-sm-9">{% if risk.category %}{{ risk.category }}{% else %}هنوز تعیین نشده (پیش از ارسال جهت ارزیابی اجباری است){% endif %}</dd>
 
   <dt class="col-sm-3">برچسب‌ها</dt>
   <dd class="col-sm-9">

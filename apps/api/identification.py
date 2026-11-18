@@ -1,12 +1,16 @@
-"""«شناسایی ریسک» در رابط React (فیگما ۱۱): فرم ورودی مدیر واحد با الگوی ثبت سناریو، پیش‌نویس، سناریوهای مشابه
-کتابخانه و ورودی‌های اخیر. ساختن ریسک از همان فرم و services در apps/risks/identification.py می‌گذرد."""
+"""«شناسایی ریسک» در رابط React: شش پرسش جلسه‌ی شناسایی با الگوی ثبت سناریو، بازبینی با شاهد و فایل شاهد، پیش‌نویس
+و ورودی‌های اخیر. ساختن ریسک از همان فرم و services در apps/risks/identification.py می‌گذرد."""
 
+import json
+
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models import Min, Q
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response as ApiResponse
 
 from apps.catalog.models import Commitment, Service
@@ -15,9 +19,10 @@ from apps.risks.identification import (
     SCENARIO_PARTS,
     TEXT_LIMIT,
     IdentificationForm,
+    clean_evidence_file,
+    draft_attachments,
     identify_units,
     save_draft,
-    scenario_rows,
     submit_identification,
     unit_owner,
     visible_drafts,
@@ -74,7 +79,7 @@ def risk_row(risk):
         "key": f"risk-{risk.pk}",
         "code": risk.code,
         "title": risk.title,
-        "category": risk.category.code,
+        "category": risk.category.code if risk.category_id else None,
         "scenario": risk.scenario.code if risk.scenario_id else None,
         "service": risk.service.name if risk.service_id else None,
         "customer": "، ".join(customers) if customers else "همه",
@@ -113,6 +118,8 @@ def recent_rows(user):
 
 
 def choices(form, user):
+    # واحدها دیگر پرسیده نمی‌شوند؛ رابط با همین فهرست و واحد مالک هر خدمت همان انتخاب auto_unit را حدس می‌زند تا
+    # مالک ریسک را در «شرط پذیرش ورودی» نشان دهد. تصمیم نهایی همیشه با سرور است.
     units = [
         {
             "value": str(unit.pk),
@@ -121,7 +128,7 @@ def choices(form, user):
             else f"{unit.name} · {fmt.person(owner)['name']}",
             "owner": fmt.person(owner),
         }
-        for unit in form.fields["org_unit"].queryset.order_by("name")
+        for unit in identify_units(user).order_by("name")
     ]
     services = {service.pk: service for service in Service.objects.filter(is_active=True)}
     commitments = {item.pk: item for item in Commitment.objects.select_related("customer")}
@@ -137,6 +144,7 @@ def choices(form, user):
                 "value": value,
                 "label": str(label),
                 "service": {"id": service.pk, "name": service.name, "environment": service.get_environment_display()},
+                "unit": str(service.org_unit_id) if service.org_unit_id else None,
                 "customer": commitment.customer.name if commitment and commitment.customer_id else None,
                 "commitment": commitment.title if commitment else None,
             }
@@ -192,8 +200,30 @@ def form_input(values):
     return data
 
 
+def draft_payload(draft):
+    return {"id": draft.pk, "saved_at": fmt.moment(draft.updated_at), "attachments": draft_attachments(draft)}
+
+
+def read_request(request):
+    """بدنه‌ی POST: JSON، یا با فایل شاهد multipart با همان مقدارها در فیلد payload و فایل در evidence_file."""
+    upload = request.FILES.get("evidence_file")
+    if request.content_type and request.content_type.startswith("multipart/"):
+        try:
+            payload = json.loads(request.data.get("payload") or "{}")
+        except ValueError:
+            payload = {}
+    else:
+        payload = request.data
+    if not isinstance(payload, dict):
+        payload = {}
+    remove = [int(pk) for pk in payload.get("remove_attachments") or [] if str(pk).isdigit()]
+    return payload, upload, remove
+
+
 class IdentificationView(ApiView):
     """GET داده‌ی صفحه (و پیش‌نویس ?draft=)، POST ذخیره‌ی پیش‌نویس یا با submit=true ساختن ریسک."""
+
+    parser_classes = (JSONParser, MultiPartParser)
 
     def get(self, request):
         user = request.user
@@ -207,10 +237,14 @@ class IdentificationView(ApiView):
                 "can_identify": can_identify,
                 "parts": [{"name": name, "label": label, "token": token} for name, label, token in SCENARIO_PARTS],
                 "choices": choices(form, user) if can_identify else None,
-                "scenarios": scenario_rows() if can_identify else [],
                 "values": form_values(draft.data) if draft else blank_values(),
-                "draft": {"id": draft.pk, "saved_at": fmt.moment(draft.updated_at)} if draft else None,
+                "draft": draft_payload(draft) if draft else None,
                 "text_limit": TEXT_LIMIT,
+                # قاعده‌ی پیوست برای کادر فایل شاهد؛ جنگو همان را دوباره می‌سنجد (check_upload).
+                "attachment": {
+                    "accept": ",".join(f".{extension}" for extension in settings.ATTACHMENT_EXTENSIONS),
+                    "max_size": settings.ATTACHMENT_MAX_SIZE,
+                },
                 "recent": recent_rows(user),
                 "scenarios_url": reverse("risks:scenario_list"),
                 "register_url": reverse("risks:risk_list"),
@@ -222,26 +256,23 @@ class IdentificationView(ApiView):
         user = request.user
         if not identify_units(user).exists():
             raise PermissionDenied
+        payload, upload, remove = read_request(request)
         draft = None
-        if request.data.get("draft"):
-            draft = get_object_or_404(visible_drafts(user), pk=request.data["draft"])
-        submit = bool(request.data.get("submit"))
-        form = IdentificationForm(form_input(request.data.get("values")), user=user, submit=submit)
-        if not form.is_valid():
+        if payload.get("draft"):
+            draft = get_object_or_404(visible_drafts(user), pk=payload["draft"])
+        submit = bool(payload.get("submit"))
+        form = IdentificationForm(form_input(payload.get("values")), user=user, submit=submit)
+        valid = form.is_valid()
+        errors = (fmt.form_errors(form) if not valid else {}) | clean_evidence_file(upload)
+        if errors:
             message = "ورودی بدون پرسش‌های اجباری ارسال نمی‌شود." if submit else "پیش‌نویس ذخیره نشد."
-            return ApiResponse(
-                {"message": message, "errors": fmt.form_errors(form)}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return ApiResponse({"message": message, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
         if not submit:
-            draft = save_draft(form, draft)
+            draft = save_draft(form, draft, upload, remove)
             return ApiResponse(
-                {
-                    "message": "پیش‌نویس ذخیره شد.",
-                    "draft": {"id": draft.pk, "saved_at": fmt.moment(draft.updated_at)},
-                    "recent": recent_rows(user),
-                }
+                {"message": "پیش‌نویس ذخیره شد.", "draft": draft_payload(draft), "recent": recent_rows(user)}
             )
-        risk = submit_identification(form, draft)
+        risk = submit_identification(form, draft, upload, remove)
         return ApiResponse(
             {
                 "message": f"ریسک {risk.code} شناسایی و در رجیستر ثبت شد.",

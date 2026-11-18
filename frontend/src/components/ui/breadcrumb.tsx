@@ -1,4 +1,4 @@
-import { usePageCrumbs } from "@/components/layout/crumbs";
+import { usePageCrumbs } from "@/components/layout/crumbs-context";
 
 export interface Crumb {
   label: string;

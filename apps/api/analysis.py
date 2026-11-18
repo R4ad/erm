@@ -307,7 +307,6 @@ def analysis(assessment, user):
     matrix = _matrix(assessment, result, likelihood)
     impacts = _impacts(summary)
     submit_allowed = can_submit(user, assessment)
-    category = risk.category
     i_high = result.impact.high if result.impact else None
     i_source = next((row["code"] for row in impacts["rows"] if i_high is not None and row["level"] == i_high), "")
     determining = [row for row in paths["rows"] if row["determining"]]
@@ -329,7 +328,7 @@ def analysis(assessment, user):
             "title": risk.title,
             "narrative": risk.description,
             "status": fmt.choice(risk, "status"),
-            "category": {"code": category.code, "name": category.name},
+            "category": fmt.category_or_blank(risk),
             "href": risk.get_absolute_url(),
         },
         "summary": {

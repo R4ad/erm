@@ -410,7 +410,7 @@ def assessment_detail(context, request):
     risk_rows = [
         ("کد ریسک", risk.code), ("عنوان", risk.title), ("سناریو", risk.description),
         ("خدمت", str(risk.service) if risk.service_id else ""), ("واحد", str(risk.org_unit)),
-        ("کانال ورود", risk.get_channel_display()), ("دسته", str(risk.category)),
+        ("کانال ورود", risk.get_channel_display()), ("دسته", str(risk.category) if risk.category_id else fmt.NO_CATEGORY),
         ("مالک", (risk.owner.get_full_name() or risk.owner.username) if risk.owner_id else ""),
         ("بانک‌های متأثر", "، ".join(risk.customers.values_list("name", flat=True))),
         ("عامل آغازگر", risk.initiator), ("مسیر ثبت‌شده", risk.realization_path),

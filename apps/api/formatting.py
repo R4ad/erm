@@ -56,6 +56,28 @@ def level(risk_level):
     }
 
 
+# ریسک تازه‌ی فرم شناسایی تا وقتی عضو GRC دسته‌اش را تعیین نکرده دسته ندارد (پیش از ارزیابی اجباری است).
+NO_CATEGORY = "بدون دسته"
+
+
+def category(value):
+    """دسته‌ی ریسک به شکل {code, name}؛ برای ریسک بی‌دسته None تا رابط «بدون دسته» بنویسد."""
+    if value is None:
+        return None
+    return {"code": value.code, "name": value.name}
+
+
+def category_code(risk):
+    """کد دسته برای جاهایی که فقط متن کوتاه نشان می‌دهند؛ ریسک بی‌دسته خط تیره می‌گیرد، نه «None»."""
+    return risk.category.code if risk.category_id else "—"
+
+
+def category_or_blank(risk):
+    """برای صفحه‌هایی که فقط ریسک ارزیابی‌شده را نشان می‌دهند و دسته را همیشه شیء می‌خوانند (دسته پیش از ارزیابی
+    اجباری است)؛ ریسک قدیمی بی‌دسته هم به‌جای خطا «بدون دسته» می‌گیرد."""
+    return category(risk.category) or {"code": "", "name": NO_CATEGORY}
+
+
 def choice(instance, field_name):
     """مقدار و برچسب فارسی یک فیلد choices."""
     value = getattr(instance, field_name)

@@ -72,8 +72,7 @@ export function LoginPage() {
         <div className="absolute top-[-18rem] left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-accent/25 blur-[120px]" />
       </div>
 
-      <header className="pad-safe relative flex h-16 items-center justify-end pt-[env(safe-area-inset-top)]">
-      </header>
+      <header className="pad-safe relative flex h-16 items-center justify-end pt-[env(safe-area-inset-top)]"></header>
 
       <main className="pad-safe relative flex flex-1 items-center justify-center pb-16">
         <div className="w-full max-w-[25rem] animate-pop-in">
@@ -81,7 +80,9 @@ export function LoginPage() {
             <LogoMark size={40} />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-h1 font-bold text-ink">ورود به سامانه</h1>
-              <p className="text-sm text-ink-2">{t("app.name")} · {t("app.tagline")}</p>
+              <p className="text-sm text-ink-2">
+                {t("app.name")} · {t("app.tagline")}
+              </p>
             </div>
           </div>
 

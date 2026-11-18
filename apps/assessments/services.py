@@ -53,6 +53,8 @@ def creation_problems(risk, kind=None):
             problems.append(f"ارزیابی {Assessment.Kind(kind).label} فقط وقتی ریسک {labels} است ثبت می‌شود.")
     elif not any(risk.status in statuses for statuses in ASSESSABLE_STATUSES.values()):
         problems.append("ارزیابی فقط وقتی ریسک «در ارزیابی» یا «برنامه‌ی درمان» است ثبت می‌شود.")
+    if not risk.category_id:
+        problems.append("دسته‌ی اصلی ریسک تعیین نشده است؛ پیش از ارزیابی آن را در ویرایش ریسک انتخاب کنید.")
     if active_version() is None:
         problems.append("هیچ نسخه‌ی روشی فعال نیست.")
     return problems

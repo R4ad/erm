@@ -42,5 +42,8 @@ export default defineConfig(({ command }) => ({
     restoreMocks: true,
     clearMocks: true,
     unstubGlobals: true,
+    // jsdom ‏document.startViewTransition ندارد؛ React Router در این حالت ناوبری را بی‌انیمیشن انجام می‌دهد و فقط
+    // همین تذکر را یک بار در هر فایل چاپ می‌کند. View Transition واقعی را آزمون e2e در مرورگر می‌بیند.
+    onConsoleLog: (log) => !log.includes("`viewTransition` option to a router update"),
   },
 }));

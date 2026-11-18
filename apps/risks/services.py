@@ -108,10 +108,10 @@ def active_risks(risks):
 
 
 def mark_covered_by_risk(risk, user):
-    """ریسک فعالی که خدمت دارد، خانه‌ی «خدمت × دسته‌ی» خودش را اگر «در انتظار» است «بررسی‌شده» می‌کند (س۳۸)
+    """ریسک فعالی که خدمت و دسته دارد، خانه‌ی «خدمت × دسته‌ی» خودش را اگر «در انتظار» است «بررسی‌شده» می‌کند (س۳۸)
     و همان خانه را برمی‌گرداند؛ اگر چیزی عوض نشد None. خانه‌ی «بررسی‌شده» دست نمی‌خورد و فرم ریسک نمی‌گذارد
     ریسک در خانه‌ی «نامرتبط» ثبت شود."""
-    if not (risk.is_active and risk.service_id):
+    if not (risk.is_active and risk.service_id and risk.category_id):
         return None
     cell = Coverage.objects.filter(service=risk.service, category=risk.category).first()
     if cell and not cell.is_pending:

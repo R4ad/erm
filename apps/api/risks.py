@@ -166,7 +166,7 @@ def risk_row(risk, level, context=None):
         "needs_completion": risk.needs_completion,
         "level": fmt.level(level),
         "score": scores.get(risk.pk),
-        "category": {"code": risk.category.code, "name": risk.category.name},
+        "category": fmt.category(risk.category),
         "service": {"code": risk.service.code, "name": risk.service.name} if risk.service_id else None,
         "scenario": (
             {"code": risk.scenario.code, "version": risk.scenario_version or 1} if risk.scenario_id else None
@@ -298,7 +298,7 @@ class RiskExportView(ApiView):
                 row["code"],
                 row["title"],
                 row["service"]["name"] if row["service"] else "",
-                row["category"]["code"],
+                row["category"]["code"] if row["category"] else "",
                 row["owner"]["name"] if row["owner"] else "بدون مالک",
                 row["org_unit"],
                 row["status"]["label"],
@@ -437,7 +437,7 @@ class RiskDetailView(ApiView):
                 ),
                 "org_unit": risk.org_unit.name,
                 "owner": fmt.person(risk.owner),
-                "category": {"code": risk.category.code, "name": risk.category.name},
+                "category": fmt.category(risk.category),
                 "customers": [customer.name for customer in risk.customers.all()],
                 "tags": [tag.name for tag in risk.tags.all()],
                 "scope": risk.scope,

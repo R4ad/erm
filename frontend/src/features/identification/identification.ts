@@ -1,55 +1,89 @@
-import type { IdentificationScenario, IdentificationValues } from "@/lib/types";
+import type { IdentificationChoices, IdentificationPart, IdentificationValues } from "@/lib/types";
 
-// شباهت متن فرم با سناریوهای کتابخانه برای «سناریوهای مشابه در کتابخانه» (فیگما ۱۱): هم‌پوشانی واژه‌های معنادار
-// (ضریب Dice)، با کمی وزن بیشتر برای همان خدمت و همان دسته. فقط راهنمای عضو است؛ پیوند را خود کاربر می‌زند.
+// منطق ویزارد شناسایی که به رندر بسته نیست: کدام فیلد مال کدام گام است، پیشنهاد خدمت از نوشته‌ی پرسش اول، واحدی که
+// سرور خودکار انتخاب می‌کند، عنوان و شرحی که در رجیستر ثبت می‌شود، و «شرط پذیرش ورودی».
 
-const STOP_WORDS = new Set(
-  "در به از با که را و یا تا برای این آن است می شود شده یک هر یا بر بی ها های ی را".split(" "),
-);
+export type PartName = IdentificationPart["name"];
+export type StepKey = PartName | "review";
+export type Target = IdentificationChoices["target"][number];
+export type Unit = IdentificationChoices["org_unit"][number];
 
-export function words(text: string): Set<string> {
-  return new Set(
-    text
-      .replace(/[‌‏‎]/g, " ")
-      .replace(/[ي]/g, "ی")
-      .replace(/[ك]/g, "ک")
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((word) => word.length > 1 && !STOP_WORDS.has(word)),
+export const REVIEW = "review" as const;
+
+/**
+ * گامی که خطای هر فیلد در آن نشان داده می‌شود. خدمت (target) و واحد پشت صحنه‌ی پرسش اول‌اند؛ هر فیلد ناشناخته (و
+ * شاهد، پیامد، وابستگی و فایل) در «بازبینی» است.
+ */
+export function stepOfField(field: string, parts: IdentificationPart[]): StepKey {
+  if (field === "target" || field === "org_unit") return parts[0]?.name ?? REVIEW;
+  return parts.find((part) => part.name === field)?.name ?? REVIEW;
+}
+
+/** «ي» و «ك» عربی و نیم‌فاصله همان فارسی و فاصله‌اند، تا «ساتنا» با هر صفحه‌کلیدی پیدا شود. */
+export function normalize(text: string): string {
+  return text
+    .replace(/[ي]/g, "ی")
+    .replace(/[ك]/g, "ک")
+    .replace(/[‌‏‎]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** خدمت‌هایی که برچسبشان همه‌ی واژه‌های نوشته‌شده را دارد، به همان ترتیب فهرست سرور. */
+export function matchTargets(query: string, targets: Target[]): Target[] {
+  const words = normalize(query).split(" ").filter(Boolean);
+  if (!words.length) return targets;
+  return targets.filter((target) => {
+    const label = normalize(target.label);
+    return words.every((word) => label.includes(word));
+  });
+}
+
+/**
+ * مقدارهایی که انتخاب یک خدمت پیشنهادی می‌گذارد. موضوع وقتی نام خدمت می‌شود که خالی است یا فقط بخشی از همان نام را
+ * برای جست‌وجو تایپ کرده‌اند؛ متنی که کاربر خودش نوشته («ساتنا · محیط تولید») عوض نمی‌شود. مشتری و هدف مثل همیشه
+ * فقط اگر خالی باشند از خدمت و تعهد پیشنهاد می‌شوند.
+ */
+export function withTarget(values: IdentificationValues, target: Target): IdentificationValues {
+  const typed = normalize(values.subject);
+  const searching = !typed || normalize(target.service.name).includes(typed);
+  return {
+    ...values,
+    target: target.value,
+    subject: searching ? target.service.name : values.subject,
+    customer: values.customer.trim()
+      ? values.customer
+      : target.customer
+        ? `${target.customer} و داتین`
+        : "همه‌ی مشتریان",
+    objective: values.objective.trim() || !target.commitment ? values.objective : target.commitment,
+  };
+}
+
+/** همان انتخاب auto_unit سرور: تنها واحد کاربر، وگرنه واحد مالک خدمت اگر جزو واحدهای کاربر است. */
+export function autoUnit(choices: IdentificationChoices, targetValue: string): Unit | null {
+  if (choices.org_unit.length === 1) return choices.org_unit[0] ?? null;
+  const target = choices.target.find((item) => item.value === targetValue);
+  if (!target?.unit) return null;
+  return choices.org_unit.find((unit) => unit.value === target.unit) ?? null;
+}
+
+/** شرح ریسک با الگوی بخش ۴ روش، همان narrative سرور؛ جزء بی‌جواب «…» است. */
+export function narrative(values: IdentificationValues): string {
+  const part = (name: PartName) => values[name].trim() || "…";
+  return (
+    `در خدمت یا فرآیند ${part("subject")}، به علت یا در شرایط ${part("conditions")}، ممکن است ${part("event")} ` +
+    `رخ دهد و انجام ${part("objective")} برای ${part("customer")} را مختل کند. ` +
+    `پیامد قابل مشاهده‌ی آن ${part("harm")} است.`
   );
 }
 
-export function similarity(query: Set<string>, text: string): number {
-  const other = words(text);
-  if (!query.size || !other.size) return 0;
-  let shared = 0;
-  for (const word of query) if (other.has(word)) shared += 1;
-  return (2 * shared) / (query.size + other.size);
-}
-
-export interface Match {
-  scenario: IdentificationScenario;
-  percent: number;
-}
-
-/** سه سناریوی شبیه‌تر به متن فرم؛ زیر ۱۵٪ شباهت نشان داده نمی‌شود. */
-export function similarScenarios(
-  values: IdentificationValues,
-  scenarios: IdentificationScenario[],
-  serviceId: number | null,
-): Match[] {
-  const query = words([values.subject, values.objective, values.conditions, values.event, values.harm].join(" "));
-  if (query.size < 2) return [];
-  return scenarios
-    .map((scenario) => {
-      let score = similarity(query, scenario.text);
-      if (score > 0 && serviceId !== null && scenario.service_id === serviceId) score += 0.15;
-      if (score > 0 && values.category && String(scenario.category.id) === values.category) score += 0.1;
-      return { scenario, percent: Math.min(99, Math.round(score * 100)) };
-    })
-    .filter((match) => match.percent >= 15)
-    .sort((a, b) => b.percent - a.percent)
-    .slice(0, 3);
+/** عنوان ریسک همان رویداد است، با نام خدمت اگر رویداد آن را نگفته باشد (risk_title سرور). */
+export function riskTitle(event: string, service: string | null): string {
+  const text = event.split(/\s+/).filter(Boolean).join(" ");
+  if (!text) return "";
+  return (service && !text.includes(service) ? `${text} در ${service}` : text).slice(0, 300);
 }
 
 /** شاخص‌های «شرط پذیرش ورودی»: هدف، رویداد، دامنه‌ی خدمت و مشتری، مالک و شاهد یا فرض قابل آزمون. */

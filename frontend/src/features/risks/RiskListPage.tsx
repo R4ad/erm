@@ -319,9 +319,13 @@ function RiskTableRow({
       </td>
       {columns.has("category") && (
         <td>
-          <span title={risk.category.name} className="code rounded-sm bg-subtle px-1.5 py-0.5 text-xs text-ink-2">
-            {risk.category.code}
-          </span>
+          {risk.category ? (
+            <span title={risk.category.name} className="code rounded-sm bg-subtle px-1.5 py-0.5 text-xs text-ink-2">
+              {risk.category.code}
+            </span>
+          ) : (
+            <span className="text-xs whitespace-nowrap text-ink-2">بدون دسته</span>
+          )}
         </td>
       )}
       {columns.has("owner") && (

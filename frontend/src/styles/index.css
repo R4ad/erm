@@ -545,6 +545,86 @@
   }
 }
 
+/*
+ * ویزارد شناسایی ریسک. گام تازه از سمتی می‌آید که در ترتیب گام‌ها هست: «بعدی» از پایان خط (چپ در راست‌به‌چپ) و
+ * «قبلی» از شروع خط؛ پس جهت translateX در راست‌به‌چپ برعکس است. گام قبلی بی‌حرکت کنار می‌رود تا فوکوس و تایپ منتظر
+ * انیمیشن نمانند، و اولین گام هنگام باز شدن صفحه حرکت ندارد (data-direction="none").
+ */
+.wizard-step {
+  --wizard-shift: 1rem;
+  animation: wizard-step-in 200ms var(--ease-out) both;
+}
+
+.wizard-step:dir(rtl) {
+  --wizard-shift: -1rem;
+}
+
+.wizard-step[data-direction="back"] {
+  --wizard-shift: -1rem;
+}
+
+.wizard-step[data-direction="back"]:dir(rtl) {
+  --wizard-shift: 1rem;
+}
+
+.wizard-step[data-direction="none"] {
+  animation: none;
+}
+
+@keyframes wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--wizard-shift));
+  }
+}
+
+/* نوار پیشرفت ویزارد از شروع خط پر می‌شود. */
+.wizard-progress {
+  transform-origin: left center;
+  transition: transform 220ms var(--ease-out);
+}
+
+.wizard-progress:dir(rtl) {
+  transform-origin: right center;
+}
+
+/*
+ * جزء جمله‌ی «الگوی ثبت سناریو» که گام فعلی کاملش می‌کند مثل ماژیک علامت می‌خورد: زمینه در جهت خواندن (از شروع
+ * خط) کشیده می‌شود. box-decoration-break زمینه و فاصله را در هر سطر جزء دوسطری تکرار می‌کند.
+ */
+.scenario-token {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 100% 100%;
+  transition:
+    color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.scenario-token:dir(rtl) {
+  background-position: right center;
+}
+
+.scenario-token[data-active] {
+  background-image: linear-gradient(var(--brand-subtle-strong), var(--brand-subtle-strong));
+  box-shadow: inset 0 -2px 0 var(--brand-primary);
+  animation: token-mark 220ms var(--ease-out);
+}
+
+@keyframes token-mark {
+  from {
+    background-size: 0% 100%;
+  }
+}
+
+@keyframes wizard-step-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -559,6 +639,20 @@
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none !important;
+  }
+
+  /* بدون جابه‌جایی: گام تازه فقط پدیدار می‌شود، نوار پیشرفت و علامت جزء جمله بی‌کشیدن عوض می‌شوند و فقط رنگ
+     بازخورد می‌دهد. */
+  .wizard-step {
+    animation-name: wizard-step-fade;
+  }
+
+  .wizard-progress {
+    transition-property: none;
+  }
+
+  .scenario-token[data-active] {
+    animation: none;
   }
 }
 

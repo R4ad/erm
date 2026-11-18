@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { fa } from "@/lib/format";
 import { t } from "@/lib/i18n";
 
-import { usePageCrumbsValue } from "./crumbs";
+import { usePageCrumbsValue } from "./crumbs-context";
 import { activeTrail } from "./nav";
 import { UserMenu } from "./user-menu";
 

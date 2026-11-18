@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
 /** دو حرف اول نام و نام خانوادگی با فاصله، مثل فیگما: «سارا محمدی» ← «س م». */
-export function initials(name: string | null | undefined): string {
+function initials(name: string | null | undefined): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "؟";
   return parts

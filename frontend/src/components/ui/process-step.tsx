@@ -24,7 +24,8 @@ export function ProcessStep({ index, label, state }: { index: number; label: str
           className={cn(
             "grid size-5 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold",
             state === "done" && "bg-brand text-white",
-            state === "current" && "border-[1.5px] border-brand bg-panel text-brand shadow-[0_0_0_3px_rgb(30_58_138/0.18)]",
+            state === "current" &&
+              "border-[1.5px] border-brand bg-panel text-brand shadow-[0_0_0_3px_rgb(30_58_138/0.18)]",
             state === "upcoming" && "border border-line-strong bg-subtle text-ink-3",
           )}
         >
@@ -46,7 +47,13 @@ export function ProcessStep({ index, label, state }: { index: number; label: str
   );
 }
 
-export function ProcessSteps({ steps, className }: { steps: { label: string; state: StepState }[]; className?: string }) {
+export function ProcessSteps({
+  steps,
+  className,
+}: {
+  steps: { label: string; state: StepState }[];
+  className?: string;
+}) {
   return (
     <ol className={cn("flex gap-2", className)}>
       {steps.map((step, index) => (

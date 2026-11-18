@@ -158,7 +158,7 @@ def queue(user):
                 "code": risk.code,
                 "title": risk.title,
                 "href": risk.get_absolute_url(),
-                "category": risk.category.code,
+                "category": fmt.category_code(risk),
                 "scope": scope_text(risk, customers, total),
                 "status": fmt.choice(risk, "status"),
                 "l": assessment.likelihood_high,

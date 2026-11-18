@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { RISK_CLASSES, riskKey } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Chip, SectionPanel, type ChipTone } from "@/components/ui/section-panel";
 import { PageSkeleton } from "@/components/ui/skeleton";

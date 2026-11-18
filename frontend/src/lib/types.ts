@@ -231,7 +231,8 @@ export interface RiskRow {
   needs_completion: boolean;
   level: Level | null;
   score: number | null;
-  category: { code: string; name: string };
+  /** ریسکی که از فرم شناسایی آمده تا تعیین دسته به‌دست عضو GRC بی‌دسته است. */
+  category: { code: string; name: string } | null;
   service: { code: string; name: string } | null;
   scenario: { code: string; version: number } | null;
   org_unit: string;
@@ -410,7 +411,7 @@ export interface RiskDetail extends RecordParts {
   service: { code: string; name: string; href: string | null } | null;
   org_unit: string;
   owner: Person | null;
-  category: { code: string; name: string };
+  category: { code: string; name: string } | null;
   customers: string[];
   tags: string[];
   scope: string;
@@ -760,7 +761,7 @@ export interface RiskBrief {
   status: Choice;
   is_active: boolean;
   service: string | null;
-  category: { code: string; name: string };
+  category: { code: string; name: string } | null;
   owner: Person | null;
   href: string;
 }
@@ -2180,16 +2181,6 @@ export interface IdentificationPart {
   token: string;
 }
 
-export interface IdentificationScenario {
-  id: number;
-  code: string;
-  title: string;
-  text: string;
-  service_id: number | null;
-  category: { id: number; code: string; name: string };
-  risk_count: number;
-}
-
 export interface IdentificationRow {
   key: string;
   code: string | null;
@@ -2213,6 +2204,8 @@ export interface IdentificationChoices {
     value: string;
     label: string;
     service: { id: number; name: string; environment: string };
+    /** واحد مالک خدمت؛ سرور واحد ریسک را از همین و واحدهای کاربر انتخاب می‌کند. */
+    unit: string | null;
     customer: string | null;
     commitment: string | null;
   }[];
@@ -2221,14 +2214,28 @@ export interface IdentificationChoices {
   evidence: { value: string; code: string; label: string }[];
 }
 
+export interface IdentificationAttachment {
+  id: number;
+  name: string;
+  size: number;
+}
+
+export interface IdentificationDraft {
+  id: number;
+  saved_at: Moment;
+  /** فایل‌های شاهدی که تا ارسال روی پیش‌نویس مانده‌اند. */
+  attachments: IdentificationAttachment[];
+}
+
 export interface IdentificationPage {
   can_identify: boolean;
   parts: IdentificationPart[];
   choices: IdentificationChoices | null;
-  scenarios: IdentificationScenario[];
   values: IdentificationValues;
-  draft: { id: number; saved_at: Moment } | null;
+  draft: IdentificationDraft | null;
   text_limit: number;
+  /** پسوندهای مجاز و سقف حجم فایل شاهد (همان قاعده‌ی پیوست جنگو). */
+  attachment: { accept: string; max_size: number };
   recent: IdentificationRow[];
   scenarios_url: string;
   register_url: string;

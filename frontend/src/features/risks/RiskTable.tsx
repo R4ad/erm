@@ -41,10 +41,16 @@ export function RiskTable({ risks, caption, empty }: { risks: RiskBrief[]; capti
                   </div>
                 )}
               </td>
-              <td data-label="دسته" title={risk.category.name}>
-                <bdi className="code">{risk.category.code}</bdi>
-                <span className="sr-only"> {risk.category.name}</span>
-              </td>
+              {risk.category ? (
+                <td data-label="دسته" title={risk.category.name}>
+                  <bdi className="code">{risk.category.code}</bdi>
+                  <span className="sr-only"> {risk.category.name}</span>
+                </td>
+              ) : (
+                <td data-label="دسته" className="text-muted">
+                  بدون دسته
+                </td>
+              )}
               <td data-label="مالک" data-empty={risk.owner ? undefined : ""} className="whitespace-nowrap">
                 {risk.owner?.name}
               </td>

@@ -267,7 +267,8 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         }
         help_texts = {
             "org_unit": "اگر خالی بماند، واحد مالک خدمت گذاشته می‌شود. دسترسی مدیر واحد به ریسک از همین واحد است.",
-            "category": "اگر خالی بماند، دسته‌ی سناریوی مرجع گذاشته می‌شود.",
+            "category": "اگر خالی بماند، دسته‌ی سناریوی مرجع گذاشته می‌شود. ریسک بی‌دسته ثبت می‌شود، ولی پیش از "
+            "ارسال جهت ارزیابی دسته لازم است.",
             "customers": "برای انتخاب چند بانک، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید.",
             "cia_a": "برچسب‌های CIA نشان می‌دهند کدام ویژگی امنیت اطلاعات درگیر است؛ امتیاز جدا نمی‌گیرند.",
         }
@@ -288,9 +289,11 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["controls"].queryset = Control.objects.filter(
             Q(is_active=True) | Q(pk__in=current_controls)
         ).order_by("code")
-        # واحد و دسته از خدمت و سناریو پر می‌شوند؛ اگر هیچ‌کدام نباشد clean خطا می‌دهد.
+        # واحد و دسته از خدمت و سناریو پر می‌شوند؛ واحدِ بی‌خدمت خطاست، ولی دسته می‌تواند تا پیش از ارزیابی خالی
+        # بماند (مثل ریسکی که از فرم شناسایی آمده است).
         self.fields["org_unit"].required = False
         self.fields["category"].required = False
+        self.fields["category"].empty_label = "هنوز تعیین نشده"
         if risk.pk:
             self.fields["tag_names"].initial = "، ".join(tag.name for tag in risk.tags.all())
 
@@ -310,11 +313,8 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
                 data["org_unit"] = service.org_unit
             else:
                 self.add_error("org_unit", "واحد را انتخاب کنید، یا خدمت را تا واحد مالک آن گذاشته شود.")
-        if not data.get("category") and "category" not in self.errors:
-            if scenario:
-                data["category"] = scenario.category
-            else:
-                self.add_error("category", "دسته را انتخاب کنید، یا سناریوی مرجع را تا دسته‌ی آن گذاشته شود.")
+        if not data.get("category") and "category" not in self.errors and scenario:
+            data["category"] = scenario.category
         category = data.get("category")
         if service and category:
             # ریسک در خانه‌ای که «نامرتبط» ثبت شده تناقض است؛ تصمیم «نامرتبط» بی‌صدا عوض نمی‌شود.

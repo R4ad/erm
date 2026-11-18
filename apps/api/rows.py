@@ -16,7 +16,7 @@ def risk_brief(risk):
         "status": fmt.choice(risk, "status"),
         "is_active": risk.is_active,
         "service": risk.service.code if risk.service_id else None,
-        "category": {"code": risk.category.code, "name": risk.category.name},
+        "category": fmt.category(risk.category),
         "owner": fmt.person(risk.owner),
         "href": risk.get_absolute_url(),
     }

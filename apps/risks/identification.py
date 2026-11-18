@@ -1,14 +1,18 @@
-"""فرم شناسایی ریسک (فیگما ۱۱): مدیر واحد یا عضو GRC سناریو را با الگوی بخش ۴ روش از مأموریت و تعهد واحد ثبت
-می‌کند. پیش‌نویس جدا نگه داشته می‌شود و «ارسال برای شناسایی» ریسک را با وضعیت «ثبت‌شده در رجیستر» می‌سازد؛ بعد عضو
-GRC آن را برای ارزیابی می‌فرستد یا با پرسش مشخص برای تکمیل برمی‌گرداند."""
+"""فرم شناسایی ریسک (فیگما ۱۱): مدیر واحد یا عضو GRC سناریو را با شش پرسش جلسه‌ی شناسایی و الگوی بخش ۴ روش ثبت
+می‌کند. خدمت از پرسش اول انتخاب می‌شود و واحد از روی آن و واحدهای خود کاربر (auto_unit)؛ دسته و منبع را بعداً عضو
+GRC تعیین می‌کند. پیش‌نویس جدا نگه داشته می‌شود و «ارسال برای شناسایی» ریسک را با وضعیت «ثبت‌شده در رجیستر» می‌سازد؛
+بعد عضو GRC آن را برای ارزیابی می‌فرستد یا با پرسش مشخص برای تکمیل برمی‌گرداند."""
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.roles import Role
 from apps.catalog.models import Commitment, Service
+from apps.core.forms import check_upload
+from apps.core.models import Attachment
 from apps.organization.models import OrgUnit
 
 from .models import Evidence, IdentificationDraft, Risk, RiskCategory, RiskScenario
@@ -26,9 +30,10 @@ SCENARIO_PARTS = [
     ("event", "چه اتفاق مشخصی ممکن است رخ دهد؟", "رویداد مشخص"),
     ("harm", "آسیب قابل مشاهده و دامنه‌ی آن چیست؟", "نوع و دامنه‌ی پیامد"),
 ]
-# فیلدهای متنی که با ارسال اجباری‌اند. پیامد برای شرکت و وابستگی اختیاری‌اند؛ نبود شاهد هم دلیل رد نیست و به جایش
-# فرض قابل آزمون نوشته می‌شود.
-REQUIRED_TEXT = ["mission", "objective", "conditions", "customer", "event", "harm", "evidence"]
+# فیلدهای متنی که با ارسال اجباری‌اند. مأموریت، پیامد برای شرکت و وابستگی اختیاری‌اند؛ نبود شاهد هم دلیل رد نیست و
+# به جایش فرض قابل آزمون نوشته می‌شود. «موضوع» خودش اجباری نیست، ولی خدمتی که از پیشنهادهای همان پرسش انتخاب می‌شود
+# (target) اجباری است.
+REQUIRED_TEXT = ["objective", "conditions", "customer", "event", "harm", "evidence"]
 INTAKE_FIELDS = ["mission", *(name for name, *_ in SCENARIO_PARTS), "impact", "dependencies", "evidence"]
 
 
@@ -41,6 +46,19 @@ def identify_units(user):
     if user.has_role(Role.UNIT_MANAGER):
         return units.filter(pk__in=user.managed_unit_ids())
     return units.none()
+
+
+def auto_unit(user, service):
+    """واحد ریسکی که این کاربر برای این خدمت شناسایی می‌کند، بی آن‌که واحد پرسیده شود: اگر کاربر فقط یک واحد دارد
+    همان، وگرنه واحد مالک خدمت اگر جزو واحدهای کاربر است. اگر هیچ‌کدام نشد None، و ارسال به پرسش اول (خدمت)
+    برمی‌گردد."""
+    units = identify_units(user)
+    only = list(units[:2])
+    if len(only) == 1:
+        return only[0]
+    if service is not None and service.org_unit_id:
+        return units.filter(pk=service.org_unit_id).first()
+    return None
 
 
 def unit_owner(unit, user):
@@ -112,9 +130,9 @@ def risk_title(event, service):
 
 
 class IdentificationForm(forms.Form):
-    """مقدارهای فرم شناسایی. پیش‌نویس فقط شکل مقدارها را چک می‌کند؛ ارسال، فیلدهای اجباری را هم (submit=True)."""
+    """مقدارهای فرم شناسایی. پیش‌نویس فقط شکل مقدارها را چک می‌کند و بدون واحد هم ذخیره می‌شود؛ ارسال، فیلدهای اجباری
+    و واحد را هم (submit=True). واحد فیلد فرم نیست و در clean از خدمت انتخاب‌شده و واحدهای کاربر می‌آید."""
 
-    org_unit = forms.ModelChoiceField(OrgUnit.objects.none(), label="واحد و تکمیل‌کننده", required=False)
     target = forms.ChoiceField(label="خدمت، مشتری و تعهد", required=False)
     mission = forms.CharField(label="مأموریت و خروجی اصلی", required=False, max_length=TEXT_LIMIT)
     subject = forms.CharField(label=SCENARIO_PARTS[0][1], required=False, max_length=TEXT_LIMIT)
@@ -136,7 +154,6 @@ class IdentificationForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.user = user
         self.submit = submit
-        self.fields["org_unit"].queryset = identify_units(user)
         self.fields["target"].choices = [("", "")] + target_choices()
         self.fields["category"].queryset = RiskCategory.objects.filter(is_active=True)
         self.fields["scenario"].queryset = RiskScenario.objects.filter(is_active=True)
@@ -148,24 +165,26 @@ class IdentificationForm(forms.Form):
     def clean(self):
         data = super().clean()
         data["service"], data["commitment"] = parse_target(data.get("target"))
+        data["org_unit"] = auto_unit(self.user, data["service"])
         if not self.submit:
-            if not data.get("org_unit") and "org_unit" not in self.errors:
-                self.add_error("org_unit", "واحد را انتخاب کنید تا پیش‌نویس ذخیره شود.")
             return data
-        required = {
-            "org_unit": "واحد را انتخاب کنید.",
-            "target": "خدمت و مشتری را انتخاب کنید.",
-            "category": "دسته‌ی اصلی را انتخاب کنید.",
-            "source": "منبع شناسایی را انتخاب کنید.",
-        }
-        for name, message in required.items():
-            if not data.get(name) and name not in self.errors:
-                self.add_error(name, message)
         for name in REQUIRED_TEXT:
             if not (data.get(name) or "").strip() and name not in self.errors:
                 self.add_error(name, "این پرسش برای ارسال اجباری است.")
-        if data.get("target") and not data.get("service") and "target" not in self.errors:
+        if "target" in self.errors:
+            return data
+        if not data.get("target"):
+            self.add_error("target", "خدمت را از پیشنهادهای همین پرسش انتخاب کنید.")
+        elif not data["service"]:
             self.add_error("target", "این خدمت دیگر فعال نیست؛ گزینه‌ی دیگری انتخاب کنید.")
+        elif not data["org_unit"]:
+            # خطای واحد مال پرسش اول است، چون واحد از خدمتی می‌آید که همان‌جا انتخاب شده است.
+            unit = data["service"].org_unit
+            self.add_error(
+                "subject",
+                f"واحد مالک خدمت «{data['service'].name}» ({unit.name}) جزو واحدهایی نیست که برایشان ریسک شناسایی "
+                "می‌کنید؛ خدمتی از واحد خودتان انتخاب کنید یا ثبت را به عضو GRC بسپارید.",
+            )
         return data
 
     def draft_data(self):
@@ -184,18 +203,58 @@ class IdentificationForm(forms.Form):
         return values
 
 
-def save_draft(form, draft=None):
+EVIDENCE_FILE_NOTE = "شاهد پیوست‌شده در فرم شناسایی"
+
+
+def clean_evidence_file(upload):
+    """فایل شاهد همان قاعده‌ی هر پیوست دیگر را دارد (حجم، پسوند و هم‌خوانی محتوا)؛ خطا با نام فیلد برمی‌گردد."""
+    if upload is None:
+        return {}
+    try:
+        check_upload(upload)
+    except ValidationError as error:
+        return {"evidence_file": list(error.messages)}
+    return {}
+
+
+def attach_evidence(record, upload, user):
+    return Attachment.objects.create(
+        content_object=record,
+        file=upload,
+        original_name=upload.name[:255],
+        size=upload.size,
+        description=EVIDENCE_FILE_NOTE,
+        created_by=user,
+    )
+
+
+def draft_attachments(draft):
+    return [
+        {"id": item.pk, "name": item.original_name, "size": item.size}
+        for item in draft.attachments.order_by("created_at", "pk")
+    ]
+
+
+@transaction.atomic
+def save_draft(form, draft=None, upload=None, remove=()):
+    """پیش‌نویس را با واحدی که از خدمت آمده یا بدون واحد ذخیره می‌کند؛ فایل شاهد تازه به پیش‌نویس پیوست و
+    فایل‌هایی که کاربر برداشته از آن پاک می‌شوند."""
     draft = draft or IdentificationDraft(created_by=form.user)
     draft.org_unit = form.cleaned_data.get("org_unit")
     draft.data = form.draft_data()
     draft.save()
+    if remove:
+        draft.attachments.filter(pk__in=remove).delete()
+    if upload is not None:
+        attach_evidence(draft, upload, form.user)
     return draft
 
 
 @transaction.atomic
-def submit_identification(form, draft=None):
+def submit_identification(form, draft=None, upload=None, remove=()):
     """ریسک را از فرم شناسایی می‌سازد: «ثبت‌شده در رجیستر» با مالک واحد، سناریوی پیوندشده یا «مورد جدید»، و
-    شواهد انتخاب‌شده. پیش‌نویس با ارسال پاک می‌شود."""
+    شواهد انتخاب‌شده. دسته اگر نیامده باشد از سناریوی پیوندشده می‌آید وگرنه خالی می‌ماند تا عضو GRC تعیینش کند.
+    فایل‌های شاهد پیش‌نویس و فایل تازه پیوست ریسک می‌شوند و پیش‌نویس با ارسال پاک می‌شود."""
     data = form.cleaned_data
     service, commitment, scenario = data["service"], data["commitment"], data.get("scenario")
     intake = {name: (data.get(name) or "").strip() for name in INTAKE_FIELDS}
@@ -207,9 +266,9 @@ def submit_identification(form, draft=None):
         service=service,
         org_unit=data["org_unit"],
         owner=unit_owner(data["org_unit"], form.user),
-        category=data["category"],
+        category=data.get("category") or (scenario.category if scenario else None),
         channel=Risk.Channel.IDENTIFICATION,
-        source=data["source"],
+        source=data.get("source") or "",
         scope=intake["subject"],
         intake=intake,
         status=Risk.Status.REGISTERED,
@@ -238,31 +297,18 @@ def submit_identification(form, draft=None):
     for item in data.get("evidence_items") or []:
         item.risks.add(risk)
     if draft and draft.pk:
+        if remove:
+            draft.attachments.filter(pk__in=remove).delete()
+        # جابه‌جایی با save تا تاریخچه‌ی پیوست هم بگوید از پیش‌نویس به ریسک آمده است.
+        for attachment in draft.attachments.all():
+            attachment.content_object = risk
+            attachment.save()
         draft.delete()
+    if upload is not None:
+        attach_evidence(risk, upload, form.user)
     return risk
 
 
 def visible_drafts(user):
     return IdentificationDraft.objects.filter(created_by=user)
 
-
-def scenario_rows():
-    """سناریوهای فعال کتابخانه برای «سناریوهای مشابه»: شباهت را رابط React همان لحظه از متن فرم حساب می‌کند."""
-    scenarios = (
-        RiskScenario.objects.filter(is_active=True)
-        .select_related("category", "service")
-        .prefetch_related("risks")
-        .order_by("code")
-    )
-    return [
-        {
-            "id": scenario.pk,
-            "code": scenario.code,
-            "title": scenario.title,
-            "text": " ".join([scenario.title, scenario.event, scenario.conditions, scenario.objective]),
-            "service_id": scenario.service_id,
-            "category": {"id": scenario.category_id, "code": scenario.category.code, "name": scenario.category.name},
-            "risk_count": sum(1 for risk in scenario.risks.all() if risk.is_active),
-        }
-        for scenario in scenarios
-    ]

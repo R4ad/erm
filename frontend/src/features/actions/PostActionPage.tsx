@@ -6,7 +6,7 @@ import { AppLink } from "@/components/ui/app-link";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
-import { RISK_CLASSES, riskKey } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Chip, SectionPanel } from "@/components/ui/section-panel";
 import { PageSkeleton } from "@/components/ui/skeleton";

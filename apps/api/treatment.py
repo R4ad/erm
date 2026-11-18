@@ -71,7 +71,7 @@ def risk_info(risk, note=None):
         "code": risk.code,
         "title": risk.title,
         "href": risk.get_absolute_url(),
-        "note": f"{risk.category.code} · {note or scope_of(risk)}",
+        "note": f"{fmt.category_code(risk)} · {note or scope_of(risk)}",
     }
 
 

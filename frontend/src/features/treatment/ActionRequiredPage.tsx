@@ -14,7 +14,8 @@ import {
 import { Checkbox, Radio } from "@/components/ui/field";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { IconChip, type ChipTone as IconTone } from "@/components/ui/icon-chip";
-import { LevelBadge, RISK_CLASSES, riskKey } from "@/components/ui/level-badge";
+import { LevelBadge } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Chip, SectionPanel, type ChipTone } from "@/components/ui/section-panel";

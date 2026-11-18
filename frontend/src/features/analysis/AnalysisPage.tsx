@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FieldError, Select } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
-import { RISK_CLASSES, riskKey, type RiskKey } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey, type RiskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProcessSteps, type StepState } from "@/components/ui/process-step";
 import { Chip, SectionPanel, type ChipTone } from "@/components/ui/section-panel";

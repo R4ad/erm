@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { usePageCrumbs } from "@/components/layout/crumbs";
+import { usePageCrumbs } from "@/components/layout/crumbs-context";
 import { cn } from "@/lib/cn";
 
 import type { Crumb } from "./breadcrumb";

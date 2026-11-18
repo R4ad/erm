@@ -319,7 +319,13 @@ class Risk(TimeStampedModel):
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, related_name="risks"
     )
     category = models.ForeignKey(
-        RiskCategory, verbose_name="دسته‌ی اصلی", on_delete=models.PROTECT, related_name="risks"
+        RiskCategory,
+        verbose_name="دسته‌ی اصلی",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="risks",
+        help_text="فرم شناسایی دسته نمی‌گیرد و عضو GRC آن را تعیین می‌کند؛ پیش از ارسال جهت ارزیابی اجباری است.",
     )
     tags = models.ManyToManyField(Tag, verbose_name="برچسب‌ها", related_name="risks", blank=True)
     data_class = models.CharField("طبقه‌ی اطلاعات", max_length=20, choices=DataClass.choices, blank=True)
@@ -447,6 +453,8 @@ class IdentificationDraft(TimeStampedModel):
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
     data = models.JSONField("مقدارهای فرم", default=dict, blank=True)
+    # فایل شاهدی که پیش از ارسال پیوست شده؛ با ارسال به ریسک ساخته‌شده منتقل و با حذف پیش‌نویس پاک می‌شود.
+    attachments = GenericRelation("core.Attachment")
 
     class Meta:
         verbose_name = "پیش‌نویس شناسایی"

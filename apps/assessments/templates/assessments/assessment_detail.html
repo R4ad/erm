@@ -64,7 +64,7 @@
   <dt class="col-sm-3">نوع و دامنه پیامد</dt><dd class="col-sm-9">{{ assessment.risk.scenario_snapshot.consequence|default:"-" }}</dd>
   {% endif %}
   <dt class="col-sm-3">خدمت</dt><dd class="col-sm-9">{{ assessment.risk.service|default:"-" }}</dd>
-  <dt class="col-sm-3">واحد و دسته</dt><dd class="col-sm-9">{{ assessment.risk.org_unit }}، {{ assessment.risk.category }}</dd>
+  <dt class="col-sm-3">واحد و دسته</dt><dd class="col-sm-9">{{ assessment.risk.org_unit }}، {{ assessment.risk.category|default:"بدون دسته" }}</dd>
   <dt class="col-sm-3">کانال ورود</dt><dd class="col-sm-9">{{ assessment.risk.get_channel_display }}</dd>
   <dt class="col-sm-3">مالک</dt><dd class="col-sm-9">{{ assessment.risk.owner|default:"-" }}</dd>
   <dt class="col-sm-3">بانک‌های متأثر</dt><dd class="col-sm-9">{% for item in assessment.risk.customers.all %}{{ item }}{% if not forloop.last %}، {% endif %}{% empty %}-{% endfor %}</dd>

@@ -5,7 +5,7 @@ import type { Day, Deadline as DeadlineValue } from "@/lib/types";
 import { Icon } from "./icon";
 
 /** متن مهلت مثل فیگما: «امروز»، «۲ روز دیگر»، «۳ روز تأخیر». */
-export function dueText(value: DeadlineValue): string {
+function dueText(value: DeadlineValue): string {
   const days = value.days_left;
   if (days === 0) return "امروز";
   if (days === 1) return "فردا";
@@ -13,7 +13,7 @@ export function dueText(value: DeadlineValue): string {
   return `${fa(-days)} روز تأخیر`;
 }
 
-export function dueTone(value: DeadlineValue | null | undefined): string {
+function dueTone(value: DeadlineValue | null | undefined): string {
   if (!value) return "text-ink-3";
   if (value.overdue || value.days_left <= 0) return "text-danger";
   if (value.days_left <= 1) return "text-warning";

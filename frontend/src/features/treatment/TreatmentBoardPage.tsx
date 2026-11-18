@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Checkbox, Radio, Select } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
-import { LevelBadge, RISK_CLASSES, riskKey } from "@/components/ui/level-badge";
+import { LevelBadge } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Chip, SectionPanel, type ChipTone } from "@/components/ui/section-panel";

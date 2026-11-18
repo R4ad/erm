@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Field, Textarea } from "@/components/ui/field";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { RISK_CLASSES, riskKey } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/states";
 import { useBridgeAction } from "@/features/forms/bridge-action";

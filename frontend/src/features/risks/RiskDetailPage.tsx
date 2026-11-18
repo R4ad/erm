@@ -18,7 +18,8 @@ import {
 import { Checkbox } from "@/components/ui/field";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { IconChip } from "@/components/ui/icon-chip";
-import { LevelBadge, RISK_CLASSES, riskKey, ScoreChip } from "@/components/ui/level-badge";
+import { LevelBadge, ScoreChip } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -229,7 +230,13 @@ function RecordHeader({ risk }: { risk: RiskDetail }) {
             {risk.org_unit}
           </MetaItem>
           <MetaItem icon="tag" label="دسته">
-            <bdi>{risk.category.code}</bdi> {risk.category.name}
+            {risk.category ? (
+              <>
+                <bdi>{risk.category.code}</bdi> {risk.category.name}
+              </>
+            ) : (
+              "هنوز تعیین نشده"
+            )}
           </MetaItem>
           {risk.scenario && (
             <MetaItem icon="books" label="سناریو">

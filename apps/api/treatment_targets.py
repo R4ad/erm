@@ -104,7 +104,7 @@ def target_row(risk, plan):
             "code": risk.code,
             "title": risk.title,
             "href": risk.get_absolute_url(),
-            "category": risk.category.code,
+            "category": fmt.category_code(risk),
             "scope": scope_of(risk),
         },
         "current": {
