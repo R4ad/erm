@@ -2193,13 +2193,16 @@ export interface IdentificationRow {
   stage: { value: string; label: string; tone: "neutral" | "info" | "warning" | "brand" };
   owner: Person | null;
   due: Deadline | null;
-  /** نشانی جنگوی پرونده‌ی ریسک، یا برای پیش‌نویس مسیر همین صفحه (route). */
+  /**
+   * نشانی جنگوی پرونده‌ی ریسک، یا برای ورودی‌ای که هنوز ریسک نیست مسیر صفحه‌ای که در آن باز می‌شود (route). پاسخ
+   * ارسال‌شده‌ی مدیر واحد هیچ‌کدام را ندارد، چون دیگر ویرایش نمی‌شود.
+   */
   href: string | null;
   route: string | null;
 }
 
 export interface IdentificationChoices {
-  org_unit: { value: string; label: string; owner: Person | null }[];
+  org_unit: { value: string; name: string; owner: Person | null }[];
   target: {
     value: string;
     label: string;
@@ -2222,13 +2225,18 @@ export interface IdentificationAttachment {
 
 export interface IdentificationDraft {
   id: number;
+  /** «پیش‌نویس» یا پاسخ مدیر واحد که «در حال شناسایی» منتظر عضو GRC است. */
+  status: { value: "draft" | "identifying"; label: string };
   saved_at: Moment;
   /** فایل‌های شاهدی که تا ارسال روی پیش‌نویس مانده‌اند. */
   attachments: IdentificationAttachment[];
 }
 
 export interface IdentificationPage {
+  /** ثبت و تکمیل در «شناسایی ریسک»: عضو GRC و مدیر سامانه. */
   can_identify: boolean;
+  /** «پاسخ به پرسشنامه‌ها»: مدیر واحدی که دست‌کم یک واحد دارد. */
+  can_answer: boolean;
   parts: IdentificationPart[];
   choices: IdentificationChoices | null;
   values: IdentificationValues;

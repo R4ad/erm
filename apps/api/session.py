@@ -7,6 +7,7 @@ from apps.actions.models import MonitoringNotice
 from apps.assessments.models import Assessment
 from apps.core.jalali import jalali_year, jalali_year_range
 from apps.methodology.services import active_version
+from apps.risks.identification import can_answer
 from apps.risks.models import Risk
 
 from . import formatting as fmt
@@ -46,16 +47,17 @@ def navigation(user):
     config = [link("تعریف متدولوژی", "methodology:active"), link("چارت سازمانی", "organization:unit_list")]
     if user.is_system_admin:
         config.append(link("تعریف کاربر و نقش", "accounts:user_list"))
+    desk = [link("کارهای من", "actions:my_work")]
+    if can_answer(user):
+        # مدیر واحد سناریوی واحدش را از اینجا می‌فرستد؛ عضو GRC آن را در «شناسایی ریسک» تکمیل می‌کند.
+        desk.append(spa_link("پاسخ به پرسشنامه‌ها", "desk:questionnaire_answers", "/questionnaire-answers"))
+    desk += [
+        link("رجیستر ریسک", "risks:risk_list"),
+        link("اعلان‌های پایش", "actions:notices", counts["notices"], "gold"),
+        link("گزارش مدیریتی", "reports:management"),
+    ]
     return {
-        "desk": {
-            "title": "میز کار",
-            "items": [
-                link("کارهای من", "actions:my_work"),
-                link("رجیستر ریسک", "risks:risk_list"),
-                link("اعلان‌های پایش", "actions:notices", counts["notices"], "gold"),
-                link("گزارش مدیریتی", "reports:management"),
-            ],
-        },
+        "desk": {"title": "میز کار", "items": desk},
         "modules": [
             {
                 "key": "assessment",

@@ -1,6 +1,7 @@
-"""«شناسایی ریسک»: پیش‌نویس جدا از رجیستر (حتی بدون واحد)، ارسال با پرسش‌های اجباری (بی مأموریت و منبع)، انتخاب
-خودکار واحد از خدمت پرسش اول، ساختن ریسک با مالک واحد و بدون دسته، فایل شاهد، سناریوی پیوندشده یا «مورد جدید»، و
-ورودی‌های اخیر."""
+"""«شناسایی ریسک»: ثبت با عضو GRC و مدیر سامانه است و مدیر واحد فقط وضعیت ورودی‌های خودش را می‌بیند (سناریو را از
+«پاسخ به پرسشنامه‌ها» می‌فرستد، test_questionnaire_answers.py). پیش‌نویس جدا از رجیستر (حتی بدون واحد)، ارسال با
+پرسش‌های اجباری (بی مأموریت و منبع)، واحد از خدمت پرسش اول، ساختن ریسک با مالک واحد و بدون دسته، فایل شاهد،
+سناریوی پیوندشده یا «مورد جدید»، و ورودی‌های اخیر."""
 
 import json
 
@@ -31,6 +32,11 @@ def manager(unit):
     user = make_user("manager", Role.UNIT_MANAGER, first_name="حسین", last_name="نوری")
     user.managed_units.add(unit)
     return user
+
+
+@pytest.fixture
+def grc():
+    return make_user("grc", Role.GRC_MEMBER, first_name="نسترن", last_name="امینی")
 
 
 @pytest.fixture
@@ -79,12 +85,17 @@ def payload(form_values, **fields):
     return json.dumps({"values": form_values, **fields})
 
 
-def test_the_page_offers_the_six_questions_and_services_with_their_unit(client, manager, unit, service, commitment):
-    data = login(client, manager).get(URL).json()
+def test_the_page_offers_the_six_questions_and_services_with_their_unit(client, grc, manager, unit, service, commitment):
+    data = login(client, grc).get(URL).json()
 
-    assert data["can_identify"] is True
+    assert (data["can_identify"], data["can_answer"]) == (True, False)
+    # مالک هر واحد مدیر همان واحد است، نه عضو GRC که ثبت می‌کند.
     assert data["choices"]["org_unit"] == [
-        {"value": str(unit.pk), "label": "پرداخت · حسین نوری", "owner": {"id": manager.pk, "name": "حسین نوری"}}
+        {
+            "value": str(unit.pk),
+            "name": "پرداخت",
+            "owner": {"id": manager.pk, "name": "حسین نوری"},
+        }
     ]
     targets = {item["value"]: item for item in data["choices"]["target"]}
     assert targets[str(service.pk)]["label"] == "ساتنا · همه‌ی مشتریان"
@@ -112,8 +123,8 @@ def test_the_page_offers_the_six_questions_and_services_with_their_unit(client, 
     assert data["values"]["org_unit"] == "" and data["draft"] is None
 
 
-def test_a_draft_stays_out_of_the_register_until_it_is_submitted(client, manager, unit, service, commitment):
-    client = login(client, manager)
+def test_a_draft_stays_out_of_the_register_until_it_is_submitted(client, grc, unit, service, commitment):
+    client = login(client, grc)
     saved = client.post(URL, {"values": values(unit, service, commitment, harm="")}, content_type="application/json")
 
     assert saved.status_code == 200
@@ -135,8 +146,9 @@ def test_a_draft_stays_out_of_the_register_until_it_is_submitted(client, manager
     assert login(client, other).get(URL, {"draft": draft.pk}).status_code == 404
 
 
-def test_submitting_registers_the_risk_with_the_unit_owner_and_template(client, manager, unit, service, commitment):
-    grc = make_user("grc", Role.GRC_MEMBER)
+def test_submitting_registers_the_risk_with_the_unit_owner_and_template(
+    client, grc, manager, unit, service, commitment
+):
     evidence = Evidence.objects.create(
         kind=Evidence.Kind.INCIDENT,
         title="گزارش رخداد انتشار",
@@ -175,7 +187,7 @@ def test_submitting_registers_the_risk_with_the_unit_owner_and_template(client, 
     assert not IdentificationDraft.objects.exists()
 
 
-def test_linking_a_library_scenario_keeps_its_snapshot(client, manager, unit, service, commitment):
+def test_linking_a_library_scenario_keeps_its_snapshot(client, grc, unit, service, commitment):
     scenario = RiskScenario.objects.create(
         title="اعمال بسته‌ی انتشار نامعتبر",
         event="ر",
@@ -184,7 +196,7 @@ def test_linking_a_library_scenario_keeps_its_snapshot(client, manager, unit, se
         category=RiskCategory.objects.get(code="T2"),
         service=service,
     )
-    client = login(client, manager)
+    client = login(client, grc)
     client.post(
         URL,
         {"values": values(unit, service, commitment, scenario=str(scenario.pk)), "submit": True},
@@ -195,52 +207,58 @@ def test_linking_a_library_scenario_keeps_its_snapshot(client, manager, unit, se
     assert risk.scenario == scenario and risk.scenario_snapshot["code"] == scenario.code
 
 
-def test_only_unit_managers_and_grc_identify(client, manager, unit, service, commitment):
+def test_only_grc_and_system_admins_identify(client, manager, unit, service, commitment):
+    """مدیر واحد دیگر از این صفحه ثبت نمی‌کند: صفحه را برای دیدن ورودی‌های خودش می‌خواند ولی فرم و POST و DELETE ندارد
+    و به «پاسخ به پرسشنامه‌ها» راه داده می‌شود."""
     viewer = make_user("viewer", Role.VIEWER)
     page = login(client, viewer).get(URL).json()
-    assert page["can_identify"] is False and page["choices"] is None
+    assert (page["can_identify"], page["can_answer"], page["choices"]) == (False, False, None)
     denied = client.post(URL, {"values": values(unit, service, commitment)}, content_type="application/json")
     assert denied.status_code == 403
 
+    page = login(client, manager).get(URL).json()
+    assert (page["can_identify"], page["can_answer"], page["choices"]) == (False, True, None)
+    for submit in (False, True):
+        denied = client.post(
+            URL, {"values": values(unit, service, commitment), "submit": submit}, content_type="application/json"
+        )
+        assert denied.status_code == 403
+    draft = IdentificationDraft.objects.create(created_by=manager, data={"subject": "ساتنا"})
+    assert client.delete(f"{URL}?draft={draft.pk}").status_code == 403
+    assert IdentificationDraft.objects.filter(pk=draft.pk).exists()
 
-def test_a_manager_with_one_unit_identifies_for_that_unit_whatever_the_service(client, manager, unit):
-    """واحد پرسیده نمی‌شود: مدیری که فقط یک واحد دارد همیشه برای همان واحد ثبت می‌کند، حتی اگر خدمت مال واحد دیگری
-    باشد، و واحدی که رابط فرستاده (مثلاً از پیش‌نویس قدیمی) نادیده گرفته می‌شود."""
-    elsewhere = OrgUnit.objects.create(name="تدارکات")
-    other_service = make_service("SRV-PROC", org_unit=elsewhere, name="تدارکات")
-    response = login(client, manager).post(
-        URL,
-        {"values": values(elsewhere, other_service, None, target=str(other_service.pk)), "submit": True},
-        content_type="application/json",
+    admin = make_user("admin", Role.SYSTEM_ADMIN)
+    assert login(client, admin).get(URL).json()["can_identify"] is True
+    created = client.post(
+        URL, {"values": values(unit, service, commitment), "submit": True}, content_type="application/json"
     )
-
-    assert response.status_code == 201
-    risk = Risk.objects.get()
-    assert (risk.org_unit, risk.owner, risk.service) == (unit, manager, other_service)
+    assert created.status_code == 201
+    assert Risk.objects.get().owner == manager
 
 
-def test_with_several_units_the_unit_comes_from_the_chosen_service(client, manager, unit):
+def test_the_risk_unit_comes_from_the_chosen_service(client, grc, unit):
+    """واحد پرسیده نمی‌شود: عضو GRC همه‌ی واحدها را دارد و واحد ریسک همیشه واحد مالک خدمت انتخاب‌شده است؛ واحدی که
+    رابط فرستاده (مثلاً از پیش‌نویس قدیمی) نادیده گرفته می‌شود و مالک، مدیر همان واحد است."""
     second = OrgUnit.objects.create(name="تسویه")
     second_manager = make_user("second", Role.UNIT_MANAGER, first_name="مینا", last_name="راد")
     second_manager.managed_units.add(second)
-    manager.managed_units.add(second)
     settlement = make_service("SRV-SETTLE", org_unit=second, name="تسویه")
-    response = login(client, manager).post(
+    response = login(client, grc).post(
         URL,
-        {"values": values(unit, settlement, None, target=str(settlement.pk), org_unit=""), "submit": True},
+        {"values": values(unit, settlement, None, target=str(settlement.pk)), "submit": True},
         content_type="application/json",
     )
 
     assert response.status_code == 201
     risk = Risk.objects.get()
-    # ثبت‌کننده مدیر همین واحد هم هست، پس مالک ریسک خود اوست.
-    assert (risk.org_unit, risk.owner) == (second, manager)
+    assert (risk.org_unit, risk.owner, risk.service) == (second, second_manager, settlement)
 
 
-def test_submitting_points_back_to_the_first_question_when_no_unit_of_the_user_fits(client, manager, unit):
-    manager.managed_units.add(OrgUnit.objects.create(name="تسویه"))
-    foreign = make_service("SRV-HR", org_unit=OrgUnit.objects.create(name="منابع انسانی"), name="حقوق و دستمزد")
-    response = login(client, manager).post(
+def test_submitting_points_back_to_the_first_question_when_the_service_unit_is_inactive(client, grc, unit):
+    OrgUnit.objects.create(name="تسویه")
+    closed = OrgUnit.objects.create(name="منابع انسانی", is_active=False)
+    foreign = make_service("SRV-HR", org_unit=closed, name="حقوق و دستمزد")
+    response = login(client, grc).post(
         URL,
         {"values": values(unit, foreign, None, target=str(foreign.pk)), "submit": True},
         content_type="application/json",
@@ -253,10 +271,11 @@ def test_submitting_points_back_to_the_first_question_when_no_unit_of_the_user_f
     assert not Risk.objects.exists()
 
 
-def test_a_draft_is_saved_even_when_no_unit_can_be_chosen(client, manager, unit):
-    manager.managed_units.add(OrgUnit.objects.create(name="تسویه"))
-    foreign = make_service("SRV-HR", org_unit=OrgUnit.objects.create(name="منابع انسانی"), name="حقوق و دستمزد")
-    client = login(client, manager)
+def test_a_draft_is_saved_even_when_no_unit_can_be_chosen(client, grc, unit):
+    OrgUnit.objects.create(name="تسویه")
+    closed = OrgUnit.objects.create(name="منابع انسانی", is_active=False)
+    foreign = make_service("SRV-HR", org_unit=closed, name="حقوق و دستمزد")
+    client = login(client, grc)
 
     unknown = client.post(
         URL, {"values": values(unit, foreign, None, target=str(foreign.pk))}, content_type="application/json"
@@ -269,8 +288,8 @@ def test_a_draft_is_saved_even_when_no_unit_can_be_chosen(client, manager, unit)
     assert row["stage"]["label"] == "پیش‌نویس" and row["owner"] is None
 
 
-def test_mission_source_and_category_are_not_needed_to_submit(client, manager, unit, service, commitment):
-    response = login(client, manager).post(
+def test_mission_source_and_category_are_not_needed_to_submit(client, grc, unit, service, commitment):
+    response = login(client, grc).post(
         URL,
         {"values": values(unit, service, commitment, mission="", source="", category="", tags=[]), "submit": True},
         content_type="application/json",
@@ -282,8 +301,8 @@ def test_mission_source_and_category_are_not_needed_to_submit(client, manager, u
     assert risk.intake["mission"] == ""
 
 
-def test_submitting_without_a_service_asks_for_it_on_the_first_question(client, manager, unit, service, commitment):
-    response = login(client, manager).post(
+def test_submitting_without_a_service_asks_for_it_on_the_first_question(client, grc, unit, service, commitment):
+    response = login(client, grc).post(
         URL, {"values": values(unit, service, commitment, target=""), "submit": True}, content_type="application/json"
     )
 
@@ -291,8 +310,8 @@ def test_submitting_without_a_service_asks_for_it_on_the_first_question(client, 
     assert set(response.json()["errors"]) == {"target"}
 
 
-def test_an_evidence_file_waits_on_the_draft_and_moves_to_the_risk(client, manager, unit, service, commitment):
-    client = login(client, manager)
+def test_an_evidence_file_waits_on_the_draft_and_moves_to_the_risk(client, grc, unit, service, commitment):
+    client = login(client, grc)
     report = SimpleUploadedFile("گزارش رخداد.txt", "بیست بسته‌ی نامعتبر".encode(), content_type="text/plain")
     saved = client.post(URL, {"payload": payload(values(unit, service, commitment)), "evidence_file": report})
 
@@ -316,9 +335,9 @@ def test_an_evidence_file_waits_on_the_draft_and_moves_to_the_risk(client, manag
 
 
 def test_a_removed_draft_file_does_not_reach_the_risk_and_a_bad_file_is_refused(
-    client, manager, unit, service, commitment
+    client, grc, unit, service, commitment
 ):
-    client = login(client, manager)
+    client = login(client, grc)
     first = SimpleUploadedFile("اول.txt", b"one", content_type="text/plain")
     saved = client.post(URL, {"payload": payload(values(unit, service, commitment)), "evidence_file": first})
     draft_id = saved.json()["draft"]["id"]

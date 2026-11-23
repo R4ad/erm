@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { useBlocker } from "react-router-dom";
+import { useBlocker, type Location } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/dialog";
 
@@ -11,11 +11,16 @@ interface LeaveGuardProps {
    * بعدی پیش بیاید و `when` هنوز مقدار رندر قبلی را داشته باشد.
    */
   released?: RefObject<boolean>;
+  /**
+   * رفتن در همین صفحه هم پرسیده شود وقتی این تابع درست برگرداند، مثلاً نشانی‌ای که فرم را با داده‌ی دیگری از نو
+   * می‌سازد. رفتن به صفحه‌ی دیگر همیشه پرسیده می‌شود.
+   */
+  replaces?: (current: Location, next: Location) => boolean;
   description?: string;
 }
 
 /** پیش از بستن برگه یا رفتن به صفحه‌ی دیگر با تغییر ذخیره‌نشده می‌پرسد. */
-export function LeaveGuard({ when, released, description }: LeaveGuardProps) {
+export function LeaveGuard({ when, released, replaces, description }: LeaveGuardProps) {
   useEffect(() => {
     if (!when) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -26,7 +31,9 @@ export function LeaveGuard({ when, released, description }: LeaveGuardProps) {
   }, [when, released]);
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      when && !released?.current && currentLocation.pathname !== nextLocation.pathname,
+      when &&
+      !released?.current &&
+      (currentLocation.pathname !== nextLocation.pathname || Boolean(replaces?.(currentLocation, nextLocation))),
   );
   return (
     <ConfirmDialog

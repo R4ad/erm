@@ -32,6 +32,9 @@ import type {
   FormPageData,
   FormSchema,
   HolidayList,
+  IdentificationPage,
+  IdentificationRow,
+  IdentificationValues,
   ImpactRow,
   Level,
   MethodPage,
@@ -532,6 +535,15 @@ export function session(): Session {
         title: "میز کار",
         items: [
           { key: "actions:my_work", label: "کارهای من", href: "/actions/mine/", route: "/", count: null, tone: null },
+          // کاربر آزمون مدیر واحد است و «پاسخ به پرسشنامه‌ها» را درست بعد از «کارهای من» می‌بیند.
+          {
+            key: "desk:questionnaire_answers",
+            label: "پاسخ به پرسشنامه‌ها",
+            href: "/app/questionnaire-answers",
+            route: "/questionnaire-answers",
+            count: null,
+            tone: null,
+          },
           { key: "risks:risk_list", label: "رجیستر ریسک", href: "/risks/", route: "/risks", count: null, tone: null },
           {
             key: "actions:notices",
@@ -7201,5 +7213,111 @@ export function staffImportDone(overrides: Partial<StaffImportResult> = {}): Sta
       confirm: null,
     } as StaffImportResult),
     ...overrides,
+  };
+}
+
+// ───────────── شناسایی ریسک و پاسخ به پرسشنامه‌ها ─────────────
+
+/** شش پرسش جلسه‌ی شناسایی، همان SCENARIO_PARTS سرور. */
+export const identificationParts: IdentificationPage["parts"] = [
+  { name: "subject", label: "موضوع بررسی کدام خدمت یا فرآیند است؟", token: "خدمت" },
+  { name: "objective", label: "کدام هدف یا تعهد مختل می‌شود؟", token: "هدف یا تعهد" },
+  { name: "conditions", label: "چه علت یا شرایطی زمینه‌ی اختلال را فراهم می‌کند؟", token: "عامل و وضعیت" },
+  { name: "customer", label: "داتین، مشتری یا هر دو متأثرند؟", token: "داتین یا مشتری" },
+  { name: "event", label: "چه اتفاق مشخصی ممکن است رخ دهد؟", token: "رویداد مشخص" },
+  { name: "harm", label: "آسیب قابل مشاهده و دامنه‌ی آن چیست؟", token: "نوع و دامنه‌ی پیامد" },
+];
+
+/** مقدارهای خالی فرم شناسایی، همان blank_values سرور. */
+export function identificationValues(overrides: Partial<IdentificationValues> = {}): IdentificationValues {
+  return {
+    org_unit: "",
+    target: "",
+    mission: "",
+    subject: "",
+    objective: "",
+    conditions: "",
+    customer: "",
+    event: "",
+    harm: "",
+    impact: "",
+    dependencies: "",
+    evidence: "",
+    category: "",
+    tags: [],
+    source: "",
+    scenario: "",
+    evidence_items: [],
+    ...overrides,
+  };
+}
+
+/** پاسخی که مدیر واحد فرستاده و منتظر کارشناس ریسک است؛ خدمت ندارد و ستون خدمت موضوعی است که خودش نوشته. */
+export function identifyingRow(overrides: Partial<IdentificationRow> = {}): IdentificationRow {
+  return {
+    key: "draft-31",
+    code: null,
+    title: "توقف سامانه‌ی آزمون پس از انتشار",
+    category: null,
+    scenario: null,
+    service: "سامانه‌ی آزمون در محیط تولید",
+    customer: null,
+    source: "",
+    stage: { value: "identifying", label: "در حال شناسایی", tone: "warning" },
+    owner: tester,
+    due: null,
+    href: null,
+    route: null,
+    ...overrides,
+  };
+}
+
+/** «پاسخ به پرسشنامه‌ها» برای مدیر یک واحد: شش پرسش، بی فهرست خدمت‌ها. */
+export function questionnaireAnswers(overrides: Partial<IdentificationPage> = {}): IdentificationPage {
+  return {
+    can_identify: false,
+    can_answer: true,
+    parts: identificationParts,
+    choices: {
+      org_unit: [{ value: "6", name: "واحد آزمون", owner: tester }],
+      target: [],
+      category: [{ value: "1", code: "T1", label: "دسته‌ی آزمون" }],
+      source: [{ value: "change", label: "ثبت تغییرات نرمال" }],
+      evidence: [{ value: "9", code: "EV-0110", label: "شاهد آزمون" }],
+    },
+    values: identificationValues(),
+    draft: null,
+    text_limit: 1000,
+    attachment: { accept: ".pdf,.png,.jpg,.docx,.txt", max_size: 20 * 1024 * 1024 },
+    recent: [
+      {
+        key: "risk-55",
+        code: "RK-1405-0055",
+        title: "ریسک آزمون واحد",
+        category: "T1",
+        scenario: null,
+        service: "خدمت آزمون",
+        customer: "همه",
+        source: "ارزیابی دوره‌ای",
+        stage: { value: "identified", label: "شناسایی‌شده", tone: "info" },
+        owner: tester,
+        due: null,
+        href: "/risks/55/",
+        route: null,
+      },
+    ],
+    scenarios_url: "/risks/scenarios/",
+    register_url: "/risks/",
+    evidence_url: "/risks/evidence/new/",
+    ...overrides,
+  };
+}
+
+/** جواب «ارسال برای شناسایی» در «پاسخ به پرسشنامه‌ها»: ریسکی ساخته نمی‌شود و ردیف تازه «در حال شناسایی» است. */
+export function questionnaireAnswersSent() {
+  return {
+    message: "پاسخ‌ها ثبت شد و برای شناسایی به کارشناس ریسک رسید.",
+    entry: { id: 31 },
+    recent: [identifyingRow(), ...questionnaireAnswers().recent],
   };
 }

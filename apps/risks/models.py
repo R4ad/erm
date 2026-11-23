@@ -443,8 +443,19 @@ class Risk(TimeStampedModel):
 
 
 class IdentificationDraft(TimeStampedModel):
-    """پیش‌نویس فرم شناسایی (فیگما ۱۱). ریسک فقط با «ارسال برای شناسایی» ساخته می‌شود، تا پیش‌نویس نیمه‌کاره در
-    رجیستر، جهان ریسک و گزارش‌ها شمرده نشود. مقدارها همان فیلدهای فرم‌اند و با ارسال، پیش‌نویس پاک می‌شود."""
+    """ورودی فرم شناسایی (فیگما ۱۱) پیش از آن‌که ریسک شود. «پیش‌نویس» کار نیمه‌کاره‌ی ثبت‌کننده است و فقط خودش آن را
+    می‌بیند. «در حال شناسایی» پاسخی است که مدیر واحد از «پاسخ به پرسشنامه‌ها» فرستاده و منتظر عضو GRC است تا خدمت،
+    مشتری و تعهد را انتخاب کند؛ مدیر دیگر آن را تغییر نمی‌دهد. هر دو عمداً بیرون از رجیستر می‌مانند تا کد ریسک
+    نگیرند و در رجیستر، جهان ریسک، گزارش‌ها و چرخه‌ی ارزیابی شمرده نشوند. ریسک فقط وقتی ساخته می‌شود که عضو GRC
+    ورودی را در «شناسایی ریسک» ارسال کند؛ آن موقع پیوست‌ها به ریسک منتقل و ورودی پاک می‌شود."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "پیش‌نویس"
+        IDENTIFYING = "identifying", "در حال شناسایی"
+
+    class Origin(models.TextChoices):
+        IDENTIFICATION = "identification", "شناسایی ریسک"
+        QUESTIONNAIRE = "questionnaire", "پاسخ به پرسشنامه‌ها"
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.CASCADE, related_name="+"
@@ -453,6 +464,10 @@ class IdentificationDraft(TimeStampedModel):
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
     data = models.JSONField("مقدارهای فرم", default=dict, blank=True)
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    submitted_at = models.DateTimeField("زمان ارسال به کارشناس ریسک", null=True, blank=True)
+    # صفحه‌ای که ورودی در آن نوشته شده؛ پیش‌نویس همان‌جا ادامه می‌یابد، حتی برای کاربری که هر دو صفحه را دارد.
+    origin = models.CharField("صفحه‌ی ثبت", max_length=20, choices=Origin.choices, default=Origin.IDENTIFICATION)
     # فایل شاهدی که پیش از ارسال پیوست شده؛ با ارسال به ریسک ساخته‌شده منتقل و با حذف پیش‌نویس پاک می‌شود.
     attachments = GenericRelation("core.Attachment")
 

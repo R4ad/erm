@@ -488,6 +488,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "questionnaire-answers",
+            lazy: async () => ({
+              Component: (await import("@/features/identification/QuestionnaireAnswersPage")).QuestionnaireAnswersPage,
+            }),
+          },
+          {
             path: "responses/:id",
             lazy: async () => ({
               Component: keyedById((await import("@/features/questionnaires/ResponseFormPage")).ResponseFormPage),
