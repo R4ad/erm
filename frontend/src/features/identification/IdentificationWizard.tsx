@@ -26,7 +26,6 @@ import type {
 import {
   REVIEW,
   autoUnit,
-  emptyValues,
   fieldId,
   narrative,
   riskTitle,
@@ -34,9 +33,8 @@ import {
   withTarget,
   type StepKey,
   type Target,
-  type WizardMode,
 } from "./identification";
-import { MODES } from "./modes";
+import { WIZARD } from "./modes";
 import {
   EntryCriteria,
   EvidencePicker,
@@ -49,12 +47,11 @@ import {
   type StepStatus,
 } from "./steps";
 
-// ویزارد شش پرسش جلسه‌ی شناسایی و یک گام «بازبینی»، مشترک «شناسایی ریسک» (mode="identify") و «پاسخ به پرسشنامه‌ها»
-// (mode="answer"). بالای ویزارد «الگوی ثبت سناریو» چسبان است و با هر حرف جزء همان پرسش را در جمله پر و
-// علامت‌گذاری می‌کند. در شناسایی خدمت از پیشنهادهای پرسش اول انتخاب می‌شود و واحد، مشتری و تعهد از همان می‌آیند؛ در
-// پاسخ موضوع آزاد و اجباری است و خدمت را کارشناس ریسک بعداً انتخاب می‌کند. دسته و منبع را عضو GRC تعیین می‌کند.
-// بازبینی شاهد (اجباری)، فایل شاهد، پیامد، وابستگی و شرط پذیرش ورودی را دارد. پیش‌نویس با Ctrl+S هم ذخیره می‌شود و
-// رفتن با تغییر ذخیره‌نشده پرسیده می‌شود. متن‌های هر حالت در modes.ts است.
+// ویزارد ثبت دستی ریسک: شش پرسش جلسه‌ی شناسایی و یک گام «بازبینی». بالای ویزارد «الگوی ثبت سناریو» چسبان است و با
+// هر حرف جزء همان پرسش را در جمله پر و علامت‌گذاری می‌کند. خدمت از پیشنهادهای پرسش اول انتخاب می‌شود و واحد، مشتری و
+// تعهد از همان می‌آیند. دسته و منبع را عضو GRC تعیین می‌کند. بازبینی شاهد (اجباری)، فایل شاهد، پیامد، وابستگی و شرط
+// پذیرش ورودی را دارد. پیش‌نویس با Ctrl+S هم ذخیره می‌شود و رفتن با تغییر ذخیره‌نشده پرسیده می‌شود. متن‌ها در
+// modes.ts است.
 
 type Errors = Partial<Record<string, string[]>>;
 
@@ -85,22 +82,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 const REQUIRED = "این پرسش برای ارسال اجباری است.";
 
-export function IdentificationWizard({
-  data,
-  mode,
-  onDraftSaved,
-  onSubmitted,
-  focusFirst = false,
-}: {
-  data: PageData;
-  mode: WizardMode;
-  onDraftSaved: (id: string) => void;
-  /** بعد از «ارسال برای شناسایی» در حالتی که به ریسک نمی‌رود (answer)، تا صفحه فرم خالی تازه بسازد. */
-  onSubmitted?: () => void;
-  /** فرمی که بعد از ارسال از نو ساخته شده فوکوس را روی پرسش اول می‌گذارد، چون دکمه‌ی ارسال از صفحه رفته است. */
-  focusFirst?: boolean;
-}) {
-  const config = MODES[mode];
+export function IdentificationWizard({ data, onDraftSaved }: { data: PageData; onDraftSaved: (id: string) => void }) {
   const choices = data.choices as IdentificationChoices;
   const parts = data.parts;
   const queryClient = useQueryClient();
@@ -118,12 +100,10 @@ export function IdentificationWizard({
   const [index, setIndex] = useState(0);
   // جهت آخرین جابه‌جایی برای CSS؛ گام اول هنگام باز شدن صفحه حرکت ندارد.
   const [direction, setDirection] = useState<"forward" | "back" | "none">("none");
-  const [focusRequest, setFocusRequest] = useState<{ field: string; n: number } | null>(
-    focusFirst ? { field: parts[0]?.name ?? "subject", n: 0 } : null,
-  );
+  const [focusRequest, setFocusRequest] = useState<{ field: string; n: number } | null>(null);
   const shell = useRef<HTMLDivElement>(null);
   // جایی که خود ویزارد بعد از جواب سرور به آن می‌رود و هشدار «تغییرات ذخیره نشده» (LeaveGuard) جلویش را نمی‌گیرد:
-  // leaving برای ریسک تازه یا فرم خالی بعد از ارسال (این فرم کنار می‌رود)، ownSearch برای ?draft= پیش‌نویسی که همین
+  // leaving برای ریسک تازه (این فرم کنار می‌رود)، ownSearch برای ?draft= پیش‌نویسی که همین
   // حالا ذخیره شد. ref است نه state، چون جواب سریع سرور ممکن است پیش از رندر بعدی برسد و هشدار هنوز با مقدارهای پیش از
   // ذخیره تصمیم بگیرد.
   const leaving = useRef(false);
@@ -192,7 +172,7 @@ export function IdentificationWizard({
   function status(key: StepKey): StepStatus {
     if (stepErrors(key).length) return "error";
     if (key === REVIEW) return values.evidence.trim() ? "answered" : "empty";
-    if (key === "subject" && config.services) return values.target ? "answered" : "empty";
+    if (key === "subject") return values.target ? "answered" : "empty";
     return values[key].trim() ? "answered" : "empty";
   }
 
@@ -201,7 +181,7 @@ export function IdentificationWizard({
     if (key === REVIEW) {
       return values.evidence.trim() ? {} : { evidence: ["شاهد یا فرض قابل آزمون را بنویسید؛ برای ارسال اجباری است."] };
     }
-    if (key === "subject" && config.services) {
+    if (key === "subject") {
       if (!values.target) {
         return {
           target: [
@@ -306,7 +286,7 @@ export function IdentificationWizard({
   const save = useMutation({
     mutationFn: ({ submit, values }: { submit: boolean; values: IdentificationValues }) => {
       const payload = { values, submit, draft: draft?.id ?? null, remove_attachments: removed };
-      const url = `${config.endpoint}/`;
+      const url = "identification/";
       if (!file) return post<SaveResult>(url, payload);
       const body = new FormData();
       body.set("payload", JSON.stringify(payload));
@@ -321,11 +301,6 @@ export function IdentificationWizard({
       setFile(null);
       setRemoved([]);
       toast({ title: faText(result.message) });
-      // جدول صفحه‌ی دیگر هم ورودی‌های همین کاربر را نشان می‌دهد (برای کسی که هر دو صفحه را دارد)؛ کهنه علامت می‌خورد
-      // تا رفتن به آن تازه بخواند.
-      for (const { endpoint } of Object.values(MODES)) {
-        if (endpoint !== config.endpoint) void queryClient.invalidateQueries({ queryKey: [endpoint] });
-      }
       if (submit && result.redirect) {
         // ورودی با ارسال پاک شده است و دوباره خواندن ?draft= همین حالا ۴۰۴ می‌دهد؛ داده‌ی شناسایی فقط کهنه علامت
         // می‌خورد تا بازگشت به صفحه تازه بخواند.
@@ -335,32 +310,11 @@ export function IdentificationWizard({
         navigate(result.redirect);
         return;
       }
-      if (submit) {
-        // پاسخ ارسال‌شده دیگر در این فرم نیست: فرم خالی با ردیف «در حال شناسایی» در جدول از نو ساخته می‌شود.
-        queryClient.setQueryData<PageData>([config.endpoint, ""], {
-          ...data,
-          values: emptyValues(sent),
-          draft: null,
-          recent: result.recent ?? data.recent,
-        });
-        // نشانی هنوز ?draft= دارد؛ برداشتن داده‌ی پیش‌نویس همین حالا آن را دوباره می‌خواند. کهنه علامت می‌خورد تا
-        // بازگشت به آن نشانی از سرور بخواند که دیگر پیش‌نویسی نیست.
-        if (draft) {
-          void queryClient.invalidateQueries({
-            queryKey: [config.endpoint, String(draft.id)],
-            exact: true,
-            refetchType: "none",
-          });
-        }
-        leaving.current = true;
-        onSubmitted?.();
-        return;
-      }
       if (result.draft) {
         const id = String(result.draft.id);
         setDraft(result.draft);
         // داده‌ی نشانی تازه همین فرم است، تا با ?draft= دوباره خوانده و از نو ساخته نشود و گام و فوکوس سر جایش بماند.
-        queryClient.setQueryData<PageData>([config.endpoint, id], {
+        queryClient.setQueryData<PageData>(["identification", id], {
           ...data,
           values: sent,
           draft: result.draft,
@@ -490,12 +444,12 @@ export function IdentificationWizard({
                 value={values[part.name]}
                 limit={limit}
                 messages={stepErrors(part.name)}
-                required={part.name !== "subject" || !config.services}
-                hint={config.hints[part.name]}
+                required={part.name !== "subject"}
+                hint={WIZARD.hints[part.name]}
                 onChange={(value) => set(part.name, value)}
                 onEnter={next}
               >
-                {part.name === "subject" && config.services && (
+                {part.name === "subject" && (
                   <ServiceSuggestions
                     targets={choices.target}
                     query={values.subject}
@@ -509,14 +463,14 @@ export function IdentificationWizard({
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col gap-1">
                   <h3 className="text-h2 font-semibold text-ink">بازبینی پیش از ارسال</h3>
-                  <p className="text-sm text-ink-2">{config.reviewIntro}</p>
+                  <p className="text-sm text-ink-2">{WIZARD.reviewIntro}</p>
                 </div>
                 <figure className="flex flex-col gap-2 rounded-lg bg-subtle px-4 py-3.5">
                   <figcaption className="text-xs font-medium text-ink-2">جمله‌ی کامل سناریو</figcaption>
                   <blockquote className="text-base leading-8 text-pretty text-ink">{narrative(values)}</blockquote>
                   {title && (
                     <p className="text-xs text-ink-2">
-                      {config.titleLabel}: <span className="font-medium text-ink">{title}</span>
+                      {WIZARD.titleLabel}: <span className="font-medium text-ink">{title}</span>
                     </p>
                   )}
                 </figure>
@@ -603,7 +557,7 @@ export function IdentificationWizard({
                     />
                   </Field>
                 </div>
-                <EntryCriteria values={values} unit={unit} mode={mode} />
+                <EntryCriteria values={values} unit={unit} />
               </div>
             )}
           </section>
@@ -657,8 +611,8 @@ export function IdentificationWizard({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={config.confirmTitle}
-        description={config.confirmDescription(Boolean(values.scenario))}
+        title={WIZARD.confirmTitle}
+        description={WIZARD.confirmDescription(Boolean(values.scenario))}
         confirmLabel="ارسال برای شناسایی"
         loading={save.isPending}
         onConfirm={() => save.mutate({ submit: true, values })}

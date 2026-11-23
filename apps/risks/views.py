@@ -3,7 +3,6 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
-from django.template.response import TemplateResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.functional import cached_property
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -297,7 +296,7 @@ class RiskFormMixin(RoleRequiredMixin, BackToRecordMixin, FormPageMixin):
 class RiskCreateView(RiskFormMixin, CreateView):
     @property
     def scenario_flow(self):
-        return self.request.resolver_match.view_name in {"risks:risk_create", "questionnaires:pending_convert"}
+        return self.request.resolver_match.view_name == "risks:risk_create"
 
     @cached_property
     def selected_scenario(self):
@@ -309,15 +308,6 @@ class RiskCreateView(RiskFormMixin, CreateView):
                 raise PermissionDenied
             scenario = self.selected_scenario
             if not scenario:
-                if request.resolver_match.view_name == "questionnaires:pending_convert":
-                    pending = self.pending
-                    if not pending.is_pending:
-                        messages.error(request, "تکلیف این ریسک در انتظار پیش‌تر تعیین شده است.")
-                        return redirect(pending.response.get_absolute_url())
-                    scenarios = RiskScenario.objects.filter(is_active=True, service__is_active=True).select_related("service")
-                    # TemplateResponse تا رابط React همین فهرست را از context بخواند (apps/api/bridge.py).
-                    context = {"pending": pending, "scenarios": scenarios}
-                    return TemplateResponse(request, "risks/pending_scenario_select.html", context)
                 messages.error(request, "برای ثبت ریسک، ابتدا یک سناریوی فعال انتخاب کنید.")
                 return redirect("risks:scenario_list")
             if not scenario.service_id or not scenario.service.is_active:

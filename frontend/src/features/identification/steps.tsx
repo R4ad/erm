@@ -26,9 +26,8 @@ import {
   type StepKey,
   type Target,
   type Unit,
-  type WizardMode,
 } from "./identification";
-import { MODES } from "./modes";
+import { WIZARD } from "./modes";
 
 // جزءهای ویزارد شناسایی که «شناسایی ریسک» و «پاسخ به پرسشنامه‌ها» هر دو دارند: الگوی چسبان سناریو، گام‌نما، پیشنهاد
 // خدمت (فقط در شناسایی)، گام هر پرسش، «شرط پذیرش ورودی»، پیوند شاهد و فایل‌های پیش‌نویس.
@@ -363,18 +362,9 @@ export function QuestionStep({
 
 // ─────────────────────────────── بازبینی ───────────────────────────────
 
-export function EntryCriteria({
-  values,
-  unit,
-  mode,
-}: {
-  values: IdentificationValues;
-  unit: Unit | null;
-  mode: WizardMode;
-}) {
+export function EntryCriteria({ values, unit }: { values: IdentificationValues; unit: Unit | null }) {
   const owner = unit?.owner?.name ?? null;
-  const { checks, evidence, met, total } = entryChecks(values, owner, mode);
-  const config = MODES[mode];
+  const { checks, evidence, met, total } = entryChecks(values, owner);
   return (
     <section aria-labelledby="identification-entry-title" className="flex flex-col gap-3 border-t border-line pt-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -383,24 +373,18 @@ export function EntryCriteria({
         </h4>
         <Chip tone={met === total ? "success" : "warning"}>{`${fa(met)} از ${fa(total)}`}</Chip>
       </div>
-      <p className="-mt-2 text-sm text-ink-2">
-        {total === 5
-          ? "سناریوی قابل ارزیابی این پنج شاخص را دارد."
-          : "سناریوی قابل ارزیابی این چهار شاخص را دارد؛ مالک فقط برای اطلاع آمده است."}
-      </p>
+      <p className="-mt-2 text-sm text-ink-2">سناریوی قابل ارزیابی این پنج شاخص را دارد.</p>
       <ul className="grid gap-2.5 sm:grid-cols-2">
         {checks.map((check) => (
           <li key={check.key} className="flex items-start gap-2 text-sm text-ink">
             <Icon
-              name={check.info ? "info" : check.met ? "check-circle" : "x-circle"}
+              name={check.met ? "check-circle" : "x-circle"}
               size={16}
-              className={cn("mt-0.5 shrink-0", check.info ? "text-info" : check.met ? "text-success" : "text-ink-3")}
+              className={cn("mt-0.5 shrink-0", check.met ? "text-success" : "text-ink-3")}
             />
-            <span className={check.met && !check.info ? "font-medium" : "text-ink-2"}>
+            <span className={check.met ? "font-medium" : "text-ink-2"}>
               {check.label}
-              <span className="sr-only">
-                {check.info ? " (برای اطلاع؛ شرط ارسال نیست)" : check.met ? " (برقرار)" : " (برقرار نیست)"}
-              </span>
+              <span className="sr-only">{check.met ? " (برقرار)" : " (برقرار نیست)"}</span>
             </span>
           </li>
         ))}
@@ -426,8 +410,8 @@ export function EntryCriteria({
           </span>
         </li>
       </ul>
-      <p className="text-xs text-ink-2">{config.unitLine(unit)}</p>
-      <p className="text-xs text-ink-2">{config.footer}</p>
+      <p className="text-xs text-ink-2">{WIZARD.unitLine(unit)}</p>
+      <p className="text-xs text-ink-2">{WIZARD.footer}</p>
     </section>
   );
 }

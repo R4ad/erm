@@ -1,11 +1,8 @@
 import type { IdentificationChoices, IdentificationPart, IdentificationValues } from "@/lib/types";
 
 // منطق ویزارد شناسایی که به رندر بسته نیست: کدام فیلد مال کدام گام است، پیشنهاد خدمت از نوشته‌ی پرسش اول، واحدی که
-// سرور خودکار انتخاب می‌کند، عنوان و شرحی که در رجیستر ثبت می‌شود، و «شرط پذیرش ورودی». همین ویزارد دو حالت دارد:
-// «identify» در «شناسایی ریسک» (عضو GRC خدمت را از فهرست انتخاب می‌کند) و «answer» در «پاسخ به پرسشنامه‌ها» (مدیر
-// واحد موضوع را آزاد می‌نویسد و خدمت را بعداً کارشناس ریسک انتخاب می‌کند).
+// سرور خودکار انتخاب می‌کند، عنوان و شرحی که در رجیستر ثبت می‌شود، و «شرط پذیرش ورودی».
 
-export type WizardMode = "identify" | "answer";
 export type PartName = IdentificationPart["name"];
 export type StepKey = PartName | "review";
 export type Target = IdentificationChoices["target"][number];
@@ -106,50 +103,26 @@ export interface EntryCheck {
   key: string;
   label: string;
   met: boolean;
-  /** شاخصی که فقط خبر می‌دهد و ورودی را ناقص نشان نمی‌دهد (مالکی که کارشناس ریسک بعداً تعیین می‌کند). */
-  info?: boolean;
 }
 
-/**
- * شاخص‌های «شرط پذیرش ورودی»: هدف، رویداد، دامنه‌ی خدمت و مشتری، مالک و شاهد یا فرض قابل آزمون. در حالت answer
- * دامنه با موضوعی سنجیده می‌شود که مدیر نوشته، و مالک فقط خبر است: اگر مدیر یک واحد دارد خود اوست، وگرنه بعد از
- * انتخاب خدمت معلوم می‌شود؛ هیچ‌کدام چیزی نیست که مدیر بتواند در این فرم کامل کند.
- */
-export function entryChecks(values: IdentificationValues, owner: string | null, mode: WizardMode = "identify") {
+/** شاخص‌های «شرط پذیرش ورودی»: هدف، رویداد، دامنه‌ی خدمت و مشتری، مالک و شاهد یا فرض قابل آزمون. */
+export function entryChecks(values: IdentificationValues, owner: string | null) {
   const filled = (text: string) => text.trim().length > 0;
   const evidence: "met" | "assumption" | "missing" = values.evidence_items.length
     ? "met"
     : filled(values.evidence)
       ? "assumption"
       : "missing";
-  const answer = mode === "answer";
-  const service = answer ? filled(values.subject) : Boolean(values.target);
   const checks: EntryCheck[] = [
     { key: "objective", label: "هدف یا تعهد مشخص", met: filled(values.objective) },
     { key: "event", label: "رویداد مشخص", met: filled(values.event) },
-    { key: "scope", label: "دامنه‌ی خدمت و مشتری", met: service && filled(values.customer) },
-    answer
-      ? {
-          key: "owner",
-          label: `مالک: ${owner ?? "پس از انتخاب خدمت توسط کارشناس ریسک تعیین می‌شود"}`,
-          met: true,
-          info: !owner,
-        }
-      : { key: "owner", label: owner ? `مالک: ${owner}` : "مالک ریسک", met: Boolean(owner) },
+    { key: "scope", label: "دامنه‌ی خدمت و مشتری", met: Boolean(values.target) && filled(values.customer) },
+    { key: "owner", label: owner ? `مالک: ${owner}` : "مالک ریسک", met: Boolean(owner) },
   ];
-  // شاخص اطلاعی (مالکی که هنوز معلوم نیست) شرط نیست و در شمار «x از y» نمی‌آید، نه برقرار نه نابرقرار.
-  const counted = checks.filter((check) => !check.info);
   return {
     checks,
     evidence,
-    met: counted.filter((check) => check.met).length + (evidence === "met" ? 1 : 0),
-    total: counted.length + 1,
+    met: checks.filter((check) => check.met).length + (evidence === "met" ? 1 : 0),
+    total: checks.length + 1,
   };
-}
-
-/** فرم خالی بعد از «ارسال برای شناسایی» در «پاسخ به پرسشنامه‌ها»: همه‌ی متن‌ها تهی و همه‌ی فهرست‌ها خالی. */
-export function emptyValues(values: IdentificationValues): IdentificationValues {
-  return Object.fromEntries(
-    Object.entries(values).map(([name, value]) => [name, Array.isArray(value) ? [] : ""]),
-  ) as unknown as IdentificationValues;
 }

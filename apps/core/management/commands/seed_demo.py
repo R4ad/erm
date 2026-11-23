@@ -34,7 +34,6 @@ from apps.core.models import Comment
 from apps.methodology.models import MethodParameter, MethodVersion
 from apps.methodology.services import MethodTables, copy_version, save_with_reason
 from apps.organization.models import OrgUnit
-from apps.questionnaires.models import Option, Question, Questionnaire, Response
 from apps.risks.identification import narrative
 from apps.risks.models import Coverage, Evidence, ExternalLink, IdentificationDraft, Risk, RiskCategory, RiskScenario
 from apps.risks.models import ScenarioProposal
@@ -68,7 +67,6 @@ class Command(BaseCommand):
         self.dependencies()
         self.identification()
         self.universe()
-        self.questionnaire()
         self.method_draft()
         self.access()
         self.scenario_library()
@@ -1057,112 +1055,6 @@ class Command(BaseCommand):
                         "reviewed_on": self.today - timedelta(days=12 + 3 * index),
                     },
                 )
-
-    # ───────────── پرسشنامه‌ی شناسایی (فیگما ۱۰) ─────────────
-
-    GRC_QUESTIONS = [
-        (
-            "single",
-            "شدیدترین پیامد باورپذیر برای بانک‌ها چیست؟",
-            True,
-            [
-                ("توقف کامل انتقال وجه بیش از ۴ ساعت", True),
-                ("تأخیر در تسویه بدون توقف خدمت", True),
-                ("افشا یا دستکاری داده‌ی تراکنش", True),
-                ("اثر قابل توجهی ندارد", False),
-            ],
-        ),
-        (
-            "multiple",
-            "این کارکرد به کدام وابستگی‌ها تکیه دارد؟",
-            False,
-            [
-                ("مرکز داده‌ی پشتیبان", False),
-                ("پایگاه داده‌ی مرکزی", False),
-                ("ماژول HSM", False),
-                ("ارائه‌دهنده‌ی پیامک", False),
-            ],
-        ),
-        ("yes_no", "در شش ماه گذشته رخداد یا نزدیک‌به‌رخدادی داشته‌اید؟", True, [("بله", True), ("خیر", False)]),
-        ("text", "کدام تغییر مهم در شش ماه آینده برای این خدمت برنامه‌ریزی شده است؟", False, []),
-        (
-            "single",
-            "پشتیبان‌گیری از داده‌های این خدمت چند وقت یک‌بار آزموده می‌شود؟",
-            True,
-            [("هر ماه", False), ("هر سه ماه", False), ("سالی یک بار", False), ("آزموده نمی‌شود", True)],
-        ),
-        ("yes_no", "برای این خدمت سایت پشتیبان آماده‌ی جابه‌جایی دارید؟", False, [("بله", False), ("خیر", True)]),
-        (
-            "multiple",
-            "کدام کنترل‌ها امروز برای این خدمت اجرا می‌شوند؟",
-            False,
-            [
-                ("پایش ۲۴ ساعته", False),
-                ("احراز هویت دوعاملی", False),
-                ("رمزنگاری ارتباط با بانک‌ها", False),
-                ("بازبینی دسترسی فصلی", False),
-            ],
-        ),
-        ("text", "کدام فرد کلیدی این خدمت جایگزین ندارد؟", False, []),
-        (
-            "single",
-            "قرارداد تأمین‌کننده‌ی اصلی این خدمت SLA دارد؟",
-            False,
-            [("دارد و پایش می‌شود", False), ("دارد ولی پایش نمی‌شود", True), ("ندارد", True)],
-        ),
-        ("yes_no", "داده‌ی شخصی مشتری در این خدمت نگه داشته می‌شود؟", False, [("بله", False), ("خیر", False)]),
-        ("text", "آخرین آزمون نفوذ یا بازبینی امنیتی کی انجام شد و چه یافت؟", False, []),
-        (
-            "single",
-            "اگر خدمت یک روز کامل قطع شود، کار به‌صورت دستی ادامه می‌یابد؟",
-            True,
-            [("بله، کامل", False), ("بخشی", True), ("خیر", True)],
-        ),
-    ]
-
-    def questionnaire(self):
-        """پرسشنامه‌ی کلاسیک فیگما ۱۰ با دوازده سؤال GRC، و پیش‌نویس مصاحبه‌ای که سارا به نام مدیر پرداخت برای ساتنا
-        ثبت می‌کند: کارکردها کامل و سه پرسش از هشت پرسش جلسه جواب دارد. مهلت پنج روز کاری، دو روز مانده."""
-        questionnaire = Questionnaire.objects.create(
-            title="پرسشنامه‌ی شناسایی ریسک ۱۴۰۵",
-            is_active=True,
-            description="کارکردها، هشت پرسش جلسه‌ی شناسایی و سؤال‌های GRC؛ هر پاسخ برای یک واحد و در صورت نیاز یک خدمت.",
-        )
-        for order, (kind, text, required, options) in enumerate(self.GRC_QUESTIONS, 1):
-            question = Question.objects.create(
-                questionnaire=questionnaire, order=order, text=text, kind=kind, is_required=required
-            )
-            for index, (label, risky) in enumerate(options, 1):
-                Option.objects.create(question=question, order=index, text=label, indicates_risk=risky)
-        response = Response.objects.create(
-            questionnaire=questionnaire,
-            org_unit=self.units["pay"],
-            service=self.services["SRV-SATNA"],
-            respondent=self.hossein,
-            recorded_by=self.sara,
-            channel=Response.Channel.INTERVIEW,
-            functions="\n".join(
-                [
-                    "انتقال وجه بین‌بانکی ساتنا برای بانک‌های مشتری",
-                    "تسویه‌ی پایان روز با بانک مرکزی",
-                    "گزارش وضعیت تراکنش به بانک‌ها",
-                    "پشتیبانی و رفع اشکال تراکنش‌های معلق",
-                    "نگهداری سوابق تراکنش برای حسابرسی",
-                ]
-            ),
-            mission="انتقال وجه بانک‌ها در همان روز کاری و تسویه‌ی کامل با بانک مرکزی.",
-            commitments="دسترس‌پذیری ۹۹٫۹ درصد در ساعات کاری؛ تسویه پیش از ساعت ۱۶.",
-            disruptive_event="خرابی پایگاه داده‌ی اصلی ساتنا یا قطع ارتباط با سایت پشتیبان هنگام تسویه‌ی پایان روز.",
-        )
-        created = next(
-            self.today - timedelta(days=back)
-            for back in range(1, 12)
-            if (add_working_days(self.today - timedelta(days=back), 5) - self.today).days <= 2
-        )
-        Response.objects.filter(pk=response.pk).update(
-            created_at=timezone.now() - timedelta(days=(self.today - created).days),
-            updated_at=timezone.now() - timedelta(minutes=10),
-        )
 
     # ───────────── شناسایی ریسک (فیگما ۱۱) ─────────────
 

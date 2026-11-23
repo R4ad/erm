@@ -17,9 +17,6 @@ from .pages import READ_PAGES
 # نام صفحه‌ی جنگو → مسیر React (نسبت به /app). None یعنی همان نشانی جنگو بدون / آخر، که قاعده‌ی صفحه‌های تازه است.
 SPA_PAGES = {
     "actions:my_work": "/",
-    "questionnaires:answer_home": "/questionnaires",
-    "questionnaires:response_start": "/questionnaires/{questionnaire_pk}/start",
-    "questionnaires:response_answer": "/responses/{pk}",
     "assessments:assessment_list": "/assessments",
     "assessments:candidates": "/assessments/new",
     "workflow:question_list": "/questionnaires/risk-questions",

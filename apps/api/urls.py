@@ -2,7 +2,7 @@ from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
-from . import questionnaire_answers, questionnaires, reports, risks, session, treatment, treatment_board, treatment_targets
+from . import reports, risk_questions, risks, session, treatment, treatment_board, treatment_targets
 from . import ad_sync, impact_levels, method_diff, user_profile
 
 app_name = "api"
@@ -27,11 +27,6 @@ urlpatterns = [
     path("assessments/candidates/", assessment_workspace.AssessmentCandidatesView.as_view(), name="assessment_candidates"),
     path("assessments/risks/<int:pk>/start/", assessment_workspace.StartAssessmentView.as_view(), name="assessment_start"),
     path("identification/", identification.IdentificationView.as_view(), name="identification"),
-    path(
-        "questionnaire-answers/",
-        questionnaire_answers.QuestionnaireAnswersView.as_view(),
-        name="questionnaire_answers",
-    ),
     path("analysis/", analysis.AnalysisIndexView.as_view(), name="analysis_index"),
     path("analysis/<int:pk>/", analysis.AnalysisView.as_view(), name="analysis"),
     path("evaluation/", evaluation.EvaluationView.as_view(), name="evaluation"),
@@ -78,13 +73,10 @@ urlpatterns = [
         impact_levels.ImpactLevelsView.as_view(),
         name="impact_levels",
     ),
-    path("questionnaires/", questionnaires.AnswerHomeView.as_view(), name="answer_home"),
-    path("questionnaires/<int:pk>/start/", questionnaires.ResponseStartView.as_view(), name="response_start"),
-    path("responses/<int:pk>/", questionnaires.ResponseDetailView.as_view(), name="response_detail"),
-    path("risk-questions/", questionnaires.RiskQuestionListView.as_view(), name="risk_question_list"),
+    path("risk-questions/", risk_questions.RiskQuestionListView.as_view(), name="risk_question_list"),
     path(
         "risk-questions/<int:pk>/answer/",
-        questionnaires.RiskQuestionAnswerView.as_view(),
+        risk_questions.RiskQuestionAnswerView.as_view(),
         name="risk_question_answer",
     ),
 ]

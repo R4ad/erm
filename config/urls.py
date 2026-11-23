@@ -29,7 +29,6 @@ urlpatterns = [
     path("catalog/", include("apps.catalog.urls")),
     path("method/", include("apps.methodology.urls")),
     path("risks/", include("apps.risks.urls")),
-    path("questionnaires/", include("apps.questionnaires.urls")),
     path("workflow/", include("apps.workflow.urls")),
     path("controls/", include("apps.controls.urls")),
     path("assessments/", include("apps.assessments.urls")),

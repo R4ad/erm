@@ -13,9 +13,8 @@ import { IdentificationWizard } from "./IdentificationWizard";
 import { RecentEntries } from "./RecentEntries";
 import { useWizardPage } from "./use-wizard-page";
 
-// «شناسایی ریسک»: عضو GRC و مدیر سامانه ریسک را با ویزارد شش پرسش ثبت می‌کنند و ورودی‌های «در حال شناسایی» مدیران
-// واحد را، که بالای جدول ورودی‌های اخیر می‌آیند، با انتخاب خدمت تکمیل می‌کنند. مدیر واحد سناریو را از «پاسخ به
-// پرسشنامه‌ها» می‌فرستد و اینجا فقط وضعیت ورودی‌های خودش را می‌بیند.
+// «شناسایی ریسک»: عضو GRC و مدیر سامانه ریسک را با ویزارد شش پرسش ثبت می‌کنند. مدیر واحد سناریو را از «پاسخ به
+// پرسشنامه‌ها» می‌فرستد و اینجا فقط ورودی‌های اخیر را می‌بیند.
 
 const PROCESS: { label: string; state: StepState }[] = [
   { label: "شناسایی", state: "current" },
@@ -29,7 +28,7 @@ const PROCESS: { label: string; state: StepState }[] = [
 
 export function IdentificationPage() {
   useTitle("شناسایی ریسک");
-  const { query, formKey, onDraftSaved } = useWizardPage("identify");
+  const { query, formKey, onDraftSaved } = useWizardPage();
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,13 +52,10 @@ export function IdentificationPage() {
       ) : (
         <>
           {query.data.can_identify && query.data.choices ? (
-            <IdentificationWizard key={formKey} mode="identify" data={query.data} onDraftSaved={onDraftSaved} />
+            <IdentificationWizard key={formKey} data={query.data} onDraftSaved={onDraftSaved} />
           ) : query.data.can_answer ? (
             <Alert tone="info" title="ثبت و تکمیل ریسک در این صفحه با عضو GRC است">
-              <p>
-                سناریوی واحدتان را از «پاسخ به پرسشنامه‌ها» بفرستید. وضعیت پاسخ‌هایی را که فرستاده‌اید پایین همین صفحه
-                می‌بینید.
-              </p>
+              <p>سناریوی واحدتان را از «پاسخ به پرسشنامه‌ها» بفرستید.</p>
               <Link
                 to="/questionnaire-answers"
                 viewTransition

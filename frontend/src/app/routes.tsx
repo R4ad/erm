@@ -50,11 +50,6 @@ const FORM_ROUTES = [
   "actions/risks/:risk_pk/acceptance/new",
   "actions/acceptances/:pk/edit",
   "actions/risks/:risk_pk/review/new",
-  "questionnaires/manage/new",
-  "questionnaires/manage/:pk/edit",
-  "questionnaires/responses/:pk/return",
-  "questionnaires/responses/:pk/pending/new",
-  "questionnaires/pending/:pk/dismiss",
   "controls/new",
   "controls/:pk/edit",
   "controls/:pk/effectiveness/new",
@@ -82,9 +77,6 @@ const FORM_ROUTES = [
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
-const questionFormPage = async () => ({
-  Component: keyedByPath((await import("@/features/questionnaires/QuestionFormPage")).QuestionFormPage),
-});
 
 // هر صفحه بخش جدای کد خودش است و فقط وقتی باز می‌شود دانلود می‌شود.
 export const routes: RouteObject[] = [
@@ -384,61 +376,9 @@ export const routes: RouteObject[] = [
           },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),
           {
-            path: "questionnaires",
-            lazy: async () => ({
-              Component: (await import("@/features/questionnaires/AnswerHomePage")).AnswerHomePage,
-            }),
-          },
-          {
             path: "questionnaires/risk-questions",
             lazy: async () => ({
               Component: (await import("@/features/questionnaires/RiskQuestionsPage")).RiskQuestionsPage,
-            }),
-          },
-          {
-            path: "questionnaires/manage",
-            lazy: async () => ({
-              Component: (await import("@/features/questionnaires/QuestionnairePages")).QuestionnaireListPage,
-            }),
-          },
-          {
-            path: "questionnaires/manage/:pk",
-            lazy: async () => ({
-              Component: keyedByPath(
-                (await import("@/features/questionnaires/QuestionnairePages")).QuestionnaireDetailPage,
-              ),
-            }),
-          },
-          {
-            path: "questionnaires/manage/:questionnaire_pk/questions/new",
-            lazy: questionFormPage,
-          },
-          {
-            path: "questionnaires/questions/:pk/edit",
-            lazy: questionFormPage,
-          },
-          {
-            path: "questionnaires/responses",
-            lazy: async () => ({
-              Component: (await import("@/features/questionnaires/ReviewPages")).ResponseListPage,
-            }),
-          },
-          {
-            path: "questionnaires/responses/:pk",
-            lazy: async () => ({
-              Component: keyedByPath((await import("@/features/questionnaires/ReviewPages")).ResponseReviewPage),
-            }),
-          },
-          {
-            path: "questionnaires/pending/:pk/convert",
-            lazy: async () => ({
-              Component: keyedByPath((await import("@/features/questionnaires/PendingConvertPage")).PendingConvertPage),
-            }),
-          },
-          {
-            path: "questionnaires/:id/start",
-            lazy: async () => ({
-              Component: keyedById((await import("@/features/questionnaires/ResponseStartPage")).ResponseStartPage),
             }),
           },
           {
@@ -485,18 +425,6 @@ export const routes: RouteObject[] = [
             path: "identification",
             lazy: async () => ({
               Component: (await import("@/features/identification/IdentificationPage")).IdentificationPage,
-            }),
-          },
-          {
-            path: "questionnaire-answers",
-            lazy: async () => ({
-              Component: (await import("@/features/identification/QuestionnaireAnswersPage")).QuestionnaireAnswersPage,
-            }),
-          },
-          {
-            path: "responses/:id",
-            lazy: async () => ({
-              Component: keyedById((await import("@/features/questionnaires/ResponseFormPage")).ResponseFormPage),
             }),
           },
           {

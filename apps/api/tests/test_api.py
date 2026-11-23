@@ -16,7 +16,6 @@ from apps.catalog.tests.factories import make_service, make_user
 from apps.core.jalali import to_jalali
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
-from apps.questionnaires.models import Option, PendingRisk, Question, Questionnaire, Response
 from apps.risks.models import Risk, RiskCategory
 from apps.workflow.models import RiskQuestion, StatusTransition
 
@@ -71,19 +70,6 @@ REQUIRED_FIXED = {
 }
 
 
-def make_questionnaire():
-    questionnaire = Questionnaire.objects.create(title="شناسایی ریسک عملیات", is_active=True)
-    text = Question.objects.create(
-        questionnaire=questionnaire, order=1, text="کدام کار متوقف می‌شود؟", kind=Question.Kind.TEXT, is_required=True
-    )
-    single = Question.objects.create(
-        questionnaire=questionnaire, order=2, text="تغییرات تولید چطور تأیید می‌شود؟", kind=Question.Kind.SINGLE
-    )
-    safe = Option.objects.create(question=single, order=1, text="با فرم CAB")
-    risky = Option.objects.create(question=single, order=2, text="بدون تأیید", indicates_risk=True)
-    return questionnaire, text, single, safe, risky
-
-
 def test_an_api_request_without_login_gets_json_not_the_login_page(client):
     response = client.get(reverse("api:my_work"))
 
@@ -119,32 +105,28 @@ def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_ad
     assert "accounts:user_list" in [item["key"] for item in admin_nav["modules"][2]["items"]]
 
 
-def test_writes_need_the_csrf_token_like_django_forms(client, manager, unit):
+def test_writes_need_the_csrf_token_like_django_forms(client, manager):
     client = client.__class__(enforce_csrf_checks=True)
     client.force_login(manager)
-    questionnaire, *_ = make_questionnaire()
-    url = reverse("api:response_start", args=[questionnaire.pk])
+    url = reverse("api:notice_channels")
 
-    assert client.post(url, {"org_unit": unit.pk}, content_type="application/json").status_code == 403
+    assert client.post(url, {"email": True}, content_type="application/json").status_code == 403
 
     token = client.get(reverse("api:session")).json()["csrf_token"]
-    response = client.post(url, {"org_unit": unit.pk}, content_type="application/json", HTTP_X_CSRFTOKEN=token)
-    assert response.status_code == 201
+    response = client.post(url, {"email": True}, content_type="application/json", HTTP_X_CSRFTOKEN=token)
+    assert response.status_code == 200
 
 
-def test_a_denied_api_request_is_written_to_the_audit_log(api, unit):
+def test_a_denied_api_request_is_written_to_the_audit_log(api):
     staff = make_user("staff")
-    questionnaire, *_ = make_questionnaire()
 
-    response = api(staff).post(
-        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
-    )
+    response = api(staff).post(reverse("api:identification"), {"values": {}}, content_type="application/json")
 
     assert response.status_code == 403
     assert "login_url" not in response.json()
     event = AuditEvent.objects.get(event=AuditEvent.Event.PERMISSION_DENIED)
     assert event.user == staff
-    assert event.details["path"] == reverse("api:response_start", args=[questionnaire.pk])
+    assert event.details["path"] == reverse("api:identification")
     assert event.details["method"] == "POST"
 
 
@@ -358,131 +340,6 @@ def test_a_unit_manager_answers_a_risk_question(api, grc, manager, unit):
     assert question.answer == "مهر ۱۴۰۵، موفق"
     assert question.answered_by == manager
     assert client.post(url, {"answer": "دوباره"}, content_type="application/json").status_code == 404
-
-
-def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
-    questionnaire, text, single, _safe, risky = make_questionnaire()
-    client = api(manager)
-
-    home = client.get(reverse("api:answer_home")).json()
-    assert home["can_answer"] is True
-    assert next(item for item in home["questionnaires"] if item["id"] != questionnaire.pk)["question_count"] == 9
-
-    start = client.get(reverse("api:response_start", args=[questionnaire.pk])).json()
-    assert "respondent" not in start["fields"]  # مدیر واحد فقط به نام خودش جواب می‌دهد
-    assert start["fields"]["org_unit"]["choices"] == [{"value": str(unit.pk), "label": "عملیات"}]
-
-    created = client.post(
-        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
-    )
-    assert created.status_code == 201
-    response = Response.objects.get(pk=created.json()["id"])
-    assert (response.respondent, response.recorded_by, response.channel) == (
-        manager,
-        manager,
-        Response.Channel.QUESTIONNAIRE,
-    )
-
-    url = reverse("api:response_detail", args=[response.pk])
-    payload = {"fixed": {"functions": "تسویه‌ی روزانه"}, "answers": {str(single.pk): risky.pk}}
-    saved = client.put(url, payload, content_type="application/json")
-    assert saved.status_code == 200
-    response.refresh_from_db()
-    assert response.functions == "تسویه‌ی روزانه"
-    assert response.status == Response.Status.DRAFT
-
-    blocked = client.put(url, {**payload, "submit": True}, content_type="application/json")
-    assert blocked.status_code == 400
-    # کارکرد، رویداد، شرایط و پیامد (فیگما ۱۰) و سؤال‌های اجباری پیش از ارسال جواب لازم دارند.
-    assert set(blocked.json()["errors"]) == {"disruptive_event", "conditions", "consequence", f"question_{text.pk}"}
-    assert Response.objects.get(pk=response.pk).status == Response.Status.DRAFT
-
-    payload["fixed"] |= REQUIRED_FIXED
-    payload["answers"][str(text.pk)] = "تسویه با بانک‌ها"
-    submitted = client.put(url, {**payload, "submit": True}, content_type="application/json")
-    assert submitted.status_code == 200
-    assert "ریسک در انتظار: 1" in submitted.json()["message"]
-    response.refresh_from_db()
-    assert response.status == Response.Status.SUBMITTED
-    assert response.pending_risks.get().status == PendingRisk.Status.PENDING
-    assert submitted.json()["response"]["can_edit"] is False
-    assert client.put(url, payload, content_type="application/json").status_code == 403
-
-
-def test_the_response_has_figma_sections_deadline_limit_and_attachments(api, manager, unit):
-    from django.utils import timezone
-
-    from apps.questionnaires.services import response_due
-    from apps.workcalendar.workdays import add_working_days
-
-    questionnaire, *_ = make_questionnaire()
-    client = api(manager)
-    created = client.post(
-        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
-    )
-    url = reverse("api:response_detail", args=[created.json()["id"]])
-    data = client.get(url).json()
-    sections = [(item["name"], item["section"], item["required"]) for item in data["fixed"]]
-    assert sections[0] == ("functions", "functions", True)
-    assert [name for name, section, _ in sections if section == "session"] == Response.FIXED_ITEMS[1:]
-    assert len(sections) - 1 == 8
-    assert {name for name, _, required in sections if required} == set(Response.REQUIRED_FIXED)
-    assert next(item for item in data["fixed"] if item["name"] == "disruptive_event")["expected"] == "رویداد مخل"
-    assert (data["function_slots"], data["text_limit"], data["attach_limit_mb"]) == (5, 1000, 20)
-    due = add_working_days(timezone.localdate(), 5)
-    assert data["due"]["iso"] == due.isoformat() and data["due"]["days_left"] == (due - timezone.localdate()).days
-    assert data["saved_at"]["iso"] and data["attach_url"] and data["attachments"] == []
-
-    too_long = client.put(url, {"fixed": {"mission": "ا" * 1001}}, content_type="application/json")
-    assert too_long.status_code == 400 and "mission" in too_long.json()["errors"]
-
-    response = Response.objects.get(pk=created.json()["id"])
-    response.status = Response.Status.SUBMITTED
-    assert response_due(response) is None
-
-
-def test_the_start_form_refuses_a_second_open_response_for_the_same_unit(api, manager, unit):
-    questionnaire, *_ = make_questionnaire()
-    client = api(manager)
-    url = reverse("api:response_start", args=[questionnaire.pk])
-    client.post(url, {"org_unit": unit.pk}, content_type="application/json")
-
-    response = client.post(url, {"org_unit": unit.pk}, content_type="application/json")
-
-    assert response.status_code == 400
-    assert "پاسخ بازی" in response.json()["errors"]["__all__"][0]
-
-
-def test_a_submitted_response_keeps_showing_an_option_deactivated_later(api, manager, unit):
-    questionnaire, text, single, safe, risky = make_questionnaire()
-    client = api(manager)
-    created = client.post(
-        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
-    )
-    url = reverse("api:response_detail", args=[created.json()["id"]])
-    payload = {"fixed": REQUIRED_FIXED, "answers": {str(text.pk): "تسویه", str(single.pk): risky.pk}}
-
-    Option.objects.filter(pk=safe.pk).update(is_active=False)
-    editable = client.get(url).json()
-    assert [option["id"] for option in editable["questions"][1]["options"]] == [risky.pk]
-
-    client.put(url, {**payload, "submit": True}, content_type="application/json")
-    Option.objects.filter(pk=risky.pk).update(is_active=False)
-    submitted = client.get(url).json()
-    question = submitted["questions"][1]
-    assert question["value"] == risky.pk
-    assert [option["id"] for option in question["options"]] == [risky.pk]
-
-
-def test_another_unit_cannot_see_the_response(api, manager, unit):
-    questionnaire, *_ = make_questionnaire()
-    created = api(manager).post(
-        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
-    )
-    stranger = make_user("stranger", Role.UNIT_MANAGER)
-    stranger.managed_units.add(OrgUnit.objects.create(name="مالی"))
-
-    assert api(stranger).get(reverse("api:response_detail", args=[created.json()["id"]])).status_code == 404
 
 
 def test_the_app_page_serves_the_built_index_for_every_route(client, manager, settings, tmp_path):

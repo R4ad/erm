@@ -46,9 +46,6 @@ function defaults(): Record<string, Handler | unknown> {
       return page;
     },
     "GET risks/1/": data.riskDetail(),
-    "GET questionnaires/": data.answerHome(),
-    "GET questionnaires/1/start/": data.startForm(),
-    "GET responses/1/": data.response(),
     "GET risk-questions/": data.riskQuestions(),
     // پل فرم‌ها و صفحه‌های جنگو: هر نشانی جنگو (?path=) جواب خودش را دارد.
     "GET forms/": byPath({
@@ -58,9 +55,6 @@ function defaults(): Record<string, Handler | unknown> {
       "/assessments/1/initiator/": data.initiatorForm(),
       "/assessments/1/impacts/": data.impactProfileForm(),
       "/actions/plans/1/reassess/": data.reassessmentForm(),
-      "/questionnaires/questions/1/edit/": data.questionForm(),
-      "/questionnaires/pending/1/convert/": (call: ApiCall) =>
-        djangoQuery(call).get("scenario") ? data.pendingConvertForm() : data.pendingPicker(),
       "/controls/1/effectiveness/new/": data.controlAssessmentForm(),
       "/catalog/services/1/dependencies/new/supplier/": data.dependencyForm(),
       "/holidays/new/": data.holidayForm(),
@@ -93,16 +87,6 @@ function defaults(): Record<string, Handler | unknown> {
       "/actions/acceptances/2/": data.acceptanceDetail(),
       "/actions/notices/": data.notices(),
       "/actions/reviews/1/": data.reviewDetail(),
-      "/questionnaires/manage/": data.questionnaireList(),
-      "/questionnaires/manage/1/": data.questionnaireDetail(),
-      "/questionnaires/responses/": (call: ApiCall) => {
-        const page = data.reviewList();
-        const status = djangoQuery(call).get("status");
-        page.results = page.results.filter((row) => !status || row.status.value === status);
-        page.count = page.results.length;
-        return page;
-      },
-      "/questionnaires/responses/1/": data.responseReview(),
       "/controls/": data.controlList(),
       "/controls/1/": data.controlDetail(),
       "/controls/effectiveness/3/": data.controlAssessmentDetail(),
@@ -184,18 +168,6 @@ function saved(call: ApiCall) {
     return {
       message: "امضای شما ثبت شد.",
       redirect: { href: "/actions/acceptances/2/#signatures", route: "/actions/acceptances/2#signatures" },
-    };
-  }
-  if (path.startsWith("/questionnaires/questions/")) {
-    return {
-      message: "سؤال «پشتیبان آزمون روزانه آزموده می‌شود؟» ذخیره شد.",
-      redirect: { href: "/questionnaires/manage/1/", route: "/questionnaires/manage/1" },
-    };
-  }
-  if (path.startsWith("/questionnaires/responses/1/reviewed/")) {
-    return {
-      message: "بررسی این پاسخ تمام شد.",
-      redirect: { href: "/questionnaires/responses/1/", route: "/questionnaires/responses/1" },
     };
   }
   if (path.startsWith("/actions/notices/")) {

@@ -106,7 +106,6 @@ def values_of(described):
 def test_django_addresses_map_to_their_react_routes():
     assert spa_route(reverse_lazy("risks:risk_list")) == "/risks"
     assert spa_route("/risks/12/edit/?next=/risks/") == "/risks/12/edit?next=/risks/"
-    assert spa_route("/questionnaires/responses/5/answer/") == "/responses/5"
     assert spa_route("/risks/7/#comments") == "/risks/7#comments"
     assert spa_route("/actions/mine/") == "/"
     assert spa_route("/risks/coverage/3/1/") == "/risks/coverage/3/1"
@@ -121,7 +120,7 @@ def test_django_addresses_map_to_their_react_routes():
     assert table["risks:risk_update"]["route"] == "/risks/:pk/edit"
     assert table["risks:risk_update"]["form"] is True
     assert table["risks:evidence_list"]["form"] is False
-    assert table["questionnaires:response_answer"]["route"] == "/responses/:pk"
+    assert table["workflow:question_list"]["route"] == "/questionnaires/risk-questions"
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,7 @@ export function RecentEntries({ rows, registerUrl }: { rows: IdentificationRow[]
   return (
     <Panel
       title="ورودی‌های اخیر شناسایی"
-      description="گردش کار: پیش‌نویس ← در حال شناسایی ← شناسایی‌شده ← در ارزیابی · ادغام یا تفکیک با حفظ شناسه‌ی مبدأ"
+      description="گردش کار: پیش‌نویس ← شناسایی‌شده ← در ارزیابی · ادغام یا تفکیک با حفظ شناسه‌ی مبدأ"
       aside={
         <AppLink href={registerUrl} button={{ variant: "ghost", size: "sm" }}>
           همه‌ی ورودی‌ها

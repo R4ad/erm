@@ -1,7 +1,5 @@
-"""«شناسایی ریسک» در رابط React: شش پرسش جلسه‌ی شناسایی با الگوی ثبت سناریو، بازبینی با شاهد و فایل شاهد، پیش‌نویس
-و ورودی‌های اخیر. عضو GRC و مدیر سامانه اینجا ریسک ثبت می‌کنند و ورودی‌های «در حال شناسایی» مدیران واحد را با
-انتخاب خدمت تکمیل می‌کنند؛ مدیر واحد فقط وضعیت ورودی‌های خودش را می‌بیند. «پاسخ به پرسشنامه‌ها»
-(questionnaire_answers.py) همین شکل داده و پایه‌ی EntryView را دارد. ساختن ریسک از همان فرم و services در
+"""ثبت دستی ریسک در رابط React: شش پرسش جلسه‌ی شناسایی با الگوی ثبت سناریو، بازبینی با شاهد و فایل شاهد، پیش‌نویس
+و ورودی‌های اخیر. عضو GRC و مدیر سامانه اینجا ریسک ثبت می‌کنند. ساختن ریسک از همان فرم و services در
 apps/risks/identification.py می‌گذرد."""
 
 import json
@@ -23,13 +21,10 @@ from apps.risks.identification import (
     SCENARIO_PARTS,
     TEXT_LIMIT,
     IdentificationForm,
-    answers_page,
     can_answer,
     clean_evidence_file,
     draft_attachments,
     identify_units,
-    identifying_entries,
-    own_drafts,
     pick_owner,
     save_draft,
     split_target,
@@ -37,19 +32,17 @@ from apps.risks.identification import (
     unit_managers,
     visible_drafts,
 )
-from apps.risks.models import IdentificationDraft, Risk, RiskCategory
+from apps.risks.models import Risk, RiskCategory
 from apps.risks.permissions import can_edit_register, visible_evidence, visible_risks
 
 from . import formatting as fmt
 from .base import ApiView
 
 S = Risk.Status
-E = IdentificationDraft.Status
 SHORT_SOURCE = {Risk.Source.PERIODIC: "ارزیابی دوره‌ای"}
-# مرحله‌ی هر ورودی در گردش کار شناسایی: پیش‌نویس ← در حال شناسایی ← شناسایی‌شده ← در ارزیابی، و برگشت برای تکمیل.
-# دو مرحله‌ی اول هنوز ریسک نیستند و همان وضعیت IdentificationDraft‌اند، فقط با رنگ؛ بقیه وضعیت ریسک‌اند. «در حال
-# شناسایی» رنگ warning دارد، یعنی «نیازمند تکمیل» در DESIGN.md؛ gold با متن ریز نشان به تضاد ۴٫۵ نمی‌رسد.
-ENTRY_TONES = {E.DRAFT: "neutral", E.IDENTIFYING: "warning"}
+# مرحله‌ی هر ورودی در گردش کار شناسایی: پیش‌نویس ← شناسایی‌شده ← در ارزیابی، و برگشت برای تکمیل. پیش‌نویس هنوز
+# ریسک نیست (IdentificationDraft)؛ بقیه وضعیت ریسک‌اند.
+DRAFT_STAGE = {"value": "draft", "label": "پیش‌نویس"}
 STAGES = {
     S.REGISTERED: ("identified", "شناسایی‌شده", "info"),
     S.QUESTIONS: ("returned", "بازگشت برای تکمیل", "warning"),
@@ -95,23 +88,13 @@ class RowLookup:
         return pick_owner(self.managers.get(draft.org_unit_id, []), draft.created_by) if draft.org_unit_id else None
 
 
-def draft_row(draft, grc, lookup):
-    """ردیف ورودی‌ای که هنوز ریسک نشده. ورودی مدیر واحد خدمت ندارد، پس ستون خدمت موضوعی را نشان می‌دهد که خودش
-    نوشته؛ مالک ورودی در حال شناسایی همان مدیر پاسخ‌دهنده است تا عضو GRC خدمتی از واحد دیگری انتخاب کند. ورودی در
-    حال شناسایی فقط برای عضو GRC (grc) پیوند تکمیل دارد. پیش‌نویس فقط مال ثبت‌کننده‌اش است و در صفحه‌ای باز می‌شود که
-    در آن نوشته شده (answers_page)، هر صفحه‌ای که جدول را نشان دهد."""
+def draft_row(draft, lookup):
+    """ردیف پیش‌نویسی که هنوز ریسک نشده. بی خدمت انتخاب‌شده، ستون خدمت موضوعی را نشان می‌دهد که ثبت‌کننده نوشته."""
     data = draft.data
     category = lookup.category(data)
     service_name, customer = lookup.target(data.get("target"))
     if service_name is None:
         service_name = (data.get("subject") or "").strip() or None
-    owner = lookup.owner(draft)
-    if draft.status == E.IDENTIFYING:
-        owner = owner or draft.created_by
-        route = f"/identification?draft={draft.pk}" if grc else None
-    else:
-        # پیش‌نویس فقط مال کاربر است (own_drafts)، پس grc همان قاعده‌ی ثبت‌کننده است.
-        route = f"{'/questionnaire-answers' if answers_page(draft, grc) else '/identification'}?draft={draft.pk}"
     return {
         "key": f"draft-{draft.pk}",
         "code": None,
@@ -121,11 +104,11 @@ def draft_row(draft, grc, lookup):
         "service": service_name,
         "customer": customer,
         "source": source_label(data.get("source")),
-        "stage": {**fmt.choice(draft, "status"), "tone": ENTRY_TONES[draft.status]},
-        "owner": fmt.person(owner),
+        "stage": {**DRAFT_STAGE, "tone": "neutral"},
+        "owner": fmt.person(lookup.owner(draft)),
         "due": None,
         "href": None,
-        "route": route,
+        "route": f"/identification?draft={draft.pk}",
     }
 
 
@@ -149,17 +132,9 @@ def risk_row(risk):
     }
 
 
-def recent_rows(user, queue):
-    """ورودی‌های اخیر. ورودی‌های در حال شناسایی بی‌سقف و به ترتیب ارسال بالای جدول می‌آیند: با queue همه‌ی آن‌هایی
-    که سهم کاربر است (برای عضو GRC صف کارش در «شناسایی ریسک»)، وگرنه فقط آن‌هایی که خودش فرستاده. مدیر واحد هم وضعیت
-    هیچ پاسخ ارسال‌شده‌ای را گم نمی‌کند، چون این جدول تنها جایی است که آن را می‌بیند. بعد پیش‌نویس‌های خود کاربر و
-    ریسک‌ها با سقف RECENT."""
-    related = ("org_unit", "created_by")
-    entries = identifying_entries(user)
-    if not queue:
-        entries = entries.filter(created_by=user)
-    entries = list(entries.select_related(*related).order_by("-submitted_at", "-pk"))
-    drafts = list(own_drafts(user).select_related(*related)[:RECENT])
+def recent_rows(user):
+    """ورودی‌های اخیر: پیش‌نویس‌های خود کاربر و بعد ریسک‌ها، روی هم حداکثر RECENT ردیف."""
+    drafts = list(visible_drafts(user).select_related("org_unit", "created_by").order_by("-updated_at")[:RECENT])
     risks = (
         visible_risks(user)
         .filter(merged_into__isnull=True, status__in=list(STAGES))
@@ -168,10 +143,8 @@ def recent_rows(user, queue):
         .annotate(question_due=Min("questions__due", filter=Q(questions__answered_at__isnull=True)))
         .order_by("-created_at")[: max(RECENT - len(drafts), 0)]
     )
-    grc = can_edit_register(user)
-    lookup = RowLookup(entries + drafts)
-    rows = [draft_row(draft, grc, lookup) for draft in entries + drafts]
-    return rows + [risk_row(risk) for risk in risks]
+    lookup = RowLookup(drafts)
+    return [draft_row(draft, lookup) for draft in drafts] + [risk_row(risk) for risk in risks]
 
 
 def unit_choices(units, registrant):
@@ -191,10 +164,7 @@ def unit_choices(units, registrant):
 
 
 def target_options(form):
-    """گزینه‌های پرسش اول (خدمت، مشتری و تعهد). فرم «پاسخ به پرسشنامه‌ها» این پرسش را ندارد و فهرستش ساخته
-    نمی‌شود."""
-    if "target" not in form.fields:
-        return []
+    """گزینه‌های پرسش اول (خدمت، مشتری و تعهد)."""
     services = {service.pk: service for service in Service.objects.filter(is_active=True)}
     commitments = {item.pk: item for item in Commitment.objects.select_related("customer")}
     targets = []
@@ -272,7 +242,7 @@ def form_input(values):
 def draft_payload(draft):
     return {
         "id": draft.pk,
-        "status": fmt.choice(draft, "status"),
+        "status": DRAFT_STAGE,
         "saved_at": fmt.moment(draft.updated_at),
         "attachments": draft_attachments(draft),
     }
@@ -295,8 +265,8 @@ def read_request(request):
 
 
 def page_data(user, form, draft, units, recent, **flags):
-    """داده‌ی هر دو صفحه‌ی ویزارد؛ form None است وقتی کاربر فرم ندارد، و units واحدهایی است که رابط مالک را با
-    آن‌ها حدس می‌زند."""
+    """داده‌ی صفحه‌ی ویزارد؛ form None است وقتی کاربر فرم ندارد، و units واحدهایی است که رابط مالک را با آن‌ها حدس
+    می‌زند."""
     return {
         **flags,
         "parts": [{"name": name, "label": label, "token": token} for name, label, token in SCENARIO_PARTS],
@@ -316,99 +286,52 @@ def page_data(user, form, draft, units, recent, **flags):
     }
 
 
-class EntryView(ApiView):
-    """پایه‌ی ذخیره، ارسال و حذف ورودی در «شناسایی ریسک» و «پاسخ به پرسشنامه‌ها». بدنه‌ی POST در هر دو یکی است:
-    JSON، یا multipart با فایل شاهد. ورودی با قفل ردیف پیدا می‌شود تا دو ارسال هم‌زمان یک ورودی را دو بار ریسک
-    نکنند و ذخیره‌ای که دیر برسد ورودیِ ارسال‌شده و پاک‌شده را دوباره نسازد."""
+class IdentificationView(ApiView):
+    """GET داده‌ی صفحه (و پیش‌نویس ?draft=)، POST ذخیره یا با submit=true ساختن ریسک، DELETE حذف پیش‌نویس. ثبت با عضو
+    GRC و مدیر سامانه است. بدنه‌ی POST، JSON است یا multipart با فایل شاهد. پیش‌نویس با قفل ردیف پیدا می‌شود تا دو
+    ارسال هم‌زمان یک پیش‌نویس را دو بار ریسک نکنند و ذخیره‌ای که دیر برسد پیش‌نویسِ ارسال‌شده و پاک‌شده را دوباره
+    نسازد."""
 
     parser_classes = (JSONParser, MultiPartParser)
-    # IdentificationForm یا AnswerForm
-    form_class = None
-    # آیا ورودی «در حال شناسایی» در این صفحه ویرایش می‌شود؛ حذفش در هیچ صفحه‌ای نیست (رد کردن پاسخ مدیر نیست).
-    edits_identifying = False
-    # آیا جدول همه‌ی ورودی‌های در حال شناسایی سهم کاربر را نشان می‌دهد یا فقط آن‌هایی که خودش فرستاده (recent_rows).
-    queue = False
-    # پیام ۴۰۳ برای ورودی‌ای که در این صفحه دیگر تغییر نمی‌کند.
-    locked_message = ""
 
-    def can_write(self, user):
-        raise NotImplementedError
-
-    def entries(self, user):
-        """ورودی‌هایی که این کاربر در این صفحه ذخیره یا حذف می‌کند."""
-        raise NotImplementedError
-
-    def finish(self, form, draft, upload, remove):
-        """بدنه‌ی پاسخ «ارسال برای شناسایی»؛ بدنه‌ای که redirect دارد جدول ورودی‌ها را نمی‌گیرد."""
-        raise NotImplementedError
-
-    def entry(self, user, pk, editing):
-        draft = get_object_or_404(self.entries(user).select_for_update(), pk=pk)
-        if draft.status == E.IDENTIFYING and not (editing and self.edits_identifying):
-            raise PermissionDenied(self.locked_message)
-        return draft
+    def draft(self, user, pk):
+        return get_object_or_404(visible_drafts(user).select_for_update(), pk=pk)
 
     def post(self, request):
         user = request.user
-        if not self.can_write(user):
+        if not can_edit_register(user):
             raise PermissionDenied
         payload, upload, remove = read_request(request)
         submit = bool(payload.get("submit"))
         with transaction.atomic():
-            draft = self.entry(user, payload["draft"], editing=True) if payload.get("draft") else None
-            form = self.form_class(form_input(payload.get("values")), user=user, submit=submit)
+            draft = self.draft(user, payload["draft"]) if payload.get("draft") else None
+            form = IdentificationForm(form_input(payload.get("values")), user=user, submit=submit)
             valid = form.is_valid()
             errors = (fmt.form_errors(form) if not valid else {}) | clean_evidence_file(upload)
             if errors:
                 message = "ورودی بدون پرسش‌های اجباری ارسال نمی‌شود." if submit else "پیش‌نویس ذخیره نشد."
                 return ApiResponse({"message": message, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
             if submit:
-                body = self.finish(form, draft, upload, remove)
-            else:
-                draft = save_draft(form, draft, upload, remove)
-                body = {
-                    "message": "پیش‌نویس ذخیره شد."
-                    if draft.status == E.DRAFT
-                    else "تغییرها ذخیره شد؛ ورودی همچنان در حال شناسایی است.",
-                    "draft": draft_payload(draft),
-                }
-        # جدول بیرون از تراکنش ساخته می‌شود تا قفل ورودی بیش از ذخیره نگه داشته نشود.
-        if "redirect" not in body:
-            body["recent"] = recent_rows(user, self.queue)
-        return ApiResponse(body, status=status.HTTP_201_CREATED if submit else status.HTTP_200_OK)
+                risk = submit_identification(form, draft, upload, remove)
+                return ApiResponse(
+                    {
+                        "message": f"ریسک {risk.code} شناسایی و در رجیستر ثبت شد.",
+                        "risk": {"id": risk.pk, "code": risk.code},
+                        "redirect": f"/risks/{risk.pk}",
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            draft = save_draft(form, draft, upload, remove)
+        # جدول بیرون از تراکنش ساخته می‌شود تا قفل پیش‌نویس بیش از ذخیره نگه داشته نشود.
+        return ApiResponse({"message": "پیش‌نویس ذخیره شد.", "draft": draft_payload(draft), "recent": recent_rows(user)})
 
     def delete(self, request):
         user = request.user
-        if not self.can_write(user):
+        if not can_edit_register(user):
             raise PermissionDenied
         with transaction.atomic():
-            draft = self.entry(user, request.query_params.get("draft"), editing=False)
-            draft.delete()
-        return ApiResponse({"message": "پیش‌نویس حذف شد.", "recent": recent_rows(user, self.queue)})
-
-
-class IdentificationView(EntryView):
-    """GET داده‌ی صفحه (و ورودی ?draft=)، POST ذخیره یا با submit=true ساختن ریسک. ثبت و تکمیل با عضو GRC و مدیر
-    سامانه است؛ مدیر واحد فقط وضعیت ورودی‌های خودش را می‌بیند و به «پاسخ به پرسشنامه‌ها» راه داده می‌شود."""
-
-    form_class = IdentificationForm
-    edits_identifying = True
-    queue = True
-    locked_message = "ورودی در حال شناسایی حذف نمی‌شود؛ خدمت را انتخاب و آن را برای شناسایی ارسال کنید."
-
-    def can_write(self, user):
-        return can_edit_register(user)
-
-    def entries(self, user):
-        return visible_drafts(user)
-
-    def finish(self, form, draft, upload, remove):
-        risk = submit_identification(form, draft, upload, remove)
-        return {
-            "message": f"ریسک {risk.code} شناسایی و در رجیستر ثبت شد.",
-            "risk": {"id": risk.pk, "code": risk.code},
-            "redirect": f"/risks/{risk.pk}",
-        }
+            self.draft(user, request.query_params.get("draft")).delete()
+        return ApiResponse({"message": "پیش‌نویس حذف شد.", "recent": recent_rows(user)})
 
     def get(self, request):
         user = request.user
@@ -422,7 +345,7 @@ class IdentificationView(EntryView):
                 IdentificationForm(user=user) if can_identify else None,
                 draft,
                 identify_units(user) if can_identify else None,
-                recent_rows(user, self.queue),
+                recent_rows(user),
                 can_identify=can_identify,
                 can_answer=can_answer(user),
             )

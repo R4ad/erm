@@ -6,7 +6,6 @@ from .actions import reassessment_form
 from .admin_pages import staff_import_form, staff_import_result
 from .assessments import impact_forms, impact_profile, initiator_form, path_form
 from .controls import control_assessment_form
-from .questionnaire_pages import pending_convert, pending_dismiss, question_form, question_forms
 
 
 def _transition(context, request):
@@ -65,14 +64,6 @@ def _scenario_for_risk(context, request):
     return {"facts": {"title": "جزئیات سناریو", "rows": [{"label": label, "value": value} for label, value in rows]}}
 
 
-def _pending_convert(context, request):
-    """ثبت ریسک در انتظار: اول انتخاب سناریو، بعد همان فرم ثبت ریسک از سناریو با جزئیات سناریو."""
-    extra = pending_convert(context, request)
-    if "form" in context:
-        extra.update(_scenario_for_risk(context, request))
-    return extra
-
-
 def _submit(label):
     """فقط دکمه‌ی فرستادن برچسب دیگری از «ذخیره» دارد."""
     return lambda context, request: {"submit": label}
@@ -110,14 +101,6 @@ FORM_PAGES = {
     "actions:acceptance_update": None,
     "actions:reassessment_create": reassessment_form,
     "actions:review_create": _submit("ثبت محرک بازبینی"),
-    "questionnaires:questionnaire_create": None,
-    "questionnaires:questionnaire_update": None,
-    "questionnaires:question_create": question_form,
-    "questionnaires:question_update": question_form,
-    "questionnaires:response_return": _submit("برگشت با سؤال"),
-    "questionnaires:pending_create": _submit("ساختن ریسک در انتظار"),
-    "questionnaires:pending_convert": _pending_convert,
-    "questionnaires:pending_dismiss": pending_dismiss,
     "controls:control_create": None,
     "controls:control_update": None,
     "controls:control_assessment_create": control_assessment_form,
@@ -148,8 +131,6 @@ FORM_PAGES = {
 # صفحه‌هایی که به‌جای یک form چند فرم با پیشوند دارند؛ خطاهای فرستادن ناموفق از همه‌ی این فرم‌ها خوانده می‌شود.
 FORM_SETS = {
     "assessments:impact_profile": impact_forms,
-    "questionnaires:question_create": question_forms,
-    "questionnaires:question_update": question_forms,
 }
 
 # صفحه‌هایی که فقط فرمشان از راه API فرستاده می‌شود (نمایش صفحه API جدای خودش را دارد).
@@ -168,7 +149,6 @@ POST_ONLY_PAGES = {
     "actions:acceptance_revoke",
     "actions:notice_read",
     "actions:review_detail",
-    "questionnaires:response_reviewed",
     "workcalendar:holiday_delete",
     "accounts:staff_import_confirm",
 }

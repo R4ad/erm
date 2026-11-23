@@ -21,7 +21,6 @@ from .forms import describe_field
 from .listing import listing
 from .methodology import METHODOLOGY_PAGES
 from .monitoring import MONITORING_PAGES
-from .questionnaire_pages import QUESTIONNAIRE_PAGES
 from .records import record_parts
 from .rows import coverage_cell, coverage_create_url, evidence_row, risk_brief, risk_ref
 
@@ -239,7 +238,6 @@ READ_PAGES = {
     **ASSESSMENT_PAGES,
     **ACTION_PAGES,
     **MONITORING_PAGES,
-    **QUESTIONNAIRE_PAGES,
     **CONTROL_PAGES,
     **CATALOG_PAGES,
     **METHODOLOGY_PAGES,

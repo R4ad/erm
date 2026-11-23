@@ -200,7 +200,6 @@ def test_asking_new_questions_sends_the_risk_back_until_they_are_answered(client
     assert client.get(reverse("workflow:question_answer", args=[questions[0].pk])).status_code == 404
     client.force_login(manager)
     assert set(client.get(reverse("workflow:question_list")).context["questions"]) == set(questions)
-    assert client.get(reverse("questionnaires:answer_home")).context["risk_question_count"] == 2
     for question in questions:
         client.post(reverse("workflow:question_answer", args=[question.pk]), {"answer": "بله، از تیر ۱۴۰۵"})
     assert RiskQuestion.objects.filter(answered_by=manager).count() == 2

@@ -92,6 +92,7 @@
 | برش | lint | vitest | e2e (یکتا، دسکتاپ و موبایل) |
 |---|---|---|---|
 | الف | قبول | ۴۳ فایل، ۳۱۷ قبول | ۵۹ قبول، ۴۳ شکست، ۲ رد شده. **هیچ شکست تازه‌ای نیست**؛ ۱۹ مورد از فهرست بالا دیگر شکست نمی‌خورند، از جمله دو شکست تضاد توکن‌ها و آزمون حذف‌شده‌ی سوییچ تم |
+| ب۰ | قبول | ۳۸ فایل، ۲۷۶ قبول (تست‌های جریان حذف‌شده رفتند)؛ pytest ۷۵۱ قبول | هنگام کامیت هنوز در حال اجرا بود؛ نتیجه در برش بعد ثبت می‌شود |
 
 ## ۱. تصمیم‌ها
 
@@ -257,7 +258,10 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 - `RiskPath.recovery` و `ServiceRecord.purpose`.
 - فیلدهای قدیمی `PendingRisk`: `option`، `description`، `scenario` و منبع‌های option، new_item و manual.
 
-**تست‌ها:** تست‌های همین جریان حذف می‌شوند و فهرستشان در گزارش نهایی می‌آید.
+**تست‌ها:** تست‌های همین جریان حذف شدند:
+- pytest: `apps/api/tests/test_questionnaire_answers.py`، `test_questionnaire_bridge.py`، `apps/questionnaires/tests/test_questionnaires.py`، `test_repair_migration.py` و `test_structured.py`، و ۵ تست پاسخ در `apps/api/tests/test_api.py`. pytest از ۸۱۳ به ۷۵۱ رسید، بی شکست.
+- vitest: `QuestionnaireAnswersPage.test.tsx`، `ResponseFormPage.test.tsx`، `ResponseStartPage.test.tsx`، `manage.test.tsx`، `response-form.test.ts` و چهار تست حالت پاسخ و «در حال شناسایی» در `IdentificationPage.test.tsx`.
+- e2e: `questionnaires.spec.ts` (آزمون «پرسش‌های ریسک» به `risk-questions.spec.ts` رفت)، `questionnaire-answers.spec.ts`، `questionnaire-review.spec.ts` و `questionnaire-structured.spec.ts`.
 
 **داده:**
 - ردیف‌های مدل‌های حذف‌شده و جدول تاریخچه‌ی آن‌ها، به تصمیم صاحب محصول. تاریخچه‌ی `Response` و `PendingRisk` و `AuditEvent` می‌مانند.
@@ -275,6 +279,10 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
    - `mode="answer"` و حالت «در حال شناسایی»
 
 اگر نسخه‌ی دیگر سرور 0013 را اجرا کرده است، پیش از pull همان‌جا `migrate risks 0012` لازم است.
+
+**انجام شد (۱۴۰۵/۰۹/۰۲، با تأیید صاحب محصول):** پشتیبان `/opt/erm-dev-backups/erm-dev-20261123-1923.dump`، بعد
+`migrate risks 0012` و `migrate questionnaires` (0007 حذف داده، 0008 حذف جدول‌ها و ستون‌ها). داده‌ی جریان قدیمی در DB
+توسعه پاک شد؛ ۳۲ ریسک، ۲ پیش‌نویس شناسایی، ۸۸ رخداد ممیزی و ۱ ردیف تاریخچه‌ی `Response` ماندند.
 
 ### ۴-۳. مایگریشن‌های تازه
 
@@ -385,7 +393,7 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 
 متن‌ها در جدول ۱۰ آمده‌اند.
 
-## ۱۰. متن‌هایی که در copy.md نیستند (پیشنهادی؛ منتظر تأیید)
+## ۱۰. متن‌هایی که در copy.md نیستند (تأییدشده‌ی صاحب محصول، ۱۴۰۵/۰۹/۰۲)
 
 لحن و واژه‌ها از copy.md گرفته شده است: «پاسخنامه»، «کارشناس ریسک»، «ریسک پیشنهادی»، «شناسایی هوشمند»، «بازگرداندن برای تکمیل». `{…}` جای مقدار است.
 

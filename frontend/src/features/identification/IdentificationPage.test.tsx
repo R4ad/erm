@@ -6,9 +6,9 @@ import { expectNoAxeViolations } from "@/test/axe";
 import { renderPage } from "@/test/render";
 import type { IdentificationChoices, IdentificationPage as PageData, IdentificationValues } from "@/lib/types";
 
-import { identificationParts, identificationValues, identifyingRow } from "@/test/fixtures";
+import { identificationParts, identificationValues } from "@/test/fixtures";
 
-import { autoUnit, emptyValues, entryChecks, matchTargets, narrative, stepOfField, withTarget } from "./identification";
+import { autoUnit, entryChecks, matchTargets, narrative, stepOfField, withTarget } from "./identification";
 import { IdentificationPage } from "./IdentificationPage";
 
 const blank = identificationValues();
@@ -182,38 +182,6 @@ describe("identification helpers", () => {
     expect(result.met).toBe(4);
     expect(result.evidence).toBe("assumption");
     expect(entryChecks({ ...values, evidence_items: ["9"] }, "حسین نوری").met).toBe(5);
-  });
-
-  it("checks the scope by the written subject in answer mode and only informs about the owner", () => {
-    const values = {
-      ...blank,
-      subject: "سامانه‌ی ساتنا",
-      objective: "ه",
-      event: "ر",
-      customer: "ب",
-      evidence_items: ["9"],
-    };
-    const known = entryChecks(values, "حسین نوری", "answer");
-    expect(known).toMatchObject({ met: 5, total: 5 });
-    expect(known.checks.find((check) => check.key === "owner")).toMatchObject({
-      label: "مالک: حسین نوری",
-      info: false,
-    });
-    const unknown = entryChecks(values, null, "answer");
-    // مالک نامعلوم فقط اطلاع است: نه برقرار شمرده می‌شود نه نابرقرار.
-    expect(unknown).toMatchObject({ met: 4, total: 4 });
-    expect(unknown.checks.find((check) => check.key === "owner")).toMatchObject({
-      label: "مالک: پس از انتخاب خدمت توسط کارشناس ریسک تعیین می‌شود",
-      met: true,
-      info: true,
-    });
-    expect(entryChecks({ ...values, subject: "" }, null, "answer").checks[2]?.met).toBe(false);
-    // در شناسایی همان موضوع بی انتخاب خدمت دامنه نیست.
-    expect(entryChecks(values, "حسین نوری").checks[2]?.met).toBe(false);
-  });
-
-  it("empties every answer after sending", () => {
-    expect(emptyValues({ ...answered, tags: ["ت"], evidence_items: ["9"] })).toEqual(blank);
   });
 });
 
@@ -530,61 +498,28 @@ describe("IdentificationPage", () => {
     expect(screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" })).toBeInTheDocument();
   });
 
-  it("puts every identifying entry on top for GRC with a link to complete it", async () => {
-    const entry = identifyingRow({ route: "/identification?draft=31", owner: { id: 4, name: "حسین نوری" } });
-    mockApi({ "GET identification/": page({ recent: [entry, ...page().recent] }) });
-    renderPage(<IdentificationPage />, options);
-    const recent = await screen.findByRole("region", { name: "ورودی‌های اخیر شناسایی" });
-    expect(within(recent).getByText(/پیش‌نویس ← در حال شناسایی ← شناسایی‌شده ← در ارزیابی/)).toBeInTheDocument();
-    const [first] = within(recent).getAllByRole("row").slice(1);
-    expect(within(first!).getByRole("link", { name: entry.title })).toHaveAttribute("href", "/identification?draft=31");
-    expect(within(first!).getByText("در حال شناسایی")).toBeInTheDocument();
-    // ورودی مدیر خدمت ندارد: ستون خدمت موضوع نوشته‌شده است، بی «همه».
-    expect(within(first!).getByText("سامانه‌ی آزمون در محیط تولید")).toBeInTheDocument();
-    expect(within(first!).getByText("حسین نوری")).toBeInTheDocument();
-  });
-
-  it("completes an identifying entry for GRC: picks a service by the manager's subject and opens the new risk", async () => {
-    const api = mockApi({
+  it("asks before a draft row replaces what GRC has typed into a new entry", async () => {
+    mockApi({
       "GET identification/": page({
-        values: { ...answered, target: "", subject: "سامانه‌ی ساتنا در محیط تولید", evidence: "دو توقف مشابه" },
-        draft: { ...savedDraft.draft, id: 31, status: { value: "identifying", label: "در حال شناسایی" } },
+        recent: [
+          {
+            key: "draft-31",
+            code: null,
+            title: "توقف سامانه‌ی آزمون پس از انتشار",
+            category: null,
+            scenario: null,
+            service: null,
+            customer: null,
+            source: "",
+            stage: { value: "draft", label: "پیش‌نویس", tone: "neutral" },
+            owner: null,
+            due: null,
+            href: null,
+            route: "/identification?draft=31",
+          },
+        ],
       }),
-      "POST identification/": reply(201, {
-        message: "ریسک RK-1405-0030 شناسایی و در رجیستر ثبت شد.",
-        risk: { id: 30, code: "RK-1405-0030" },
-        redirect: "/risks/30",
-      }),
     });
-    const { user } = renderPage(<IdentificationPage />, {
-      ...options,
-      path: "/identification?draft=31",
-      routes: [{ path: "/risks/:id", element: <h1>پرونده‌ی ریسک</h1> }],
-    });
-    expect(await screen.findByText(/^در حال شناسایی · /)).toBeInTheDocument();
-    const suggestions = screen.getByRole("list", { name: /پیشنهاد از فهرست خدمت‌ها/ });
-    await user.click(within(suggestions).getByRole("button", { name: /بانک ملت/ }));
-    // موضوعی که مدیر نوشته می‌ماند و فقط خدمت انتخاب می‌شود.
-    expect(question(/موضوع بررسی کدام خدمت/)).toHaveValue("سامانه‌ی ساتنا در محیط تولید");
-    expect(screen.getByText(/خدمت انتخاب‌شده/)).toHaveTextContent("ساتنا · بانک ملت");
-
-    await user.click(screen.getByRole("button", { name: /گام ۷: بازبینی/ }));
-    await user.click(screen.getByRole("button", { name: "ارسال برای شناسایی" }));
-    await user.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "ارسال برای شناسایی" }),
-    );
-    expect(await screen.findByRole("heading", { name: "پرونده‌ی ریسک" })).toBeInTheDocument();
-    expect(api.callsTo("POST identification/")[0]?.body).toMatchObject({
-      submit: true,
-      draft: 31,
-      values: { target: "1:3", subject: "سامانه‌ی ساتنا در محیط تولید" },
-    });
-    // ورودی با ارسال پاک شده است؛ نشانی ?draft= آن دیگر خوانده نمی‌شود.
-    expect(api.callsTo("GET identification/")).toHaveLength(1);
-  });
-
-  it("asks before a queue row replaces what GRC has typed into a new entry", async () => {
-    mockApi({ "GET identification/": page({ recent: [identifyingRow({ route: "/identification?draft=31" })] }) });
     const { user } = renderPage(<IdentificationPage />, options);
     await user.type(await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }), "سامانه‌ی پیامک");
     const recent = screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" });
@@ -596,18 +531,13 @@ describe("IdentificationPage", () => {
     expect(question(/موضوع بررسی کدام خدمت/)).toHaveValue("سامانه‌ی پیامک");
   });
 
-  it("sends a unit manager to questionnaire answers and shows only the state of their entries", async () => {
-    mockApi({
-      "GET identification/": page({ can_identify: false, can_answer: true, choices: null, recent: [identifyingRow()] }),
-    });
+  it("sends a unit manager to questionnaire answers", async () => {
+    mockApi({ "GET identification/": page({ can_identify: false, can_answer: true, choices: null }) });
     renderPage(<IdentificationPage />, options);
     expect(await screen.findByText("ثبت و تکمیل ریسک در این صفحه با عضو GRC است")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /پاسخ به پرسشنامه‌ها/ })).toHaveAttribute("href", "/questionnaire-answers");
     expect(screen.queryByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).not.toBeInTheDocument();
-    const recent = screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" });
-    // پاسخ ارسال‌شده پیوند ویرایش ندارد.
-    expect(within(recent).getByText("توقف سامانه‌ی آزمون پس از انتشار").closest("a")).toBeNull();
-    expect(within(recent).getByText("در حال شناسایی")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" })).toBeInTheDocument();
     await expectNoAxeViolations();
   });
 });
