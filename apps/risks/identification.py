@@ -1,7 +1,10 @@
-"""فرم شناسایی ریسک (فیگما ۱۱): مدیر واحد یا عضو GRC سناریو را با شش پرسش جلسه‌ی شناسایی و الگوی بخش ۴ روش ثبت
-می‌کند. خدمت از پرسش اول انتخاب می‌شود و واحد از روی آن و واحدهای خود کاربر (auto_unit)؛ دسته و منبع را بعداً عضو
-GRC تعیین می‌کند. پیش‌نویس جدا نگه داشته می‌شود و «ارسال برای شناسایی» ریسک را با وضعیت «ثبت‌شده در رجیستر» می‌سازد؛
-بعد عضو GRC آن را برای ارزیابی می‌فرستد یا با پرسش مشخص برای تکمیل برمی‌گرداند."""
+"""فرم شناسایی ریسک (فیگما ۱۱): سناریو با شش پرسش جلسه‌ی شناسایی و الگوی بخش ۴ روش ثبت می‌شود، از دو راه:
+
+- «پاسخ به پرسشنامه‌ها» برای مدیر واحد، که در RACI روش مالک «ثبت مأموریت و سناریو» است (AnswerForm). او خدمت را از
+  کاتالوگ انتخاب نمی‌کند و موضوع را آزاد می‌نویسد؛ ارسالش ریسک نمی‌سازد و ورودی «در حال شناسایی» می‌شود.
+- «شناسایی ریسک» برای عضو GRC و مدیر سامانه (IdentificationForm). خدمت از پرسش اول انتخاب می‌شود و واحد از روی آن
+  (auto_unit). عضو GRC ورودی تازه ثبت می‌کند یا ورودی «در حال شناسایی» مدیر را تکمیل می‌کند. «ارسال برای شناسایی»
+  ریسک را با وضعیت «ثبت‌شده در رجیستر» می‌سازد و دسته و منبع را عضو GRC بعداً تعیین می‌کند."""
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -38,37 +41,74 @@ INTAKE_FIELDS = ["mission", *(name for name, *_ in SCENARIO_PARTS), "impact", "d
 
 
 def identify_units(user):
-    """واحدهایی که این کاربر برایشان ریسک شناسایی می‌کند: عضو GRC و مدیر سامانه همه‌ی واحدهای فعال، مدیر واحد
-    واحدهای تحت مدیریتش و زیرمجموعه‌هایشان."""
+    """واحدهایی که این کاربر در «شناسایی ریسک» برایشان ریسک ثبت می‌کند: عضو GRC و مدیر سامانه همه‌ی واحدهای فعال،
+    بقیه هیچ. مدیر واحد سناریو را از «پاسخ به پرسشنامه‌ها» می‌فرستد (managed_units)."""
     units = OrgUnit.objects.filter(is_active=True)
-    if can_edit_register(user):
-        return units
-    if user.has_role(Role.UNIT_MANAGER):
-        return units.filter(pk__in=user.managed_unit_ids())
-    return units.none()
+    return units if can_edit_register(user) else units.none()
+
+
+def managed_units(user):
+    """واحدهای فعالی که مدیر واحد مدیریت می‌کند، با زیرمجموعه‌هایشان؛ برای کاربر بی‌نقش مدیر واحد خالی."""
+    units = OrgUnit.objects.filter(is_active=True)
+    if not user.has_role(Role.UNIT_MANAGER):
+        return units.none()
+    return units.filter(pk__in=user.managed_unit_ids())
+
+
+def can_answer(user):
+    """«پاسخ به پرسشنامه‌ها» مال مدیر واحدی است که دست‌کم یک واحد دارد. منو، endpoint و صفحه‌ی شناسایی همین را
+    می‌پرسند."""
+    return managed_units(user).exists()
+
+
+def only_unit(units):
+    """تنها واحد این فهرست، یا None اگر هیچ یا بیش از یکی است."""
+    only = list(units[:2])
+    return only[0] if len(only) == 1 else None
+
+
+def answer_unit(user):
+    """واحد پاسخ مدیر واحد، بی آن‌که پرسیده شود: تنها واحدی که مدیریت می‌کند، وگرنه None تا واحد از خدمتی بیاید که
+    عضو GRC انتخاب می‌کند."""
+    return only_unit(managed_units(user))
 
 
 def auto_unit(user, service):
-    """واحد ریسکی که این کاربر برای این خدمت شناسایی می‌کند، بی آن‌که واحد پرسیده شود: اگر کاربر فقط یک واحد دارد
-    همان، وگرنه واحد مالک خدمت اگر جزو واحدهای کاربر است. اگر هیچ‌کدام نشد None، و ارسال به پرسش اول (خدمت)
-    برمی‌گردد."""
+    """واحد ریسکی که این کاربر برای این خدمت شناسایی می‌کند، بی آن‌که واحد پرسیده شود: اگر فقط یک واحد فعال هست
+    همان، وگرنه واحد مالک خدمت اگر فعال است. اگر هیچ‌کدام نشد None، و ارسال به پرسش اول (خدمت) برمی‌گردد."""
     units = identify_units(user)
-    only = list(units[:2])
-    if len(only) == 1:
-        return only[0]
-    if service is not None and service.org_unit_id:
-        return units.filter(pk=service.org_unit_id).first()
-    return None
+    unit = only_unit(units)
+    if unit is None and service is not None and service.org_unit_id:
+        unit = units.filter(pk=service.org_unit_id).first()
+    return unit
+
+
+def unit_managers(unit_ids):
+    """مدیران فعال هر واحد، به ترتیب نام، با یک پرس‌وجو برای همه‌ی واحدها؛ جدول و فهرست واحدها برای هر ردیف
+    پرس‌وجو نمی‌زنند."""
+    links = (
+        OrgUnit.managers.through.objects.filter(orgunit_id__in=unit_ids, user__is_active=True)
+        .select_related("user")
+        .order_by("user__first_name", "user__last_name", "user__pk")
+    )
+    managers = {}
+    for link in links:
+        managers.setdefault(link.orgunit_id, []).append(link.user)
+    return managers
+
+
+def pick_owner(managers, user):
+    """مالک ریسک از میان مدیران فعال واحد: خود کاربر اگر از آن‌هاست، وگرنه نخستین مدیر."""
+    if any(manager.pk == user.pk for manager in managers):
+        return user
+    return managers[0] if managers else None
 
 
 def unit_owner(unit, user):
     """مالک ریسکی که از واحد شناسایی می‌شود: خود مدیر واحد اگر ثبت‌کننده است، وگرنه نخستین مدیر فعال واحد."""
     if unit is None:
         return None
-    managers = unit.managers.filter(is_active=True).order_by("first_name", "last_name", "pk")
-    if managers.filter(pk=user.pk).exists():
-        return user
-    return managers.first()
+    return pick_owner(unit_managers([unit.pk]).get(unit.pk, []), user)
 
 
 def active_commitments():
@@ -100,12 +140,22 @@ def target_choices():
     return choices
 
 
-def parse_target(value):
-    """«۱۲» یعنی خدمت ۱۲ برای همه‌ی مشتریان و «۱۲:۳» یعنی تعهد ۳ همان خدمت."""
+def split_target(value):
+    """شناسه‌ی خدمت و تعهد گزینه‌ی پرسش اول: «۱۲» یعنی خدمت ۱۲ برای همه‌ی مشتریان و «۱۲:۳» یعنی تعهد ۳ همان خدمت.
+    بخشی که عدد نیست None است."""
     service_id, _, commitment_id = (value or "").partition(":")
-    service = Service.objects.filter(pk=service_id, is_active=True).first() if service_id.isdigit() else None
+    return (
+        int(service_id) if service_id.isdigit() else None,
+        int(commitment_id) if commitment_id.isdigit() else None,
+    )
+
+
+def parse_target(value):
+    """خدمت فعال و تعهد فعال همان خدمت از گزینه‌ی پرسش اول (split_target)."""
+    service_id, commitment_id = split_target(value)
+    service = Service.objects.filter(pk=service_id, is_active=True).first() if service_id else None
     commitment = None
-    if service and commitment_id.isdigit():
+    if service and commitment_id:
         commitment = active_commitments().filter(pk=commitment_id, services=service).select_related("customer").first()
     return service, commitment
 
@@ -129,11 +179,13 @@ def risk_title(event, service):
     return event[:300]
 
 
-class IdentificationForm(forms.Form):
-    """مقدارهای فرم شناسایی. پیش‌نویس فقط شکل مقدارها را چک می‌کند و بدون واحد هم ذخیره می‌شود؛ ارسال، فیلدهای اجباری
-    و واحد را هم (submit=True). واحد فیلد فرم نیست و در clean از خدمت انتخاب‌شده و واحدهای کاربر می‌آید."""
+class EntryForm(forms.Form):
+    """مقدارهای مشترک دو صفحه‌ی ثبت سناریو: شش پرسش، بازبینی با شاهد و برچسب‌ها. پیش‌نویس فقط شکل مقدارها را چک
+    می‌کند و بدون واحد هم ذخیره می‌شود؛ ارسال (submit=True) پرسش‌های اجباری را هم. واحد فیلد فرم نیست و هر زیرکلاس
+    آن را در resolve_unit تعیین می‌کند. origin صفحه‌ای است که پیش‌نویس تازه‌ی این فرم مال آن می‌شود."""
 
-    target = forms.ChoiceField(label="خدمت، مشتری و تعهد", required=False)
+    required_text = REQUIRED_TEXT
+    origin = None
     mission = forms.CharField(label="مأموریت و خروجی اصلی", required=False, max_length=TEXT_LIMIT)
     subject = forms.CharField(label=SCENARIO_PARTS[0][1], required=False, max_length=TEXT_LIMIT)
     objective = forms.CharField(label=SCENARIO_PARTS[1][1], required=False, max_length=TEXT_LIMIT)
@@ -154,7 +206,6 @@ class IdentificationForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.user = user
         self.submit = submit
-        self.fields["target"].choices = [("", "")] + target_choices()
         self.fields["category"].queryset = RiskCategory.objects.filter(is_active=True)
         self.fields["scenario"].queryset = RiskScenario.objects.filter(is_active=True)
         self.fields["evidence_items"].queryset = visible_evidence(user)
@@ -164,36 +215,21 @@ class IdentificationForm(forms.Form):
 
     def clean(self):
         data = super().clean()
-        data["service"], data["commitment"] = parse_target(data.get("target"))
-        data["org_unit"] = auto_unit(self.user, data["service"])
-        if not self.submit:
-            return data
-        for name in REQUIRED_TEXT:
-            if not (data.get(name) or "").strip() and name not in self.errors:
-                self.add_error(name, "این پرسش برای ارسال اجباری است.")
-        if "target" in self.errors:
-            return data
-        if not data.get("target"):
-            self.add_error("target", "خدمت را از پیشنهادهای همین پرسش انتخاب کنید.")
-        elif not data["service"]:
-            self.add_error("target", "این خدمت دیگر فعال نیست؛ گزینه‌ی دیگری انتخاب کنید.")
-        elif not data["org_unit"]:
-            # خطای واحد مال پرسش اول است، چون واحد از خدمتی می‌آید که همان‌جا انتخاب شده است.
-            unit = data["service"].org_unit
-            self.add_error(
-                "subject",
-                f"واحد مالک خدمت «{data['service'].name}» ({unit.name}) جزو واحدهایی نیست که برایشان ریسک شناسایی "
-                "می‌کنید؛ خدمتی از واحد خودتان انتخاب کنید یا ثبت را به عضو GRC بسپارید.",
-            )
+        self.resolve_unit(data)
+        if self.submit:
+            for name in self.required_text:
+                if not (data.get(name) or "").strip() and name not in self.errors:
+                    self.add_error(name, "این پرسش برای ارسال اجباری است.")
         return data
 
+    def resolve_unit(self, data):
+        raise NotImplementedError
+
     def draft_data(self):
-        """مقدارهای پیش‌نویس به شکلی که فرم دوباره می‌خواند."""
+        """مقدارهای پیش‌نویس به شکلی که فرم دوباره می‌خواند. واحد را save_draft می‌نویسد."""
         data = self.cleaned_data
         values = {name: (data.get(name) or "") for name in INTAKE_FIELDS}
         values |= {
-            "org_unit": data["org_unit"].pk if data.get("org_unit") else None,
-            "target": data.get("target") or "",
             "category": data["category"].pk if data.get("category") else None,
             "tags": data.get("tags") or [],
             "source": data.get("source") or "",
@@ -201,6 +237,64 @@ class IdentificationForm(forms.Form):
             "evidence_items": [item.pk for item in data.get("evidence_items") or []],
         }
         return values
+
+
+class IdentificationForm(EntryForm):
+    """«شناسایی ریسک»: خدمت، مشتری و تعهد از پیشنهادهای پرسش اول انتخاب می‌شود و واحد از روی خدمت و واحدهای کاربر
+    (auto_unit). ارسال بی خدمت به پرسش اول برمی‌گردد."""
+
+    origin = IdentificationDraft.Origin.IDENTIFICATION
+    target = forms.ChoiceField(label="خدمت، مشتری و تعهد", required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["target"].choices = [("", "")] + target_choices()
+
+    def clean(self):
+        data = super().clean()
+        if self.submit:
+            self.check_service(data)
+        return data
+
+    def resolve_unit(self, data):
+        """خدمت و تعهد از گزینه‌ی پرسش اول، و واحد از خدمت (auto_unit)."""
+        data["service"], data["commitment"] = parse_target(data.get("target"))
+        data["org_unit"] = auto_unit(self.user, data["service"])
+
+    def check_service(self, data):
+        """ارسال بی خدمت انتخاب‌شده، یا با خدمتی که واحدش معلوم نمی‌شود، به پرسش اول برمی‌گردد."""
+        if "target" in self.errors:
+            return
+        if not data.get("target"):
+            self.add_error("target", "خدمت را از پیشنهادهای همین پرسش انتخاب کنید.")
+        elif not data["service"]:
+            self.add_error("target", "این خدمت دیگر فعال نیست؛ گزینه‌ی دیگری انتخاب کنید.")
+        elif not data["org_unit"]:
+            # خطای واحد مال پرسش اول است، چون واحد از خدمتی می‌آید که همان‌جا انتخاب شده است. این فرم فقط مال عضو
+            # GRC و مدیر سامانه است که همه‌ی واحدهای فعال را دارند، پس واحد فقط وقتی پیدا نمی‌شود که غیرفعال باشد.
+            unit = data["service"].org_unit
+            self.add_error(
+                "subject",
+                f"واحد مالک خدمت «{data['service'].name}» ({unit.name}) فعال نیست؛ خدمت دیگری انتخاب کنید یا واحد را "
+                "در چارت سازمانی فعال کنید.",
+            )
+
+    def draft_data(self):
+        return super().draft_data() | {"target": self.cleaned_data.get("target") or ""}
+
+
+class AnswerForm(EntryForm):
+    """پاسخ مدیر واحد در «پاسخ به پرسشنامه‌ها». مدیر خدمت‌های کاتالوگ را با نام فنی‌شان نمی‌شناسد، پس خدمت پرسیده
+    نمی‌شود و فهرستش هم ساخته نمی‌شود؛ موضوع (پرسش اول) خودش برای ارسال اجباری است. واحد هم پرسیده نمی‌شود: اگر
+    مدیر فقط یک واحد دارد همان (answer_unit)، وگرنه خالی می‌ماند و واحد نهایی از خدمتی می‌آید که عضو GRC انتخاب
+    می‌کند. این فرم خدمت (target) ندارد، پس خدمتی که پیش‌نویس قدیمی‌تر از صفحه‌ی شناسایی داشته با save_draft
+    دست‌نخورده می‌ماند تا عضو GRC آن را از پیش انتخاب‌شده ببیند."""
+
+    required_text = ["subject", *REQUIRED_TEXT]
+    origin = IdentificationDraft.Origin.QUESTIONNAIRE
+
+    def resolve_unit(self, data):
+        data["org_unit"] = answer_unit(self.user)
 
 
 EVIDENCE_FILE_NOTE = "شاهد پیوست‌شده در فرم شناسایی"
@@ -236,12 +330,19 @@ def draft_attachments(draft):
 
 
 @transaction.atomic
-def save_draft(form, draft=None, upload=None, remove=()):
+def save_draft(form, draft=None, upload=None, remove=(), **fields):
     """پیش‌نویس را با واحدی که از خدمت آمده یا بدون واحد ذخیره می‌کند؛ فایل شاهد تازه به پیش‌نویس پیوست و
-    فایل‌هایی که کاربر برداشته از آن پاک می‌شوند."""
-    draft = draft or IdentificationDraft(created_by=form.user)
-    draft.org_unit = form.cleaned_data.get("org_unit")
-    draft.data = form.draft_data()
+    فایل‌هایی که کاربر برداشته از آن پاک می‌شوند. ورودی «در حال شناسایی» که عضو GRC هنوز خدمتی برایش انتخاب نکرده (یا
+    خدمت را برداشته) همان واحد پاسخ مدیر را می‌گیرد. کلیدی که فرم نمی‌نویسد (خدمت پیش‌نویس قدیمی در AnswerForm) از
+    داده‌ی قبلی می‌ماند؛ ثبت‌کننده و صفحه‌ی ثبت با ذخیره عوض نمی‌شوند و وضعیت فقط با fields (submit_answers)."""
+    draft = draft or IdentificationDraft(created_by=form.user, origin=form.origin)
+    unit = form.cleaned_data.get("org_unit")
+    if unit is None and draft.status == IdentificationDraft.Status.IDENTIFYING:
+        unit = answer_unit(draft.created_by)
+    draft.org_unit = unit
+    draft.data = draft.data | form.draft_data() | {"org_unit": draft.org_unit_id}
+    for name, value in fields.items():
+        setattr(draft, name, value)
     draft.save()
     if remove:
         draft.attachments.filter(pk__in=remove).delete()
@@ -251,10 +352,20 @@ def save_draft(form, draft=None, upload=None, remove=()):
 
 
 @transaction.atomic
+def submit_answers(form, draft=None, upload=None, remove=()):
+    """«ارسال برای شناسایی» از «پاسخ به پرسشنامه‌ها»: پاسخ‌ها و پیوست‌ها با همان save_draft ذخیره می‌شوند و ورودی
+    «در حال شناسایی» می‌شود تا عضو GRC خدمت را انتخاب و ریسک را ثبت کند. اینجا هیچ ریسکی ساخته نمی‌شود."""
+    return save_draft(
+        form, draft, upload, remove, status=IdentificationDraft.Status.IDENTIFYING, submitted_at=timezone.now()
+    )
+
+
+@transaction.atomic
 def submit_identification(form, draft=None, upload=None, remove=()):
     """ریسک را از فرم شناسایی می‌سازد: «ثبت‌شده در رجیستر» با مالک واحد، سناریوی پیوندشده یا «مورد جدید»، و
     شواهد انتخاب‌شده. دسته اگر نیامده باشد از سناریوی پیوندشده می‌آید وگرنه خالی می‌ماند تا عضو GRC تعیینش کند.
-    فایل‌های شاهد پیش‌نویس و فایل تازه پیوست ریسک می‌شوند و پیش‌نویس با ارسال پاک می‌شود."""
+    مالک نسبت به ثبت‌کننده‌ی ورودی سنجیده می‌شود: اگر مدیری که پاسخ داده مدیر واحد خدمت انتخاب‌شده است، مالک خود
+    اوست. فایل‌های شاهد پیش‌نویس و فایل تازه پیوست ریسک می‌شوند و پیش‌نویس با ارسال پاک می‌شود."""
     data = form.cleaned_data
     service, commitment, scenario = data["service"], data["commitment"], data.get("scenario")
     intake = {name: (data.get(name) or "").strip() for name in INTAKE_FIELDS}
@@ -265,7 +376,7 @@ def submit_identification(form, draft=None, upload=None, remove=()):
         description=narrative(intake),
         service=service,
         org_unit=data["org_unit"],
-        owner=unit_owner(data["org_unit"], form.user),
+        owner=unit_owner(data["org_unit"], draft.created_by if draft else form.user),
         category=data.get("category") or (scenario.category if scenario else None),
         channel=Risk.Channel.IDENTIFICATION,
         source=data.get("source") or "",
@@ -309,6 +420,36 @@ def submit_identification(form, draft=None, upload=None, remove=()):
     return risk
 
 
+def own_drafts(user):
+    """پیش‌نویس‌های شخصی کاربر؛ جز ثبت‌کننده هیچ‌کس، حتی عضو GRC، آن‌ها را نمی‌بیند."""
+    return IdentificationDraft.objects.filter(created_by=user, status=IdentificationDraft.Status.DRAFT)
+
+
+def answers_page(draft, grc):
+    """آیا پیش‌نویس کاربر در «پاسخ به پرسشنامه‌ها» ادامه می‌یابد (وگرنه در «شناسایی ریسک»)؛ grc یعنی ثبت‌کننده
+    can_edit_register دارد. پیش‌نویس هر صفحه همان‌جا باز می‌شود؛ پیش‌نویس کسی که در «شناسایی ریسک» ثبت نمی‌کند (مثلاً
+    پیش‌نویس قدیمی مدیر واحد از پیش از این صفحه) هم اینجا."""
+    return draft.origin == IdentificationDraft.Origin.QUESTIONNAIRE or not grc
+
+
+def answer_entries(user):
+    """ورودی‌های کاربر در «پاسخ به پرسشنامه‌ها»، با همان قاعده‌ی answers_page."""
+    entries = IdentificationDraft.objects.filter(created_by=user)
+    if can_edit_register(user):
+        entries = entries.filter(origin=IdentificationDraft.Origin.QUESTIONNAIRE)
+    return entries
+
+
+def identifying_entries(user):
+    """ورودی‌های «در حال شناسایی»: عضو GRC و مدیر سامانه همه را برای تکمیل می‌بینند و ثبت‌کننده ورودی خودش را فقط
+    برای دیدن وضعیت."""
+    entries = IdentificationDraft.objects.filter(status=IdentificationDraft.Status.IDENTIFYING)
+    return entries if can_edit_register(user) else entries.filter(created_by=user)
+
+
 def visible_drafts(user):
-    return IdentificationDraft.objects.filter(created_by=user)
+    """هر ورودی‌ای که این کاربر در «شناسایی ریسک» باز می‌کند: پیش‌نویس‌هایی که خودش همین‌جا نوشته و ورودی‌های در
+    حال شناسایی که سهم اوست."""
+    drafts = own_drafts(user).filter(origin=IdentificationDraft.Origin.IDENTIFICATION)
+    return drafts | identifying_entries(user)
 

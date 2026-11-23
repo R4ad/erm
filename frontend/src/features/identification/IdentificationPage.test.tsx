@@ -1,46 +1,22 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { mockApi, reply } from "@/test/api";
+import { deferred, mockApi, reply } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
 import { renderPage } from "@/test/render";
 import type { IdentificationChoices, IdentificationPage as PageData, IdentificationValues } from "@/lib/types";
 
-import { autoUnit, entryChecks, matchTargets, narrative, stepOfField, withTarget } from "./identification";
+import { identificationParts, identificationValues, identifyingRow } from "@/test/fixtures";
+
+import { autoUnit, emptyValues, entryChecks, matchTargets, narrative, stepOfField, withTarget } from "./identification";
 import { IdentificationPage } from "./IdentificationPage";
 
-const blank: IdentificationValues = {
-  org_unit: "",
-  target: "",
-  mission: "",
-  subject: "",
-  objective: "",
-  conditions: "",
-  customer: "",
-  event: "",
-  harm: "",
-  impact: "",
-  dependencies: "",
-  evidence: "",
-  category: "",
-  tags: [],
-  source: "",
-  scenario: "",
-  evidence_items: [],
-};
-
-const parts: PageData["parts"] = [
-  { name: "subject", label: "موضوع بررسی کدام خدمت یا فرآیند است؟", token: "خدمت" },
-  { name: "objective", label: "کدام هدف یا تعهد مختل می‌شود؟", token: "هدف یا تعهد" },
-  { name: "conditions", label: "چه علت یا شرایطی زمینه‌ی اختلال را فراهم می‌کند؟", token: "عامل و وضعیت" },
-  { name: "customer", label: "داتین، مشتری یا هر دو متأثرند؟", token: "داتین یا مشتری" },
-  { name: "event", label: "چه اتفاق مشخصی ممکن است رخ دهد؟", token: "رویداد مشخص" },
-  { name: "harm", label: "آسیب قابل مشاهده و دامنه‌ی آن چیست؟", token: "نوع و دامنه‌ی پیامد" },
-];
+const blank = identificationValues();
+const parts = identificationParts;
 
 function choices(overrides: Partial<IdentificationChoices> = {}): IdentificationChoices {
   return {
-    org_unit: [{ value: "6", label: "پرداخت · حسین نوری", owner: { id: 4, name: "حسین نوری" } }],
+    org_unit: [{ value: "6", name: "پرداخت", owner: { id: 4, name: "حسین نوری" } }],
     target: [
       {
         value: "1",
@@ -89,6 +65,7 @@ const answered: IdentificationValues = {
 function page(overrides: Partial<PageData> = {}): PageData {
   return {
     can_identify: true,
+    can_answer: false,
     parts,
     choices: choices(),
     values: blank,
@@ -137,7 +114,12 @@ function page(overrides: Partial<PageData> = {}): PageData {
 const options = { path: "/identification", route: "/identification" };
 const savedDraft = {
   message: "پیش‌نویس ذخیره شد.",
-  draft: { id: 12, saved_at: { iso: "2026-11-16T09:00:00+00:00", jalali: "1405/08/25 12:30" }, attachments: [] },
+  draft: {
+    id: 12,
+    status: { value: "draft" as const, label: "پیش‌نویس" },
+    saved_at: { iso: "2026-11-16T09:00:00+00:00", jalali: "1405/08/25 12:30" },
+    attachments: [],
+  },
   recent: [],
 };
 
@@ -153,8 +135,8 @@ describe("identification helpers", () => {
     expect(autoUnit(choices(), "2")?.value).toBe("6"); // فقط یک واحد دارد، خدمت هر واحدی باشد
     const two = choices({
       org_unit: [
-        { value: "6", label: "پرداخت", owner: null },
-        { value: "7", label: "تسویه", owner: null },
+        { value: "6", name: "پرداخت", owner: null },
+        { value: "7", name: "تسویه", owner: null },
       ],
     });
     expect(autoUnit(two, "1")?.value).toBe("6");
@@ -177,6 +159,11 @@ describe("identification helpers", () => {
       subject: "محیط تولید",
       customer: "داتین",
     });
+    // موضوعی که مدیر واحد آزاد نوشته همه‌ی واژه‌ها را در یک خدمت ندارد؛ خدمت‌هایی با واژه‌ی مشترک پیشنهاد می‌شوند و
+    // واژه‌های کوتاه («در») چیزی پیدا نمی‌کنند.
+    expect(matchTargets("سامانه‌ی ساتنا در محیط تولید", targets).map((target) => target.value)).toEqual(["1", "1:3"]);
+    expect(matchTargets("ساتنا ملت پرداخت", targets).map((target) => target.value)).toEqual(["1:3", "1"]);
+    expect(matchTargets("در", targets)).toEqual([]);
   });
 
   it("maps every server field to a wizard step and builds the narrative", () => {
@@ -195,6 +182,38 @@ describe("identification helpers", () => {
     expect(result.met).toBe(4);
     expect(result.evidence).toBe("assumption");
     expect(entryChecks({ ...values, evidence_items: ["9"] }, "حسین نوری").met).toBe(5);
+  });
+
+  it("checks the scope by the written subject in answer mode and only informs about the owner", () => {
+    const values = {
+      ...blank,
+      subject: "سامانه‌ی ساتنا",
+      objective: "ه",
+      event: "ر",
+      customer: "ب",
+      evidence_items: ["9"],
+    };
+    const known = entryChecks(values, "حسین نوری", "answer");
+    expect(known).toMatchObject({ met: 5, total: 5 });
+    expect(known.checks.find((check) => check.key === "owner")).toMatchObject({
+      label: "مالک: حسین نوری",
+      info: false,
+    });
+    const unknown = entryChecks(values, null, "answer");
+    // مالک نامعلوم فقط اطلاع است: نه برقرار شمرده می‌شود نه نابرقرار.
+    expect(unknown).toMatchObject({ met: 4, total: 4 });
+    expect(unknown.checks.find((check) => check.key === "owner")).toMatchObject({
+      label: "مالک: پس از انتخاب خدمت توسط کارشناس ریسک تعیین می‌شود",
+      met: true,
+      info: true,
+    });
+    expect(entryChecks({ ...values, subject: "" }, null, "answer").checks[2]?.met).toBe(false);
+    // در شناسایی همان موضوع بی انتخاب خدمت دامنه نیست.
+    expect(entryChecks(values, "حسین نوری").checks[2]?.met).toBe(false);
+  });
+
+  it("empties every answer after sending", () => {
+    expect(emptyValues({ ...answered, tags: ["ت"], evidence_items: ["9"] })).toEqual(blank);
   });
 });
 
@@ -403,13 +422,13 @@ describe("IdentificationPage", () => {
     expect(question(/موضوع بررسی کدام خدمت/)).toHaveAccessibleDescription(/جزو واحدهایی نیست/);
   });
 
-  it("warns on the first question when the chosen service belongs to none of the user's units", async () => {
+  it("warns on the first question when the chosen service's unit is not active", async () => {
     mockApi({
       "GET identification/": page({
         choices: choices({
           org_unit: [
-            { value: "6", label: "پرداخت", owner: null },
-            { value: "7", label: "تسویه", owner: null },
+            { value: "6", name: "پرداخت", owner: null },
+            { value: "7", name: "تسویه", owner: null },
           ],
         }),
       }),
@@ -419,7 +438,7 @@ describe("IdentificationPage", () => {
     await user.click(screen.getByRole("button", { name: /پایا/ }));
     await user.click(screen.getByRole("button", { name: "بعدی" }));
     expect(position()).toHaveTextContent("گام ۱ از ۷");
-    expect(screen.getByText(/واحد مالک «پایا» جزو واحدهایی نیست/)).toBeInTheDocument();
+    expect(screen.getByText(/واحد مالک «پایا» فعال نیست/)).toBeInTheDocument();
   });
 
   it("saves a draft without a unit with Ctrl+S, keeps its id in the address and uploads the evidence file", async () => {
@@ -457,6 +476,21 @@ describe("IdentificationPage", () => {
     expect(JSON.parse(body.get("payload") as string)).toMatchObject({ draft: 12, remove_attachments: [3] });
   });
 
+  it("keeps what was typed during a save marked unsaved, since the server never got it", async () => {
+    const answer = deferred();
+    const api = mockApi({ "GET identification/": page(), "POST identification/": answer.promise });
+    const { user } = renderPage(<IdentificationPage />, options);
+    const subject = await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ });
+    await user.type(subject, "فرآیند");
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(api.callsTo("POST identification/")).toHaveLength(1));
+    await user.type(subject, " تازه");
+    answer.resolve(savedDraft);
+    await screen.findByText("پیش‌نویس ذخیره شد.");
+    expect(api.callsTo("POST identification/")[0]?.body).toMatchObject({ values: { subject: "فرآیند" } });
+    expect(screen.getByText("تغییر ذخیره‌نشده")).toBeInTheDocument();
+  });
+
   it("refuses a file type the server would refuse", async () => {
     mockApi({ "GET identification/": page({ values: answered }) });
     const { user } = renderPage(<IdentificationPage />, options);
@@ -489,10 +523,92 @@ describe("IdentificationPage", () => {
   it("lets other roles see recent entries without the form", async () => {
     mockApi({ "GET identification/": page({ can_identify: false, choices: null }) });
     renderPage(<IdentificationPage />, options);
-    expect(await screen.findByText("ثبت ورودی شناسایی با مدیر واحد و عضو GRC است")).toBeInTheDocument();
+    expect(await screen.findByText("ثبت ورودی شناسایی با عضو GRC و مدیر سامانه است")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /پاسخ به پرسشنامه‌ها/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "الگوی ثبت سناریو" })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" })).toBeInTheDocument();
+  });
+
+  it("puts every identifying entry on top for GRC with a link to complete it", async () => {
+    const entry = identifyingRow({ route: "/identification?draft=31", owner: { id: 4, name: "حسین نوری" } });
+    mockApi({ "GET identification/": page({ recent: [entry, ...page().recent] }) });
+    renderPage(<IdentificationPage />, options);
+    const recent = await screen.findByRole("region", { name: "ورودی‌های اخیر شناسایی" });
+    expect(within(recent).getByText(/پیش‌نویس ← در حال شناسایی ← شناسایی‌شده ← در ارزیابی/)).toBeInTheDocument();
+    const [first] = within(recent).getAllByRole("row").slice(1);
+    expect(within(first!).getByRole("link", { name: entry.title })).toHaveAttribute("href", "/identification?draft=31");
+    expect(within(first!).getByText("در حال شناسایی")).toBeInTheDocument();
+    // ورودی مدیر خدمت ندارد: ستون خدمت موضوع نوشته‌شده است، بی «همه».
+    expect(within(first!).getByText("سامانه‌ی آزمون در محیط تولید")).toBeInTheDocument();
+    expect(within(first!).getByText("حسین نوری")).toBeInTheDocument();
+  });
+
+  it("completes an identifying entry for GRC: picks a service by the manager's subject and opens the new risk", async () => {
+    const api = mockApi({
+      "GET identification/": page({
+        values: { ...answered, target: "", subject: "سامانه‌ی ساتنا در محیط تولید", evidence: "دو توقف مشابه" },
+        draft: { ...savedDraft.draft, id: 31, status: { value: "identifying", label: "در حال شناسایی" } },
+      }),
+      "POST identification/": reply(201, {
+        message: "ریسک RK-1405-0030 شناسایی و در رجیستر ثبت شد.",
+        risk: { id: 30, code: "RK-1405-0030" },
+        redirect: "/risks/30",
+      }),
+    });
+    const { user } = renderPage(<IdentificationPage />, {
+      ...options,
+      path: "/identification?draft=31",
+      routes: [{ path: "/risks/:id", element: <h1>پرونده‌ی ریسک</h1> }],
+    });
+    expect(await screen.findByText(/^در حال شناسایی · /)).toBeInTheDocument();
+    const suggestions = screen.getByRole("list", { name: /پیشنهاد از فهرست خدمت‌ها/ });
+    await user.click(within(suggestions).getByRole("button", { name: /بانک ملت/ }));
+    // موضوعی که مدیر نوشته می‌ماند و فقط خدمت انتخاب می‌شود.
+    expect(question(/موضوع بررسی کدام خدمت/)).toHaveValue("سامانه‌ی ساتنا در محیط تولید");
+    expect(screen.getByText(/خدمت انتخاب‌شده/)).toHaveTextContent("ساتنا · بانک ملت");
+
+    await user.click(screen.getByRole("button", { name: /گام ۷: بازبینی/ }));
+    await user.click(screen.getByRole("button", { name: "ارسال برای شناسایی" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "ارسال برای شناسایی" }),
+    );
+    expect(await screen.findByRole("heading", { name: "پرونده‌ی ریسک" })).toBeInTheDocument();
+    expect(api.callsTo("POST identification/")[0]?.body).toMatchObject({
+      submit: true,
+      draft: 31,
+      values: { target: "1:3", subject: "سامانه‌ی ساتنا در محیط تولید" },
+    });
+    // ورودی با ارسال پاک شده است؛ نشانی ?draft= آن دیگر خوانده نمی‌شود.
+    expect(api.callsTo("GET identification/")).toHaveLength(1);
+  });
+
+  it("asks before a queue row replaces what GRC has typed into a new entry", async () => {
+    mockApi({ "GET identification/": page({ recent: [identifyingRow({ route: "/identification?draft=31" })] }) });
+    const { user } = renderPage(<IdentificationPage />, options);
+    await user.type(await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }), "سامانه‌ی پیامک");
+    const recent = screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" });
+    await user.click(within(recent).getByRole("link", { name: /توقف سامانه‌ی آزمون/ }));
+    // نشانی فقط در ?draft= فرق دارد ولی فرم از نو ساخته می‌شود؛ نوشته‌ی ذخیره‌نشده بی‌هشدار از دست نمی‌رود.
+    const dialog = await screen.findByRole("alertdialog", { name: "تغییرات ذخیره نشده است" });
+    await user.click(within(dialog).getByRole("button", { name: "ماندن در صفحه" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/identification$/);
+    expect(question(/موضوع بررسی کدام خدمت/)).toHaveValue("سامانه‌ی پیامک");
+  });
+
+  it("sends a unit manager to questionnaire answers and shows only the state of their entries", async () => {
+    mockApi({
+      "GET identification/": page({ can_identify: false, can_answer: true, choices: null, recent: [identifyingRow()] }),
+    });
+    renderPage(<IdentificationPage />, options);
+    expect(await screen.findByText("ثبت و تکمیل ریسک در این صفحه با عضو GRC است")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /پاسخ به پرسشنامه‌ها/ })).toHaveAttribute("href", "/questionnaire-answers");
+    expect(screen.queryByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).not.toBeInTheDocument();
+    const recent = screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" });
+    // پاسخ ارسال‌شده پیوند ویرایش ندارد.
+    expect(within(recent).getByText("توقف سامانه‌ی آزمون پس از انتشار").closest("a")).toBeNull();
+    expect(within(recent).getByText("در حال شناسایی")).toBeInTheDocument();
+    await expectNoAxeViolations();
   });
 });
 

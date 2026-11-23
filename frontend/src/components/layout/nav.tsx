@@ -21,6 +21,7 @@ const TIP_SIDE = locale.dir === "rtl" ? "left" : "right";
 /** آیکون پیوندهای «میز کار» (آیکون‌های فیگما). */
 const DESK_ICONS: Record<string, IconName> = {
   "actions:my_work": "tray",
+  "desk:questionnaire_answers": "clipboard",
   "risks:risk_list": "list",
   "actions:notices": "bell",
   "reports:management": "chart-bar",

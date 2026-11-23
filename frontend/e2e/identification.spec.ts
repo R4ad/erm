@@ -1,43 +1,20 @@
 import { expect, expectAccessible, reply, test } from "./fixtures";
 
 import type { IdentificationPage } from "../src/lib/types";
+import { identificationParts, identificationValues } from "../src/test/fixtures";
 
 // «شناسایی ریسک»: ویزارد شش پرسش و بازبینی، الگوی چسبان جمله، صفحه‌کلید، خطای سرور و حرکت با «کاهش حرکت»، در
 // دسکتاپ و موبایل و هر دو تم. axe فقط محتوای همین صفحه (#main) را می‌سنجد؛ پوسته‌ی برنامه آزمون خودش را دارد.
 
-const values: IdentificationPage["values"] = {
-  org_unit: "",
-  target: "",
-  mission: "",
-  subject: "",
-  objective: "",
-  conditions: "",
-  customer: "",
-  event: "",
-  harm: "",
-  impact: "",
-  dependencies: "",
-  evidence: "",
-  category: "",
-  tags: [],
-  source: "",
-  scenario: "",
-  evidence_items: [],
-};
+const values = identificationValues();
 
 function identification(overrides: Partial<IdentificationPage> = {}): IdentificationPage {
   return {
     can_identify: true,
-    parts: [
-      { name: "subject", label: "موضوع بررسی کدام خدمت یا فرآیند است؟", token: "خدمت" },
-      { name: "objective", label: "کدام هدف یا تعهد مختل می‌شود؟", token: "هدف یا تعهد" },
-      { name: "conditions", label: "چه علت یا شرایطی زمینه‌ی اختلال را فراهم می‌کند؟", token: "عامل و وضعیت" },
-      { name: "customer", label: "داتین، مشتری یا هر دو متأثرند؟", token: "داتین یا مشتری" },
-      { name: "event", label: "چه اتفاق مشخصی ممکن است رخ دهد؟", token: "رویداد مشخص" },
-      { name: "harm", label: "آسیب قابل مشاهده و دامنه‌ی آن چیست؟", token: "نوع و دامنه‌ی پیامد" },
-    ],
+    can_answer: false,
+    parts: identificationParts,
     choices: {
-      org_unit: [{ value: "6", label: "پرداخت · حسین نوری", owner: { id: 4, name: "حسین نوری" } }],
+      org_unit: [{ value: "6", name: "پرداخت", owner: { id: 4, name: "حسین نوری" } }],
       target: [
         {
           value: "1",
@@ -207,7 +184,12 @@ test.describe("risk identification", () => {
     api.on("GET identification/", identification());
     api.on("POST identification/", {
       message: "پیش‌نویس ذخیره شد.",
-      draft: { id: 12, saved_at: { iso: "2026-11-16T09:00:00+00:00", jalali: "1405/08/25 12:30" }, attachments: [] },
+      draft: {
+        id: 12,
+        status: { value: "draft", label: "پیش‌نویس" },
+        saved_at: { iso: "2026-11-16T09:00:00+00:00", jalali: "1405/08/25 12:30" },
+        attachments: [],
+      },
       recent: [],
     });
     await page.goto("/app/identification");
