@@ -26,10 +26,6 @@ const fa = {
   "shell.logout": "خروج",
   "shell.loggingOut": "در حال خروج",
   "shell.footer": "نسخه‌ی تازه‌ی رابط؛ صفحه‌هایی که هنوز نیامده‌اند در صفحه‌های فعلی باز می‌شوند.",
-  "theme.label": "تم",
-  "theme.dark": "تیره",
-  "theme.light": "روشن",
-  "theme.system": "پیرو سیستم",
   "toast.label": "اعلان",
   // Radix جای {hotkey} را با کلید میان‌بر (F8) پر می‌کند.
   "toast.region": "اعلان‌ها ({hotkey})",

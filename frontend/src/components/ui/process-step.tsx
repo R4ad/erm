@@ -14,7 +14,7 @@ export function ProcessStep({ index, label, state }: { index: number; label: str
         className={cn(
           "h-1 rounded-full",
           state === "done" && "bg-brand",
-          state === "current" && "bg-gradient-to-l from-[#818cf8] to-brand",
+          state === "current" && "bg-brand",
           state === "upcoming" && "bg-line",
         )}
       />
@@ -23,9 +23,8 @@ export function ProcessStep({ index, label, state }: { index: number; label: str
           aria-hidden
           className={cn(
             "grid size-5 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold",
-            state === "done" && "bg-brand text-white",
-            state === "current" &&
-              "border-[1.5px] border-brand bg-panel text-brand shadow-[0_0_0_3px_rgb(30_58_138/0.18)]",
+            state === "done" && "bg-brand text-on-brand",
+            state === "current" && "border-[1.5px] border-brand bg-panel text-brand shadow-focus",
             state === "upcoming" && "border border-line-strong bg-subtle text-ink-3",
           )}
         >

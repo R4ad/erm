@@ -10,7 +10,9 @@ const tones = {
   warning: "bg-warning-subtle text-warning",
   danger: "bg-danger-subtle text-danger",
   brand: "bg-brand-subtle text-brand",
-  gold: "bg-gold-subtle text-gold",
+  tangerine: "bg-tangerine-subtle text-tangerine",
+  /** نام قدیمی tangerine. */
+  gold: "bg-tangerine-subtle text-tangerine",
   /** نام قدیمی brand */
   accent: "bg-brand-subtle text-brand",
 } as const;

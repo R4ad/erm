@@ -4,7 +4,7 @@ import type { TestOptions } from "./e2e/fixtures";
 
 // آزمون‌های سرتاسری روی ساخت نهایی اجرا می‌شوند، با همان CSP و Trusted Types که جنگو می‌فرستد (e2e/server.mjs)،
 // و هر درخواست /api/ را با داده‌ی آزمون جواب می‌دهند (e2e/fixtures.ts)؛ جنگو و پایگاه داده لازم نیست. هر صفحه در
-// دسکتاپ و موبایل و در هر دو تم تیره و روشن با axe سنجیده می‌شود.
+// دسکتاپ و موبایل با تم داتین (تنها تم سامانه) با axe سنجیده می‌شود.
 const port = 4173;
 
 export default defineConfig<TestOptions>({
@@ -21,13 +21,8 @@ export default defineConfig<TestOptions>({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "desktop-dark", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
-    {
-      name: "desktop-light",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, theme: "light" },
-    },
-    { name: "mobile-dark", use: { ...devices["Pixel 7"] } },
-    { name: "mobile-light", use: { ...devices["Pixel 7"], theme: "light" } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     command: "npx vite build --logLevel warn && node e2e/server.mjs",

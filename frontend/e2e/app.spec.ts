@@ -57,18 +57,6 @@ test.describe("shell and my work", () => {
     await expect(page.getByRole("heading", { name: "رجیستر ریسک", level: 1 })).toBeVisible();
   });
 
-  test("switches theme and keeps it after reload", async ({ page, theme }) => {
-    await page.goto("/app/");
-    const html = page.locator("html");
-    await expect(html).toHaveAttribute("data-theme", theme);
-    const other = theme === "dark" ? "روشن" : "تیره";
-    await page.getByRole("button", { name: /تم/ }).click();
-    await page.getByRole("menuitemradio", { name: other }).click();
-    await expect(html).toHaveAttribute("data-theme", theme === "dark" ? "light" : "dark");
-    await page.reload();
-    await expect(html).toHaveAttribute("data-theme", theme === "dark" ? "light" : "dark");
-  });
-
   test("tells the user when the connection drops", async ({ page, context }) => {
     await page.goto("/app/");
     await expect(page.getByRole("heading", { name: "کارهای من", level: 1 })).toBeVisible();

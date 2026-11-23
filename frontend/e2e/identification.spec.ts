@@ -101,7 +101,7 @@ const answered = {
 };
 
 test.describe("risk identification", () => {
-  test("walks the six questions and the review from the keyboard, in both themes", async ({ page, api }) => {
+  test("walks the six questions and the review from the keyboard", async ({ page, api }) => {
     api.on("GET identification/", identification());
     await page.goto("/app/identification");
     await expect(page.getByRole("heading", { name: "شناسایی ریسک", level: 1 })).toBeVisible();

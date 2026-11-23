@@ -95,7 +95,7 @@ export function AppShell() {
         <div className="flex min-h-dvh">
           <aside
             className={cn(
-              "sticky top-0 hidden h-dvh shrink-0 border-e border-white/7 transition-[width] duration-300 ease-out lg:block print:hidden",
+              "sticky top-0 hidden h-dvh shrink-0 transition-[width] duration-200 ease-out lg:block print:hidden",
               collapsed ? "w-[4.5rem]" : "w-(--sidebar-w)",
             )}
           >
@@ -120,7 +120,7 @@ export function AppShell() {
               id="main"
               ref={main}
               tabIndex={-1}
-              className="pad-safe w-full flex-1 py-6 outline-none [view-transition-name:main] lg:px-8"
+              className="pad-safe w-full flex-1 py-6 outline-none [view-transition-name:main] lg:px-8 lg:pt-8 lg:pb-10"
             >
               <Outlet />
             </main>

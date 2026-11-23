@@ -77,7 +77,7 @@ export function LoginPage() {
       <main className="pad-safe relative flex flex-1 items-center justify-center pb-16">
         <div className="w-full max-w-[25rem] animate-pop-in">
           <div className="mb-8 flex flex-col items-center gap-4 text-center">
-            <LogoMark size={40} />
+            <LogoMark size={40} className="text-brand" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-h1 font-bold text-ink">ورود به سامانه</h1>
               <p className="text-sm text-ink-2">

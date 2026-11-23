@@ -4,7 +4,8 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/cn";
 
-// کامپوننت «Button» فیگما: Primary، Secondary، Ghost و Danger در دو اندازه‌ی md (۳۶) و sm (۳۲)، گوشه‌ی ۸، متن ۱۳.
+// کامپوننت «Button» فیگما: Primary، Secondary، Ghost و Danger در دو اندازه‌ی md (۳۶؛ Secondary ۳۸) و sm (۳۲؛ Secondary
+// ۳۴)، گوشه‌ی ۸، متن ۱۳.
 // آیکون ۱۸ (md) یا ۱۶ (sm) بعد از متن در ترتیب راست‌به‌چپ می‌آید، یعنی سمت راست متن.
 
 const base =
@@ -41,7 +42,16 @@ export function buttonClasses({
   size = "md",
   className,
 }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
-  return cn(base, variants[variant], variant !== "link" && sizes[size], className);
+  // Secondary در فیگما ۲ پیکسل بلندتر از Primary است (۳۸ و ۳۴)، چون حاشیه‌اش بیرون از کادر ۳۶ و ۳۲ است.
+  const bordered = variant === "secondary" || variant === "outline";
+  return cn(
+    base,
+    variants[variant],
+    variant !== "link" && sizes[size],
+    bordered && size === "md" && "h-[2.375rem]",
+    bordered && size === "sm" && "h-[2.125rem]",
+    className,
+  );
 }
 
 interface ButtonProps extends ComponentProps<"button"> {

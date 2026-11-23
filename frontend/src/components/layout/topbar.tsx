@@ -136,13 +136,13 @@ function Notifications() {
       to={notices?.route ?? "/actions/notices"}
       viewTransition
       aria-label={unread ? `اعلان‌های پایش، ${fa(unread)} نخوانده` : "اعلان‌های پایش"}
-      className="relative grid size-9 shrink-0 place-items-center rounded-md border border-line text-ink-2 transition-colors hover:bg-subtle hover:text-ink"
+      className="relative grid size-9 shrink-0 place-items-center rounded-md border border-line bg-panel text-ink-2 transition-colors hover:bg-subtle hover:text-ink"
     >
       <Icon name="bell" size={18} />
       {unread > 0 && (
         <span
           aria-hidden
-          className="absolute top-[7px] right-[8px] size-2 rounded-full border-2 border-white bg-danger-solid"
+          className="absolute top-[7px] end-[8px] size-2 rounded-full border-2 border-panel bg-danger-solid"
         />
       )}
     </Link>
@@ -153,7 +153,7 @@ function Notifications() {
 export function Topbar({ onOpenMenu, menuOpen }: { onOpenMenu: () => void; menuOpen: boolean }) {
   const { method } = useSession();
   return (
-    <header className="glass sticky top-0 z-40 border-b border-line pt-[env(safe-area-inset-top)] print:hidden">
+    <header className="sticky top-0 z-40 border-b border-line bg-panel pt-[env(safe-area-inset-top)] print:hidden">
       <div className="pad-safe flex h-(--topbar-h) items-center justify-between gap-3 py-2.5 lg:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <button
@@ -171,7 +171,7 @@ export function Topbar({ onOpenMenu, menuOpen }: { onOpenMenu: () => void; menuO
         <div className="flex shrink-0 items-center gap-3">
           {method && (
             <Link to={method.route ?? "/method"} viewTransition className="hidden rounded-sm xl:inline-flex">
-              <Badge tone="gold">
+              <Badge tone="tangerine">
                 روش ارزیابی: نسخه‌ی {fa(method.number)} · {method.title}
               </Badge>
             </Link>

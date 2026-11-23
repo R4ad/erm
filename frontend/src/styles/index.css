@@ -1,41 +1,41 @@
 @import "tailwindcss";
 
 /* ───────────────────────── توکن‌ها ─────────────────────────
-   همه از فیگما (کالکشن‌های «ERM / Color» و «ERM / Dimension»، مود Light؛ فایل z9nJXkSW8DzSlAXV6RmeHL). کامپوننت‌ها
-   فقط نام نقش را می‌شناسند. نام‌های قدیمی (panel، surface، fg، muted، accent، ...) نام دیگر همین توکن‌ها هستند تا
-   صفحه‌هایی که هنوز بازنویسی نشده‌اند هم رنگ‌های فیگما را بگیرند. */
+   تم داتین از متغیرهای فیگما (فایل «ERM — سامانه مدیریت ریسک سازمانی»، کالکشن colors؛ docs/design/tokens.json). فقط
+   تم روشن هست. کامپوننت‌ها فقط نام نقش را می‌شناسند. نام‌های قدیمی (panel، surface، fg، muted، accent، gold، ...) نام
+   دیگر همین توکن‌ها هستند تا صفحه‌هایی که هنوز بازنویسی نشده‌اند هم رنگ‌های داتین را بگیرند. */
 
 :root {
   color-scheme: light;
 
   /* سطح */
-  --bg-canvas: #f8fafc;
+  --bg-canvas: #f6f8f7;
   --bg-surface: #ffffff;
-  --bg-subtle: #f1f5f9;
-  --bg-muted: #e8ecf1;
+  --bg-subtle: #f0f4f2;
+  --bg-muted: #e5ebe8;
   /* منو */
-  --bg-sidebar: #0b1628;
-  --bg-sidebar-hover: #15233b;
-  --bg-sidebar-active: #1b2c4a;
+  --bg-sidebar: #006839;
+  --bg-sidebar-hover: #0f7145;
+  --bg-sidebar-active: #1f7a51;
   /* متن */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  --text-on-dark: #f8fafc;
-  --text-on-dark-muted: #94a3b8;
+  --text-primary: #101a15;
+  --text-secondary: #45524b;
+  --text-tertiary: #66736c;
+  --text-on-dark: #ffffff;
+  --text-on-dark-muted: #bfd9ce;
   --text-on-brand: #ffffff;
   /* برند و تأکید */
-  --brand-primary: #1e3a8a;
-  --brand-primary-hover: #1e40af;
-  --brand-subtle: #eef2ff;
-  --brand-subtle-strong: #c7d2fe;
-  --accent-gold: #a16207;
-  --accent-gold-subtle: #fef3c7;
-  --accent-gold-bright: #eab308;
+  --brand-primary: #006839;
+  --brand-primary-hover: #00552f;
+  --brand-subtle: #ebf3ef;
+  --brand-subtle-strong: #bfd9ce;
+  --accent-tangerine: #a85604;
+  --accent-tangerine-subtle: #fef1e4;
+  --accent-tangerine-bright: #f68b1f;
   /* حاشیه */
-  --border-default: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --border-focus: #0369a1;
+  --border-default: #e1e8e4;
+  --border-strong: #c8d3cd;
+  --border-focus: #006839;
   /* وضعیت */
   --status-info: #0369a1;
   --status-info-subtle: #e0f2fe;
@@ -63,11 +63,12 @@
   --risk-none-bg: #f1f5f9;
   --risk-none-fg: #475569;
 
-  --overlay: rgb(15 23 42 / 0.45);
-  /* سایه‌ها: Elevation/1 — Card، Elevation/2 — Popover، Focus/Ring */
-  --elevation-1: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -6px rgb(15 23 42 / 0.07);
-  --elevation-2: 0 2px 6px rgb(15 23 42 / 0.06), 0 20px 48px -12px rgb(15 23 42 / 0.14);
-  --focus-ring: 0 0 0 3px rgb(3 105 161 / 0.35);
+  /* پرده‌ی پشت مودال و کشو: text/primary با شفافیت */
+  --overlay: rgb(16 26 21 / 0.45);
+  /* سایه‌ها: Elevation/1 — Card، Elevation/2 — Popover و Toast، Focus/Ring */
+  --elevation-1: 0 1px 2px rgb(16 26 21 / 0.04), 0 8px 24px -6px rgb(16 26 21 / 0.07);
+  --elevation-2: 0 2px 6px rgb(16 26 21 / 0.06), 0 20px 48px -12px rgb(16 26 21 / 0.16);
+  --focus-ring: 0 0 0 3px rgb(0 104 57 / 0.25);
 }
 
 @theme inline {
@@ -90,9 +91,9 @@
   --color-brand-hover: var(--brand-primary-hover);
   --color-brand-subtle: var(--brand-subtle);
   --color-brand-subtle-strong: var(--brand-subtle-strong);
-  --color-gold: var(--accent-gold);
-  --color-gold-subtle: var(--accent-gold-subtle);
-  --color-gold-bright: var(--accent-gold-bright);
+  --color-tangerine: var(--accent-tangerine);
+  --color-tangerine-subtle: var(--accent-tangerine-subtle);
+  --color-tangerine-bright: var(--accent-tangerine-bright);
 
   --color-line: var(--border-default);
   --color-line-strong: var(--border-strong);
@@ -125,6 +126,9 @@
   --color-risk-none-fg: var(--risk-none-fg);
 
   /* نام‌های قدیمی همین توکن‌ها */
+  --color-gold: var(--accent-tangerine);
+  --color-gold-subtle: var(--accent-tangerine-subtle);
+  --color-gold-bright: var(--accent-tangerine-bright);
   --color-surface: var(--bg-subtle);
   --color-elevated: var(--bg-surface);
   --color-fg: var(--text-primary);
@@ -149,8 +153,10 @@
 }
 
 @theme {
-  /* Vazirmatn برای همه‌ی متن‌ها و رقم‌های فارسی؛ IBM Plex Mono برای کدها (RK-1405-0012، AS-…، TR-…). */
+  /* Vazirmatn برای همه‌ی متن‌ها و رقم‌های فارسی؛ IBM Plex Mono برای کدها (RK-1405-0012، AS-…، TR-…). فونت برند
+     (IRANYekanX) بعداً با فایل‌های دارای مجوز جایگزین می‌شود؛ تا آن زمان --font-brand همان Vazirmatn است. */
   --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-brand: var(--font-sans);
   --font-code: "IBM Plex Mono", ui-monospace, monospace;
 
   /* استایل‌های متن فیگما: Caption 12/18 · Label و Body Small 13/20 · Body 14/24 · H3 15/24 · H2 18/28 · H1 22/34 ·
@@ -179,12 +185,18 @@
   --text-title: 1.375rem;
   --text-title--line-height: 2.125rem;
 
-  /* گوشه‌ها: radius/sm 4 · md 8 · lg 10 · xl 16 · full */
+  /* گوشه‌ها (tokens.json): badge 4 · button و input 8 · table-card، choice و nav-item 10 · item 12 · card 14 ·
+     bento-card و modal 16 · hero-card 20 · chip کامل */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 10px;
   --radius-xl: 16px;
   --radius-2xl: 16px;
+  --radius-item: 12px;
+  --radius-card: 14px;
+  --radius-bento: 16px;
+  --radius-modal: 16px;
+  --radius-hero: 20px;
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -193,11 +205,11 @@
   --animate-fade-out: fade-out 140ms ease-in;
   --animate-pop-in: pop-in 200ms var(--ease-out);
   --animate-pop-out: pop-out 140ms ease-in;
-  --animate-sheet-in-right: sheet-in-right 280ms var(--ease-out);
+  --animate-sheet-in-right: sheet-in-right 240ms var(--ease-out);
   --animate-sheet-out-right: sheet-out-right 200ms ease-in;
-  --animate-sheet-in-left: sheet-in-left 280ms var(--ease-out);
+  --animate-sheet-in-left: sheet-in-left 240ms var(--ease-out);
   --animate-sheet-out-left: sheet-out-left 200ms ease-in;
-  --animate-toast-in: toast-in 260ms var(--ease-out);
+  --animate-toast-in: toast-in 220ms var(--ease-out);
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
   --animate-progress: progress 1.1s var(--ease-in-out) infinite;
 

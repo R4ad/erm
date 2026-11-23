@@ -273,16 +273,12 @@ function toCall(request: Request): ApiCall {
   };
 }
 
-export type Theme = "dark" | "light";
-
 export interface TestOptions {
-  theme: Theme;
   /** خطاهای کنسول که این آزمون انتظارشان را دارد (مثلاً جواب ۴۰۰ ورود اشتباه). */
   allowConsoleErrors: RegExp[];
 }
 
 export const test = base.extend<TestOptions & { api: MockApi }>({
-  theme: ["dark", { option: true }],
   allowConsoleErrors: [[], { option: true }],
   // خودکار: حتی آزمونی که api را نمی‌خواهد، جواب‌های پیش‌فرض را می‌گیرد.
   api: [
@@ -293,22 +289,13 @@ export const test = base.extend<TestOptions & { api: MockApi }>({
     },
     { auto: true },
   ],
-  page: async ({ page, theme, allowConsoleErrors }, use) => {
-    await page.addInitScript((choice) => {
-      try {
-        // فقط بار اول همین برگه؛ بعد از reload، انتخاب خود کاربر می‌ماند.
-        if (!window.sessionStorage.getItem("e2e:theme")) {
-          window.localStorage.setItem("erm:theme", choice);
-          window.sessionStorage.setItem("e2e:theme", choice);
-        }
-      } catch {
-        // بدون localStorage هم تم پیش‌فرض کار می‌کند.
-      }
+  page: async ({ page, allowConsoleErrors }, use) => {
+    await page.addInitScript(() => {
       (window as unknown as { __csp: string[] }).__csp = [];
       document.addEventListener("securitypolicyviolation", (event) => {
         (window as unknown as { __csp: string[] }).__csp.push(`${event.violatedDirective} ${event.blockedURI}`);
       });
-    }, theme);
+    });
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());

@@ -39,13 +39,31 @@ export function Icon({ name, size = 18, label, className, ...props }: IconProps)
   );
 }
 
-/** نشان سامانه (brand/logo-mark): ماتریس ۳×۳ سطح‌های ریسک. */
+/** کمان‌های نازک ربع بالا-راست نشان داتین (از ۸۴- تا ۶- درجه، روی شعاع‌های ۹٫۸ تا ۱۲٫۹). */
+const LOGO_ARCS = [9.8, 10.9, 12, 12.9].map((r) => {
+  const point = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return `${(16 + r * Math.cos(rad)).toFixed(2)} ${(16 + r * Math.sin(rad)).toFixed(2)}`;
+  };
+  return `M${point(-84)}A${r} ${r} 0 0 1 ${point(-6)}`;
+});
+
+/** نشان داتین: حلقه‌ی ضخیم سه‌چهارم و چهار کمان نازک در ربع باقی‌مانده؛ رنگ از currentColor. */
 export function LogoMark({ size = 28, className }: { size?: number; className?: string }) {
-  const cells = ["#DC2626", "#EA580C", "#EAB308", "#EA580C", "#EAB308", "#16A34A", "#EAB308", "#16A34A", "#16A34A"];
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" aria-hidden focusable="false" className={className}>
-      {cells.map((fill, index) => (
-        <rect key={index} x={(index % 3) * 10} y={Math.floor(index / 3) * 10} width="8" height="8" rx="2" fill={fill} />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M16 5.5A10.5 10.5 0 1 0 26.5 16" strokeWidth={5} />
+      {LOGO_ARCS.map((d) => (
+        <path key={d} d={d} strokeWidth={0.7} />
       ))}
     </svg>
   );

@@ -13,8 +13,8 @@ import type { Navigation, NavLink, NavModule, NavModuleKey } from "@/lib/types";
 
 import { Brand } from "./brand";
 
-// منوی کناری فیگما («Sidebar» و «Navigation 2.0 — منوی ماژولار»): زمینه‌ی تیره با نور ملایم، «میز کار» و سه ماژول یک
-// چرخه با گام‌های شماره‌دار، کارت چرخه‌ی ارزیابی و کارت کاربر. پیوند فعال زمینه‌ی نیلی ملایم، متن روشن و نوار طلایی دارد.
+// منوی کناری سبز داتین (components.md، «Nav»): «میز کار» و سه ماژول یک چرخه با گام‌های شماره‌دار، کارت چرخه‌ی ارزیابی
+// و کارت کاربر. پیوند فعال زمینه‌ی bg/sidebar-active، حاشیه‌ی سفید کم‌رنگ و نوار نارنجی کوچک دارد.
 
 const TIP_SIDE = locale.dir === "rtl" ? "left" : "right";
 
@@ -27,35 +27,11 @@ const DESK_ICONS: Record<string, IconName> = {
   "reports:management": "chart-bar",
 };
 
-/** کاشی هر ماژول: گرادیان، آیکون و رنگ ریل و نشانگر گام فعال (Nav/Module Tile). */
-const MODULES: Record<
-  NavModuleKey,
-  { icon: IconName; tile: string; glow: string; rail: string; marker: string; markerGlow: string }
-> = {
-  assessment: {
-    icon: "gauge",
-    tile: "from-[#818cf8] to-[#6d28d9]",
-    glow: "shadow-[0_6px_14px_-3px_rgb(99_102_241/0.55),inset_0_-2px_3px_rgb(0_0_0/0.22)]",
-    rail: "from-[rgb(129_140_248/0.75)]",
-    marker: "from-[#818cf8] to-[#7c3aed]",
-    markerGlow: "shadow-[0_0_10px_rgb(99_102_241/0.7)]",
-  },
-  treatment: {
-    icon: "shield-check",
-    tile: "from-[#34d399] to-[#047857]",
-    glow: "shadow-[0_6px_14px_-3px_rgb(16_185_129/0.5),inset_0_-2px_3px_rgb(0_0_0/0.22)]",
-    rail: "from-[rgb(52_211_153/0.7)]",
-    marker: "from-[#34d399] to-[#047857]",
-    markerGlow: "shadow-[0_0_10px_rgb(16_185_129/0.7)]",
-  },
-  config: {
-    icon: "gear",
-    tile: "from-[#fcd34d] to-[#d96506]",
-    glow: "shadow-[0_6px_14px_-3px_rgb(249_115_22/0.5),inset_0_-2px_3px_rgb(0_0_0/0.22)]",
-    rail: "from-[rgb(252_191_36/0.7)]",
-    marker: "from-[#fcd34d] to-[#d96506]",
-    markerGlow: "shadow-[0_0_10px_rgb(249_115_22/0.7)]",
-  },
+/** آیکون کاشی هر ماژول (Nav/Module Tile). */
+const MODULE_ICONS: Record<NavModuleKey, IconName> = {
+  assessment: "gauge",
+  treatment: "shield-check",
+  config: "gear",
 };
 
 /**
@@ -117,7 +93,7 @@ function CountPill({ value, tone, label }: { value: number; tone: NavLink["tone"
     <span
       className={cn(
         "inline-grid h-[1.125rem] min-w-[1.125rem] shrink-0 place-items-center rounded-full px-1.5 text-xs font-medium tabular",
-        tone === "red" ? "bg-[#ef4444] text-white" : "bg-gold-bright text-ink",
+        tone === "red" ? "bg-danger-solid text-on-brand" : "bg-tangerine-bright text-ink",
       )}
     >
       <span className="sr-only">{label}: </span>
@@ -128,8 +104,7 @@ function CountPill({ value, tone, label }: { value: number; tone: NavLink["tone"
 
 const itemBase =
   "relative flex items-center rounded-lg border border-transparent text-sm transition-colors duration-150 focus-visible:outline-offset-0";
-const itemActive =
-  "border-white/8 bg-gradient-to-r from-[rgb(139_92_246/0.03)] to-[rgb(99_102_241/0.26)] font-semibold text-on-dark";
+const itemActive = "border-on-dark/12 bg-nav-active font-semibold text-on-dark";
 
 function DeskItem({
   link,
@@ -143,27 +118,22 @@ function DeskItem({
   onNavigate?: () => void;
 }) {
   const icon = (
-    <Icon name={DESK_ICONS[link.key] ?? "file-text"} size={18} className={active ? "text-gold-bright" : ""} />
+    <Icon name={DESK_ICONS[link.key] ?? "file-text"} size={18} className={active ? "text-tangerine-bright" : ""} />
   );
   const content = (
     <>
-      {active && (
-        <span
-          aria-hidden
-          className="h-[18px] w-[3px] shrink-0 rounded-[2px] bg-gold-bright shadow-[0_0_8px_rgb(234_179_8/0.85)]"
-        />
-      )}
+      {active && <span aria-hidden className="h-[18px] w-[3px] shrink-0 rounded-[2px] bg-tangerine-bright" />}
       {icon}
       <span className={cn("min-w-0 flex-1 truncate", collapsed && "sr-only")}>{link.label}</span>
       {link.count !== null && !collapsed && <CountPill value={link.count} tone={link.tone} label="منتظر" />}
       {link.count !== null && collapsed && (
-        <span aria-hidden className="absolute top-1.5 end-1.5 size-2 rounded-full bg-gold-bright" />
+        <span aria-hidden className="absolute top-1.5 end-1.5 size-2 rounded-full bg-tangerine-bright" />
       )}
     </>
   );
   const classes = cn(
     itemBase,
-    "h-9 gap-2.5 px-3 font-medium text-on-dark-muted hover:bg-nav-hover hover:text-on-dark",
+    "h-9 gap-2.5 px-3 font-medium text-on-dark hover:bg-nav-hover",
     active && itemActive,
     collapsed && "justify-center px-0",
   );
@@ -192,25 +162,20 @@ function StepItem({
   link,
   index,
   active,
-  module,
   onNavigate,
 }: {
   link: NavLink;
   index: number;
   active: boolean;
-  module: NavModuleKey;
   onNavigate?: () => void;
 }) {
-  const style = MODULES[module];
   const content = (
     <>
       <span
         aria-hidden
         className={cn(
           "relative z-[1] grid size-5 shrink-0 place-items-center rounded-full border text-[0.6875rem] font-medium",
-          active
-            ? cn("border-white/35 bg-gradient-to-br text-on-dark", style.marker, style.markerGlow)
-            : "border-white/18 bg-[#0e142b] text-on-dark-muted",
+          active ? "border-on-dark bg-on-dark text-brand" : "border-on-dark/25 bg-brand-hover text-on-dark-muted",
         )}
       >
         {fa(index)}
@@ -221,8 +186,8 @@ function StepItem({
   );
   const classes = cn(
     itemBase,
-    "h-[2.125rem] gap-2 ps-[5px] pe-2 font-medium text-on-dark-muted hover:bg-nav-hover hover:text-on-dark",
-    active && cn(itemActive, "font-medium"),
+    "h-[2.125rem] gap-2 ps-[5px] pe-2 font-medium text-on-dark hover:bg-nav-hover",
+    active && itemActive,
   );
   return link.route === null ? (
     <a href={link.href} className={classes}>
@@ -241,20 +206,14 @@ function StepItem({
   );
 }
 
-function ModuleTile({ module, size = 30 }: { module: NavModuleKey; size?: number }) {
-  const style = MODULES[module];
+/** کاشی ماژول: مربع ۳۰ با گوشه‌ی ۹، سفید نیمه‌شفاف. */
+function ModuleTile({ module }: { module: NavModuleKey }) {
   return (
     <span
       aria-hidden
-      style={{ width: size, height: size }}
-      className={cn(
-        "relative grid shrink-0 place-items-center overflow-hidden rounded-[9px] border border-white/30 bg-gradient-to-br text-white",
-        style.tile,
-        style.glow,
-      )}
+      className="grid size-[1.875rem] shrink-0 place-items-center rounded-[9px] border border-on-dark/25 bg-on-dark/15 text-on-dark"
     >
-      <span className="absolute inset-0 bg-gradient-to-b from-white/38 to-transparent to-50%" />
-      <Icon name={style.icon} size={18} className="relative" />
+      <Icon name={MODULE_ICONS[module]} size={18} />
     </span>
   );
 }
@@ -285,8 +244,8 @@ function ModuleGroup({
           viewTransition
           aria-label={module.title}
           className={cn(
-            "mx-auto grid size-10 place-items-center rounded-xl border border-transparent",
-            containsActive && "border-white/12 bg-white/5",
+            "mx-auto grid size-10 place-items-center rounded-lg border border-transparent hover:bg-nav-hover",
+            containsActive && "border-on-dark/12 bg-nav-active",
           )}
           onClick={onNavigate}
         >
@@ -304,13 +263,7 @@ function ModuleGroup({
   }
 
   return (
-    <section
-      aria-labelledby={`${id}-title`}
-      className={cn(
-        "flex flex-col gap-1 rounded-[14px] border border-transparent p-1.5",
-        containsActive && "border-white/10 bg-gradient-to-b from-white/7 to-white/1",
-      )}
-    >
+    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-1 p-1.5">
       <button
         type="button"
         aria-expanded={open}
@@ -330,13 +283,7 @@ function ModuleGroup({
       </button>
       {open && (
         <div id={`${id}-steps`} className="relative">
-          <span
-            aria-hidden
-            className={cn(
-              "absolute -top-2 bottom-4 start-[14px] w-0.5 rounded-[1px] bg-gradient-to-b to-white/10",
-              MODULES[module.key].rail,
-            )}
-          />
+          <span aria-hidden className="absolute -top-2 bottom-4 start-[14px] w-px bg-on-dark/25" />
           <ul className="flex flex-col gap-0.5">
             {module.items.map((link, index) => (
               <li key={link.key}>
@@ -344,7 +291,6 @@ function ModuleGroup({
                   link={link}
                   index={index + 1}
                   active={link.route !== null && link.route === active}
-                  module={module.key}
                   onNavigate={onNavigate}
                 />
               </li>
@@ -364,12 +310,12 @@ function SectionTitle({ children, collapsed }: { children: string; collapsed: bo
   );
 }
 
-/** کارت «چرخه‌ی ارزیابی» پایین منو. */
+/** کارت «چرخه‌ی ارزیابی» پایین منو: نوار پیشرفت نارنجی با دستگیره‌ی گرد در انتهای بخش پرشده. */
 function CycleCard() {
   const { cycle } = useSession();
   const percent = cycle.total ? Math.round((cycle.assessed / cycle.total) * 100) : 0;
   return (
-    <div className="flex flex-col gap-2.5 rounded-[14px] border border-white/12 bg-gradient-to-br from-[rgb(99_102_241/0.28)] to-[rgb(217_70_239/0.08)] p-3 backdrop-blur-lg">
+    <div className="flex flex-col gap-2.5 rounded-card border border-on-dark/15 bg-on-dark/8 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col">
           <span className="text-xs font-medium text-on-dark">چرخه‌ی ارزیابی {fa(cycle.year)}</span>
@@ -385,12 +331,16 @@ function CycleCard() {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
-        className="h-1.5 overflow-hidden rounded-full bg-white/10"
+        className="relative h-1.5 rounded-full bg-on-dark/20"
       >
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-[#f0abfc] via-[#c084fc] to-[#818cf8] shadow-[0_0_8px_rgb(168_85_247/0.6)]"
-          style={{ width: `${percent}%` }}
-        />
+        <div className="h-full rounded-full bg-tangerine-bright" style={{ width: `${percent}%` }} />
+        {percent > 0 && (
+          <span
+            aria-hidden
+            className="absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-nav bg-tangerine-bright ltr:-translate-x-1/2 rtl:translate-x-1/2"
+            style={{ insetInlineStart: `${percent}%` }}
+          />
+        )}
       </div>
     </div>
   );
@@ -403,11 +353,11 @@ function UserCard({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 rounded-[14px] border border-white/8 bg-white/5 px-2 py-2.5",
+        "flex items-center gap-2.5 rounded-card border border-on-dark/12 bg-on-dark/8 px-2 py-2.5",
         collapsed && "flex-col px-1",
       )}
     >
-      <Avatar name={user.name} />
+      <Avatar name={user.name} className="bg-on-dark text-brand" />
       <div className={cn("flex min-w-0 flex-1 flex-col", collapsed && "sr-only")}>
         <span className="truncate text-sm font-semibold text-on-dark">{user.name}</span>
         {detail && <span className="truncate text-xs text-on-dark-muted">{detail}</span>}
@@ -418,7 +368,7 @@ function UserCard({ collapsed }: { collapsed: boolean }) {
           aria-label={t("shell.logout")}
           disabled={logout.isPending}
           onClick={() => logout.mutate()}
-          className="grid size-[1.875rem] shrink-0 place-items-center rounded-md text-on-dark-muted transition-colors hover:bg-white/8 hover:text-on-dark disabled:opacity-50"
+          className="grid size-[1.875rem] shrink-0 place-items-center rounded-md text-on-dark-muted transition-colors hover:bg-on-dark/8 hover:text-on-dark disabled:opacity-50"
         >
           <Icon name="sign-out" size={18} />
         </button>
@@ -446,22 +396,13 @@ export function Sidebar({
     <div
       className={cn(
         "relative isolate flex h-full flex-col gap-2 overflow-hidden bg-nav px-3 py-4 text-on-dark",
-        "bg-[linear-gradient(180deg,rgb(59_58_152/0.3)_0%,rgb(11_22_40/0)_45%,rgb(5_8_20/0.35)_100%)]",
         className,
       )}
     >
-      {/* نور ملایم پشت منو (Aurora)؛ فقط تزئین است. */}
+      {/* نوار مورب کم‌رنگ پایین منو، مثل فریم‌ها؛ فقط تزئین است. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute -top-[110px] left-[70px] -z-10 size-[230px] rounded-full bg-[#6366f1]/45 blur-[60px]"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-[420px] -left-[110px] -z-10 size-[200px] rounded-full bg-[#a855f7]/22 blur-[60px]"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-[834px] left-[110px] -z-10 size-[200px] rounded-full bg-[#eab308]/12 blur-[60px]"
+        className="pointer-events-none absolute -bottom-24 -left-20 -z-10 h-[26rem] w-24 rotate-[-38deg] bg-on-dark/5"
       />
 
       <div className={cn("flex items-center gap-2.5 px-2 pt-1 pb-4", collapsed && "flex-col px-0")}>
@@ -473,7 +414,7 @@ export function Sidebar({
               aria-label={collapsed ? t("shell.expand") : t("shell.collapse")}
               aria-expanded={!collapsed}
               onClick={onToggleCollapsed}
-              className="grid size-7 shrink-0 place-items-center rounded-md border border-white/9 bg-white/5 text-on-dark-muted transition-colors hover:text-on-dark"
+              className="grid size-7 shrink-0 place-items-center rounded-md border border-on-dark/15 bg-on-dark/8 text-on-dark-muted transition-colors hover:text-on-dark"
             >
               <Icon name="sidebar" size={16} />
             </button>
