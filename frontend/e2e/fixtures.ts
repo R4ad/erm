@@ -47,6 +47,13 @@ function defaults(): Record<string, Handler | unknown> {
     },
     "GET risks/1/": data.riskDetail(),
     "GET risk-questions/": data.riskQuestions(),
+    "GET questionnaire-answers/": (call: ApiCall) =>
+      call.query.get("response")
+        ? data.questionnaireAnswers({
+            values: data.answeredValues(),
+            response: data.answerResponse({ step: 8 }),
+          })
+        : data.questionnaireAnswers(),
     // پل فرم‌ها و صفحه‌های جنگو: هر نشانی جنگو (?path=) جواب خودش را دارد.
     "GET forms/": byPath({
       "/risks/1/edit/": data.riskForm(),

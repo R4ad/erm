@@ -416,7 +416,8 @@
     font-weight: 500;
     color: var(--text-secondary);
     white-space: nowrap;
-    background-color: var(--bg-surface);
+    /* layout.md: سطر سرستون bg/subtle */
+    background-color: var(--bg-subtle);
     border-bottom: 1px solid var(--border-default);
   }
 
@@ -446,6 +447,20 @@
 
   .data-table tbody tr:hover {
     background-color: color-mix(in oklab, var(--bg-subtle) 70%, transparent);
+  }
+
+  /* ردیف تازه (پاسخنامه‌ای که همین حالا فرستاده شد، 30f): زمینه‌ی brand/subtle و نوار ۳ پیکسلی برند در لبه‌ی شروع. */
+  .data-table tbody tr[data-fresh],
+  .data-table tbody tr[data-fresh]:hover {
+    background-color: var(--brand-subtle);
+  }
+
+  .data-table tbody tr[data-fresh] > :first-child {
+    box-shadow: inset 3px 0 0 var(--brand-primary);
+  }
+
+  .data-table tbody tr[data-fresh] > :first-child:dir(rtl) {
+    box-shadow: inset -3px 0 0 var(--brand-primary);
   }
 
   .data-table tbody tr:last-child td,
@@ -494,6 +509,18 @@
       gap: 0.375rem 1rem;
       padding: 0.875rem 1rem;
       border-bottom: 1px solid var(--border-default);
+    }
+
+    .data-table:not(.data-matrix) tbody tr[data-fresh] {
+      box-shadow: inset 3px 0 0 var(--brand-primary);
+    }
+
+    .data-table:not(.data-matrix) tbody tr[data-fresh]:dir(rtl) {
+      box-shadow: inset -3px 0 0 var(--brand-primary);
+    }
+
+    .data-table:not(.data-matrix) tbody tr[data-fresh] > :first-child {
+      box-shadow: none;
     }
 
     .data-table:not(.data-matrix) tbody tr:last-child {

@@ -7,16 +7,20 @@ from apps.core.models import TimeStampedModel
 
 
 class Response(TimeStampedModel):
-    """پاسخنامه‌ی یک واحد به پرسش‌های جلسه‌ی شناسایی. بعد از ارسال فقط وقتی ویرایش می‌شود که کارشناس ریسک آن را
-    برای تکمیل بازگرداند."""
+    """پاسخنامه‌ی یک واحد به هشت پرسش جلسه‌ی شناسایی (ویزارد «پاسخ به پرسشنامه‌ها»). بعد از ارسال فقط وقتی ویرایش
+    می‌شود که کارشناس ریسک آن را برای تکمیل بازگرداند. پاسخ گام ۱ و ۲ در ServiceRecord و ServiceObjective، گام ۳ و ۴
+    در همین مدل، و مسیرها، رویدادها و پیامدها در RiskPath، RiskInstance و PathConsequence است."""
 
     class Status(models.TextChoices):
         DRAFT = "draft", "پیش‌نویس"
-        SUBMITTED = "submitted", "ارسال‌شده"
-        RETURNED = "returned", "برگشت‌خورده"
+        SUBMITTED = "submitted", "در انتظار بررسی"
+        RETURNED = "returned", "بازگشت برای تکمیل اطلاعات"
+        IDENTIFIED = "identified", "شناسایی‌شده"
         REVIEWED = "reviewed", "بررسی‌شده"
 
     EDITABLE_STATUSES = [Status.DRAFT, Status.RETURNED]
+
+    code = models.CharField("کد", max_length=20, unique=True, editable=False)
 
     org_unit = models.ForeignKey(
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, related_name="questionnaire_responses"
@@ -37,15 +41,16 @@ class Response(TimeStampedModel):
         related_name="questionnaire_responses",
     )
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.DRAFT)
-    conditions = models.TextField(
-        "در چه شرایطی این اتفاق ممکن می‌شود؟",
-        blank=True,
-        help_text="علت یا شرط قابل بررسی؛ لازم نیست نام تهدید را بدانید.",
-    )
+    conditions = models.TextField("عامل و وضعیت", blank=True)
+    responsibility = models.TextField("داتین یا مشتری", blank=True)
+    wizard_step = models.PositiveSmallIntegerField("گام ویزارد", default=1)
 
     submitted_at = models.DateTimeField("زمان ارسال", null=True, blank=True)
-    returned_at = models.DateTimeField("زمان برگشت", null=True, blank=True)
-    return_due = models.DateField("مهلت برگشت", null=True, blank=True)
+    review_due = models.DateField("مهلت بررسی", null=True, blank=True)
+    returned_at = models.DateTimeField("زمان بازگرداندن", null=True, blank=True)
+    return_due = models.DateField("مهلت تکمیل", null=True, blank=True)
+    return_questions = models.JSONField("پرسش‌های تکمیلی", default=list, blank=True)
+    return_message = models.TextField("پیام به پاسخ‌دهنده", blank=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="بررسی‌کننده",
@@ -64,7 +69,7 @@ class Response(TimeStampedModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"پاسخنامه‌ی {self.org_unit.name}"
+        return self.code
 
     def get_absolute_url(self):
         return f"/app/identification/responses/{self.pk}"
@@ -75,11 +80,14 @@ class Response(TimeStampedModel):
 
 
 class ServiceRecord(TimeStampedModel):
-    """خدمتی که پاسخ‌دهنده در یک پاسخ توصیف کرده است، مستقل از فهرست خدمات."""
+    """خدمتی که پاسخ‌دهنده در گام ۱ نوشته است، مستقل از فهرست خدمات؛ هر پاسخنامه یکی."""
 
     response = models.ForeignKey(Response, on_delete=models.CASCADE, related_name="service_records")
     source_key = models.CharField(max_length=80, blank=True)
     name_and_scope = models.TextField("خدمت و محدوده", blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["response"], name="one_service_record_per_response")]
 
 
 class ServiceObjective(TimeStampedModel):
@@ -89,24 +97,37 @@ class ServiceObjective(TimeStampedModel):
 
 
 class RiskInstance(TimeStampedModel):
+    """یک رویداد مشخص (گام ۶). چند مسیر می‌توانند به یک رویداد برسند و پیامدش (گام ۷) یک بار پرسیده می‌شود؛
+    دامنه‌ی پیامد همین‌جاست. source_key کلید پایدار رابط است تا ویرایش بعد از بازگرداندن همان رویداد را نگه دارد."""
+
     service = models.ForeignKey(ServiceRecord, on_delete=models.CASCADE, related_name="risk_instances")
     source_key = models.CharField(max_length=80, blank=True)
+    number = models.PositiveSmallIntegerField("شماره", default=1)
     scope = models.TextField("دامنه", blank=True)
     trigger = models.TextField("آغازگر", blank=True)
     event = models.TextField("رویداد اصلی", blank=True)
 
 
 class RiskPath(TimeStampedModel):
+    """یک مسیر تحقق (گام ۵) با شماره‌ی سراسری در پاسخنامه."""
+
     risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="paths")
     source_key = models.CharField(max_length=80, blank=True)
+    number = models.PositiveSmallIntegerField("شماره", default=1)
     description = models.TextField("نحوه پیشروی", blank=True)
 
 
 class PathConsequence(TimeStampedModel):
+    """پیامد یک رویداد (گام ۷): نوع‌ها از بُعدهای پیامد روش (S، D، F، C، R) و شرح کوتاه برای مالک ریسک."""
+
     risk_instance = models.ForeignKey(RiskInstance, on_delete=models.CASCADE, related_name="consequences")
     source_key = models.CharField(max_length=80, blank=True)
     path = models.ForeignKey(RiskPath, on_delete=models.CASCADE, related_name="consequences", null=True, blank=True)
-    description = models.TextField("پیامد", blank=True)
+    impact_types = models.JSONField("نوع پیامد", default=list, blank=True)
+    description = models.TextField("شرح پیامد", blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["risk_instance"], name="one_consequence_per_event")]
 
 
 class PendingRisk(TimeStampedModel):

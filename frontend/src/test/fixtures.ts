@@ -7,6 +7,8 @@ import type {
   AcceptanceList,
   AcceptanceRow,
   ActionDetail,
+  AnswerResponse,
+  AnswerValues,
   ActionList,
   ActionRow,
   AssessmentDetail,
@@ -42,6 +44,8 @@ import type {
   NoticeList,
   PlanActionRow,
   PlanDetail,
+  QuestionnaireAnswersData,
+  ResponseRow,
   ReviewDetail,
   RiskBrief,
   RiskDetail,
@@ -6627,6 +6631,143 @@ export function identificationValues(overrides: Partial<IdentificationValues> = 
     source: "",
     scenario: "",
     evidence_items: [],
+    ...overrides,
+  };
+}
+
+// ─────────────────────────────── پاسخ به پرسشنامه‌ها ───────────────────────────────
+
+export function blankAnswers(): AnswerValues {
+  return { service: "", objective: "", conditions: "", responsibility: "", paths: [], events: [], impacts: [] };
+}
+
+/** پاسخنامه‌ی کامل فریم 30e: سه مسیر، دو رویداد (مسیر ۳ همان رویداد مسیر ۲ را انتخاب کرده) و دو پیامد. */
+export function answeredValues(): AnswerValues {
+  return {
+    service: "انتقال وجه ساتنا",
+    objective: "پردازش دستورهای پرداخت در پنجره‌ی SLA",
+    conditions: "ثبت اشتباه تنظیمات مقصد در بسته‌ی انتشار",
+    responsibility: "بانک الف و داتین",
+    paths: [
+      {
+        key: "p1",
+        description:
+          "بسته‌ی انتشار با تنظیمات مقصد اشتباه روی محیط تولید نصب می‌شود و پیام‌های ساتنا به بانک مقصد نادرست ارسال می‌شوند؛ کنترل پیش از انتشار این خطا را تشخیص نمی‌دهد.",
+        event: "e1",
+      },
+      {
+        key: "p2",
+        description:
+          "سرویس ساتنا مقصد معتبری پیدا نمی‌کند و صف پیام‌ها را متوقف می‌کند؛ تراکنش‌های جدید پذیرفته نمی‌شوند.",
+        event: "e2",
+      },
+      {
+        key: "p3",
+        description:
+          "پایش، خطای مقصد را تشخیص می‌دهد و اپراتور برای جلوگیری از ارسال نادرست، سرویس ساتنا را دستی متوقف می‌کند.",
+        event: "e2",
+      },
+    ],
+    events: [
+      { key: "e1", text: "ارسال تراکنش‌های ساتنا به بانک مقصد نادرست" },
+      { key: "e2", text: "توقف کامل پردازش پیام‌های ساتنا" },
+    ],
+    impacts: [
+      {
+        event: "e1",
+        types: ["F", "R"],
+        scope: "برگشت دستی حدود ۱٬۲۰۰ تراکنش؛ اختلاف حساب بین‌بانکی تا پایان روز کاری",
+        description: "زیان مالی و اختلاف حساب",
+      },
+      {
+        event: "e2",
+        types: ["S"],
+        scope: "توقف انتقال وجه ساتنا برای همه‌ی بانک‌ها، بیش از ۹۰ دقیقه",
+        description: "توقف خدمت برای همه‌ی بانک‌ها",
+      },
+    ],
+  };
+}
+
+export function answerResponse(overrides: Partial<AnswerResponse> = {}): AnswerResponse {
+  return {
+    id: 113,
+    code: "QR-1405-0113",
+    status: { value: "draft", label: "پیش‌نویس", tone: "neutral" },
+    step: 1,
+    saved_at: { iso: new Date().toISOString(), jalali: "1405/09/02 10:00" },
+    org_unit: { id: 3, name: "عملیات زیرساخت" },
+    returned: null,
+    ...overrides,
+  };
+}
+
+export function responseRow(overrides: Partial<ResponseRow> = {}): ResponseRow {
+  return {
+    id: 109,
+    code: "QR-1405-0109",
+    service: "پرداخت اینترنتی",
+    summary: { paths: 3, events: 2, impacts: 2 },
+    step: 8,
+    org_unit: "پرداخت الکترونیک",
+    status: { value: "submitted", label: "در انتظار بررسی", tone: "info" },
+    respondent: { id: 9, name: "مریم صادقی" },
+    updated_at: { iso: new Date(Date.now() - 2 * 3600_000).toISOString(), jalali: "1405/09/02 08:00" },
+    route: "/identification/responses/109",
+    ...overrides,
+  };
+}
+
+export function questionnaireAnswers(overrides: Partial<QuestionnaireAnswersData> = {}): QuestionnaireAnswersData {
+  return {
+    can_answer: true,
+    unit: { id: 3, name: "عملیات زیرساخت" },
+    units: [],
+    impact_types: [
+      { value: "S", label: "خدمت و تداوم" },
+      { value: "D", label: "داده و تمامیت" },
+      { value: "F", label: "مالی" },
+      { value: "C", label: "تعهدات و انطباق" },
+      { value: "R", label: "اعتبار و رابطه مشتری" },
+    ],
+    limits: { text: 1000, path: 500, impact: 120, paths: 20 },
+    response: null,
+    values: blankAnswers(),
+    recent: [
+      responseRow({
+        id: 112,
+        code: "QR-1405-0112",
+        service: "انتقال وجه ساتنا",
+        org_unit: "عملیات زیرساخت",
+        status: { value: "draft", label: "پیش‌نویس", tone: "neutral" },
+        respondent: { id: 7, name: "سارا محمدی" },
+        updated_at: { iso: new Date(Date.now() - 10 * 60_000).toISOString(), jalali: "1405/09/02 09:50" },
+        route: "/questionnaire-answers?response=112",
+      }),
+      responseRow(),
+      responseRow({
+        id: 104,
+        code: "QR-1405-0104",
+        service: "سامانه‌ی پایا",
+        summary: { paths: 1, events: 1, impacts: 1 },
+        org_unit: "عملیات بانکی",
+        status: { value: "returned", label: "بازگشت برای تکمیل اطلاعات", tone: "warning" },
+        respondent: { id: 11, name: "علی رضایی" },
+        route: "/identification/responses/104",
+      }),
+      responseRow({
+        id: 98,
+        code: "QR-1405-0098",
+        service: "کارت و سوئیچ",
+        summary: { paths: 4, events: 3, impacts: 3 },
+        org_unit: "زیرساخت شبکه",
+        status: { value: "identified", label: "شناسایی‌شده", tone: "success" },
+        respondent: { id: 12, name: "زهرا کریمی" },
+        updated_at: { iso: "2026-11-23T08:00:00Z", jalali: "1405/09/02 11:30" },
+        route: "/identification/responses/98",
+      }),
+    ],
+    all_url: "/identification/responses",
     ...overrides,
   };
 }

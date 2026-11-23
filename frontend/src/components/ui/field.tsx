@@ -91,7 +91,8 @@ export function FieldError({ id, messages }: { id?: string; messages?: string[] 
   );
 }
 
-const control =
+/** ظاهر مشترک کنترل‌های فرم، برای کنترلی که خودش input نیست (مثل دکمه‌ی بازکننده‌ی انتخاب چندتایی). */
+export const control =
   "w-full rounded-md border border-line-strong bg-panel text-base text-ink transition-[border-color,box-shadow] duration-150 " +
   "placeholder:text-ink-3 hover:border-ink-3 focus-visible:border-focus focus-visible:outline-none " +
   "focus-visible:shadow-[0_0_0_1px_var(--border-focus),var(--focus-ring)] " +
@@ -196,7 +197,7 @@ export function Radio({ label, description, card = false, className, ...props }:
 
 function ChoiceText({ label, description }: { label: ReactNode; description?: ReactNode }) {
   return (
-    <span className="flex flex-col gap-0.5">
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="text-ink">{label}</span>
       {description && <span className="text-xs text-ink-3">{description}</span>}
     </span>

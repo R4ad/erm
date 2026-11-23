@@ -3089,3 +3089,99 @@ export interface UserProfile {
   open_duties: string;
   users_page: string;
 }
+
+// پاسخ به پرسشنامه‌ها (apps/api/questionnaire_answers.py و apps/questionnaires/answers.py)
+
+export type ResponseStatusValue = "draft" | "submitted" | "returned" | "identified" | "reviewed";
+
+export interface ResponseStatus {
+  value: ResponseStatusValue;
+  label: string;
+  tone: "neutral" | "info" | "warning" | "success" | "brand";
+}
+
+/** مسیر تحقق (گام ۵) با کلید پایداری که رابط می‌سازد؛ event کلید رویدادی است که مسیر به آن می‌رسد. */
+export interface AnswerPath {
+  key: string;
+  description: string;
+  event: string;
+}
+
+export interface AnswerEvent {
+  key: string;
+  text: string;
+}
+
+/** پیامد یک رویداد (گام ۷): نوع‌ها کد بُعدهای پیامد روش‌اند (S، D، F، C، R). */
+export interface AnswerImpact {
+  event: string;
+  types: string[];
+  scope: string;
+  description: string;
+}
+
+export interface AnswerValues {
+  service: string;
+  objective: string;
+  conditions: string;
+  responsibility: string;
+  paths: AnswerPath[];
+  events: AnswerEvent[];
+  impacts: AnswerImpact[];
+}
+
+export interface AnswerSummary {
+  paths: number;
+  events: number;
+  impacts: number;
+}
+
+/** پرسش تکمیلی کارشناس ریسک؛ step گامی است که پرسش درباره‌ی آن است (۱ تا ۷) و about برچسب کوتاهش، مثل «مسیر تحقق ۲». */
+export interface ReturnQuestion {
+  text: string;
+  step: number | null;
+  about: string;
+}
+
+export interface AnswerResponse {
+  id: number;
+  code: string;
+  status: ResponseStatus;
+  step: number;
+  saved_at: Moment;
+  org_unit: { id: number; name: string };
+  returned: { message: string; questions: ReturnQuestion[]; due: Deadline | null } | null;
+}
+
+export interface ResponseRow {
+  id: number;
+  code: string;
+  service: string;
+  summary: AnswerSummary;
+  step: number;
+  org_unit: string;
+  status: ResponseStatus;
+  respondent: Person | null;
+  updated_at: Moment;
+  route: string;
+}
+
+export interface QuestionnaireAnswersData {
+  can_answer: boolean;
+  unit: { id: number; name: string } | null;
+  /** واحدهای مدیر چند واحد برای پاسخنامه‌ی تازه؛ خالی وقتی واحد خودکار است. */
+  units: Choice[];
+  impact_types: Choice[];
+  limits: { text: number; path: number; impact: number; paths: number };
+  response: AnswerResponse | null;
+  values: AnswerValues;
+  recent: ResponseRow[];
+  all_url: string;
+}
+
+export interface AnswerSaveResult {
+  message: string;
+  response: AnswerResponse;
+  recent: ResponseRow[];
+  summary?: AnswerSummary;
+}

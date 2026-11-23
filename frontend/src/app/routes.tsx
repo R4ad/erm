@@ -376,6 +376,13 @@ export const routes: RouteObject[] = [
           },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),
           {
+            path: "questionnaire-answers",
+            lazy: async () => ({
+              Component: (await import("@/features/questionnaire-answers/QuestionnaireAnswersPage"))
+                .QuestionnaireAnswersPage,
+            }),
+          },
+          {
             path: "questionnaires/risk-questions",
             lazy: async () => ({
               Component: (await import("@/features/questionnaires/RiskQuestionsPage")).RiskQuestionsPage,

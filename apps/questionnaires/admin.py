@@ -11,8 +11,10 @@ class NoDeleteAdmin(SimpleHistoryAdmin):
 
 @admin.register(Response)
 class ResponseAdmin(NoDeleteAdmin):
-    list_display = ("__str__", "org_unit", "respondent", "status", "submitted_at")
+    list_display = ("__str__", "org_unit", "respondent", "status", "submitted_at", "review_due")
     list_filter = ("status",)
+    search_fields = ("code",)
+    readonly_fields = ("code",)
     raw_id_fields = ("service", "respondent", "reviewed_by")
 
 

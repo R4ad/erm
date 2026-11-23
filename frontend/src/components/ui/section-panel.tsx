@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 
 import { Card } from "./card";
 
-export type ChipTone = "neutral" | "success" | "warning" | "info" | "brand" | "danger";
+export type ChipTone = "neutral" | "success" | "warning" | "info" | "brand" | "danger" | "tangerine";
 
 // کارت صفحه‌های تازه‌ی فیگما (شناسایی، آنالیز، ...): سرکارت با خط جداکننده، عنوان H3، توضیح ۱۳ و نشان یا اقدام در
 // سمت چپ؛ و تراشه‌ی کپسولی ۲۲ پیکسلی که شمار و وضعیت کوتاه را نشان می‌دهد.
@@ -58,6 +58,7 @@ export function Chip({ tone = "neutral", children }: { tone?: ChipTone; children
     info: "bg-info-subtle text-info",
     brand: "bg-brand-subtle text-brand",
     danger: "bg-danger-subtle text-danger",
+    tangerine: "bg-tangerine-subtle text-tangerine",
   };
   return (
     <span
