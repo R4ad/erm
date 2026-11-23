@@ -171,7 +171,8 @@ def test_the_impact_profile_has_datin_and_each_affected_bank(client, grc, risk, 
         }
     )
     response = client.post(url, data)
-    assert response.url == assessment.get_absolute_url()
+    # ذخیره در همین صفحه می‌ماند (فیگما ۰۶)؛ «ادامه» با next=initiator به عامل آغازگر می‌رود.
+    assert response.url == url
 
     # بعد از ذخیره، صفحه‌ی پروفایل پیشنهاد را از مقدار ذخیره‌شده نشان می‌دهد.
     saved = client.get(url).context["groups"][1]["forms"][0]

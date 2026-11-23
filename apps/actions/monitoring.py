@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.accounts.delegation import forwarded
 from apps.accounts.roles import Role
 from apps.assessments.models import Assessment
 from apps.controls.models import ControlAssessment
@@ -51,6 +52,7 @@ def escalation_users(risk):
 
 def notify(risk, key, message, href, recipients):
     count = 0
+    recipients = [*recipients, *forwarded(recipients)]  # جانشین تفویض برقرار هم اعلان را می‌گیرد (فیگما ۲۹)
     for person in {
         user.pk: user for user in recipients if user and user.is_active
     }.values():
@@ -236,6 +238,17 @@ def _schedule(risk, base, today):
 
 
 @transaction.atomic
+def reminder_days(acceptance):
+    """روزهای یادآوری اول و دوم پیش از پایان اعتبار پذیرش، از پارامترهای نسخه‌ی روش. پذیرش کوتاه‌تر از یادآوری اول
+    در نیمه‌ی دوره یادآوری می‌گیرد و یادآوری دوم هیچ‌وقت از نصف اولی دیرتر نیست."""
+    version = acceptance.assessment.method_version
+    span = max(1, (acceptance.end_date - acceptance.start_date).days)
+    first_limit = int(parameter(version, MethodParameter.Key.REMINDER_FIRST))
+    first = first_limit if span > first_limit else max(1, span // 2)
+    second = min(int(parameter(version, MethodParameter.Key.REMINDER_SECOND)), max(1, first // 2))
+    return first, second
+
+
 def run_monitoring(today=None):
     """اجرای تکرارپذیر زمان‌بند؛ هر اعلان یک بار برای هر گیرنده و رویداد ثبت می‌شود."""
     today = today or timezone.localdate()
@@ -255,14 +268,7 @@ def run_monitoring(today=None):
     for acceptance in acceptances:
         risk = acceptance.risk
         days = (acceptance.end_date - today).days
-        version = acceptance.assessment.method_version
-        span = max(1, (acceptance.end_date - acceptance.start_date).days)
-        first_limit = int(parameter(version, MethodParameter.Key.REMINDER_FIRST))
-        first = first_limit if span > first_limit else max(1, span // 2)
-        second = min(
-            int(parameter(version, MethodParameter.Key.REMINDER_SECOND)),
-            max(1, first // 2),
-        )
+        first, second = reminder_days(acceptance)
         stage = (
             "expired"
             if days < 0

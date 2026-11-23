@@ -51,9 +51,11 @@ from .services import (
     active_categories,
     active_risks,
     coverage_rows,
+    coverage_tabs,
     critical_coverage,
     mark_covered_by_risk,
     save_coverage,
+    scenario_index,
     status_counts,
 )
 
@@ -64,6 +66,14 @@ class CoverageView(FilteredListView):
     filter_form_class = CoverageFilterForm
     template_name = "risks/coverage.html"
     context_object_name = "services"
+    max_page_size = 200
+
+    def get_paginate_by(self, queryset):
+        # «نمایش بیشتر» فیگما ۰۹ همین صفحه را با ?size= بزرگ‌تر می‌خواند، نه صفحه‌ی بعد را.
+        size = self.request.GET.get("size", "")
+        if size.isdecimal() and int(size) > 0:
+            return min(int(size), self.max_page_size)
+        return self.paginate_by
 
     def get_queryset(self):
         self.queryset = self.base_services().select_related("org_unit")
@@ -83,7 +93,10 @@ class CoverageView(FilteredListView):
             rows=coverage_rows(context["services"], categories, visible_risks(self.request.user)),
             critical=critical_coverage(services, categories),
             counts=status_counts(services, categories),
+            tabs=coverage_tabs(services, categories),
+            scenarios=scenario_index(context["services"], categories),
             can_edit=can_edit_coverage(self.request.user),
+            can_create_risk=can_edit_register(self.request.user),
         )
         return context
 

@@ -160,10 +160,35 @@ def test_the_impact_profile_is_one_page_of_prefixed_forms(api, grc, ready, bank)
     assert body["errors"]["datin-D-rationale"] == ["صفر یعنی «اثر ندارد» و دلیل می‌خواهد."]
     assert "بعضی خانه‌ها ایراد دارند" in body["message"]
 
+    # «ذخیره‌ی پیش‌نویس» در همین صفحه می‌ماند و «ادامه» به عامل آغازگر می‌رود (فیگما ۰۶).
     saved = send(api(grc), url, {**values, f"{bank.pk}-S-level": "4"})
     assert saved.status_code == 200
-    assert saved.json()["redirect"]["route"] == f"/assessments/{ready.pk}"
+    assert saved.json()["redirect"]["route"] == f"/assessments/{ready.pk}/impacts"
     assert ready.impacts.get(customer=bank, scale__code="S").level == 4
+    continued = send(api(grc), url, {**values, "next": "initiator"})
+    assert continued.json()["redirect"]["route"] == f"/assessments/{ready.pk}/initiator"
+
+
+def test_the_impact_profile_carries_the_figma_header_and_overview(api, grc, ready, bank):
+    url = reverse("assessments:impact_profile", args=[ready.pk])
+    data = form(api(grc), url).json()
+
+    header = data["assessment"]
+    assert header["code"] == ready.code and header["stakeholders"] == ["داتین", bank.name]
+    assert header["saved_at"]["jalali"]
+    overview = data["overview"]
+    assert overview["impact"] == [3, 3]
+    assert overview["top"] == {"code": "S", "name": ready.method_version.scales.get(code="S").name, "stakeholder": bank.name}
+    assert [check["ok"] for check in overview["checks"]] == [True, True, True]
+    assert data["note"].startswith("سطح S از مدت اختلال")
+
+    # یک خانه نامعلوم شود: I بازه یا نامعلوم است و توضیح کارت همان را می‌گوید.
+    detail = ready.impacts.get(customer=bank, scale__code="S")
+    detail.level, detail.confidence = None, ""
+    detail.save()
+    overview = form(api(grc), url).json()["overview"]
+    assert overview["top"] is None
+    assert "نامعلوم" in overview["text"]
 
 
 def test_two_assessments_are_compared_column_by_column(api, grc, ready):
@@ -200,3 +225,54 @@ def test_a_workgroup_member_sees_the_referral_form(api, grc, checker, workgroup,
     ready.refresh_from_db()
     assert ready.status == S.APPROVED
     assert Role.SECURITY_WORKGROUP in [group.name for group in workgroup.groups.all()]
+
+
+def test_the_dossier_carries_the_figma_steps_chain_checks_and_flags(api, grc, checker, ready, bank):
+    data = page(api(grc), ready.get_absolute_url()).json()
+
+    steps = {step["key"]: step for step in data["steps"]}
+    assert list(steps) == ["scope", "impacts", "initiator", "paths", "result", "review"]
+    assert steps["paths"]["state"] == "done" and steps["paths"]["sub"] == "۱ مسیر · B = ۳"
+    assert steps["result"] == {
+        "key": "result", "label": "نتیجه و تصمیم", "sub": "موقت تا تأیید", "state": "current", "warning": False,
+    }
+    assert steps["review"]["state"] == "todo" and steps["review"]["sub"] == "بدون هشدار"
+
+    chain = data["chain"]
+    assert chain["a"] == "2" and chain["b"] == [3, 3] and chain["likelihood"] == [2, 2]
+    assert chain["impact"] == [3, 3] and chain["score"] == [6, 6]
+    assert chain["impact_source"].endswith(bank.name)
+    assert chain["decision_level"]["name"] == "متوسط"
+    grid = chain["grid"]
+    assert (grid["a"], grid["b"]) == (2, 3)
+    assert len(grid["rows"]) == ready.method_version.scales.get(code="A").levels.count()
+    assert grid["rows"][1]["a"] == 2 and grid["rows"][1]["cells"][2] == 2
+    path = ready.paths.get()
+    assert any(f"«{path.name}»" in note["text"] and "تعیین‌کننده" in note["text"] for note in chain["notes"])
+    row = data["likelihood"]["paths"][0]
+    assert row["determining"] is True
+    assert [item["code"] for item in row["evidence"]] == [item.code for item in path.evidence.all()]
+
+    assert all(check["ok"] for check in data["checks"])
+    assert "escalation" not in [check["key"] for check in data["checks"]]
+    assert [flag["on"] for flag in data["flags"]["items"]] == [False, False, False]
+    assert data["assessment"]["submitted_at"] is None and data["assessment"]["reviewer"] is None
+
+    # شاهد پیامد مثبت برداشته شود: همان قاعده‌ی ارسال در فهرست بررسی‌ها و گام کنترل کیفیت دیده می‌شود.
+    ready.impacts.get(customer=bank, scale__code="S").evidence.clear()
+    data = page(api(grc), ready.get_absolute_url()).json()
+    failing = [check for check in data["checks"] if not check["ok"]]
+    assert [check["key"] for check in failing] == ["impact_evidence"]
+    assert "شاهد ندارد" in failing[0]["problems"][0]
+    assert data["review"]["submission_problems"] == failing[0]["problems"]
+    review = next(step for step in data["steps"] if step["key"] == "review")
+    assert review["warning"] is True and review["sub"] == "۱ هشدار"
+
+
+def test_the_dossier_header_names_the_submission_and_the_checker(api, grc, checker, ready):
+    send(api(grc), reverse("assessments:submit", args=[ready.pk]), {"notes": "آماده است"})
+    send(api(checker), reverse("assessments:review", args=[ready.pk]), {"action": "return", "notes": "شاهد کم است"})
+
+    header = page(api(grc), ready.get_absolute_url()).json()["assessment"]
+    assert header["submitted_at"]["jalali"]
+    assert header["reviewer"]["name"] == checker.get_full_name()

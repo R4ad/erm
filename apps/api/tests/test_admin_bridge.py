@@ -42,6 +42,7 @@ def pending_dir(settings, tmp_path):
 def test_admin_pages_open_in_react():
     assert spa_route(reverse("accounts:user_list")) == "/accounts/users"
     assert spa_route(reverse("accounts:staff_import")) == "/accounts/staff-import"
+    assert spa_route(reverse("accounts:user_create")) == "/accounts/users/new"
     assert spa_route(reverse("workcalendar:holiday_list")) == "/holidays"
     assert spa_route(reverse("workcalendar:holiday_create")) == "/holidays/new"
     assert spa_route(reverse("workcalendar:holiday_update", args=[3])) == "/holidays/3/edit"
@@ -57,6 +58,7 @@ def test_only_the_system_admin_opens_the_admin_pages(api, system_admin):
         assert page(api(viewer), path).status_code == 403
         assert page(api(system_admin), path).status_code == 200
     assert form(api(viewer), reverse("accounts:staff_import")).status_code == 403
+    assert form(api(viewer), reverse("accounts:user_create")).status_code == 403
     assert form(api(viewer), reverse("workcalendar:holiday_create")).status_code == 403
     # سوابق ممیزی را «فقط مشاهده» (ممیز) هم می‌بیند، ولی کاربر بی‌نقش نه.
     assert page(api(viewer), reverse("audit:event_list")).status_code == 200
@@ -85,6 +87,85 @@ def test_the_user_list_shows_roles_and_filters(api, system_admin):
 
     inactive = page(api(system_admin), f"{reverse('accounts:user_list')}?status=inactive").json()
     assert [row["username"] for row in inactive["results"]] == ["old"]
+
+
+NEW_USER = {
+    "username": "n.karimi",
+    "password1": "Sabz-Kooh-1405",
+    "password2": "Sabz-Kooh-1405",
+    "first_name": "نسرین",
+    "last_name": "کریمی",
+    "personnel_code": "4410",
+    "job_title": "ممیز بیرونی",
+    "email": "n.karimi@example.com",
+}
+
+
+def test_the_system_admin_adds_a_user_without_the_django_admin(api, system_admin):
+    """مدیر سامانه staff نیست و پنل ادمین جنگو را نمی‌بیند؛ «کاربر جدید» فرم خود سامانه است."""
+    assert not system_admin.is_staff
+    unit = OrgUnit.objects.create(name="خزانه")
+    OrgUnit.objects.create(name="بایگانی", is_active=False)
+    client = api(system_admin)
+
+    data = form(client, reverse("accounts:user_create")).json()
+    assert data["title"] == "کاربر جدید"
+    assert data["cancel"]["route"] == "/accounts/users"
+    fields = {field["name"]: field for field in data["form"]["fields"]}
+    assert list(fields) == [
+        "username",
+        "password1",
+        "password2",
+        "first_name",
+        "last_name",
+        "personnel_code",
+        "job_title",
+        "org_unit",
+        "email",
+        "roles",
+        "access_expires",
+    ]
+    assert fields["password1"]["kind"] == "password" and fields["roles"]["kind"] == "multiselect"
+    assert [choice["label"] for choice in fields["roles"]["choices"]] == Role.ALL
+    assert [choice["label"] for choice in fields["org_unit"]["choices"]] == ["خزانه"]  # واحد غیرفعال نه
+    assert fields["access_expires"]["kind"] == "date"
+
+    roles = {choice["label"]: choice["value"] for choice in fields["roles"]["choices"]}
+    expires = timezone.localdate() + datetime.timedelta(days=20)
+    values = {
+        **NEW_USER,
+        "org_unit": str(unit.pk),
+        "roles": [roles[Role.VIEWER]],
+        "access_expires": to_jalali(expires),
+    }
+    response = send(client, reverse("accounts:user_create"), values)
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == {
+        "message": "کاربر «n.karimi» تعریف شد.",
+        "redirect": {"href": reverse("accounts:user_list"), "route": "/accounts/users"},
+    }
+    user = User.objects.get(username="n.karimi")
+    assert user.check_password("Sabz-Kooh-1405")
+    assert user.get_full_name() == "نسرین کریمی" and user.personnel_code == "4410"
+    assert user.org_unit == unit and user.access_expires == expires
+    assert user.role_names == [Role.VIEWER]
+    assert user.source == User.Source.LOCAL and user.is_active
+    assert not user.is_staff and not user.is_superuser
+
+
+def test_the_new_user_form_rejects_a_taken_username_and_mismatched_passwords(api, system_admin):
+    make_user("n.karimi")
+    client = api(system_admin)
+
+    response = send(
+        client, reverse("accounts:user_create"), {**NEW_USER, "password2": "something-else", "first_name": ""}
+    )
+
+    assert response.status_code == 400
+    errors = response.json()["errors"]
+    assert set(errors) == {"username", "password2", "first_name"}
+    assert User.objects.filter(username="n.karimi").count() == 1
 
 
 def upload(client, tmp_path, *rows, deactivate=False):

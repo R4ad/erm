@@ -169,7 +169,7 @@ describe("FormPage", () => {
     expect(screen.getByText(/تعریف آغازگر، واحد شمارش یا دامنه‌ی ریسک کامل نیست/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "تکمیل ریسک" })).toHaveAttribute("href", "/risks/1/edit");
 
-    const facts = screen.getByRole("heading", { name: "مرز آغازگر از ریسک RK-1405-0001" }).closest("div.rounded-2xl")!;
+    const facts = screen.getByRole("heading", { name: "مرز آغازگر از ریسک RK-1405-0001" }).closest("div.rounded-lg")!;
     expect(within(facts as HTMLElement).getByText("عامل آغازگر").nextSibling).toHaveTextContent("عامل آزمون");
     expect(within(facts as HTMLElement).getByText("خارج از شمارش").nextSibling).toHaveTextContent("-");
 

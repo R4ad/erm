@@ -1,13 +1,19 @@
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    BaseUserCreationForm,
+    SetPasswordMixin,
+)
+from django.contrib.auth.models import Group
 from django.core.validators import FileExtensionValidator
-from django.db.models import Q
+from django.db.models import Case, Q, When
 
-from apps.core.forms import BootstrapFormMixin
+from apps.core.forms import BootstrapFormMixin, JalaliDateField
 from apps.organization.forms import UnitChoiceField
 from apps.organization.models import OrgUnit
 from apps.organization.services import get_subtree_ids
 
+from .models import User
 from .roles import Role
 from .staff_import import ZWNJ, clean_code
 
@@ -69,3 +75,70 @@ class UserFilterForm(BootstrapFormMixin, forms.Form):
         if data["status"]:
             users = users.filter(is_active=data["status"] == "active")
         return users
+
+
+class UserCreateForm(BootstrapFormMixin, BaseUserCreationForm):
+    """تعریف کاربر محلی به دست مدیر سامانه، بی‌نیاز از پنل ادمین جنگو (که فقط کاربر staff را راه می‌دهد).
+    کاربرهای AD با همگام‌سازی می‌آیند؛ این‌جا فقط حساب محلی ساخته می‌شود و هیچ‌وقت staff یا superuser نیست."""
+
+    password1, password2 = SetPasswordMixin.create_password_fields(label1="گذرواژه", label2="تکرار گذرواژه")
+    roles = forms.ModelMultipleChoiceField(
+        Group.objects.none(),
+        label="نقش‌های سامانه",
+        required=False,
+        help_text="بدون نقش، کاربر فقط کارهای خودش را می‌بیند. نقش‌ها بعداً در پروفایل کاربر هم تغییر می‌کنند.",
+    )
+    field_order = (
+        "username",
+        "password1",
+        "password2",
+        "first_name",
+        "last_name",
+        "personnel_code",
+        "job_title",
+        "org_unit",
+        "email",
+        "roles",
+        "access_expires",
+    )
+
+    class Meta(BaseUserCreationForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "personnel_code",
+            "job_title",
+            "org_unit",
+            "access_expires",
+        )
+        field_classes = {
+            **BaseUserCreationForm.Meta.field_classes,
+            "org_unit": UnitChoiceField,
+            "access_expires": JalaliDateField,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["first_name"].required = True
+        self.fields["last_name"].required = True
+        self.fields["username"].help_text = "حرف لاتین، رقم و نویسه‌های @ . + - _؛ با همین نام وارد سامانه می‌شود."
+        self.fields["password1"].help_text = "دست‌کم ۸ نویسه؛ تنها رقم، رایج یا شبیه نام کاربری نباشد."
+        self.fields["password2"].help_text = "همان گذرواژه را دوباره بنویسید."
+        unit = self.fields["org_unit"]
+        unit.queryset = OrgUnit.objects.filter(is_active=True)
+        unit.empty_label = "بدون واحد"
+        # ترتیب نقش‌ها همان ترتیب Role.ALL است، نه ترتیب الفبایی گروه‌ها.
+        order = Case(*[When(name=name, then=index) for index, name in enumerate(Role.ALL)])
+        self.fields["roles"].queryset = Group.objects.filter(name__in=Role.ALL).order_by(order)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.source = User.Source.LOCAL
+        user.is_staff = user.is_superuser = False
+        if commit:
+            user.save()
+            user.groups.set(self.cleaned_data["roles"])
+        return user

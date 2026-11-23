@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.questionnaires",
     "apps.controls",
     "apps.assessments",
+    "apps.committee",
     "apps.api",
     "django_jalali",
     "simple_history",
@@ -156,6 +157,7 @@ MAILERS = {
 
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.AccessWindowBackend"]
 
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "core:home"

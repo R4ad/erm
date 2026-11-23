@@ -149,6 +149,16 @@ class RiskScenario(TimeStampedModel):
     is_active = models.BooleanField(
         "فعال", default=True, help_text="از سناریوی غیرفعال ریسک تازه ساخته نمی‌شود، ولی ریسک‌های قبلی می‌مانند."
     )
+    # کتابخانه‌ی سناریو (فیگما ۲۱): سناریوی ادغام‌شده غیرفعال می‌ماند و به سناریوی مقصد اشاره می‌کند؛ حذف فیزیکی ممنوع است
+    merged_into = models.ForeignKey(
+        "self",
+        verbose_name="ادغام‌شده در",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="merged_from",
+    )
 
     history = HistoricalRecords()
 
@@ -176,6 +186,57 @@ class RiskScenario(TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class ScenarioProposal(TimeStampedModel):
+    """پیشنهاد ادغام یا تفکیک سناریوی مرجع (بخش ۶ روش، فیگما ۲۱): با دلیل ثبت و با دلیل تصمیم‌گیری می‌شود."""
+
+    class Kind(models.TextChoices):
+        MERGE = "merge", "ادغام"
+        SPLIT = "split", "تفکیک"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "در انتظار تصمیم"
+        ACCEPTED = "accepted", "پذیرفته"
+        REJECTED = "rejected", "ردشده"
+
+    kind = models.CharField("نوع", max_length=10, choices=Kind.choices)
+    scenario = models.ForeignKey(
+        RiskScenario, verbose_name="سناریو", on_delete=models.PROTECT, related_name="proposals"
+    )
+    target = models.ForeignKey(
+        RiskScenario,
+        verbose_name="سناریوی مقصد",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="incoming_proposals",
+    )
+    similarity = models.PositiveSmallIntegerField("شباهت (درصد)", null=True, blank=True)
+    reason = models.TextField("دلیل پیشنهاد")
+    status = models.CharField("وضعیت", max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    decided_at = models.DateTimeField("زمان تصمیم", null=True, blank=True)
+    decision_reason = models.TextField("دلیل تصمیم", blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "پیشنهاد ادغام یا تفکیک سناریو"
+        verbose_name_plural = "پیشنهادهای ادغام یا تفکیک سناریو"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(kind="merge") | models.Q(target__isnull=False), name="merge_proposal_has_target"
+            ),
+            models.CheckConstraint(condition=~models.Q(target=models.F("scenario")), name="proposal_target_differs"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} {self.scenario.code}"
+
+
 class Risk(TimeStampedModel):
     """نمونه‌ی ریسک (بخش ۱ و ۶ سند v5): کاربرد یک سناریو در یک خدمت، بانک و دامنه‌ی مشخص، با یک مالک. تعریف عامل
     آغازگر هم اینجاست، چون بخش ۱۳ می‌گوید در همه‌ی ارزیابی‌های یک ریسک ثابت می‌ماند. ریسک حذف نمی‌شود؛ رد،
@@ -201,6 +262,17 @@ class Risk(TimeStampedModel):
         CHANGE = "change", "تغییر"
         SCAN = "scan", "اسکن"
         AUDIT = "audit", "ممیزی"
+        IDENTIFICATION = "identification", "فرم شناسایی"
+
+    class Source(models.TextChoices):
+        # «منبع شناسایی» فیگما ۱۱: ریسک از چه مجرایی اعلام شده است.
+        PERIODIC = "periodic", "ارزیابی دوره‌ای ریسک امنیت اطلاعات"
+        CHANGE = "change", "ثبت تغییرات نرمال"
+        NEW_ASSET = "new_asset", "اضافه شدن دارایی جدید"
+        NONCONFORMITY = "nonconformity", "مشاهده‌ی عدم انطباق"
+        ENVIRONMENT = "environment", "تغییر شرایط محیطی"
+        BEHAVIOR = "behavior", "تحلیل رفتار کاربر"
+        THREAT = "threat", "مشاهده‌ی تهدید"
 
     # ریسک ردشده یا بسته‌شده فقط سابقه است.
     CLOSED_STATUSES = [Status.REJECTED, Status.CLOSED]
@@ -247,7 +319,13 @@ class Risk(TimeStampedModel):
         "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, related_name="risks"
     )
     category = models.ForeignKey(
-        RiskCategory, verbose_name="دسته‌ی اصلی", on_delete=models.PROTECT, related_name="risks"
+        RiskCategory,
+        verbose_name="دسته‌ی اصلی",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="risks",
+        help_text="فرم شناسایی دسته نمی‌گیرد و عضو GRC آن را تعیین می‌کند؛ پیش از ارسال جهت ارزیابی اجباری است.",
     )
     tags = models.ManyToManyField(Tag, verbose_name="برچسب‌ها", related_name="risks", blank=True)
     data_class = models.CharField("طبقه‌ی اطلاعات", max_length=20, choices=DataClass.choices, blank=True)
@@ -271,6 +349,9 @@ class Risk(TimeStampedModel):
         help_text="کنترل‌هایی که این ریسک به آن‌ها تکیه دارد؛ ردیابی رجیستر به بیانیه‌ی کاربردپذیری از همین‌جاست.",
     )
     channel = models.CharField("کانال ورود", max_length=20, choices=Channel.choices)
+    source = models.CharField("منبع شناسایی", max_length=20, choices=Source.choices, blank=True)
+    # جواب‌های فرم شناسایی (فیگما ۱۱): مأموریت، اجزای الگوی سناریو، پیامد، وابستگی و شاهد، همان‌طور که واحد نوشت.
+    intake = models.JSONField("ورودی شناسایی", default=dict, blank=True)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False)
     needs_completion = models.BooleanField(
         "نیازمند تکمیل",
@@ -359,6 +440,29 @@ class Risk(TimeStampedModel):
         else:
             self.needs_completion = not (self.initiator.strip() and self.count_unit.strip() and self.scope.strip())
         super().save(*args, **kwargs)
+
+
+class IdentificationDraft(TimeStampedModel):
+    """پیش‌نویس فرم شناسایی (فیگما ۱۱). ریسک فقط با «ارسال برای شناسایی» ساخته می‌شود، تا پیش‌نویس نیمه‌کاره در
+    رجیستر، جهان ریسک و گزارش‌ها شمرده نشود. مقدارها همان فیلدهای فرم‌اند و با ارسال، پیش‌نویس پاک می‌شود."""
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.CASCADE, related_name="+"
+    )
+    org_unit = models.ForeignKey(
+        "organization.OrgUnit", verbose_name="واحد", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    data = models.JSONField("مقدارهای فرم", default=dict, blank=True)
+    # فایل شاهدی که پیش از ارسال پیوست شده؛ با ارسال به ریسک ساخته‌شده منتقل و با حذف پیش‌نویس پاک می‌شود.
+    attachments = GenericRelation("core.Attachment")
+
+    class Meta:
+        verbose_name = "پیش‌نویس شناسایی"
+        verbose_name_plural = "پیش‌نویس‌های شناسایی"
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return self.data.get("event") or f"پیش‌نویس {self.pk}"
 
 
 class ExternalLink(TimeStampedModel):

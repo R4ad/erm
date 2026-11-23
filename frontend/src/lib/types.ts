@@ -39,16 +39,31 @@ export interface Choice {
 export type Errors = Record<string, string[]>;
 
 export interface NavLink {
-  /** نام ثابت صفحه در جنگو (risks:risk_list)؛ آیکون پیوند با آن انتخاب می‌شود. */
+  /** نام ثابت صفحه در جنگو (risks:risk_list)، یا module:… برای صفحه‌هایی که فقط در React هستند. */
   key: string;
   label: string;
   href: string;
   route: string | null;
+  /** شمار کارهای منتظر کنار نام؛ null یعنی شمارنده نشان داده نمی‌شود. */
+  count: number | null;
+  tone: "gold" | "red" | null;
 }
 
 export interface NavGroup {
   title: string;
   items: NavLink[];
+}
+
+export type NavModuleKey = "assessment" | "treatment" | "config";
+
+export interface NavModule extends NavGroup {
+  key: NavModuleKey;
+}
+
+/** منوی کناری فیگما: میز کار و سه ماژول یک چرخه. */
+export interface Navigation {
+  desk: NavGroup;
+  modules: NavModule[];
 }
 
 /** یک سطر جدول پیوندها (apps/api/routes.py): نشانی جنگو با این الگو در رابط React همین مسیر است. */
@@ -65,7 +80,11 @@ export interface RouteEntry {
 export interface Session {
   user: Person & { username: string; roles: string[]; job_title: string; org_unit: string | null };
   today: Today;
-  navigation: NavGroup[];
+  navigation: Navigation;
+  /** کارت «چرخه‌ی ارزیابی» پایین منو. */
+  cycle: { year: number; assessed: number; total: number };
+  /** نسخه‌ی فعال روش ارزیابی برای نشان نوار بالا؛ null وقتی هنوز نسخه‌ای فعال نشده است. */
+  method: { number: number; title: string; route: string | null } | null;
   routes: RouteEntry[];
   logout_url: string;
   classic_home: string;
@@ -103,9 +122,104 @@ export interface WorkSection {
   items: WorkItem[];
 }
 
+export type WorkCategory = "actions" | "signoff" | "assessments" | "questions" | "acceptances";
+export type WorkTone = "brand" | "danger" | "warning" | "success" | "info" | "gold" | "neutral";
+
+/** یک ردیف «صف کارها»ی فیگما. */
+export interface WorkTask {
+  key: string;
+  category: WorkCategory;
+  title: string;
+  kind: string;
+  context: string;
+  code: string;
+  href: string;
+  route: string | null;
+  icon: string;
+  tone: WorkTone;
+  cta: string;
+  cta_style: "primary" | "secondary" | "ghost";
+  level: Level | null;
+  due: Deadline | null;
+  due_text: string | null;
+  no_due: string;
+}
+
+export interface WorkKpi {
+  count: number;
+  note: string;
+}
+
+export interface WorkPlanRow {
+  key: string;
+  code: string;
+  title: string;
+  level: Level | null;
+  note: string;
+  state: string;
+  tone: WorkTone;
+  route: string | null;
+}
+
+export interface WorkAcceptanceRow {
+  key: string;
+  code: string;
+  risk_code: string;
+  owner: string | null;
+  label: string;
+  tone: WorkTone;
+  route: string | null;
+}
+
 export interface MyWork {
   today: Today;
+  first_name: string;
+  kpis: Record<"waiting" | "due_today" | "overdue" | "to_verify", WorkKpi>;
+  categories: { key: WorkCategory; label: string; count: number }[];
+  tasks: WorkTask[];
+  plans: WorkPlanRow[];
+  acceptances: WorkAcceptanceRow[];
   sections: WorkSection[];
+}
+
+export interface ReportKpi {
+  count?: number;
+  percent?: number | null;
+  note: string;
+}
+
+export interface ManagementReport {
+  today: Today;
+  months: number;
+  periods: number[];
+  start: Day;
+  kpis: Record<"active" | "critical" | "high" | "coverage" | "key_controls", ReportKpi>;
+  distribution: { level: Level | null; label: string; count: number; delta: number; up_is_good: boolean }[];
+  matrix: {
+    rows: { likelihood: number; cells: { impact: number; count: number; level: Level | null }[] }[];
+    unassessed: number;
+  };
+  overdue: {
+    key: string;
+    code: string;
+    title: string;
+    level: Level | null;
+    owner: string | null;
+    service: string | null;
+    days: number;
+    route: string | null;
+  }[];
+  acceptances: { key: string; label: string; icon: string; tone: WorkTone; count: number; route: string }[];
+  changes: {
+    key: string;
+    code: string;
+    title: string;
+    before: Level | null;
+    after: Level | null;
+    reason: { label: string; tone: WorkTone };
+    route: string | null;
+  }[];
+  concentration: { key: string; target: string; risks: number; services: number; shared: boolean }[];
 }
 
 export interface RiskRow {
@@ -116,24 +230,49 @@ export interface RiskRow {
   is_active: boolean;
   needs_completion: boolean;
   level: Level | null;
-  category: { code: string; name: string };
+  score: number | null;
+  /** ریسکی که از فرم شناسایی آمده تا تعیین دسته به‌دست عضو GRC بی‌دسته است. */
+  category: { code: string; name: string } | null;
   service: { code: string; name: string } | null;
+  scenario: { code: string; version: number } | null;
   org_unit: string;
   owner: Person | null;
   channel: Choice;
   created_at: Day;
+  next_action: RiskNextAction | null;
 }
 
 export type RiskOrdering = "newest" | "oldest" | "code" | "-code" | "level" | "-level";
+
+export interface RiskNextAction {
+  label: string;
+  icon: string;
+  tone: "brand" | "danger" | "warning" | "neutral";
+  href: string;
+  route: string | null;
+}
+
+export type RegisterTab = "all" | "mine" | "assessment" | "treatment_plan" | "incomplete" | "unowned";
 
 export interface RiskPage {
   count: number;
   page: number;
   pages: number;
+  page_size: number;
   ordering: RiskOrdering;
   results: RiskRow[];
+  pipeline: { status: string; label: string; icon: string; count: number }[];
+  tabs: Record<RegisterTab, number>;
+  active: number;
+  closed: number;
   can_create: boolean;
+  can_send_to_assessment: boolean;
   create_url: string;
+}
+
+export interface BulkTransitionResult {
+  done: string[];
+  failed: { code: string; problems: string[] }[];
 }
 
 export type RiskFilters = Record<string, { label: string; choices: Choice[] }>;
@@ -144,6 +283,8 @@ export interface Transition {
   description: string;
   target: string;
   href: string;
+  /** شرط‌های برقرارنشده؛ تا رفعشان انتقال غیرفعال است. */
+  problems?: string[];
 }
 
 export interface AssessmentRow {
@@ -155,6 +296,8 @@ export interface AssessmentRow {
   score: [number, number] | null;
   meeting_date: Day | null;
   approved_at: Moment | null;
+  /** توضیح کوتاه ردیف در پرونده‌ی ریسک: موعد هدف، «مبنای تصمیم»، کنترل‌های کنارگذاشته‌ی ارزیابی ذاتی. */
+  detail?: string;
   href: string;
 }
 
@@ -192,6 +335,62 @@ export interface RecordParts {
   comment_url: string;
 }
 
+export interface RiskControl {
+  code: string;
+  title: string;
+  kind: string;
+  iso: string[];
+  is_key: boolean;
+  /** E مؤثر امروز؛ بدون ارزیابی یا با شاهد کهنه ۱. */
+  e: number;
+  no_valid_evidence: boolean;
+  problem: string | null;
+  href: string | null;
+}
+
+export interface RiskStep {
+  status: string;
+  label: string;
+  state: "done" | "current" | "todo" | "skipped";
+  date: Day | null;
+}
+
+export interface RiskBanner {
+  tone: "warning" | "danger";
+  title: string;
+  text: string;
+  link: { label: string; href: string } | null;
+  /** زبانه‌ای از پرونده که نوار به آن می‌برد، مثل questions. */
+  tab: string | null;
+}
+
+export interface LatestResult {
+  code: string;
+  href: string;
+  approved_at: Day | null;
+  method_version: number;
+  horizon_months: number;
+  a: number | null;
+  b: number | null;
+  likelihood: number | null;
+  impact: number | null;
+  score: number | null;
+  level: Level | null;
+  explanation: string;
+  note: string;
+}
+
+export interface TimelineEntry {
+  status: string;
+  label: string;
+  from: string | null;
+  reason: string;
+  meeting_date: Day | null;
+  by: Person | null;
+  role: string;
+  at: Moment;
+}
+
 export interface RiskDetail extends RecordParts {
   realization_path?: string;
   additional_notes?: string;
@@ -212,7 +411,7 @@ export interface RiskDetail extends RecordParts {
   service: { code: string; name: string; href: string | null } | null;
   org_unit: string;
   owner: Person | null;
-  category: { code: string; name: string };
+  category: { code: string; name: string } | null;
   customers: string[];
   tags: string[];
   scope: string;
@@ -228,21 +427,20 @@ export interface RiskDetail extends RecordParts {
     kind: string;
     reliability: string;
     observed_on: Day | null;
+    valid_until: Day | null;
     expired: boolean;
     confidential: boolean;
     href: string;
   }[];
-  controls: { code: string; title: string; href: string | null }[];
+  /** قدمت مجاز شاهد کنترل کلیدی در نسخه‌ی روش فعال (روز). */
+  key_evidence_age: number | null;
+  controls: RiskControl[];
+  stepper: RiskStep[];
+  banner: RiskBanner | null;
+  latest: LatestResult | null;
+  timeline: TimelineEntry[];
   workflow: {
     transitions: Transition[];
-    timeline: {
-      from: string;
-      to: string;
-      reason: string;
-      meeting_date: Day | null;
-      by: Person | null;
-      at: Moment;
-    }[];
     questions: {
       text: string;
       due: Deadline | Day | null;
@@ -329,6 +527,14 @@ export interface TextItem {
   value: string;
 }
 
+/** پرسش ثابت پاسخ (فیگما ۱۰): کارکردها گام اول است و بقیه «هشت پرسش جلسه‌ی شناسایی». */
+export interface FixedItem extends TextItem {
+  required: boolean;
+  /** خروجی مورد انتظار، مثل «رویداد مخل». */
+  expected: string;
+  section: "functions" | "session";
+}
+
 export type AnswerValue = string | number | number[] | null;
 
 export interface QuestionItem {
@@ -341,19 +547,27 @@ export interface QuestionItem {
   value: AnswerValue;
 }
 
-export interface ResponseDetail extends Omit<ResponseRow, "questionnaire"> {
+export interface ResponseDetail extends Omit<ResponseRow, "questionnaire">, RecordParts {
   is_structured: boolean;
   structured_data: unknown[];
   structured_questions: { id: number; text: string; stage: string; required: boolean; help: string }[];
   questionnaire: { id: number; title: string; description: string };
   recorded_by: Person | null;
+  respondent_title: string;
+  service_name: string | null;
+  /** پیش‌نویس پنج روز کاری از آغاز؛ برگشت‌خورده همان مهلت برگشت. */
+  due: Deadline | null;
+  saved_at: Moment;
+  function_slots: number;
+  text_limit: number;
+  attach_limit_mb: number;
   can_edit: boolean;
   submitted_at: Moment | null;
   return_question: string;
   return_due: Deadline | null;
   reviewed_by: Person | null;
   reviewed_at: Moment | null;
-  fixed: TextItem[];
+  fixed: FixedItem[];
   new_item: TextItem;
   questions: QuestionItem[];
   pending_risks: { description: string; status: Choice; source: string }[];
@@ -463,6 +677,10 @@ export interface FormPageData {
   guides?: FormGuide[];
   // پروفایل پیامد: چند فرم با پیشوند، یک گروه برای هر ذی‌نفع
   groups?: ImpactGroup[];
+  /** سرپرونده و کارت خلاصه‌ی پروفایل پیامد (فیگما ۰۶). */
+  assessment?: AssessmentHeader & { stakeholders: string[]; saved_at: Moment | null };
+  overview?: ImpactOverview;
+  note?: string;
   // بازسنجی طرح مواجهه: مقایسه‌ی مبنا، ارزیابی تازه و هدف، و اقدام‌هایی که هنوز تأیید نشده‌اند
   comparison?: Comparison;
   open_actions?: { code: string; href: string; status: ActionStatus }[];
@@ -503,6 +721,14 @@ export interface ImpactRow extends FormSchema {
   provisional_note: string;
 }
 
+/** I از آنچه ذخیره شده، خانه‌ای که از آن آمده و سه بررسی پروفایل. */
+export interface ImpactOverview {
+  impact: [number, number] | null;
+  top: { code: string; name: string; stakeholder: string } | null;
+  text: string;
+  checks: { label: string; ok: boolean }[];
+}
+
 export interface ImpactGroup {
   name: string;
   is_datin: boolean;
@@ -535,7 +761,7 @@ export interface RiskBrief {
   status: Choice;
   is_active: boolean;
   service: string | null;
-  category: { code: string; name: string };
+  category: { code: string; name: string } | null;
   owner: Person | null;
   href: string;
 }
@@ -619,22 +845,34 @@ export interface CoverageCell {
   category_name?: string;
   status: Choice;
   summary: string;
+  reason: string;
+  reviewed_by: Person | null;
+  reviewed_on: Day | null;
   risk_count: number;
   risks_url: string | null;
   edit_url: string | null;
+  /** «ثبت ریسک برای این خانه»؛ برای خانه‌ی «نامرتبط» یا کسی که ریسک ثبت نمی‌کند خالی است. */
+  create_risk_url: string | null;
 }
 
 export interface CoverageRow {
   service: { id: number; code: string; name: string; is_critical: boolean; org_unit: string; href: string };
   cells: CoverageCell[];
+  /** خانه‌های غیر «در انتظار» از همه‌ی دسته‌های فعال. */
+  done: number;
+  total: number;
 }
 
 export interface CoveragePage extends Listing<CoverageRow> {
   categories: { id: number; code: string; name: string }[];
   critical: { total: number; complete: number; percent: number | null };
   counts: { reviewed: number; not_relevant: number; pending: number };
+  tabs: { all: number; critical: number; incomplete: number };
+  /** اندازه‌ی صفحه؛ «نمایش بیشتر» آن را با ?size= بزرگ می‌کند. */
+  size: number;
   can_edit: boolean;
   categories_url: string;
+  export_url: string;
 }
 
 export interface ChangeRiskRef {
@@ -713,6 +951,9 @@ export interface AssessmentHeader {
     evidence: EvidenceRef[];
   } | null;
   href: string;
+  /** آخرین ارسال برای کنترل کیفیت و آخرین کسی که درباره‌اش تصمیم گرفت (سرپرونده‌ی فیگما ۰۵). */
+  submitted_at?: Moment | null;
+  reviewer?: Person | null;
 }
 
 export interface AssessmentOutcome {
@@ -756,6 +997,10 @@ export interface AssessmentReview {
 export interface AssessmentPath {
   id: number;
   name: string;
+  /** شواهد B0 مسیر. */
+  evidence: EvidenceRef[];
+  /** B سناریو از این مسیر آمده است. */
+  determining: boolean;
   description: string;
   independent: boolean;
   independence_rationale: string;
@@ -814,7 +1059,50 @@ export interface AssessmentImpacts {
   rows: { code: string; name: string; cells: (ImpactCell | null)[] }[];
 }
 
+export interface AssessmentStep {
+  key: "scope" | "impacts" | "initiator" | "paths" | "result" | "review";
+  label: string;
+  sub: string;
+  state: "done" | "current" | "todo";
+  warning: boolean;
+}
+
+/** «زنجیره‌ی محاسبه»ی فیگما ۰۵؛ همه از موتور محاسبه و نسخه‌ی روش ارزیابی. */
+export interface AssessmentChain {
+  a: string | null;
+  a_basis: string;
+  b: [number, number] | null;
+  likelihood: [number, number] | null;
+  likelihood_name: string;
+  impact: [number, number] | null;
+  impact_source: string;
+  score: [number, number] | null;
+  base_level: Level | null;
+  decision_level: Level | null;
+  floor: string;
+  grid: { a: number | null; b: number | null; rows: { a: number; cells: (number | null)[] }[] };
+  notes: { icon: "check" | "info"; text: string }[];
+}
+
+export interface AssessmentCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  problems: string[];
+}
+
+export interface AssessmentFlags {
+  items: { label: string; on: boolean }[];
+  confidence: string;
+  confidence_key: "" | "low" | "medium" | "high";
+}
+
 export interface AssessmentDetail {
+  steps: AssessmentStep[];
+  chain: AssessmentChain;
+  /** بررسی‌های پیش از تأیید؛ ارزیابی تأییدشده null. */
+  checks: AssessmentCheck[] | null;
+  flags: AssessmentFlags;
   risk_details?: { label: string; value: string }[];
   view: string;
   title: string;
@@ -904,6 +1192,40 @@ export interface PlanRisk {
   href: string | null;
 }
 
+export interface PlanOption {
+  value: string;
+  label: string;
+  hint: string;
+  selected: boolean;
+  disabled: boolean;
+}
+
+export interface PlanPoint extends CodeRef {
+  score: number | null;
+  level: Level | null;
+}
+
+export interface PlanCheck {
+  label: string;
+  /** fail تأیید را می‌بندد؛ warn فقط هشدار است. */
+  state: "ok" | "warn" | "fail";
+}
+
+export interface PlanActionRow extends ActionRow {
+  acceptance: string;
+  effect: { label: string; kind: "likelihood" | "impact"; title: string };
+  verifier: Person | null;
+  start: Day;
+  missing_cost: boolean;
+  /** جای میله در ستون زمان‌بندی، به درصد کل بازه. */
+  bar: { start: number; width: number } | null;
+}
+
+export interface PlanTimeline {
+  label: string;
+  months: { label: string; start: number; width: number }[];
+}
+
 export interface PlanDetail extends RecordParts {
   view: string;
   title: string;
@@ -914,21 +1236,42 @@ export interface PlanDetail extends RecordParts {
     state: { value: "pending" | "approved" | "closed"; label: string };
     risk: PlanRisk;
     risk_owner: Person | null;
-    assessment: CodeRef & { score: number | null };
+    assessment: CodeRef & { score: number | null; kind: string };
     level: Level | null;
     plan_required: boolean;
     decision_due: Day | null;
+    /** روزهای کاری مانده تا مهلت طرح؛ بعد از تأیید مالک خالی است. */
+    deadline: { working_days: number; overdue: boolean } | null;
     overdue: boolean;
     containment_due: Moment | null;
+    author: (Person & { role: string }) | null;
+    created: Day;
     rationale: string;
     option_details: string;
     target: (CodeRef & { status: string; level: Level | null }) | null;
     approved_by: Person | null;
     approved_at: Moment | null;
   };
-  approval: { problems: string[]; approve_url: string | null; message: string; waiting_for_owner: boolean };
-  actions: ActionRow[];
+  options: { items: PlanOption[]; note: string };
+  compare: {
+    current: PlanPoint;
+    target: (PlanPoint & { status: Choice; is_approved: boolean; due: Day | null; assumptions: string }) | null;
+    needs_target: boolean;
+  };
+  approval: {
+    problems: string[];
+    approve_url: string | null;
+    message: string;
+    waiting_for_owner: boolean;
+    owner: (Person & { job_title: string }) | null;
+    owner_state: { value: "pending" | "approved"; label: string };
+    checks: PlanCheck[];
+    estimate: string | null;
+  };
+  actions: PlanActionRow[];
+  timeline: PlanTimeline | null;
   add_action_url: string | null;
+  remind_url: string | null;
   reassessment: {
     performed_on: Day;
     responsible: Person | null;
@@ -1005,14 +1348,22 @@ export interface SignForm extends FormSchema {
   intro: string;
 }
 
+/** یک گام امضا (فیگما ۰۸). گامی که این پذیرش لازم ندارد required=false دارد و «لازم نیست» نشان داده می‌شود. */
 export interface AcceptanceSignature {
   authority: string;
   label: string;
   reason: string;
+  required: boolean;
+  /** این کاربر همین گام را امضا می‌کند (فرمش در sign_forms هست). */
+  mine: boolean;
+  /** چه کسی امضا می‌کند، برای گامی که هنوز امضا نشده است. */
+  who: string;
   signature: {
     approved: boolean;
     by: Person | null;
     at: Moment;
+    /** «خودش در سامانه»، «ثبت از روی صورت‌جلسه» یا «ثبت از روی نامه». */
+    channel: string;
     reference_kind: string;
     reference: string;
     reference_date: Day | null;
@@ -1031,8 +1382,15 @@ export interface AcceptanceDetail extends RecordParts {
     id: number;
     code: string;
     state: AcceptanceState;
+    /** «پذیرش عادی»، «پذیرش موقت» یا «پذیرش غیرعادی». */
+    kind: string;
+    approvals: number;
+    required: number;
+    locked: boolean;
     days_left: number | null;
     decision_text: string;
+    /** متنی که با آخرین تأیید نوشته می‌شود، تا وقتی متن تصمیم نوشته نشده است. */
+    decision_preview: string;
     closed: { label: string; by: Person | null; at: Moment | null; reason: string } | null;
     start: Day;
     end: Day;
@@ -1050,6 +1408,8 @@ export interface AcceptanceDetail extends RecordParts {
   };
   risk: PlanRisk & { owner: Person | null };
   assessment: CodeRef & {
+    kind: string;
+    status: string;
     method_version: number;
     score: number | null;
     confidence: string | null;
@@ -1068,6 +1428,14 @@ export interface AcceptanceDetail extends RecordParts {
   problems_title: string;
   submit_url: string | null;
   signatures: AcceptanceSignature[];
+  /** زیرعنوان کارت امضاها: «سطح متوسط: مالک ریسک + یکی از مدیران خود واحد ریسک». */
+  signers: string;
+  validity: {
+    note: string;
+    progress: number;
+    marks: { key: string; label: string; day: Day; at: number }[];
+    cap: Day | null;
+  };
   sign_url: string;
   sign_forms: SignForm[];
   revoke: (FormSchema & { url: string }) | null;
@@ -1781,4 +2149,1165 @@ export interface AuditChangeRow {
 
 export interface AuditChangeList extends Listing<AuditChangeRow> {
   tabs: AuditTab[];
+}
+
+// ───────────── شناسایی ریسک (فیگما ۱۱) ─────────────
+
+export type IdentificationTextField =
+  | "mission"
+  | "subject"
+  | "objective"
+  | "conditions"
+  | "customer"
+  | "event"
+  | "harm"
+  | "impact"
+  | "dependencies"
+  | "evidence";
+
+export interface IdentificationValues extends Record<IdentificationTextField, string> {
+  org_unit: string;
+  target: string;
+  category: string;
+  tags: string[];
+  source: string;
+  scenario: string;
+  evidence_items: string[];
+}
+
+export interface IdentificationPart {
+  name: Extract<IdentificationTextField, "subject" | "objective" | "conditions" | "customer" | "event" | "harm">;
+  label: string;
+  token: string;
+}
+
+export interface IdentificationRow {
+  key: string;
+  code: string | null;
+  title: string;
+  category: string | null;
+  scenario: string | null;
+  service: string | null;
+  customer: string | null;
+  source: string;
+  stage: { value: string; label: string; tone: "neutral" | "info" | "warning" | "brand" };
+  owner: Person | null;
+  due: Deadline | null;
+  /** نشانی جنگوی پرونده‌ی ریسک، یا برای پیش‌نویس مسیر همین صفحه (route). */
+  href: string | null;
+  route: string | null;
+}
+
+export interface IdentificationChoices {
+  org_unit: { value: string; label: string; owner: Person | null }[];
+  target: {
+    value: string;
+    label: string;
+    service: { id: number; name: string; environment: string };
+    /** واحد مالک خدمت؛ سرور واحد ریسک را از همین و واحدهای کاربر انتخاب می‌کند. */
+    unit: string | null;
+    customer: string | null;
+    commitment: string | null;
+  }[];
+  category: { value: string; code: string; label: string }[];
+  source: { value: string; label: string }[];
+  evidence: { value: string; code: string; label: string }[];
+}
+
+export interface IdentificationAttachment {
+  id: number;
+  name: string;
+  size: number;
+}
+
+export interface IdentificationDraft {
+  id: number;
+  saved_at: Moment;
+  /** فایل‌های شاهدی که تا ارسال روی پیش‌نویس مانده‌اند. */
+  attachments: IdentificationAttachment[];
+}
+
+export interface IdentificationPage {
+  can_identify: boolean;
+  parts: IdentificationPart[];
+  choices: IdentificationChoices | null;
+  values: IdentificationValues;
+  draft: IdentificationDraft | null;
+  text_limit: number;
+  /** پسوندهای مجاز و سقف حجم فایل شاهد (همان قاعده‌ی پیوست جنگو). */
+  attachment: { accept: string; max_size: number };
+  recent: IdentificationRow[];
+  scenarios_url: string;
+  register_url: string;
+  evidence_url: string;
+}
+
+// ───────────── آنالیز ریسک (فیگما ۱۲) ─────────────
+
+export type AnalysisBand = [number, number | null] | [number, number];
+
+export interface AnalysisInitiatorValues {
+  a_basis: string;
+  a_count: number | null;
+  a_period_months: number | null;
+  a_coverage: number | null;
+  a_level: string;
+  a_high: number | null;
+  a_confidence: string;
+  a_rationale: string;
+}
+
+export interface AnalysisScaleBand {
+  value: number;
+  name: string;
+  lower: number | null;
+  upper: number | null;
+  text: string;
+}
+
+export interface AnalysisInitiator {
+  locked: boolean;
+  rows: { label: string; value: string }[];
+  values: AnalysisInitiatorValues;
+  count_unit: string;
+  rate: number | null;
+  suggestion: number | null;
+  insufficient: string[];
+  coverage_min: number | null;
+  period_min: number | null;
+  bound_rule: "" | "lower_closed" | "upper_closed";
+  bands: AnalysisScaleBand[];
+  basis_choices: { value: string; label: string }[];
+  confidence_choices: { value: string; label: string }[];
+  evidence: { code: string; title: string; href: string }[];
+  evidence_count: number;
+  form_url: string;
+}
+
+export interface AnalysisPathControl {
+  code: string;
+  title: string;
+  e: number;
+  recorded_e: number;
+  note: string;
+}
+
+export interface AnalysisPath {
+  id: number;
+  name: string;
+  description: string;
+  b0: AnalysisBand | null;
+  controls: AnalysisPathControl[];
+  bc: AnalysisBand | null;
+  b: AnalysisBand | null;
+  determining: boolean;
+  notes: string[];
+  edit_url: string | null;
+}
+
+export interface AnalysisControl {
+  code: string;
+  title: string;
+  kind: { value: string; label: string };
+  owner: string;
+  preventive: boolean;
+  href: string;
+  test: {
+    code: string;
+    href: string;
+    exists: boolean;
+    design_ok: boolean;
+    coverage: "ok" | "partial" | null;
+    operating_ok: boolean;
+    e: number;
+    recorded_e: number;
+    problem: string;
+  } | null;
+  evidence: { code: string | null; href: string | null; note: string } | null;
+  test_url: string | null;
+}
+
+export interface AnalysisPage {
+  assessment: {
+    id: number;
+    code: string;
+    status: { value: string; label: string };
+    kind: { value: string; label: string };
+    horizon_months: number;
+    method_number: string;
+    href: string;
+    impact_url: string;
+    can_edit: boolean;
+  };
+  risk: {
+    id: number;
+    code: string;
+    title: string;
+    narrative: string;
+    status: { value: string; label: string };
+    category: { code: string; name: string };
+    href: string;
+  };
+  summary: {
+    a: { value: string | null; basis: string };
+    b: { value: string | null };
+    l: { value: string | null; a: number | null; b: number | null };
+    i: { value: string | null; source: string; dimensions: number };
+    score: { value: string | null; level: Level | null; inherent: { score: number; level: Level | null } | null };
+    paths: number;
+    determining: string[];
+  };
+  initiator: AnalysisInitiator;
+  paths: {
+    rows: AnalysisPath[];
+    b: AnalysisBand | null;
+    highs: number[];
+    problems: string[];
+    add_url: string | null;
+  };
+  controls: AnalysisControl[];
+  matrix: {
+    a: number | null;
+    b: number | null;
+    l: number | null;
+    rows: { a: number; cells: (number | null)[] }[];
+    names: Record<string, string>;
+  };
+  impacts: {
+    i: AnalysisBand | null;
+    rows: { code: string; name: string; level: number | null; note: string; unknown: boolean; missing: boolean }[];
+  };
+  uncertainty: {
+    confidence: string;
+    confidence_key: "" | "low" | "medium" | "high";
+    items: { ok: boolean; text: string }[];
+    l_range: AnalysisBand | null;
+  };
+  problems: string[];
+  submit: { can_submit: boolean; url: string | null; problems: string[] };
+}
+
+// ───────────── سنجش ریسک (فیگما ۱۳) ─────────────
+
+export interface EvaluationRow {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  category: string;
+  scope: string;
+  status: { value: string; label: string };
+  l: number | null;
+  i: number | null;
+  score: number;
+  base_level: Level;
+  decision_level: Level;
+  raised: boolean;
+  reasons: string[];
+  authority: string;
+  deadline: {
+    kind: "awaiting" | "done" | "containment" | "plan";
+    text: string;
+    due: { iso: string; jalali: string } | null;
+    overdue: boolean;
+  };
+  sendable: boolean;
+  assessment_href: string;
+}
+
+export interface EvaluationLevel extends Level {
+  min_score: number;
+  max_score: number;
+  note: string;
+  decision_rule: string;
+  plan: string;
+  acceptance: string;
+  review: string;
+  count: number;
+}
+
+export interface EvaluationPage {
+  method: { number: number; status: { value: string; label: string }; href: string } | null;
+  levels: EvaluationLevel[];
+  raised: { count: number; reasons: string[] };
+  floors: { impact: number; level: string }[];
+  example: { code: string; score: number; level: string } | null;
+  rows: EvaluationRow[];
+  matrix: {
+    l: number;
+    cells: { i: number; score: number; level: Level | null; raised: boolean; count: number }[];
+  }[];
+  sendable: number[];
+}
+
+// ───────────── ریسک‌های نیازمند اقدام (فیگما ۱۴) ─────────────
+
+export type RequiredTone = "danger" | "warning" | "info" | "success";
+
+export interface ActionRequiredRow {
+  key: string;
+  kind: "plan" | "failed" | "acceptance";
+  risk: { id: number; code: string; title: string; href: string; note: string };
+  level: Level;
+  score: number | null;
+  owner: { id: number; name: string } | null;
+  option: { value: "reduce" | "avoid" | "transfer" | "accept"; label: string; suggested: boolean };
+  reason: string;
+  deadline: { text: string; tone: RequiredTone; due: { iso: string; jalali: string } | null };
+  status: { label: string; tone: RequiredTone };
+  action: { kind: "escalate" | "create" | "open"; label: string; href: string | null };
+  overdue: boolean;
+  within_48h: boolean;
+  containment_overdue: boolean;
+}
+
+export interface ActionRequiredPage {
+  rows: ActionRequiredRow[];
+  counts: { no_plan: number; overdue: number; within_48h: number; failed: number; acceptance: number };
+  owners: { id: number; name: string }[];
+  containment_overdue: { id: number; code: string; title: string; href: string }[];
+  can_escalate: boolean;
+}
+
+// ───────────── ریسک‌های در حال درمان (فیگما ۱۵) ─────────────
+
+export type BoardTone = "neutral" | "success" | "danger" | "warning";
+
+export interface BoardCard {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  status: { value: string; label: string };
+  level: Level;
+  risk: { id: number; code: string; title: string; href: string };
+  note: string;
+  assignee: { id: number; name: string } | null;
+  owner_id: number;
+  verifier_id: number;
+  due: { iso: string; jalali: string };
+  overdue: boolean;
+  progress: number;
+  footer: { text: string; tone: BoardTone; icon: "clock" | "check-circle" | "warning" };
+  alert: boolean;
+}
+
+export interface BoardReview {
+  key: string;
+  risk: { code: string; title: string; href: string };
+  note: string;
+  current: number | null;
+  target: number | null;
+  due: { iso: string; jalali: string };
+  responsible: { id: number; name: string } | null;
+  notice: { text: string; tone: BoardTone | "neutral" };
+  href: string;
+}
+
+export interface TreatmentBoardPage {
+  columns: { value: string; label: string }[];
+  cards: BoardCard[];
+  counts: { active: number; blocked: number; ready: number; verified: number; reviews: number };
+  blocked_note: string;
+  reviews: BoardReview[];
+  creatable: { code: string; title: string; href: string | null }[];
+  can_create: boolean;
+  me: number;
+}
+
+// ───────────── لیست ریسک‌های هدف (فیگما ۱۶) ─────────────
+
+export interface TargetPoint {
+  score: number;
+  level: Level | null;
+  profile: string | null;
+}
+
+export interface TargetRow {
+  id: number;
+  risk: { id: number; code: string; title: string; href: string; category: string; scope: string };
+  current: TargetPoint;
+  target: TargetPoint | null;
+  retire: boolean;
+  mechanisms: string[];
+  criteria: string;
+  plan: { href: string; action: string | null; due: { iso: string; jalali: string } | null };
+  status: { value: string; label: string; tone: "info" | "warning" | "success" | "danger" | "neutral" };
+}
+
+export interface TargetRisksPage {
+  rows: TargetRow[];
+  counts: { with_target: number; within: number; above: number; retire: number };
+  reassess: { code: string; title: string; step: string; href: string }[];
+}
+
+// ───────────── تعریف متدولوژی (فیگما ۱۷) ─────────────
+
+export interface MethodChange {
+  key: string;
+  group: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface MethodParam {
+  key: string;
+  label: string;
+  group: string;
+  value: string;
+  unit: string;
+  text: string;
+  note: string;
+  before: string | null;
+}
+
+export type ApprovalState = "done" | "current" | "locked" | "skipped";
+
+export interface MethodDefinition {
+  version: {
+    number: number;
+    name: string;
+    title: string;
+    status: { value: string; label: string };
+    is_trial: boolean;
+    based_on: string | null;
+    saved: { iso: string; jalali: string };
+    submitted: boolean;
+    editable: boolean;
+    reference: string;
+    change_notes: string;
+  };
+  can_submit: boolean;
+  can_copy: boolean;
+  copy_from: string | null;
+  versions: {
+    number: number;
+    name: string;
+    title: string;
+    status: { value: string; label: string };
+    date: { iso: string; jalali: string } | null;
+    note: string;
+    current: boolean;
+  }[];
+  changes: MethodChange[];
+  groups: { key: string; label: string; changes: number }[];
+  approval: { key: string; title: string; note: string; state: ApprovalState }[];
+  categories: { code: string; name: string; risks: number }[];
+  parameters: MethodParam[];
+  likelihood: {
+    rows: { a: number; cells: { b: number; l: number | null; changed: boolean }[] }[];
+    names: { value: number; name: string }[];
+    source: string;
+    changed: number;
+  };
+  levels: {
+    levels: { rank: number; name: string; min: number; max: number; color: string; text_color: string }[];
+    rules: { key: string; title: string; note: string; source: "version" | "system" }[];
+  };
+  appetite: {
+    rank: number;
+    level: { name: string; color: string; rank: number };
+    authority: string;
+    plan: string | null;
+    acceptance: string | null;
+    review: string | null;
+    reminder: string;
+    changed: string[];
+  }[];
+  impact_scales: { code: string; name: string; scope: string; stakeholders: string[]; levels: number }[];
+  admin_url: string | null;
+}
+
+// ───────────── چارت سازمانی (فیگما ۱۸) ─────────────
+
+export interface OrgNode {
+  id: number;
+  code: string | null;
+  name: string;
+  depth: number;
+  manager: Person | null;
+  manager_title: string;
+  risks: number;
+  critical: number;
+  children: OrgNode[];
+}
+
+export interface OrgMember {
+  id: number;
+  name: string;
+  username: string;
+  initials: string;
+  job_title: string;
+  roles: { label: string; tone: "info" | "warning" | "success" | "neutral" }[];
+  source: { value: string; label: string };
+  active: boolean;
+}
+
+export interface OrgChartPage {
+  summary: { units: number; levels: number; users: number };
+  tree: OrgNode[];
+  selected: {
+    id: number;
+    code: string | null;
+    name: string;
+    active: boolean;
+    ad_group: string;
+    parent: string | null;
+    manager: Person | null;
+    deputy: Person | null;
+    services: string[];
+    customers: string[];
+    acceptance: string | null;
+    levels: { rank: number; name: string; count: number }[];
+    edit_url: string | null;
+    add_child_url: string | null;
+  } | null;
+  members: OrgMember[];
+  can_edit: boolean;
+  add_unit_url: string | null;
+  ad_sync_url: string | null;
+  add_member_url: string | null;
+}
+
+// ───────────── تعریف کاربر و نقش (فیگما ۱۹) ─────────────
+
+export type RoleTone = "brand" | "success" | "warning" | "info" | "neutral";
+
+export interface DirectoryUser {
+  id: number;
+  name: string;
+  username: string;
+  unit: string | null;
+  job_title: string;
+  roles: { key: string; label: string; tone: RoleTone }[];
+  customers: string[] | null;
+  source: { value: string; label: string };
+  last_login: { iso: string; label: string } | null;
+  status: { value: string; label: string; tone: "success" | "warning" | "info" | "neutral" | "danger" };
+  edit_url: string;
+}
+
+export interface DirectoryRole {
+  key: string;
+  label: string;
+  tone: RoleTone;
+  description: string;
+  kind: "group" | "derived";
+  kind_label: string;
+  scope: { value: "unit" | "assigned" | "all"; label: string };
+  count: number;
+  acceptance: { levels: string[]; label: string; text: string; tone: "success" | "neutral" | "warning" | "info" }[];
+  edit_url: string | null;
+}
+
+export interface UsersRolesPage {
+  summary: {
+    active: number;
+    units: number;
+    ad: number;
+    local: number;
+    temporary: number;
+    roles: number;
+    conflicts: number;
+  };
+  users: DirectoryUser[];
+  roles: DirectoryRole[];
+  matrix: { key: string; label: string; stage: string; access: Record<string, "F" | "L"> }[];
+  sod: {
+    conflicts: { key: string; user: Person; title: string; note: string; state: "open"; href: string }[];
+    rules: { text: string; where: string }[];
+  };
+  add_user_url: string;
+  login_report_url: string;
+  import_url: string;
+}
+
+// ───────────── اعلان‌های پایش (فیگما ۲۰) ─────────────
+
+export type NoticeTone = "danger" | "warning" | "info" | "neutral";
+
+export interface InboxNotice {
+  id: number;
+  tab: "trigger" | "periodic" | "acceptance" | "evidence" | "other";
+  icon: string;
+  tone: NoticeTone;
+  title: string;
+  body: string;
+  chips: string[];
+  group: { key: string; label: string };
+  created: { iso: string; ago: string | null };
+  unread: boolean;
+  mine: boolean;
+  cta: { label: string; href: string; icon: string; primary: boolean };
+}
+
+export interface NoticeChannels {
+  in_app: boolean;
+  email: boolean;
+  sms: boolean;
+  delegate: boolean;
+}
+
+export interface MonitoringInbox {
+  unread: number;
+  summary: {
+    urgent: number;
+    urgent_days: number;
+    reviews: number;
+    review_days: number;
+    acceptances: number;
+    reminders: number[];
+    evidence: number;
+  };
+  tabs: { key: string; label: string; count: number }[];
+  notices: InboxNotice[];
+  calendar: { rank: number; name: string; cycle: string; count: number; next: string | null; overdue: boolean }[];
+  triggers: { key: string; label: string; rule: string }[];
+  channels: NoticeChannels;
+}
+
+// ───────────── کتابخانه‌ی سناریو (فیگما ۲۱) ─────────────
+
+export interface ScenarioProposalRow {
+  id: number;
+  kind: { value: "merge" | "split"; label: string };
+  scenario: { id: number; code: string };
+  target: { id: number; code: string; title: string } | null;
+  similarity: number | null;
+  reason: string;
+  created_by: string;
+  can_decide: boolean;
+}
+
+export interface LibraryScenario {
+  id: number;
+  code: string;
+  title: string;
+  category: { code: string; name: string };
+  instances: number;
+  level: { rank: number; name: string } | null;
+  reviewed: string | null;
+  active: boolean;
+  note: { tone: "warning" | "neutral"; text: string } | null;
+}
+
+export interface ScenarioLibrary {
+  summary: {
+    scenarios: number;
+    categories: number;
+    instances: number;
+    average: string;
+    empty: number;
+    proposals: number;
+  };
+  categories: { code: string; name: string; count: number }[];
+  rows: LibraryScenario[];
+  selected: {
+    id: number;
+    code: string;
+    title: string;
+    version: number;
+    active: boolean;
+    merged_into: { code: string; href: string } | null;
+    author: string | null;
+    narrative: string;
+    conditions: string;
+    event: string;
+    consequence: string;
+    category: { code: string; name: string };
+    service: string | null;
+    href: string;
+    edit_url: string | null;
+    instances: {
+      id: number;
+      code: string;
+      title: string;
+      href: string;
+      scope: string;
+      score: number | null;
+      level: { rank: number; name: string } | null;
+    }[];
+    proposal: ScenarioProposalRow | null;
+  } | null;
+  options: { id: number; code: string; title: string }[];
+  rules: { title: string; text: string }[];
+  create_url: string | null;
+  can_propose: boolean;
+}
+
+// ───────────── آزمون اثربخشی کنترل (فیگما ۲۲) ─────────────
+
+export type ControlTestState = "met" | "partial" | "unmet";
+
+export interface ControlTestRisk {
+  id: number;
+  code: string;
+  title: string;
+  href: string;
+  assessment: { code: string; href: string };
+  approved: boolean;
+  paths: { id: number; name: string; b0: string | null; bc: string | null; bc_before: string | null; note: string }[];
+  b: string | null;
+  b_change: string | null;
+  l: string | null;
+  score: string | null;
+  level: Level | null;
+  alert: string | null;
+}
+
+export interface ControlTest {
+  id: number;
+  code: string;
+  control: {
+    id: number;
+    code: string;
+    title: string;
+    is_key: boolean;
+    owner: { id: number; name: string } | null;
+    href: string;
+  };
+  e: { value: number; name: string };
+  previous: { e: number; code: string; href: string } | null;
+  tester: { id: number; name: string } | null;
+  period: { from: Day | null; to: Day | null };
+  valid_until: (Day & { days_left: number; overdue: boolean }) | null;
+  evidence_age: string;
+  suspended: boolean;
+  cards: { key: string; label: string; state: ControlTestState; state_label: string; text: string }[];
+  plan: {
+    kind: string | null;
+    rows: { label: string; value: string }[];
+    paths: { name: string; passed: boolean }[];
+  };
+  results: {
+    summary: string | null;
+    rate: string | null;
+    rows: {
+      id: number;
+      reference: string;
+      date: Day;
+      path: string;
+      performer: string | null;
+      passed: boolean;
+      note: string | null;
+    }[];
+  };
+  ladder: {
+    current: number;
+    previous: number | null;
+    target: number | null;
+    levels: { value: number; name: string; text: string; criteria: string }[];
+    conditions: { key: string; label: string; met: boolean; note: string | null }[];
+    rationale: string;
+  };
+  risks: ControlTestRisk[];
+  others: { id: number; code: string; href: string; scope: string; state: string; tone: "warning" | "neutral" }[];
+  evidence: {
+    id: number;
+    code: string;
+    title: string;
+    kind: string;
+    observed_on: Day;
+    state: "current" | "stale" | "superseded";
+    state_label: string;
+    href: string;
+  }[];
+  rules: string[];
+  new_test_url: string | null;
+  edit_url: string | null;
+}
+
+// ───────────── جلسه‌ی کمیته‌ی امنیت (فیگما ۲۳) ─────────────
+
+export type AgendaStatus = "pending" | "review" | "approved" | "deferred";
+
+export interface CommitteeOption {
+  id: number;
+  title: string;
+  description: string;
+  owner_proposal: boolean;
+  chips: { text: string; tone: "neutral" | "warning" | "danger"; level?: Level }[];
+}
+
+export interface CommitteeCase {
+  id: number;
+  subject: string;
+  kind: { value: string; label: string };
+  status: { value: AgendaStatus; label: string };
+  owner: { id: number; name: string } | null;
+  voters: number;
+  conflict: string | null;
+  options: CommitteeOption[];
+  decision: {
+    chosen: number | null;
+    votes: [number, number, number];
+    text: string;
+    at: Moment | null;
+    by: { id: number; name: string } | null;
+  } | null;
+  risk: { id: number; code: string; href: string } | null;
+  reference?: string | null;
+  assessment?: { code: string; href: string; confidence: string | null } | null;
+  scenario?: string | null;
+  score?: string | null;
+  level?: Level | null;
+  facts?: { label: string; value: string }[];
+  policy?: string | null;
+}
+
+export interface CommitteeMeeting {
+  id: number;
+  code: string;
+  title: string;
+  status: { value: "scheduled" | "open" | "closed"; label: string };
+  subtitle: string;
+  stats: {
+    agenda: { count: string; note: string };
+    quorum: { present: string; total: string; met: boolean; note: string };
+    previous: { count: string; note: string; meeting: { id: number; code: string; href: string } | null };
+    remaining: { value: string; note: string };
+  };
+  attendees: {
+    id: number;
+    name: string;
+    line: string;
+    state: "present" | "absent" | "observer" | "conflict";
+    state_label: string;
+  }[];
+  quorum: { text: string; met: boolean };
+  agenda: {
+    id: number;
+    number: number;
+    subject: string;
+    reference: string | null;
+    href: string | null;
+    level: Level | null;
+    kind: string;
+    owner: string | null;
+    status: { value: AgendaStatus; label: string };
+  }[];
+  selected: CommitteeCase | null;
+  signatures: {
+    item: number;
+    title: string;
+    rows: { id: number; name: string; role: string; signed_at: string | null; mine: boolean }[];
+    owner_note: boolean;
+  } | null;
+  authority: { level: Level; rule: string; deadline: string }[];
+  restricted: string | null;
+  minutes: {
+    number: number;
+    subject: string;
+    status: string;
+    text: string | null;
+    votes: [number, number, number] | null;
+  }[];
+  can_run: boolean;
+  candidates: { id: number; code: string; title: string }[];
+  kinds: { value: string; label: string }[];
+}
+
+// ───────────── آزمون و تأیید نتیجه‌ی اقدام (فیگما ۲۴) ─────────────
+
+export interface VerificationCard {
+  title: string;
+  hint: string;
+  l: number | null;
+  i: number | null;
+  score: string | null;
+  level: Level | null;
+}
+
+export interface ActionVerification {
+  id: number;
+  code: string;
+  title: string;
+  status: { value: string; label: string };
+  subtitle: string;
+  risk: { code: string; href: string | null };
+  action_href: string;
+  steps: { value: string; label: string; state: "done" | "current" | "upcoming" }[];
+  side: { items: { value: string; label: string; active: boolean }[]; note: string | null };
+  report: { code: string; href: string } | null;
+  criteria: {
+    summary: string;
+    met: boolean;
+    rows: {
+      id: number;
+      title: string;
+      target: string;
+      result: string;
+      status: { value: string; label: string; tone: "success" | "danger" | "neutral" };
+    }[];
+    notes: string[];
+    text: string;
+  };
+  runs: {
+    setting: string;
+    rows: {
+      id: number;
+      number: number;
+      title: string;
+      passed: boolean;
+      outcome: string;
+      description: string;
+      evidence: { code: string; href: string } | null;
+    }[];
+  };
+  people: { sod: boolean; rows: { label: string; value: string | null }[] };
+  decision: {
+    can_decide: boolean;
+    options: { value: "verify" | "fail"; label: string; problems: string[] }[];
+    follow_up: string | null;
+    closing: string;
+    submit: string;
+    waiting: string | null;
+    last: { label: string; tone: "success" | "danger"; by: string | null; at: Moment | null; note: string } | null;
+  };
+  evidence: { id: number; code: string; title: string; observed_on: string | null; href: string }[];
+  effect: {
+    title: string;
+    subtitle: string;
+    before: VerificationCard;
+    after: VerificationCard | null;
+    rows: { label: string; before: string; after: string }[];
+    profile: string[];
+    changed: string | null;
+    note: string | null;
+    reached: boolean;
+  } | null;
+  result?: { follow_ups: { code: string; href: string }[]; notified: number };
+}
+
+// «ارزیابی پس از اقدام» (فیگما ۲۵): ارزیابی جاری تازه کنار ذاتی، جاری قبلی و هدف طرح، و تصمیم مالک ریسک.
+export type PostActionTone = "neutral" | "success" | "warning" | "info" | "brand" | "danger";
+
+export interface PostActionCard {
+  key: "inherent" | "before" | "target" | "after";
+  title: string;
+  hint: string;
+  chip: { label: string; tone: PostActionTone } | null;
+  current: boolean;
+  a: string;
+  b: string;
+  l: string;
+  i: string;
+  score: string;
+  level: Level | null;
+}
+
+export interface PostActionDecision {
+  subtitle: string;
+  can_decide: boolean;
+  can_ask: boolean;
+  owner: Person | null;
+  options: { value: "monitor" | "continue" | "accept"; label: string; problems: string[] }[];
+  corrective: { label: string; count: number } | null;
+  problems: string[];
+  waiting: string | null;
+  last: { label: string; by: string; on: string | null; note: string; next: string | null } | null;
+}
+
+export interface PostAction {
+  plan: { id: number; label: string; href: string };
+  risk: { code: string; title: string; href: string };
+  title: string;
+  status: { label: string; tone: PostActionTone } | null;
+  subtitle: string;
+  cards: PostActionCard[];
+  compare_href: string | null;
+  waiting: string | null;
+  summary: { title: string; text: string; reached: boolean; rows: { label: string; value: string }[] } | null;
+  paths: {
+    subtitle: string;
+    rows: {
+      id: number;
+      name: string;
+      b0: string;
+      controls: { code: string; e: number; label: string; tone: PostActionTone }[];
+      bc: string;
+      b: string;
+    }[];
+    total: string;
+    note: string | null;
+  } | null;
+  profile: {
+    subtitle: string;
+    rows: { code: string; name: string; note: string; before: number | null; after: number | null; max: number }[];
+  } | null;
+  decision: PostActionDecision | null;
+  evidence: { id: number; code: string; title: string; observed_on: string | null; href: string }[];
+  rules: string[];
+  result?: { asked?: boolean; corrective?: number };
+}
+
+// «مقایسه‌ی نسخه‌ها»ی روش (فیگما ۲۶): پارامترهای کلیدی، شبیه‌سازی اثر، یادداشت تغییر و گردش تصویب.
+export interface MethodDiff {
+  title: string;
+  subtitle: string;
+  version: {
+    number: number;
+    name: string;
+    chip: { label: string; tone: PostActionTone };
+    note: string;
+    hint: string;
+  };
+  base: { number: number; name: string; note: string; hint: string };
+  rows: {
+    key: string;
+    label: string;
+    before: string;
+    after: string;
+    changed: boolean;
+    status: { label: string; tone: PostActionTone };
+  }[];
+  changed: number;
+  simulation: {
+    count: number;
+    subtitle: string;
+    tiles: { key: "count" | "data" | "levels" | "review"; label: string; value: number; note: string }[];
+    reminders: number;
+    rows: {
+      assessment: { code: string; href: string };
+      risk: { code: string; title: string; href: string };
+      effect: string;
+      action: string;
+    }[];
+  };
+  last_run: { at: string; by: string } | null;
+  notes: { author: string | null; date: string; text: string; groups: string[] };
+  steps: { key: string; title: string; note: string; state: "done" | "current" | "locked" | "skipped" }[];
+  rules: string[];
+  can_submit: boolean;
+  can_simulate: boolean;
+  definition: string;
+}
+
+// «ویرایش بُعد پیامد» (فیگما ۲۷): سطوح یک بُعد با معیار و برچسب، ذی‌نفعان، قواعد، تاریخچه و ماشین‌حساب S.
+export interface ImpactLevels {
+  version: { number: number; name: string; chip: { label: string; tone: PostActionTone }; editable: boolean };
+  scale: { code: string; name: string; title: string; subtitle: string };
+  tabs: { code: string; name: string }[];
+  levels: { id: number; value: number; criteria: string; tags: string[] }[];
+  base: { name: string; levels: { id: number; value: number; criteria: string; tags: string[] }[] } | null;
+  stakeholders: { key: string; label: string; note: string; on: boolean }[];
+  stakeholder_note: string;
+  rules: string[];
+  history: { version: string; title: string; note: string; current: boolean }[];
+  calculator: {
+    fraction: number;
+    services: { id: number; label: string; critical: boolean; rto: number | null; mtpd: number | null }[];
+  } | null;
+  definition: string;
+}
+
+// «همگام‌سازی با Active Directory» (فیگما ۲۸).
+export interface AdSync {
+  title: string;
+  subtitle: string;
+  pending: number;
+  applicable: number;
+  connection: {
+    server: string;
+    base_dn: string;
+    service_account: string;
+    schedule: string;
+    state: { label: string; tone: PostActionTone };
+    note: string;
+    tested: string | null;
+  };
+  tiles: { key: string; label: string; value: number; note: string }[];
+  branches: {
+    key: string;
+    ou: string;
+    users: number;
+    state: "mapped" | "unmapped" | "excluded";
+    status: { label: string; tone: PostActionTone };
+    unit: string | null;
+  }[];
+  unit_options: { id: number; name: string }[];
+  changes: {
+    key: string;
+    kind: "new" | "moved" | "disabled";
+    label: string;
+    tone: PostActionTone;
+    user: { id: number | null; name: string; username: string };
+    unit: string;
+    impact: { text: string; tone: "danger" | "warning" | "neutral" };
+    action: { kind: "successor" | "delegate" | "review" | "none"; label: string; href: string | null };
+    apply: boolean;
+    attention: boolean;
+    inactive: boolean;
+  }[];
+  unchanged: number;
+  rules: { key: string; label: string; note: string; on: boolean; locked: boolean }[];
+  rules_note: string;
+  history: { id: number; title: string; note: string; status: string; tone: string }[];
+  successors: { id: number; name: string; unit: string }[];
+  org_chart: string;
+}
+
+// «پروفایل کاربر» (فیگما ۲۹).
+export interface UserProfile {
+  id: number;
+  name: string;
+  initials: string;
+  username: string;
+  status: { value: string; label: string; tone: PostActionTone };
+  source: { value: "ad" | "local"; label: string };
+  subtitle: string;
+  identity: {
+    locked: boolean;
+    fields: { key: string; label: string; value: string; code?: boolean }[];
+    edit_url: string;
+  };
+  roles: {
+    key: string;
+    label: string;
+    tone: PostActionTone;
+    description: string;
+    scope: string;
+    origin: string;
+    since: string | null;
+    removable: boolean;
+  }[];
+  available_roles: { key: string; label: string }[];
+  sod: {
+    chip: { label: string; tone: PostActionTone };
+    checks: { text: string; tone: "success" | "warning" | "danger" }[];
+  };
+  delegation: {
+    id: number;
+    chip: { label: string; tone: PostActionTone };
+    successor: { id: number; name: string };
+    created: string;
+    period: string;
+    starts_on: string;
+    ends_on: string;
+    scope: string;
+    escalation: string;
+    max_rank: number;
+    notify_successor: boolean;
+    copy_owner: boolean;
+  } | null;
+  levels: { rank: number; name: string; color: string; text_color: string; delegable: boolean }[];
+  successors: { id: number; name: string; unit: string }[];
+  escalation: string;
+  duties: {
+    tiles: { key: string; label: string; value: number }[];
+    risks: {
+      id: number;
+      code: string;
+      title: string;
+      href: string;
+      score: number | null;
+      level: { rank: number; name: string; color: string; text_color: string } | null;
+    }[];
+    more: number;
+  };
+  activity: { key: string; icon: string; tone: string; title: string; note: string }[];
+  can_deactivate: boolean;
+  open_duties: string;
+  users_page: string;
 }

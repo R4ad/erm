@@ -63,31 +63,38 @@ describe("app shell", () => {
     expect(await screen.findByRole("heading", { name: "کارهای من", level: 1 })).toBeInTheDocument();
     const [nav] = screen.getAllByRole("navigation", { name: "منوی اصلی" });
     expect(within(nav!).getByRole("link", { name: "کارهای من" })).toHaveAttribute("aria-current", "page");
-    // صفحه‌ای که در رابط تازه هست با مسیر خود رابط باز می‌شود و بقیه هنوز با صفحه‌ی کلاسیک جنگو.
-    expect(within(nav!).getByRole("link", { name: "شواهد" })).toHaveAttribute("href", "/risks/evidence");
-    expect(within(nav!).getByRole("link", { name: "خدمات" })).toHaveAttribute("href", "/catalog/services");
-    const classic = within(nav!).getByRole("link", { name: /گزارش مدیریتی/ });
-    expect(classic).toHaveAttribute("href", "/reports/");
-    expect(classic).toHaveAccessibleName(/در صفحه‌های فعلی سامانه باز می‌شود/);
+    // منوی فیگما: میز کار و سه ماژول با گام‌های شماره‌دار؛ پیوندها با مسیر خود رابط باز می‌شوند.
+    expect(within(nav!).getByRole("link", { name: "رجیستر ریسک" })).toHaveAttribute("href", "/risks");
+    expect(within(nav!).getByRole("link", { name: /اعلان‌های پایش/ })).toHaveAttribute("href", "/actions/notices");
     expect(screen.getByRole("link", { name: "رفتن به محتوای صفحه" })).toHaveAttribute("href", "#main");
     await expectNoAxeViolations();
   });
 
-  it("derives the summary from real work items", async () => {
+  it("shows the Figma task queue with the server's KPIs", async () => {
     api();
-    renderApp();
-    const stat = async (label: string) => (await screen.findByText(label)).nextElementSibling?.textContent;
-    expect(await stat("کارهای باز")).toBe("۳");
-    expect(await stat("مهلت گذشته")).toBe("۱");
-    expect(await stat("مهلت تا ۷ روز دیگر")).toBe("۲");
-    expect(screen.getByRole("region", { name: /اقدام‌های من/ })).toBeInTheDocument();
-    const questions = screen.getByRole("region", { name: /پرسش‌های ریسک منتظر جواب/ });
-    // موردی که صفحه‌ی React دارد درون برنامه باز می‌شود؛ بقیه در صفحه‌های فعلی.
-    expect(within(questions).getByRole("link", { name: "پرسش آزمون درباره‌ی پایش" })).toHaveAttribute(
+    const { user } = renderApp();
+    const stat = async (label: string) =>
+      (await screen.findByText(label)).parentElement?.nextElementSibling?.textContent;
+    expect(await stat("منتظر اقدام من")).toBe("۳");
+    expect(await stat("عقب‌افتاده")).toBe("۱");
+    expect(await stat("سررسید امروز")).toBe("۰");
+    expect(screen.getByText("سلام کاربر؛ ۳ کار منتظر اقدام شماست و ۰ مورد امروز سررسید دارد.")).toBeInTheDocument();
+
+    const queue = screen.getByRole("region", { name: "صف کارها" });
+    // کاری که صفحه‌ی React دارد درون برنامه باز می‌شود؛ بقیه در صفحه‌های فعلی.
+    expect(within(queue).getByRole("link", { name: /پاسخ به پرسش ریسک/ })).toHaveAttribute(
       "href",
       "/questionnaires/risk-questions",
     );
-    expect(screen.getByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).toHaveAttribute("href", "/actions/2/");
+    expect(within(queue).getByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).toHaveAttribute("href", "/actions/2/");
+
+    await user.click(within(queue).getByRole("tab", { name: /پرسش‌ها/ }));
+    expect(within(queue).queryByRole("link", { name: /اقدام آزمون عقب‌افتاده/ })).not.toBeInTheDocument();
+    expect(within(queue).getByText("نمایش ۱ از ۱ کار")).toBeInTheDocument();
+
+    expect(screen.getByRole("region", { name: "برنامه‌ی درمان — حال طرح‌ها" })).toHaveTextContent("بدون طرح");
+    expect(screen.getByRole("region", { name: "پذیرش‌های رو به انقضا" })).toHaveTextContent("منقضی‌شده");
+    await expectNoAxeViolations();
   });
 
   it("jumps to register search with the / key", async () => {
@@ -154,11 +161,11 @@ describe("risk dossier", () => {
     expect(within(tabs).getByRole("tab", { name: /ارزیابی‌ها/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveTextContent("AS-1405-0001");
 
-    await user.click(within(tabs).getByRole("tab", { name: /گردش کار/ }));
-    expect(router.state.location.search).toBe("?tab=workflow");
+    await user.click(within(tabs).getByRole("tab", { name: /خط زمانی/ }));
+    expect(router.state.location.search).toBe("?tab=timeline");
     expect(screen.getByRole("tabpanel")).toHaveTextContent("دلیل آزمونی انتقال");
 
-    await user.click(within(tabs).getByRole("tab", { name: "شرح" }));
+    await user.click(within(tabs).getByRole("tab", { name: "خلاصه" }));
     expect(router.state.location.search).toBe("");
     await expectNoAxeViolations();
   });
@@ -181,20 +188,22 @@ describe("risk dossier", () => {
       "POST forms/": { message: "ریسک ذخیره شد.", redirect: { href: "/risks/1/", route: "/risks/1" } },
     });
     const { router, user } = renderApp("/risks/1");
-    const transition = await screen.findByRole("link", { name: "شروع اجرا" });
-    expect(transition).toHaveAttribute("href", "/workflow/risks/1/transition/start_treatment");
-    expect(screen.getByRole("link", { name: "RK-1405-0009" })).toHaveAttribute("href", "/risks/9");
+    // انتقالی که شرطش برقرار نیست دکمه نمی‌شود و دلیلش زیر دکمه‌هاست؛ کار اصلی دیدن طرح است.
+    expect(await screen.findByText(/«شروع اجرا» هنوز فعال نیست: مالک ریسک هنوز طرح/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "شروع اجرا" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "مشاهده‌ی طرح مواجهه" })[0]).toHaveAttribute("href", "/actions/plans/1");
 
-    await user.click(screen.getByRole("button", { name: /کارهای دیگر/ }));
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: "پیشنهاد ادغام" })).toHaveAttribute(
+    await user.click(screen.getByRole("button", { name: "پیشنهاد ادغام یا تفکیک" }));
+    const changes = await screen.findByRole("menu");
+    expect(within(changes).getByRole("menuitem", { name: "پیشنهاد ادغام" })).toHaveAttribute(
       "href",
       "/workflow/risks/1/requests/merge",
     );
-    expect(within(menu).getByRole("menuitem", { name: "شاهد تازه" })).toHaveAttribute(
-      "href",
-      "/risks/evidence/new?risk=1",
-    );
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("link", { name: /^افزودن\s*شاهد/ })).toHaveAttribute("href", "/risks/evidence/new?risk=1");
+
+    await user.click(screen.getByRole("button", { name: "کارهای دیگر پرونده" }));
+    const menu = await screen.findByRole("menu");
     // کاری که جنگو اجازه نمی‌دهد اصلاً پیشنهاد نمی‌شود (و خود جنگو هم دوباره چک می‌کند).
     expect(within(menu).queryByRole("menuitem", { name: "ارزیابی تازه" })).not.toBeInTheDocument();
     await user.click(within(menu).getByRole("menuitem", { name: "ویرایش ریسک" }));
@@ -207,12 +216,64 @@ describe("risk dossier", () => {
     expect(await screen.findByText("ریسک ذخیره شد.")).toBeInTheDocument();
   });
 
+  it("puts an allowed transition first and shows the merged risk", async () => {
+    const risk = riskDetail();
+    risk.workflow.transitions[0]!.problems = [];
+    risk.workflow.merged_into = { code: "RK-1405-0009", href: "/risks/9/" };
+    api({ "GET risks/1/": risk });
+    renderApp("/risks/1");
+    expect(await screen.findByRole("link", { name: "شروع اجرا" })).toHaveAttribute(
+      "href",
+      "/workflow/risks/1/transition/start_treatment",
+    );
+    expect(screen.getByRole("link", { name: "RK-1405-0009" })).toHaveAttribute("href", "/risks/9");
+    expect(screen.queryByText(/هنوز فعال نیست/)).not.toBeInTheDocument();
+  });
+
+  it("follows the Figma summary: lifecycle, deadline, latest result, controls and evidence", async () => {
+    const risk = riskDetail();
+    risk.evidence = Array.from({ length: 6 }, (_, index) => ({
+      ...risk.evidence[index % 2]!,
+      code: `EV-1405-000${index + 1}`,
+    }));
+    api({ "GET risks/1/": risk });
+    const { router, user } = renderApp("/risks/1");
+
+    const steps = await screen.findByRole("list", { name: "مراحل گردش کار" });
+    expect(within(steps).getAllByRole("listitem")).toHaveLength(7);
+    const current = within(steps)
+      .getByText(/برنامه‌ی درمان/)
+      .closest("li");
+    expect(current).toHaveAttribute("aria-current", "step");
+    expect(current).toHaveTextContent("از ۱۴۰۵/۰۸/۱۱");
+    expect(within(steps).getByText(/این ریسک از این مرحله نگذشت/)).toBeInTheDocument();
+
+    const deadline = screen.getByRole("region", { name: "مهلت" });
+    expect(deadline).toHaveTextContent("مهلت ثبت طرح مواجهه: ۳ روز کاری مانده");
+    expect(within(deadline).getByRole("link", { name: /رفتن به طرح/ })).toHaveAttribute("href", "/actions/plans/1");
+
+    const result = screen.getByRole("heading", { name: "نتیجه‌ی آخرین ارزیابی جاری" }).closest("div.rounded-lg");
+    expect(result).toHaveTextContent("آغازگر (A)۳");
+    expect(result).toHaveTextContent("سطح تصمیمبالا");
+    expect(result).toHaveTextContent("پس کف تغییری نداد");
+
+    expect(screen.getByText("بدون شاهد معتبر")).toHaveAttribute("title", "ارزیابی اثربخشی ندارد");
+    expect(screen.getByText("کلیدی")).toBeInTheDocument();
+    expect(screen.getAllByText("منقضی").length).toBeGreaterThan(0);
+    expect(screen.getByText(/۶ شاهد · قدمت مجاز شاهد کنترل کلیدی ۹۰ روز/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "دیدن همه‌ی ۶ شاهد" }));
+    expect(router.state.location.search).toBe("?tab=evidence");
+    expect(screen.getByRole("tabpanel").querySelectorAll("li")).toHaveLength(6);
+    await expectNoAxeViolations();
+  });
+
   it("opens the comments tab from the page section Django returns to, and posts a comment", async () => {
     const calls = api({
       "POST forms/": { message: "نظر ثبت شد.", redirect: { href: "/risks/1/#comments", route: "/risks/1#comments" } },
     });
     const { user } = renderApp("/risks/1#comments");
-    const tab = await screen.findByRole("tab", { name: /نظرها/ });
+    const tab = await screen.findByRole("tab", { name: /پیوست و نظر/ });
     expect(tab).toHaveAttribute("aria-selected", "true");
     await user.type(screen.getByRole("textbox", { name: "نظر تازه" }), "نظر آزمون");
     await user.click(screen.getByRole("button", { name: "ثبت نظر" }));
@@ -249,7 +310,9 @@ describe("risk dossier", () => {
     expect(await screen.findByRole("heading", { name: "مقایسه‌ی ارزیابی‌ها", level: 1 })).toBeInTheDocument();
     expect(router.state.location.pathname + router.state.location.search).toBe("/assessments/compare?id=2&id=1");
     await user.click(screen.getByRole("link", { name: "AS-1405-0001" }));
-    expect(await screen.findByRole("heading", { name: "ارزیابی جاری AS-1405-0001", level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "ارزیابی جاری — ریسک آزمون شماره‌ی ۱", level: 1 }),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/assessments/1");
   });
 });

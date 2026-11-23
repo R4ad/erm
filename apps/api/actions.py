@@ -5,18 +5,31 @@
 جنگو انجام می‌شوند (bridge_pages.POST_ONLY_PAGES).
 """
 
-from django.urls import reverse
+from datetime import timedelta
 
-from apps.actions.models import RiskAcceptance, TreatmentAction
+import jdatetime
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.actions import acceptance as acc
+from apps.actions.models import RiskAcceptance, TreatmentAction, TreatmentPlan
+from apps.actions.monitoring import reminder_days
+from apps.actions.services import can_remind_owner, has_valid_acceptance
+from apps.assessments.services import rials
+from apps.workcalendar.workdays import working_days_between
 
 from . import formatting as fmt
 from .assessments import comparison
 from .forms import describe_field, describe_form
 from .listing import listing
 from .records import record_parts
+from .risk_record import role_of
 
 ST = TreatmentAction.Status
 AS = RiskAcceptance.Status
+OPTION = TreatmentPlan.Option
+MECH = TreatmentAction.Mechanism
+MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"]
 
 
 def _risk(risk, visible=True):
@@ -95,9 +108,55 @@ def acceptance_list(context, request):
 # --- طرح مواجهه ---
 
 
+def _plan_checks(plan, actions, level, required):
+    """فهرست کادر «تأیید مالک ریسک» در فیگما ۰۷: همان قاعده‌های plan_problems، به‌اضافه‌ی چیزهایی که مالک پیش از
+    تأیید می‌بیند. fail تأیید را می‌بندد و warn فقط هشدار است."""
+    checks = []
+
+    def add(label, ok, warn=False):
+        checks.append({"label": label, "state": "ok" if ok else "warn" if warn else "fail"})
+
+    if required and plan.option == OPTION.ACCEPT:
+        add(f"برای سطح «{level.name}» طرح الزامی است و گزینه‌ی پذیرش کافی نیست", False)
+    if plan.needs_actions:
+        add("هر گزینه جز پذیرش دست‌کم یک اقدام دارد", bool(actions))
+    if plan.option == OPTION.REDUCE:
+        target = plan.target_assessment
+        if target is None:
+            add("گزینه‌ی کاهش: ارزیابی هدف ثبت نشده است", False)
+        else:
+            add(
+                f"گزینه‌ی کاهش: ارزیابی هدف {'تأییدشده' if target.is_approved else 'هنوز تأیید نشده'} دارد",
+                target.is_approved,
+            )
+    if plan.option in (OPTION.TRANSFER, OPTION.AVOID):
+        add(f"شرط‌های گزینه‌ی «{plan.get_option_display()}» نوشته شده", bool(plan.option_details.strip()))
+    if plan.option == OPTION.ACCEPT and not required:
+        add("پذیرش معتبر با امضای مالک ریسک و صاحبان اختیار", has_valid_acceptance(plan.assessment))
+    if actions:
+        add(
+            "تأییدکننده‌ی نتیجه‌ی هر اقدام کسی جز مالک و مجری است",
+            all(a.verifier_id not in (a.owner_id, a.assignee_id) for a in actions),
+        )
+        add("معیار قبولی برای همه‌ی اقدام‌ها نوشته شده", all(a.acceptance_criteria.strip() for a in actions))
+        costed = sum(a.cost is not None and a.person_hours is not None for a in actions)
+        add(f"هزینه و نفرساعت برای {costed} از {len(actions)} اقدام", costed == len(actions), warn=True)
+    return checks
+
+
+def _estimate(actions):
+    cost = sum(a.cost for a in actions if a.cost is not None)
+    hours = sum(a.person_hours for a in actions if a.person_hours is not None)
+    if not cost and not hours:
+        return None
+    parts = [rials(cost) if cost else None, f"{hours} نفرساعت" if hours else None]
+    return " · ".join(part for part in parts if part)
+
+
 def _approval(context):
-    """کادر تأیید طرح، با همان شرط‌های plan_detail.html."""
+    """کادر تأیید طرح، با همان شرط‌های plan_detail.html و فهرست و برآورد فیگما ۰۷."""
     plan, pending, problems = context["plan"], context["pending"], context["problems"]
+    actions = list(context["actions"])
     approvable = context["can_approve"] and (not plan.is_owner_approved or pending)
     message = ""
     if not problems and approvable:
@@ -106,11 +165,22 @@ def _approval(context):
             if plan.is_owner_approved
             else "شما مالک این ریسک هستید. با تأیید، طرح و همه‌ی اقدام‌هایش مصوب می‌شوند."
         )
+    owner = plan.risk.owner
+    if plan.is_owner_approved and not pending:
+        owner_state = {"value": "approved", "label": "تأیید شد"}
+    elif plan.is_owner_approved:
+        owner_state = {"value": "pending", "label": f"{len(pending)} اقدام تازه منتظر"}
+    else:
+        owner_state = {"value": "pending", "label": "منتظر"}
     return {
         "problems": list(problems),
         "approve_url": reverse("actions:plan_approve", args=[plan.pk]) if not problems and approvable else None,
         "message": message,
         "waiting_for_owner": not problems and not approvable and bool(pending or not plan.is_owner_approved),
+        "owner": {**fmt.person(owner), "job_title": owner.job_title} if owner else None,
+        "owner_state": owner_state,
+        "checks": _plan_checks(plan, actions, plan.level, context["plan_required"]),
+        "estimate": _estimate(actions),
     }
 
 
@@ -137,30 +207,180 @@ def _acceptance_note(plan, required):
     return "پذیرش ریسک باقیمانده، اگر لازم است، با امضای صاحبان اختیار ثبت می‌شود."
 
 
+OPTION_HINTS = {
+    OPTION.REDUCE: "یک ارزیابی هدف تأییدشده لازم است",
+    OPTION.AVOID: "شرط‌های اجتناب نوشته می‌شود",
+    OPTION.TRANSFER: "بیمه، قرارداد یا ارائه‌دهنده‌ی دیگر",
+    OPTION.ACCEPT: "یک پذیرش معتبر با امضای صاحبان اختیار",
+}
+
+
+def _options(plan, level, required):
+    """چهار کاشی «گزینه‌ی مواجهه» (فیگما ۰۷). برای سطحی که طرح الزامی است، پذیرش گزینه‌ی طرح نیست (بخش ۱۹)."""
+    rows = []
+    for value, label in OPTION.choices:
+        disabled = required and value == OPTION.ACCEPT
+        rows.append(
+            {
+                "value": value,
+                "label": label,
+                "hint": f"برای سطح «{level.name}» گزینه‌ی طرح نیست" if disabled else OPTION_HINTS[value],
+                "selected": plan.option == value,
+                "disabled": disabled,
+            }
+        )
+    if required:
+        note = f"برای سطح «{level.name}» طرح الزامی است و گزینه‌ی «پذیرش» تأیید نمی‌شود"
+    else:
+        note = f"برای سطح «{level.name}» هر چهار گزینه ممکن است؛ پذیرش با امضای صاحبان اختیار تأیید می‌شود"
+    return {"items": rows, "note": note}
+
+
+def _point(assessment):
+    return {**_ref(assessment), "score": assessment.score_high, "level": fmt.level(assessment.decision_level)}
+
+
+def _compare(plan):
+    """کارت «جاری ← هدف»: ارزیابی مبنا کنار ارزیابی هدف، با موعد تحقق و فرض‌های هدف."""
+    target = plan.target_assessment
+    return {
+        "current": _point(plan.assessment),
+        "target": {
+            **_point(target),
+            "status": fmt.choice(target, "status"),
+            "is_approved": target.is_approved,
+            "due": fmt.day(target.target_due),
+            "assumptions": target.assumptions,
+        }
+        if target
+        else None,
+        "needs_target": plan.option == OPTION.REDUCE,
+    }
+
+
+def _month(day):
+    value = jdatetime.date.fromgregorian(date=day)
+    return jdatetime.date(value.year, value.month, 1)
+
+
+def _next_month(month):
+    return jdatetime.date(month.year + (month.month == 12), month.month % 12 + 1, 1)
+
+
+def _timeline(actions):
+    """ستون «زمان‌بندی» جدول اقدام‌ها (فیگما ۰۷): ماه‌های شمسی از آغاز نخستین اقدام تا سررسید آخرین، دست‌کم سه ماه.
+    جای هر میله درصدی از کل بازه است تا رابط فقط آن را بکشد."""
+    if not actions:
+        return None
+    today = timezone.localdate()
+    first = min(a.start_date for a in actions)
+    # طرحی که هنوز شروع نشده از ماه جاری کشیده می‌شود تا فاصله‌ی امروز تا آغاز اقدام‌ها پیدا باشد
+    months = [_month(min(first, today))]
+    last = _month(max(a.due_date for a in actions))
+    while months[-1] < last or len(months) < 3:
+        months.append(_next_month(months[-1]))
+    start, end = months[0].togregorian(), _next_month(months[-1]).togregorian()
+    total = (end - start).days
+
+    def pct(day):
+        return round((day - start).days / total * 100, 2)
+
+    years = sorted({month.year for month in months})
+    return {
+        "label": f"{years[0]}" if len(years) == 1 else f"{years[0]}–{years[-1]}",
+        "months": [
+            {
+                "label": MONTHS[month.month - 1],
+                "start": pct(month.togregorian()),
+                "width": round(pct(_next_month(month).togregorian()) - pct(month.togregorian()), 2),
+            }
+            for month in months
+        ],
+        "bars": {
+            action.pk: {
+                "start": pct(action.start_date),
+                "width": round(pct(action.due_date + timedelta(days=1)) - pct(action.start_date), 2),
+            }
+            for action in actions
+        },
+    }
+
+
+def _effect(action, path_numbers):
+    """ستون «اثر روی»: مسیر و B، A، یا بُعد پیامد. نوع اثر رنگ میله‌ی زمان‌بندی را تعیین می‌کند."""
+    if action.mechanism == MECH.IMPACT:
+        code = action.dimension.code if action.dimension_id else "?"
+        return {"label": f"پیامد {code}", "kind": "impact", "title": f"پیامد: {action.dimension}"}
+    if action.mechanism == MECH.B and action.path_id:
+        number = path_numbers.get(action.path_id)
+        return {
+            "label": f"مسیر {number} · B",
+            "kind": "likelihood",
+            "title": f"امکان تحقق مسیر {number}: {action.path.name}",
+        }
+    return {
+        "label": "B" if action.mechanism == MECH.B else "A",
+        "kind": "likelihood",
+        "title": action.get_mechanism_display(),
+    }
+
+
+def plan_action_row(action, path_numbers, timeline):
+    return {
+        **action_row(action),
+        "acceptance": action.acceptance_criteria,
+        "effect": _effect(action, path_numbers),
+        "verifier": fmt.person(action.verifier),
+        "start": fmt.day(action.start_date),
+        "missing_cost": action.status == ST.PLANNED and (action.cost is None or action.person_hours is None),
+        "bar": timeline["bars"][action.pk] if timeline else None,
+    }
+
+
+def _deadline(plan):
+    """چیپ «مهلت طرح: N روز کاری» تا وقتی مالک تأیید نکرده است."""
+    if plan.is_owner_approved:
+        return None
+    today = timezone.localdate()
+    return {"working_days": working_days_between(today, plan.decision_due), "overdue": plan.decision_due < today}
+
+
 def plan_detail(context, request):
     plan, risk = context["plan"], context["risk"]
+    actions = sorted(context["actions"], key=lambda action: action.pk)  # به ترتیب کد، مثل فیگما
     target = plan.target_assessment
     reassessment = context.get("reassessment")
     if reassessment:
         state = {"value": "closed", "label": "بازسنجی‌شده و بسته"}
     elif plan.is_owner_approved:
-        state = {"value": "approved", "label": "تأییدشده‌ی مالک"}
+        state = {"value": "approved", "label": "تأییدشده‌ی مالک ریسک"}
     else:
-        state = {"value": "pending", "label": "منتظر تأیید مالک"}
+        state = {"value": "pending", "label": "منتظر تأیید مالک ریسک"}
+    timeline = _timeline(actions)
+    path_numbers = {
+        pk: index for index, pk in enumerate(plan.assessment.paths.order_by("pk").values_list("pk", flat=True), 1)
+    }
     return {
-        "title": f"طرح مواجهه: {plan.get_option_display()}",
+        "title": f"طرح مواجهه — {risk.title}",
         "plan": {
             "id": plan.pk,
             "option": fmt.choice(plan, "option"),
             "state": state,
             "risk": _risk(risk),
             "risk_owner": fmt.person(risk.owner),
-            "assessment": {**_ref(plan.assessment), "score": plan.assessment.score_high},
+            "assessment": {
+                **_ref(plan.assessment),
+                "score": plan.assessment.score_high,
+                "kind": plan.assessment.get_kind_display(),
+            },
             "level": fmt.level(plan.level),
             "plan_required": context["plan_required"],
             "decision_due": fmt.day(plan.decision_due),
+            "deadline": _deadline(plan),
             "overdue": plan.is_overdue,
             "containment_due": fmt.moment(context["containment_due"]),
+            "author": {**fmt.person(plan.created_by), "role": role_of(plan.created_by)},
+            "created": fmt.day(plan.created_at),
             "rationale": plan.rationale,
             "option_details": plan.option_details,
             "target": {
@@ -173,9 +393,13 @@ def plan_detail(context, request):
             "approved_by": fmt.person(plan.owner_approved_by) if plan.is_owner_approved else None,
             "approved_at": fmt.moment(plan.owner_approved_at) if plan.is_owner_approved else None,
         },
+        "options": _options(plan, plan.level, context["plan_required"]),
+        "compare": _compare(plan),
         "approval": _approval(context),
-        "actions": [action_row(action) for action in context["actions"]],
+        "actions": [plan_action_row(action, path_numbers, timeline) for action in actions],
+        "timeline": {key: value for key, value in timeline.items() if key != "bars"} if timeline else None,
         "add_action_url": reverse("actions:action_create", args=[plan.pk]) if context["can_add_action"] else None,
+        "remind_url": reverse("actions:plan_remind", args=[plan.pk]) if can_remind_owner(request.user, plan) else None,
         "reassessment": _reassessment(context),
         "reassess_url": reverse("actions:reassessment_create", args=[plan.pk]) if context["can_reassess"] else None,
         "comparison": comparison(context["comparison"]) if "comparison" in context else None,
@@ -271,6 +495,41 @@ SIGN_INTRO = {
 }
 
 
+# چهار گام امضای فیگما ۰۸، به ترتیب امضا: عنوان گام، نام در زیرعنوان کارت و توضیح گامی که این پذیرش لازمش ندارد.
+STEPS = {
+    "owner": ("مالک ریسک", "مالک ریسک", ""),
+    "unit_manager": ("مدیر واحد ریسک", "یکی از مدیران خود واحد ریسک", "برای سطح متوسط یا پذیرش غیرعادی"),
+    "committee": ("تصمیم کمیته امنیت", "تصمیم کمیته امنیت", "فقط برای سطح بالا و بحرانی"),
+    "senior_management": (
+        "مجوز مدیریت ارشد",
+        "مجوز مدیریت ارشد",
+        "برای عبور از حد تحمل مشتری یا ارزیابی ناقص خدمت حیاتی",
+    ),
+}
+CHANNELS = {
+    "owner": "خودش در سامانه",
+    "unit_manager": "خودش در سامانه",
+    "committee": "ثبت از روی صورت‌جلسه",
+    "senior_management": "ثبت از روی نامه",
+}
+
+
+def _who(authority, acceptance, user, managers, mine):
+    """سطر «چه کسی» زیر گامی که هنوز امضا نشده است."""
+    risk = acceptance.risk
+    if authority == "owner":
+        name = fmt.person(risk.owner)["name"] if risk.owner_id else "-"
+        return f"{name} (شما)" if mine else name
+    if authority == "unit_manager":
+        if mine:
+            return f"{user.get_full_name() or user.username} (شما) · {risk.org_unit} · نه واحد بالادست"
+        names = "، ".join(managers) or "هیچ‌کس"
+        return f"مدیران واحد «{risk.org_unit}»: {names} · نه واحد بالادست"
+    if authority == "committee":
+        return "عضو کمیته امنیت با شماره یا تاریخ صورت‌جلسه ثبت می‌کند"
+    return "عضو GRC با شماره، تاریخ و فایل نامه ثبت می‌کند"
+
+
 def _signature(row, acceptance):
     signature = row["signature"]
     authority = row["authority"]
@@ -280,6 +539,7 @@ def _signature(row, acceptance):
             "approved": signature.is_approval,
             "by": fmt.person(signature.created_by),
             "at": fmt.moment(signature.created_at),
+            "channel": CHANNELS[authority],
             "reference_kind": "صورت‌جلسه" if authority == "committee" else "نامه",
             "reference": signature.reference,
             "reference_date": fmt.day(signature.reference_date),
@@ -290,6 +550,73 @@ def _signature(row, acceptance):
     return item
 
 
+def _steps(context, acceptance, user):
+    """همه‌ی چهار گام امضا (فیگما ۰۸): گام لازم با امضا یا انتظارش، و گام لازم‌نشده با «لازم نیست»."""
+    required = {row["authority"]: row for row in context["rows"]}
+    mine = {form.initial["authority"] for form in context["sign_forms"]}
+    managers = [fmt.person(person)["name"] for person in context["unit_managers"]]
+    steps = []
+    for authority, (title, _, hint) in STEPS.items():
+        row = required.get(authority)
+        if row is None:
+            steps.append(
+                {
+                    "authority": authority,
+                    "label": title,
+                    "required": False,
+                    "reason": hint,
+                    "signature": None,
+                    "waiting": False,
+                    "mine": False,
+                    "who": "",
+                }
+            )
+            continue
+        item = {**_signature({**row, "label": title}, acceptance), "required": True, "mine": authority in mine}
+        item["who"] = "" if item["signature"] else _who(authority, acceptance, user, managers, item["mine"])
+        if authority == "unit_manager" and item["signature"] is None:
+            item["candidates"] = {"unit": str(acceptance.risk.org_unit), "names": managers}
+        steps.append(item)
+    return steps
+
+
+def _validity(acceptance, cap, level):
+    """کارت «دوره‌ی اعتبار»: آغاز، امروز، دو یادآوری و پایان روی یک خط، به درصد از آغاز تا پایان."""
+    start, end = acceptance.start_date, acceptance.end_date
+    total = max(1, (end - start).days)
+    today = timezone.localdate()
+    first, second = reminder_days(acceptance)
+
+    def at(day):
+        return round(min(max((day - start).days / total, 0), 1) * 100, 2)
+
+    marks = [
+        {"key": "start", "label": "آغاز", "day": fmt.day(start), "at": 0},
+        {
+            "key": "first",
+            "label": f"یادآوری {first} روزه",
+            "day": fmt.day(end - timedelta(days=first)),
+            "at": at(end - timedelta(days=first)),
+        },
+        {
+            "key": "second",
+            "label": f"یادآوری {second} روزه",
+            "day": fmt.day(end - timedelta(days=second)),
+            "at": at(end - timedelta(days=second)),
+        },
+        {"key": "end", "label": "پایان اعتبار", "day": fmt.day(end), "at": 100},
+    ]
+    if start <= today <= end:
+        marks.insert(1, {"key": "today", "label": "امروز", "day": fmt.day(today), "at": at(today)})
+    return {
+        "note": f"سقف سطح {level.name} {level.acceptance_value} {level.get_acceptance_unit_display()} از آغاز · تمدید "
+        "خودکار ندارد؛ ادامه یعنی پذیرش تازه با همه‌ی امضاها",
+        "progress": at(today),
+        "marks": marks,
+        "cap": fmt.day(cap),
+    }
+
+
 def acceptance_detail(context, request):
     acceptance, risk, assessment, level = (
         context["acceptance"],
@@ -298,18 +625,26 @@ def acceptance_detail(context, request):
         context["level"],
     )
     closed = acceptance.status in (AS.REJECTED, AS.REVOKED)
-    managers = [fmt.person(user)["name"] for user in context["unit_managers"]]
-    signatures = [_signature(row, acceptance) for row in context["rows"]]
-    for item in signatures:
-        if item["authority"] == "unit_manager" and item["signature"] is None:
-            item["candidates"] = {"unit": str(risk.org_unit), "names": managers}
+    steps = _steps(context, acceptance, request.user)
+    required = [step for step in steps if step["required"]]
     problems = list(context["problems"])
+    if context["temporary"]:
+        kind = "پذیرش موقت"
+    elif context["non_normal"]:
+        kind = "پذیرش غیرعادی"
+    else:
+        kind = "پذیرش عادی"
     return {
-        "title": f"پذیرش {acceptance.code}",
+        "title": f"پذیرش ریسک باقیمانده — {risk.title}",
         "acceptance": {
             "id": acceptance.pk,
             "code": acceptance.code,
             "state": acceptance_state(acceptance),
+            "kind": kind,
+            "approvals": sum(bool(step["signature"] and step["signature"]["approved"]) for step in required),
+            "required": len(required),
+            "locked": acceptance.status != AS.DRAFT,
+            "decision_preview": acc.decision_text(acceptance) if not acceptance.decision_text else "",
             "days_left": acceptance.days_left if acceptance.status == AS.ACTIVE else None,
             "decision_text": acceptance.decision_text,
             "closed": {
@@ -337,6 +672,8 @@ def acceptance_detail(context, request):
         "risk": {**_risk(risk), "owner": fmt.person(risk.owner)},
         "assessment": {
             **_ref(assessment),
+            "kind": assessment.get_kind_display(),
+            "status": assessment.get_status_display(),
             "method_version": assessment.method_version.number,
             "score": assessment.score_high,
             "confidence": assessment.get_confidence_display() or None,
@@ -364,7 +701,9 @@ def acceptance_detail(context, request):
         "submit_url": reverse("actions:acceptance_submit", args=[acceptance.pk])
         if context["can_submit"] and not problems
         else None,
-        "signatures": signatures,
+        "signatures": steps,
+        "signers": f"سطح {level.name}: " + " + ".join(STEPS[step["authority"]][1] for step in required),
+        "validity": _validity(acceptance, context["cap"], level),
         "sign_url": reverse("actions:acceptance_sign", args=[acceptance.pk]),
         "sign_forms": [
             {

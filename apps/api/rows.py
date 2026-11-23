@@ -1,5 +1,7 @@
 """ردیف‌هایی که چند صفحه به یک شکل نشان می‌دهند: ریسک در جدول کوتاه ریسک‌ها، شاهد در فهرست شواهد و خانه‌ی جهان ریسک."""
 
+from urllib.parse import urlencode
+
 from django.urls import reverse
 
 from . import formatting as fmt
@@ -14,7 +16,7 @@ def risk_brief(risk):
         "status": fmt.choice(risk, "status"),
         "is_active": risk.is_active,
         "service": risk.service.code if risk.service_id else None,
-        "category": {"code": risk.category.code, "name": risk.category.name},
+        "category": fmt.category(risk.category),
         "owner": fmt.person(risk.owner),
         "href": risk.get_absolute_url(),
     }
@@ -44,9 +46,10 @@ def evidence_row(item):
     }
 
 
-def coverage_cell(cell, service, category, can_edit, back):
+def coverage_cell(cell, service, category, can_edit, back, create_url=None):
     """یک خانه‌ی جهان ریسک (risks/includes/coverage_cell.html). back همان ?next= است که ویرایش خانه بعد از ذخیره به
-    آن برمی‌گردد."""
+    آن برمی‌گردد. create_url نشانی «ثبت ریسک برای این خانه» است، برای کسی که ریسک ثبت می‌کند؛ خانه‌ی «نامرتبط» ریسک
+    نمی‌پذیرد."""
     # خانه‌ی ذخیره‌شده دسته و خدمتش را جدا می‌خواند؛ همان شیء‌های جدول جای آن می‌نشیند.
     cell.service, cell.category = service, category
     return {
@@ -54,9 +57,22 @@ def coverage_cell(cell, service, category, can_edit, back):
         "category_name": category.name,
         "status": fmt.choice(cell, "status"),
         "summary": cell.summary,
+        "reason": cell.reason,
+        "reviewed_by": fmt.person(cell.reviewed_by),
+        "reviewed_on": fmt.day(cell.reviewed_on),
         "risk_count": cell.risk_count,
         "risks_url": f"{reverse('risks:risk_list')}?service={service.pk}&category={category.pk}"
         if cell.risk_count
         else None,
         "edit_url": f"{reverse('risks:coverage_update', args=[service.pk, category.pk])}?{back}" if can_edit else None,
+        "create_risk_url": create_url if cell.status != cell.Status.NOT_RELEVANT else None,
     }
+
+
+def coverage_create_url(service, category, scenarios):
+    """«ثبت ریسک برای این خانه»: ریسک همیشه از یک سناریو ثبت می‌شود. اگر این خدمت و دسته دقیقاً یک سناریوی فعال
+    دارند ثبت ریسک از همان، وگرنه کتابخانه‌ی سناریو با همین خدمت و دسته."""
+    matches = scenarios.get((service.pk, category.pk), [])
+    if len(matches) == 1:
+        return f"{reverse('risks:risk_create')}?scenario={matches[0]}"
+    return f"{reverse('risks:scenario_list')}?{urlencode({'service': service.pk, 'category': category.pk})}"

@@ -47,6 +47,7 @@ from .services import (
     approve_plan,
     available_moves,
     can_move,
+    can_remind_owner,
     containment_due,
     create_plan,
     decision_due,
@@ -55,6 +56,7 @@ from .services import (
     plan_creation_problems,
     plan_problems,
     plan_required,
+    remind_owner,
     unverified_dependencies,
 )
 
@@ -135,7 +137,11 @@ class PlanDetailView(DetailView):
 
     def get_queryset(self):
         return visible_plans(self.request.user).select_related(
-            "risk__owner", "assessment__decision_level", "target_assessment__decision_level", "owner_approved_by"
+            "risk__owner",
+            "assessment__decision_level",
+            "target_assessment__decision_level",
+            "owner_approved_by",
+            "created_by",
         )
 
     def get_context_data(self, **kwargs):
@@ -144,7 +150,7 @@ class PlanDetailView(DetailView):
         approvable = can_approve_plan(user, plan)
         return super().get_context_data(
             risk=plan.risk,
-            actions=plan.actions.select_related("owner", "assignee", "verifier", "dimension"),
+            actions=plan.actions.select_related("owner", "assignee", "verifier", "dimension", "path"),
             problems=plan_problems(plan),
             pending=list(pending_actions(plan)),
             plan_required=plan_required(plan.level),
@@ -179,6 +185,20 @@ class PlanApproveView(View):
                 messages.error(request, problem)
         else:
             messages.success(request, "طرح مواجهه تأیید شد و اقدام‌هایش مصوب شدند.")
+        return redirect(plan.get_absolute_url())
+
+
+class PlanRemindView(View):
+    """دکمه‌ی «یادآوری به مالک» (فیگما ۰۷): اعلان داخلی برای مالک ریسک، روزی یک بار."""
+
+    def post(self, request, pk):
+        plan = get_object_or_404(visible_plans(request.user).select_related("risk__owner"), pk=pk)
+        if not can_remind_owner(request.user, plan):
+            raise PermissionDenied
+        if remind_owner(plan, request.user):
+            messages.success(request, f"یادآوری برای {plan.risk.owner.get_full_name()} فرستاده شد.")
+        else:
+            messages.info(request, "امروز یک بار یادآوری فرستاده شده است.")
         return redirect(plan.get_absolute_url())
 
 
@@ -550,7 +570,7 @@ class ReassessmentCreateView(CreateView):
         )
 
     def dispatch(self, request, *args, **kwargs):
-        if not can_edit_plans(request.user):
+        if not reassess.can_record(request.user, self.plan):
             raise PermissionDenied
         problems = reassess.reassessment_problems(self.plan)
         if problems:
@@ -583,3 +603,11 @@ class ReassessmentCreateView(CreateView):
             **compare(reassess.comparison_assessments(plan)),
             **kwargs,
         )
+
+
+class ActionVerifyView(View):
+    """«آزمون و تأیید نتیجه» فقط در رابط React است (فیگما ۲۴)؛ پیوند سرور به همان صفحه می‌رود."""
+
+    def get(self, request, pk):
+        get_object_or_404(visible_actions(request.user), pk=pk)
+        return redirect(f"/app/actions/{pk}/verify")

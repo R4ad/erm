@@ -1,26 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeftRight,
-  CalendarDays,
-  ChevronDown,
-  ClipboardCheck,
-  Columns3,
-  FilePlus2,
-  FileSearch,
-  FileText,
-  GitBranch,
-  GitMerge,
-  History,
-  Link2,
-  Lock,
-  MessageCircleQuestionMark,
-  PencilLine,
-  ShieldCheck,
-  Split,
-  SquareArrowOutUpLeft,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
@@ -28,9 +6,8 @@ import { AppLink } from "@/components/ui/app-link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardRow } from "@/components/ui/card";
 import { Deadline } from "@/components/ui/deadline";
-import { Checkbox } from "@/components/ui/field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,106 +15,63 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LevelBadge } from "@/components/ui/level-badge";
+import { Checkbox } from "@/components/ui/field";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { IconChip } from "@/components/ui/icon-chip";
+import { LevelBadge, ScoreChip } from "@/components/ui/level-badge";
+import { RISK_CLASSES, riskKey } from "@/components/ui/risk-level";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { Alert, EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MenuLink, MetaItem } from "@/features/records/dossier";
 import { Attachments, Comments } from "@/features/records/RecordSections";
-import { useGoTo, useRouteOf } from "@/features/session/links";
+import { useGoTo } from "@/features/session/links";
 import { get } from "@/lib/api";
-import { band, dateTime, formatNumber, longDate, safeExternalUrl, shortDate } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { dateTime, fa, faText, longDate, safeExternalUrl, shortDate } from "@/lib/format";
 import { useTitle } from "@/lib/hooks";
 import { t } from "@/lib/i18n";
-import type { RelatedRisk, RiskDetail } from "@/lib/types";
+import type {
+  LatestResult,
+  RelatedRisk,
+  RiskBanner,
+  RiskControl,
+  RiskDetail,
+  RiskStep,
+  TimelineEntry,
+  Transition,
+} from "@/lib/types";
 
-const TABS = ["overview", "workflow", "assessments", "treatment", "evidence", "comments"] as const;
+import { STATUS_TONES } from "./status";
+
+// زبانه‌های پرونده به ترتیب فیگما ۰۴.
+const TABS = [
+  "overview",
+  "assessments",
+  "treatment",
+  "controls",
+  "evidence",
+  "questions",
+  "timeline",
+  "files",
+] as const;
 type Tab = (typeof TABS)[number];
 
-const score = band;
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "خلاصه",
+  assessments: "ارزیابی‌ها",
+  treatment: "طرح مواجهه",
+  controls: "کنترل‌ها",
+  evidence: "شواهد",
+  questions: "پرسش‌ها",
+  timeline: "خط زمانی",
+  files: "پیوست و نظر",
+};
 
-function Hero({ risk }: { risk: RiskDetail }) {
-  return (
-    <Card className="relative overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 end-[-6rem] size-72 rounded-full blur-3xl"
-        style={{ background: risk.level ? risk.level.color : "var(--accent)", opacity: 0.12 }}
-      />
-      <div className="relative flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="neutral" className="code">
-              {risk.code}
-            </Badge>
-            <Badge tone={risk.is_active ? "accent" : "neutral"} dot>
-              {risk.status.label}
-            </Badge>
-            {risk.needs_completion && (
-              <Badge tone="warning">
-                <TriangleAlert aria-hidden />
-                نیازمند تکمیل
-              </Badge>
-            )}
-          </div>
-          <h1 className="text-display font-bold text-fg">{risk.title}</h1>
-          <p className="text-sm text-muted">
-            دسته‌ی {risk.category.name}، واحد {risk.org_unit}،{" "}
-            {risk.owner ? `مالک ${risk.owner.name}` : <span className="text-warning">هنوز بی‌مالک</span>}
-          </p>
-          <dl className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-xs text-muted">
-            <div className="flex items-center gap-1.5">
-              <dt className="sr-only">تاریخ ثبت</dt>
-              <CalendarDays aria-hidden className="size-3.5" />
-              <dd>
-                ثبت <time dateTime={risk.created_at.iso}>{longDate(risk.created_at)}</time>
-              </dd>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <dt className="sr-only">آخرین تغییر</dt>
-              <History aria-hidden className="size-3.5" />
-              <dd>تغییر {dateTime(risk.updated_at)}</dd>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <dt className="sr-only">کانال ورود</dt>
-              <ArrowLeftRight aria-hidden className="size-3.5" />
-              <dd>ورود از {risk.channel.label}</dd>
-            </div>
-          </dl>
-        </div>
-        <div className="flex shrink-0 flex-col gap-2 rounded-xl border border-line bg-surface/60 p-4 lg:min-w-56">
-          <p className="text-xs text-muted">سطح فعلی</p>
-          <LevelBadge level={risk.level} size="lg" />
-          <p className="text-xs text-muted">
-            {risk.score
-              ? `امتیاز ${score(risk.score)}، از آخرین ارزیابی جاری تأییدشده`
-              : "هنوز ارزیابی جاری تأییدشده‌ای ندارد."}
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
+/** شمار ردیف‌های خلاصه پیش از «همه»؛ فیگما چهار شاهد نشان می‌دهد. */
+const SUMMARY_EVIDENCE = 4;
 
-/** یک کار در منوی «کارهای دیگر»: در همین رابط اگر صفحه‌اش هست، وگرنه صفحه‌ی جنگو با نشانه‌اش. */
-function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
-  const route = useRouteOf()(href);
-  return (
-    <DropdownMenuItem asChild>
-      {route ? (
-        <Link to={route} viewTransition>
-          <Icon aria-hidden />
-          {label}
-        </Link>
-      ) : (
-        <a href={href}>
-          <Icon aria-hidden />
-          {label}
-          <span className="sr-only">({t("shell.classic")})</span>
-        </a>
-      )}
-    </DropdownMenuItem>
-  );
-}
+// ─────────────────────────────── سرپرونده ───────────────────────────────
 
 function Related({ risk }: { risk: RelatedRisk }) {
   return risk.href ? (
@@ -149,72 +83,119 @@ function Related({ risk }: { risk: RelatedRisk }) {
   );
 }
 
-function RelatedList({ risks }: { risks: RelatedRisk[] }) {
-  return risks.map((item, index) => (
-    <span key={item.code}>
-      {index > 0 && "، "}
-      <Related risk={item} />
-    </span>
-  ));
-}
+/** یک کار در منوها: در همین رابط اگر صفحه‌اش هست، وگرنه صفحه‌ی جنگو با نشانه‌اش. */
+const TRANSITION_ICONS: Record<string, IconName> = {
+  send_to_assessment: "flow",
+  back_to_register: "list",
+  ask_questions: "question",
+  reject: "x-circle",
+  approve: "check-circle",
+  start_treatment: "check-square",
+  start_review: "eye",
+  reassess: "gauge",
+  close: "lock",
+};
 
-function Actions({ risk }: { risk: RiskDetail }) {
-  const { transitions, pending_change: pending, merged_into, split_from, merged_risks, split_parts } = risk.workflow;
-  const extra: { href: string | null; label: string; icon: LucideIcon }[] = [
-    { href: risk.actions.edit, label: "ویرایش ریسک", icon: PencilLine },
-    { href: risk.actions.add_link, label: "افزودن پیوند بیرونی", icon: Link2 },
-    { href: risk.actions.add_evidence, label: "شاهد تازه", icon: FilePlus2 },
-    { href: risk.actions.propose_merge, label: "پیشنهاد ادغام", icon: GitMerge },
-    { href: risk.actions.propose_split, label: "پیشنهاد تفکیک", icon: Split },
-    { href: risk.actions.add_assessment, label: "ارزیابی تازه", icon: ClipboardCheck },
-    { href: risk.actions.add_plan, label: "طرح مواجهه‌ی تازه", icon: GitBranch },
-    { href: risk.actions.add_review ?? null, label: "ثبت محرک بازبینی", icon: CalendarDays },
-  ];
-  const available = extra.filter((action): action is { href: string; label: string; icon: LucideIcon } =>
-    Boolean(action.href),
-  );
-  const relations = merged_into || split_from || merged_risks.length > 0 || split_parts.length > 0;
+/** دکمه‌های سرپرونده‌ی فیگما: کار اصلی پررنگ، انتقال‌های دیگر با حاشیه، پیشنهاد ادغام یا تفکیک کم‌رنگ، و زیرشان
+ * دلیل انتقالی که هنوز فعال نیست. */
+function HeaderActions({ risk }: { risk: RiskDetail }) {
+  const { transitions, pending_change: pending } = risk.workflow;
+  const open = transitions.filter((transition) => !transition.problems?.length);
+  const blocked = transitions.filter((transition) => transition.problems?.length);
+  const plan = risk.treatment.current_plan;
+
+  let primary: { href: string; label: string; icon: IconName } | null = null;
+  const [first, ...others] = open;
+  let rest: Transition[] = open;
+  if (first) {
+    primary = { href: first.href, label: first.label, icon: TRANSITION_ICONS[first.name] ?? "flow" };
+    rest = others;
+  } else if (plan) {
+    primary = { href: plan.href, label: "مشاهده‌ی طرح مواجهه", icon: "clipboard" };
+  } else if (risk.actions.add_plan) {
+    primary = { href: risk.actions.add_plan, label: "نوشتن طرح مواجهه", icon: "clipboard" };
+  } else if (risk.actions.add_assessment) {
+    primary = { href: risk.actions.add_assessment, label: "ارزیابی تازه", icon: "gauge" };
+  }
+
+  const change = [
+    { href: risk.actions.propose_merge, label: "پیشنهاد ادغام", icon: "merge" as const },
+    { href: risk.actions.propose_split, label: "پیشنهاد تفکیک", icon: "flow" as const },
+  ].filter((item): item is { href: string; label: string; icon: "merge" | "flow" } => Boolean(item.href));
+  const more = [
+    { href: risk.actions.edit, label: "ویرایش ریسک", icon: "pencil" as IconName },
+    { href: risk.actions.add_link, label: "افزودن پیوند بیرونی", icon: "link" as IconName },
+    { href: risk.actions.add_assessment, label: "ارزیابی تازه", icon: "gauge" as IconName },
+    { href: plan ? null : risk.actions.add_plan, label: "طرح مواجهه‌ی تازه", icon: "clipboard" as IconName },
+    { href: risk.actions.add_review ?? null, label: "ثبت محرک بازبینی", icon: "calendar" as IconName },
+  ].filter((item): item is { href: string; label: string; icon: IconName } => Boolean(item.href));
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {transitions.map((transition, index) => (
+    <div className="flex flex-col gap-1.5 lg:items-end">
+      <div className="flex flex-wrap items-center gap-2 lg:flex-row-reverse lg:justify-start">
+        {primary && (
+          <AppLink href={primary.href} button={{ variant: "primary" }}>
+            <Icon name={primary.icon} size={18} />
+            {primary.label}
+          </AppLink>
+        )}
+        {rest.map((transition) => (
           <AppLink
             key={transition.name}
             href={transition.href}
             title={transition.description || undefined}
-            button={{ variant: index === 0 ? "primary" : "secondary" }}
+            button={{ variant: "outline" }}
           >
+            <Icon name={TRANSITION_ICONS[transition.name] ?? "flow"} size={18} />
             {transition.label}
           </AppLink>
         ))}
+        {change.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost">
+                <Icon name="merge" size={18} />
+                پیشنهاد ادغام یا تفکیک
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {change.map((item) => (
+                <MenuLink key={item.label} {...item} />
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="secondary">
-              کارهای دیگر
-              <ChevronDown aria-hidden />
+            <Button variant="quiet" size="icon" aria-label="کارهای دیگر پرونده">
+              <Icon name="dots" size={18} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {available.map((action) => (
-              <MenuLink key={action.label} {...action} />
+          <DropdownMenuContent align="end">
+            {more.map((item) => (
+              <MenuLink key={item.label} {...item} />
             ))}
-            {available.length > 0 && <DropdownMenuSeparator />}
+            {more.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem asChild>
               <a href={risk.actions.classic}>
-                <SquareArrowOutUpLeft aria-hidden className="ltr:-scale-x-100" />
+                <Icon name="arrow-left" size={16} />
                 پرونده در صفحه‌های فعلی
               </a>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {transitions.length === 0 && (
-        <p className="text-xs text-muted">
-          {risk.is_active ? "از وضعیت فعلی کاری در گردش کار با نقش شما نیست." : "این ریسک فقط سابقه است."}
+      {blocked.map((transition) => (
+        <p key={transition.name} className="flex items-start gap-1 text-xs text-ink-3">
+          <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+          <span>
+            «{transition.label}» هنوز فعال نیست: {transition.problems?.join(" ")}
+          </span>
         </p>
-      )}
+      ))}
+      {!risk.is_active && <p className="text-xs text-ink-3">این ریسک فقط سابقه است و ویرایش نمی‌شود.</p>}
       {pending && (
-        <Alert tone="warning">
+        <p className="text-xs text-warning">
           پیشنهاد {pending.label}
           {pending.merge_into && (
             <>
@@ -224,221 +205,749 @@ function Actions({ risk }: { risk: RiskDetail }) {
           )}{" "}
           منتظر تأیید مالک ریسک است.{" "}
           <AppLink href={pending.href}>{pending.can_decide ? "بررسی و تأیید یا رد" : "جزئیات"}</AppLink>
-        </Alert>
-      )}
-      {relations && (
-        <ul className="flex flex-col gap-1 text-xs text-muted">
-          {merged_into && (
-            <li>
-              این ریسک در <Related risk={merged_into} /> ادغام شده است.
-            </li>
-          )}
-          {split_from && (
-            <li>
-              از ریسک <Related risk={split_from} /> تفکیک شده است.
-            </li>
-          )}
-          {merged_risks.length > 0 && (
-            <li>
-              ریسک‌های ادغام‌شده در این ریسک: <RelatedList risks={merged_risks} />
-            </li>
-          )}
-          {split_parts.length > 0 && (
-            <li>
-              ریسک‌های تفکیک‌شده از این ریسک: <RelatedList risks={split_parts} />
-            </li>
-          )}
-        </ul>
+        </p>
       )}
     </div>
   );
 }
 
-function Prose({ children }: { children: ReactNode }) {
-  return <p className="text-sm leading-8 whitespace-pre-line text-fg/90">{children}</p>;
-}
-
-function Questions({ risk }: { risk: RiskDetail }) {
-  const questions = risk.workflow.questions;
-  if (!questions.length) return null;
+function RecordHeader({ risk }: { risk: RiskDetail }) {
+  const { merged_into, split_from } = risk.workflow;
+  const score = risk.score ? risk.score[1] : null;
   return (
-    <Card>
-      <CardHeader icon={<MessageCircleQuestionMark />} title="پرسش‌های ارزیابی" as="h3" />
-      <CardContent className="flex flex-col gap-3">
-        {questions.map((question, index) => (
-          <article key={index} className="rounded-xl border border-line bg-surface/50 p-4">
-            <blockquote className="border-s-2 border-accent-line ps-3 text-sm whitespace-pre-line text-fg">
-              {question.text}
-            </blockquote>
-            {question.is_open ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-                <span className="flex items-center gap-2">
-                  <Badge tone="warning" dot>
-                    منتظر جواب
-                  </Badge>
-                  پرسش {question.asked_by?.name}
-                </span>
-                <Deadline value={question.due} label="مهلت جواب" />
-              </div>
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <bdi className="code text-sm font-medium text-ink-2">{risk.code}</bdi>
+          <Badge tone={STATUS_TONES[risk.status.value] ?? "neutral"}>{risk.status.label}</Badge>
+          <LevelBadge level={risk.level} />
+          {score !== null && <ScoreChip score={score} level={risk.level} label="امتیاز تصمیم" />}
+          {risk.needs_completion && <Badge tone="warning">نیازمند تکمیل</Badge>}
+        </div>
+        <h1 className="text-h1 font-bold text-ink">{faText(risk.title)}</h1>
+        <dl className="flex max-w-[36rem] flex-wrap gap-x-4 gap-y-1.5">
+          <MetaItem icon="flow" label="واحد">
+            {risk.org_unit}
+          </MetaItem>
+          <MetaItem icon="tag" label="دسته">
+            {risk.category ? (
+              <>
+                <bdi>{risk.category.code}</bdi> {risk.category.name}
+              </>
             ) : (
-              <div className="mt-3 flex flex-col gap-1">
-                <Prose>{question.answer}</Prose>
-                <p className="text-xs text-muted">جواب {question.answered_by?.name}</p>
-              </div>
+              "هنوز تعیین نشده"
             )}
-          </article>
-        ))}
-        {questions.some((question) => question.is_open) && (
-          <p className="text-xs text-muted">
-            مدیر واحد این پرسش‌ها را در{" "}
-            <Link to="/questionnaires/risk-questions" viewTransition className="text-accent-text hover:underline">
-              پرسش‌های ریسک
-            </Link>{" "}
-            جواب می‌دهد.
+          </MetaItem>
+          {risk.scenario && (
+            <MetaItem icon="books" label="سناریو">
+              <AppLink href={risk.scenario.href} className="text-ink">
+                <bdi className="code">{risk.scenario.code}</bdi> · نسخه‌ی {fa(risk.scenario.version)}
+              </AppLink>
+              {risk.scenario.changed && <span className="ms-1 text-warning">(نسخه‌ی تازه‌تری دارد)</span>}
+            </MetaItem>
+          )}
+          {risk.service && (
+            <MetaItem icon="layers" label="خدمت">
+              {risk.service.href ? (
+                <AppLink href={risk.service.href} className="text-ink">
+                  {risk.service.name}
+                </AppLink>
+              ) : (
+                risk.service.name
+              )}
+            </MetaItem>
+          )}
+          {risk.customers.length > 0 && (
+            <MetaItem icon="buildings" label="بانک‌ها">
+              {risk.customers.map((name) => name.replace(/^بانک\s+/, "")).join("، ")}
+            </MetaItem>
+          )}
+          <MetaItem icon="user" label="مالک">
+            {risk.owner ? risk.owner.name : <span className="text-warning">بدون مالک</span>}
+          </MetaItem>
+        </dl>
+        {(merged_into || split_from) && (
+          <p className="text-xs text-ink-3">
+            {merged_into && (
+              <>
+                در <Related risk={merged_into} /> ادغام شده است.
+              </>
+            )}
+            {split_from && (
+              <>
+                {" "}
+                از <Related risk={split_from} /> تفکیک شده است.
+              </>
+            )}
           </p>
         )}
+      </div>
+      <HeaderActions risk={risk} />
+    </header>
+  );
+}
+
+// ─────────────────────────────── مراحل و مهلت ───────────────────────────────
+
+/** روی صفحه‌ی باریک نوار مراحل اسکرول می‌خورد؛ مرحله‌ی فعلی را بدون جابه‌جا کردن صفحه در دید می‌آورد. */
+function showCurrent(card: HTMLDivElement | null) {
+  const current = card?.querySelector<HTMLElement>('[aria-current="step"]');
+  if (!card || !current || card.scrollWidth <= card.clientWidth) return;
+  const cardBox = card.getBoundingClientRect();
+  const box = current.getBoundingClientRect();
+  card.scrollLeft += box.left + box.width / 2 - (cardBox.left + cardBox.width / 2);
+}
+
+function Stepper({ steps }: { steps: RiskStep[] }) {
+  const reached = (step: RiskStep | undefined) => step !== undefined && step.state !== "todo";
+  return (
+    <Card ref={showCurrent} className="relative overflow-x-auto px-3 py-4">
+      <ol aria-label="مراحل گردش کار" className="flex min-w-[42rem]">
+        {steps.map((step, index) => {
+          const prev = steps[index - 1];
+          const next = steps[index + 1];
+          return (
+            <li
+              key={step.status}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center"
+              aria-current={step.state === "current" ? "step" : undefined}
+            >
+              <span aria-hidden className="flex w-full items-center">
+                <span
+                  className={cn("h-0.5 flex-1", !prev ? "invisible" : reached(step) ? "bg-brand" : "bg-line-strong")}
+                />
+                <span
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-full",
+                    step.state === "done" && "bg-brand text-white",
+                    step.state === "current" && "border-2 border-gold bg-gold-subtle",
+                    step.state === "todo" && "border-[1.5px] border-line-strong bg-panel",
+                    step.state === "skipped" && "border-[1.5px] border-dashed border-line-strong bg-subtle",
+                  )}
+                >
+                  {step.state === "done" && <Icon name="check" size={14} />}
+                  {step.state === "current" && <span className="size-2 rounded-full bg-gold" />}
+                </span>
+                <span
+                  className={cn("h-0.5 flex-1", !next ? "invisible" : reached(next) ? "bg-brand" : "bg-line-strong")}
+                />
+              </span>
+              <span
+                className={cn(
+                  "px-1",
+                  step.state === "current" ? "text-sm font-semibold text-ink" : "text-xs font-medium",
+                  step.state === "done" && "text-ink",
+                  (step.state === "todo" || step.state === "skipped") && "text-ink-3",
+                )}
+              >
+                {step.label}
+                <span className="sr-only">
+                  {
+                    {
+                      done: " (انجام‌شده)",
+                      current: " (مرحله‌ی فعلی)",
+                      todo: " (پیش رو)",
+                      skipped: " (این ریسک از این مرحله نگذشت)",
+                    }[step.state]
+                  }
+                </span>
+              </span>
+              {step.date && (
+                <span className="text-xs text-ink-3">
+                  {step.state === "current" && "از "}
+                  <time dateTime={step.date.iso}>{shortDate(step.date)}</time>
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
+function DeadlineBanner({ banner, active, onTab }: { banner: RiskBanner; active: boolean; onTab: (tab: Tab) => void }) {
+  const danger = banner.tone === "danger";
+  return (
+    <section
+      aria-label="مهلت"
+      className={cn(
+        "flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3",
+        danger ? "border-danger bg-danger-subtle" : "border-warning bg-warning-subtle",
+      )}
+    >
+      <Icon name="clock" size={20} className={cn("shrink-0", danger ? "text-danger" : "text-warning")} />
+      <div className="flex min-w-[min(100%,16rem)] flex-1 flex-col gap-0.5">
+        <p className={cn("text-sm font-semibold", danger ? "text-danger" : "text-warning")}>{banner.title}</p>
+        <p className="text-xs text-ink-2">{banner.text}</p>
+      </div>
+      {active && (
+        <p className="flex items-center gap-1 text-xs text-ink-3">
+          <Icon name="x-circle" size={12} />
+          مسیر پایانی دیگر: ردشده (با دلیل و تاریخ جلسه)
+        </p>
+      )}
+      {banner.link && (
+        <AppLink href={banner.link.href} button={{ variant: "ghost", size: "sm" }}>
+          {banner.link.label}
+          <Icon name="arrow-left" size={16} />
+        </AppLink>
+      )}
+      {banner.tab && TABS.includes(banner.tab as Tab) && (
+        <Button variant="ghost" size="sm" onClick={() => onTab(banner.tab as Tab)}>
+          دیدن {TAB_LABELS[banner.tab as Tab]}
+          <Icon name="arrow-left" size={16} />
+        </Button>
+      )}
+    </section>
+  );
+}
+
+// ─────────────────────────────── کارت‌های خلاصه ───────────────────────────────
+
+function Metric({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-md bg-subtle px-3 py-2.5">
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className="text-stat font-bold text-ink tabular">{value === null ? "نامعلوم" : fa(value)}</dd>
+    </div>
+  );
+}
+
+function LatestResultCard({ latest }: { latest: LatestResult | null }) {
+  if (!latest) {
+    return (
+      <Card>
+        <CardHeader as="h3" title="نتیجه‌ی آخرین ارزیابی جاری" />
+        <CardContent>
+          <p className="text-sm text-ink-3">هنوز ارزیابی جاری تأییدشده‌ای ندارد؛ سطح ریسک از آن می‌آید.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const tone = RISK_CLASSES[riskKey(latest.level)];
+  const subtitle = [
+    latest.code,
+    latest.approved_at && `تأییدشده ${shortDate(latest.approved_at)}`,
+    `نسخه‌ی روش ${fa(latest.method_version)}`,
+    `افق ${fa(latest.horizon_months)} ماه`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Card>
+      <CardHeader
+        as="h3"
+        title="نتیجه‌ی آخرین ارزیابی جاری"
+        description={<bdi>{subtitle}</bdi>}
+        actions={
+          <AppLink href={latest.href} button={{ variant: "ghost", size: "sm" }}>
+            پرونده‌ی ارزیابی
+            <Icon name="arrow-left" size={16} />
+          </AppLink>
+        }
+      />
+      <CardContent className="flex flex-col gap-3.5">
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <Metric label="آغازگر (A)" value={latest.a} />
+          <Metric label="قابلیت تحقق (B)" value={latest.b} />
+          <Metric label="احتمال (L)" value={latest.likelihood} />
+          <Metric label="پیامد (I)" value={latest.impact} />
+          <Metric label="امتیاز (L×I)" value={latest.score} />
+          <div className={cn("flex flex-col gap-1 rounded-md border px-3 py-2.5", tone.bg, tone.border)}>
+            <dt className={cn("text-xs", tone.fg)}>سطح تصمیم</dt>
+            <dd className={cn("text-stat font-bold", tone.fg)}>{latest.level?.name ?? "ناقص"}</dd>
+          </div>
+        </dl>
+        <div className="flex flex-col gap-1">
+          {latest.explanation && <p className="text-sm leading-6 text-ink-2">{latest.explanation}</p>}
+          <p className="text-xs text-ink-3">{latest.note}</p>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function Timeline({ risk }: { risk: RiskDetail }) {
-  const entries = risk.workflow.timeline;
-  if (!entries.length) return null;
+function AssessmentsCard({
+  risk,
+  selectable = false,
+  onCompare,
+}: {
+  risk: RiskDetail;
+  selectable?: boolean;
+  onCompare?: () => void;
+}) {
+  const [picked, setPicked] = useState<number[]>([]);
+  const goTo = useGoTo();
+  const comparable = risk.assessments.length > 1;
+  const canCompare = picked.length >= 2 && picked.length <= 4;
+  const header = (
+    <CardHeader
+      as={selectable ? "h2" : "h3"}
+      title="ارزیابی‌ها"
+      description="ارزیابی حذف نمی‌شود و روی ارزیابی قبلی نمی‌نویسد"
+      className="pb-4"
+      actions={
+        comparable && !selectable && onCompare ? (
+          <Button variant="outline" size="sm" onClick={onCompare}>
+            <Icon name="layers" size={16} />
+            مقایسه‌ی ارزیابی‌ها
+          </Button>
+        ) : risk.actions.add_assessment && selectable ? (
+          <AppLink href={risk.actions.add_assessment} button={{ variant: "ghost", size: "sm" }}>
+            <Icon name="plus" size={16} />
+            ارزیابی تازه
+          </AppLink>
+        ) : undefined
+      }
+    />
+  );
+  if (!risk.assessments.length) {
+    return (
+      <Card>
+        {header}
+        <CardContent>
+          <EmptyState as="h3" icon={<Icon name="gauge" size={20} />} title="هنوز ارزیابی‌ای ثبت نشده" />
+        </CardContent>
+      </Card>
+    );
+  }
   return (
-    <Card>
-      <CardHeader icon={<History />} title="گردش کار" description="تازه‌ترین بالا" as="h3" />
-      <CardContent>
-        {/* reversed شماره‌ها را از قدیمی‌ترین (۱) نگه می‌دارد، هرچند تازه‌ترین بالاست. */}
-        <ol
-          reversed
-          className="relative flex flex-col gap-5 ps-6 before:absolute before:inset-y-1 before:start-[0.4375rem] before:w-px before:bg-line"
-        >
-          {entries.map((entry, index) => (
-            <li key={index} className="relative">
-              <span
-                aria-hidden
-                className={
-                  "absolute -start-6 top-1.5 size-3.5 rounded-full border-2 border-panel " +
-                  (index === 0 ? "bg-accent shadow-[0_0_0_4px_var(--accent-soft)]" : "bg-line-strong")
-                }
-              />
-              <p className="text-sm text-fg">
-                از «{entry.from}» به <span className="font-semibold">«{entry.to}»</span>
-              </p>
-              {entry.reason && <Prose>{entry.reason}</Prose>}
-              <p className="mt-0.5 text-xs text-muted">
-                {entry.by?.name}، {dateTime(entry.at)}
-                {entry.meeting_date && `، جلسه‌ی ${longDate(entry.meeting_date)}`}
-              </p>
+    <Card className="overflow-clip">
+      {header}
+      <ul className="border-t border-line">
+        {risk.assessments.map((assessment) => {
+          const current = assessment.kind.value === "current";
+          return (
+            <li key={assessment.id}>
+              <CardRow className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {selectable && comparable && (
+                  <Checkbox
+                    label={<span className="sr-only">مقایسه‌ی {assessment.code}</span>}
+                    checked={picked.includes(assessment.id)}
+                    onChange={(event) =>
+                      setPicked((items) =>
+                        event.target.checked ? [...items, assessment.id] : items.filter((id) => id !== assessment.id),
+                      )
+                    }
+                  />
+                )}
+                <AppLink href={assessment.href} className="code text-sm font-medium text-ink">
+                  {assessment.code}
+                </AppLink>
+                <span
+                  className={cn(
+                    "inline-flex h-5 min-w-14 items-center justify-center rounded-sm px-2 text-xs font-medium",
+                    current ? "bg-brand-subtle text-brand" : "bg-subtle text-ink-2",
+                  )}
+                >
+                  {assessment.kind.label}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs text-ink-3">
+                  <bdi>{assessment.detail}</bdi>
+                </span>
+                <ScoreChip score={assessment.score ? assessment.score[1] : null} level={assessment.level} />
+                <LevelBadge level={assessment.level} />
+                <Badge tone={assessment.status.value === "approved" ? "success" : "neutral"}>
+                  {assessment.status.label}
+                </Badge>
+              </CardRow>
+            </li>
+          );
+        })}
+      </ul>
+      {selectable && comparable && (
+        <CardFooter>
+          <span aria-live="polite">
+            {picked.length > 4 ? "حداکثر چهار ارزیابی را انتخاب کنید." : "دو تا چهار ارزیابی؛ قدیمی‌ترین ستون اول است."}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!canCompare}
+            onClick={() => goTo(`/assessments/compare/?${picked.map((id) => `id=${id}`).join("&")}`)}
+          >
+            <Icon name="layers" size={16} />
+            مقایسه‌ی انتخاب‌شده‌ها
+          </Button>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+const E_CLASSES: Record<number, string> = {
+  1: "border-danger text-danger",
+  2: "border-warning text-warning",
+  3: "border-brand text-brand",
+  4: "border-success text-success",
+  5: "border-success text-success",
+};
+
+function ControlsCard({ risk, as = "h3" }: { risk: RiskDetail; as?: "h2" | "h3" }) {
+  const add = risk.actions.edit && (
+    <AppLink href={risk.actions.edit} button={{ variant: "ghost", size: "sm" }}>
+      <Icon name="plus" size={16} />
+      افزودن کنترل
+    </AppLink>
+  );
+  return (
+    <Card className="overflow-clip">
+      <CardHeader
+        as={as}
+        title="کنترل‌های فعلی"
+        description="کنترل بدون شاهد اثربخشی E1 حساب می‌شود، نه «نامعلوم»"
+        className="pb-4"
+        actions={add}
+      />
+      {risk.controls.length ? (
+        <ul className="border-t border-line">
+          {risk.controls.map((control: RiskControl) => (
+            <li key={control.code}>
+              <CardRow className="flex items-center gap-3">
+                <IconChip icon="shield-check" tone="neutral" />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  {control.href ? (
+                    <AppLink href={control.href} className="text-base font-medium text-ink">
+                      {faText(control.title)}
+                    </AppLink>
+                  ) : (
+                    <span className="text-base font-medium text-ink">{faText(control.title)}</span>
+                  )}
+                  <span className="text-xs text-ink-3">
+                    <bdi className="code font-medium">{control.code}</bdi> · {control.kind}
+                    {control.iso.length > 0 && (
+                      <>
+                        {" "}
+                        · نگاشت <bdi>{control.iso.join("، ")}</bdi>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {control.no_valid_evidence ? (
+                  <Badge tone="danger" title={control.problem ?? undefined}>
+                    بدون شاهد معتبر
+                  </Badge>
+                ) : (
+                  control.is_key && <Badge tone="gold">کلیدی</Badge>
+                )}
+                <span
+                  className={cn(
+                    "inline-grid h-[1.5625rem] min-w-[2.1875rem] place-items-center rounded-sm border-[1.5px] px-2 text-sm font-medium",
+                    E_CLASSES[control.e] ?? E_CLASSES[1],
+                  )}
+                >
+                  <span className="sr-only">اثربخشی </span>
+                  <bdi>E{control.e}</bdi>
+                </span>
+              </CardRow>
             </li>
           ))}
+        </ul>
+      ) : (
+        <CardContent>
+          <p className="text-sm text-ink-3">کنترلی به این ریسک وصل نیست.</p>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function TimelineCard({ entries, full = false }: { entries: TimelineEntry[]; full?: boolean }) {
+  return (
+    <Card>
+      <CardHeader
+        as={full ? "h2" : "h3"}
+        title="خط زمانی"
+        description="هر انتقال با انجام‌دهنده، زمان و دلیل؛ ویرایش و حذف نمی‌شود"
+      />
+      <CardContent>
+        <ol className="flex flex-col">
+          {entries.map((entry, index) => {
+            const last = index === entries.length - 1;
+            return (
+              <li key={`${entry.at.iso}-${index}`} className="flex gap-3">
+                <span aria-hidden className="flex w-2.5 shrink-0 flex-col items-center pt-1.5">
+                  <span
+                    className={cn(
+                      "size-2.5 shrink-0 rounded-full",
+                      entry.by === null ? "bg-ink-3" : index === 0 ? "bg-warning" : "bg-brand",
+                    )}
+                  />
+                  {!last && <span className="mt-1 w-0.5 flex-1 bg-line" />}
+                </span>
+                <div className={cn("flex min-w-0 flex-1 flex-col gap-0.5", !last && "pb-4")}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <p className="text-sm font-semibold text-ink">{entry.label}</p>
+                    <time dateTime={entry.at.iso} className="text-xs text-ink-3">
+                      {full ? dateTime(entry.at) : shortDate(entry.at)}
+                    </time>
+                  </div>
+                  {entry.reason && <p className="text-xs text-ink-2">{faText(entry.reason)}</p>}
+                  {full && entry.meeting_date && (
+                    <p className="text-xs text-ink-3">جلسه‌ی {longDate(entry.meeting_date)}</p>
+                  )}
+                  <p className="text-xs text-ink-3">
+                    {entry.by ? [entry.by.name, entry.role].filter(Boolean).join(" · ") : "سامانه"}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </CardContent>
     </Card>
   );
 }
 
-function Assessments({ risk }: { risk: RiskDetail }) {
-  const [picked, setPicked] = useState<number[]>([]);
-  const goTo = useGoTo();
-  if (!risk.assessments.length) {
-    return <EmptyState as="h3" icon={<ClipboardCheck />} title="هنوز ارزیابی‌ای ثبت نشده" />;
-  }
-  // مقایسه مثل فرم صفحه‌ی ریسک جنگو: ?id=…&id=…، که جنگو به ترتیب ثبت می‌چیند تا قدیمی‌ترین ستون اول باشد.
-  const comparable = risk.assessments.length > 1;
-  const canCompare = picked.length >= 2 && picked.length <= 4;
+function EvidenceCard({
+  risk,
+  limit,
+  onAll,
+  as = "h3",
+}: {
+  risk: RiskDetail;
+  limit?: number;
+  onAll?: () => void;
+  as?: "h2" | "h3";
+}) {
+  const items = limit ? risk.evidence.slice(0, limit) : risk.evidence;
+  const description = [
+    `${fa(risk.evidence.length)} شاهد`,
+    risk.key_evidence_age && `قدمت مجاز شاهد کنترل کلیدی ${fa(risk.key_evidence_age)} روز`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <div className="flex flex-col gap-3">
-      <Card className="table-shell overflow-clip">
-        <table className="data-table">
-          <caption className="sr-only">ارزیابی‌های این ریسک</caption>
-          <thead>
-            <tr>
-              {comparable && (
-                <th scope="col" className="w-0">
-                  <span className="sr-only">انتخاب برای مقایسه</span>
-                </th>
-              )}
-              <th scope="col">کد</th>
-              <th scope="col">نوع</th>
-              <th scope="col">وضعیت</th>
-              <th scope="col">سطح</th>
-              <th scope="col">امتیاز</th>
-              <th scope="col">تأیید</th>
-            </tr>
-          </thead>
-          <tbody>
-            {risk.assessments.map((assessment) => (
-              <tr key={assessment.id}>
-                {comparable && (
-                  <td data-label="مقایسه" className="w-0">
-                    <Checkbox
-                      label={<span className="sr-only">مقایسه‌ی {assessment.code}</span>}
-                      checked={picked.includes(assessment.id)}
-                      onChange={(event) =>
-                        setPicked((current) =>
-                          event.target.checked
-                            ? [...current, assessment.id]
-                            : current.filter((id) => id !== assessment.id),
-                        )
-                      }
-                    />
-                  </td>
-                )}
-                <td data-primary>
-                  <AppLink href={assessment.href} className="code">
-                    {assessment.code}
+    <Card className="overflow-clip">
+      <CardHeader
+        as={as}
+        title="شواهد"
+        description={description}
+        className="pb-4"
+        actions={
+          risk.actions.add_evidence && (
+            <AppLink href={risk.actions.add_evidence} button={{ variant: "ghost", size: "sm" }}>
+              <Icon name="plus" size={16} />
+              افزودن<span className="sr-only"> شاهد</span>
+            </AppLink>
+          )
+        }
+      />
+      {items.length ? (
+        <ul className="border-t border-line">
+          {items.map((item) => (
+            <li key={item.code}>
+              <CardRow className="flex items-start gap-2.5 py-2.5">
+                <Icon
+                  name={item.confidential ? "lock" : "file-text"}
+                  size={18}
+                  className="mt-0.5 shrink-0 text-ink-3"
+                />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <AppLink href={item.href} className="truncate text-sm text-ink">
+                    {faText(item.title)}
                   </AppLink>
-                </td>
-                <td data-label="نوع">{assessment.kind.label}</td>
-                <td data-label="وضعیت">
-                  <Badge tone={assessment.status.value === "approved" ? "success" : "neutral"}>
-                    {assessment.status.label}
-                  </Badge>
-                </td>
-                <td data-label="سطح">
-                  <LevelBadge level={assessment.level} />
-                </td>
-                <td data-label="امتیاز" data-empty={assessment.score ? undefined : ""} className="tabular">
-                  {score(assessment.score)}
-                </td>
-                <td
-                  data-label="تأیید"
-                  data-empty={assessment.approved_at ? undefined : ""}
-                  className="whitespace-nowrap text-muted"
-                >
-                  {assessment.approved_at && shortDate(assessment.approved_at)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      {comparable && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!canCompare}
-            onClick={() => goTo(`/assessments/compare/?${picked.map((id) => `id=${id}`).join("&")}`)}
-          >
-            <Columns3 aria-hidden />
-            مقایسه‌ی انتخاب‌شده‌ها
-          </Button>
-          <span className="text-xs text-muted" aria-live="polite">
-            {picked.length > 4 ? "حداکثر چهار ارزیابی را انتخاب کنید." : "دو تا چهار ارزیابی؛ قدیمی‌ترین ستون اول است."}
-          </span>
-        </div>
+                  <span className="text-xs text-ink-3">
+                    <bdi className="code font-medium">{item.code}</bdi> · {item.kind} ·{" "}
+                    {item.confidential
+                      ? "محرمانه"
+                      : item.valid_until
+                        ? `اعتبار تا ${shortDate(item.valid_until)}`
+                        : `اعتبار ${item.reliability}`}
+                  </span>
+                </div>
+                {item.expired ? (
+                  <Badge tone="danger">منقضی</Badge>
+                ) : (
+                  item.confidential && <Badge tone="neutral">محرمانه</Badge>
+                )}
+              </CardRow>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <CardContent>
+          <p className="text-sm text-ink-3">هنوز شاهدی به این ریسک وصل نیست.</p>
+        </CardContent>
       )}
+      {onAll && limit && risk.evidence.length > limit && (
+        <CardFooter className="justify-center">
+          <Button variant="link" onClick={onAll}>
+            دیدن همه‌ی {fa(risk.evidence.length)} شاهد
+          </Button>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+function LinksCard({ risk }: { risk: RiskDetail }) {
+  if (!risk.links.length && !risk.actions.add_link) return null;
+  return (
+    <Card>
+      <CardHeader
+        as="h3"
+        title="پیوندهای بیرونی"
+        actions={
+          risk.actions.add_link && (
+            <AppLink href={risk.actions.add_link} button={{ variant: "ghost", size: "sm" }}>
+              <Icon name="plus" size={16} />
+              افزودن<span className="sr-only"> پیوند بیرونی</span>
+            </AppLink>
+          )
+        }
+      />
+      <CardContent>
+        {risk.links.length ? (
+          <ul className="flex flex-col gap-2">
+            {risk.links.map((link) => {
+              const url = safeExternalUrl(link.url);
+              const ref = <bdi className="code text-sm font-medium">{link.ref}</bdi>;
+              return (
+                <li key={`${link.kind}-${link.ref}`} className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-ink-3">{link.kind}</span>
+                  <span className="flex items-center gap-2">
+                    {link.edit_url && (
+                      <a
+                        href={link.edit_url}
+                        aria-label={`ویرایش پیوند ${link.ref} (${t("shell.classic")})`}
+                        className="grid size-6 place-items-center text-ink-3 hover:text-ink"
+                      >
+                        <Icon name="pencil" size={14} />
+                      </a>
+                    )}
+                    {url ? (
+                      <a href={url} rel="noopener noreferrer" target="_blank" className="text-brand hover:underline">
+                        {ref}
+                        <span className="sr-only"> (در برگه‌ی تازه)</span>
+                      </a>
+                    ) : (
+                      <span className="text-brand">{ref}</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-ink-3">پیوندی به سامانه‌های دیگر ثبت نشده است.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  if (children === null || children === undefined || children === "" || children === false) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className="text-sm whitespace-pre-line text-ink">{children}</dd>
     </div>
+  );
+}
+
+/** شرح و مشخصات ثبت ریسک؛ فیگما خلاصه را از نتیجه شروع می‌کند و این کارت پایین ستون اصلی است. */
+function DescriptionCard({ risk }: { risk: RiskDetail }) {
+  const snapshot = Boolean(risk.scenario_snapshot && Object.keys(risk.scenario_snapshot).length);
+  return (
+    <Card>
+      <CardHeader as="h3" title={snapshot ? "سناریوی ثبت‌شده" : "شرح ریسک"} />
+      <CardContent className="flex flex-col gap-4">
+        <p className="text-sm leading-7 whitespace-pre-line text-ink-2">{faText(risk.description)}</p>
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <Fact label="عامل آغازگر">{risk.initiator}</Fact>
+          {snapshot ? (
+            <Fact label="مسیر مشخص تحقق">{risk.realization_path}</Fact>
+          ) : (
+            <>
+              <Fact label="دامنه">{risk.scope}</Fact>
+              <Fact label="واحد شمارش">{risk.count_unit}</Fact>
+              <Fact label="طبقه‌ی اطلاعات">{risk.data_class?.label}</Fact>
+              <Fact label="برچسب CIA">{risk.cia && <bdi className="code">{risk.cia}</bdi>}</Fact>
+            </>
+          )}
+          <Fact label="کانال ورود">{risk.channel.label}</Fact>
+          <Fact label="ثبت">{longDate(risk.created_at)}</Fact>
+          <Fact label="برچسب‌ها">{risk.tags.length > 0 && risk.tags.join("، ")}</Fact>
+          <Fact label="توضیحات اضافه">{risk.additional_notes}</Fact>
+          <Fact label="موارد خارج از شمارش">{risk.count_exclusions}</Fact>
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─────────────────────────────── زبانه‌های دیگر ───────────────────────────────
+
+function Questions({ risk }: { risk: RiskDetail }) {
+  const questions = risk.workflow.questions;
+  if (!questions.length) {
+    return <EmptyState as="h3" icon={<Icon name="question" size={20} />} title="پرسشی برای این ریسک طرح نشده" />;
+  }
+  return (
+    <Card className="overflow-clip">
+      <CardHeader as="h2" title="پرسش‌های ارزیابی" description="پرسش‌هایی که برای ارزیابی از واحد ریسک پرسیده شد" />
+      <ul className="border-t border-line">
+        {questions.map((question, index) => (
+          <li key={index}>
+            <CardRow className="flex flex-col gap-2">
+              <p className="text-sm font-medium whitespace-pre-line text-ink">{faText(question.text)}</p>
+              {question.is_open ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-ink-3">
+                  <span className="flex items-center gap-2">
+                    <Badge tone="warning" dot>
+                      منتظر جواب
+                    </Badge>
+                    پرسش {question.asked_by?.name}
+                  </span>
+                  <Deadline value={question.due} label="مهلت جواب" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 border-s-2 border-line ps-3">
+                  <p className="text-sm whitespace-pre-line text-ink-2">{faText(question.answer)}</p>
+                  <p className="text-xs text-ink-3">
+                    پرسش {question.asked_by?.name} · جواب {question.answered_by?.name}
+                  </p>
+                </div>
+              )}
+            </CardRow>
+          </li>
+        ))}
+      </ul>
+      {questions.some((question) => question.is_open) && (
+        <CardFooter>
+          <span>
+            مدیر واحد این پرسش‌ها را در{" "}
+            <Link to="/questionnaires/risk-questions" viewTransition className="text-brand hover:underline">
+              پرسش‌های ریسک
+            </Link>{" "}
+            جواب می‌دهد.
+          </span>
+        </CardFooter>
+      )}
+    </Card>
   );
 }
 
 function Treatment({ risk }: { risk: RiskDetail }) {
   const { current_plan: plan, plan_due: due, acceptances } = risk.treatment;
   if (!plan && !due && !acceptances.length) {
-    return <EmptyState as="h3" icon={<GitBranch />} title="هنوز طرح مواجهه یا پذیرشی ندارد" />;
+    return (
+      <EmptyState
+        as="h3"
+        icon={<Icon name="clipboard" size={20} />}
+        title="هنوز طرح مواجهه یا پذیرشی ندارد"
+        action={
+          risk.actions.add_plan && (
+            <AppLink href={risk.actions.add_plan} button={{ variant: "primary", size: "sm" }}>
+              نوشتن طرح مواجهه
+            </AppLink>
+          )
+        }
+      />
+    );
   }
   return (
     <div className="flex flex-col gap-4">
@@ -450,14 +959,14 @@ function Treatment({ risk }: { risk: RiskDetail }) {
       {plan && (
         <Card className="overflow-clip">
           <CardHeader
-            icon={<GitBranch />}
-            as="h3"
+            as="h2"
             title={
-              <AppLink href={plan.href} className="text-fg">
+              <AppLink href={plan.href} className="text-ink">
                 {plan.label}
               </AppLink>
             }
             description={`گزینه‌ی ${plan.option}`}
+            className="pb-4"
             actions={
               <Badge tone={plan.owner_approved ? "success" : "warning"} dot>
                 {plan.owner_approved ? "تأییدشده‌ی مالک ریسک" : "منتظر تأیید مالک ریسک"}
@@ -465,16 +974,18 @@ function Treatment({ risk }: { risk: RiskDetail }) {
             }
           />
           {plan.actions.length > 0 && (
-            <ul className="divide-y divide-line border-t border-line">
+            <ul className="border-t border-line">
               {plan.actions.map((action) => (
-                <li key={action.code} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <AppLink href={action.href} className="text-fg">
-                      <bdi className="code text-accent-text">{action.code}</bdi> {action.title}
-                    </AppLink>
-                    <span className="text-xs text-muted">{action.status}</span>
-                  </div>
-                  <Deadline value={action.due} />
+                <li key={action.code}>
+                  <CardRow className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <AppLink href={action.href} className="text-sm text-ink">
+                        <bdi className="code text-ink-3">{action.code}</bdi> {faText(action.title)}
+                      </AppLink>
+                      <span className="text-xs text-ink-3">{action.status}</span>
+                    </div>
+                    <Deadline value={action.due} />
+                  </CardRow>
                 </li>
               ))}
             </ul>
@@ -482,198 +993,53 @@ function Treatment({ risk }: { risk: RiskDetail }) {
         </Card>
       )}
       {acceptances.length > 0 && (
-        <Card>
-          <CardHeader icon={<ShieldCheck />} title="پذیرش‌ها" as="h3" />
-          <ul className="divide-y divide-line border-t border-line">
-            {acceptances.map((acceptance) => (
-              <li key={acceptance.code} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                <div className="flex flex-col gap-0.5">
-                  <AppLink href={acceptance.href} className="text-fg">
-                    پذیرش <bdi className="code">{acceptance.code}</bdi>
-                  </AppLink>
-                  <span className="text-xs text-muted">
-                    {acceptance.status}
-                    {acceptance.start &&
-                      acceptance.end &&
-                      `، از ${longDate(acceptance.start)} تا ${longDate(acceptance.end)}`}
-                  </span>
-                </div>
-                <LevelBadge level={acceptance.level} />
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function Evidence({ risk }: { risk: RiskDetail }) {
-  const add = risk.actions.add_evidence && (
-    <AppLink href={risk.actions.add_evidence} button={{ variant: "secondary", size: "sm" }}>
-      <FilePlus2 aria-hidden />
-      شاهد تازه
-    </AppLink>
-  );
-  return (
-    <div className="flex flex-col gap-4">
-      {risk.evidence.length ? (
         <Card className="overflow-clip">
-          <CardHeader icon={<FileSearch />} title="شواهد" as="h3" actions={add} />
-          <ul className="divide-y divide-line border-t border-line">
-            {risk.evidence.map((item) => (
-              <li key={item.code} className="flex items-start gap-3 px-5 py-4">
-                <FileSearch aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-accent-text" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <AppLink href={item.href} className="font-medium text-fg">
-                    {item.title}
-                  </AppLink>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <bdi className="code">{item.code}</bdi>
-                    <span>{item.kind}</span>
-                    <span>اعتبار {item.reliability}</span>
-                    {item.observed_on && <span>مشاهده {longDate(item.observed_on)}</span>}
-                    {item.expired && <Badge tone="danger">منقضی</Badge>}
-                    {item.confidential && (
-                      <Badge tone="info">
-                        <Lock aria-hidden />
-                        محرمانه
-                      </Badge>
-                    )}
+          <CardHeader as="h2" title="پذیرش‌ها" className="pb-4" />
+          <ul className="border-t border-line">
+            {acceptances.map((acceptance) => (
+              <li key={acceptance.code}>
+                <CardRow className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <AppLink href={acceptance.href} className="text-sm text-ink">
+                      پذیرش <bdi className="code">{acceptance.code}</bdi>
+                    </AppLink>
+                    <span className="text-xs text-ink-3">
+                      {acceptance.status}
+                      {acceptance.start &&
+                        acceptance.end &&
+                        `، از ${longDate(acceptance.start)} تا ${longDate(acceptance.end)}`}
+                    </span>
                   </div>
-                </div>
+                  <LevelBadge level={acceptance.level} />
+                </CardRow>
               </li>
             ))}
           </ul>
         </Card>
-      ) : (
-        <EmptyState as="h3" icon={<FileSearch />} title="هنوز شاهدی ندارد" action={add} />
       )}
-      <Attachments record={risk} as="h3" />
     </div>
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  if (children === null || children === undefined || children === "" || children === false) return null;
-  return (
-    <div className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-sm text-fg">{children}</dd>
-    </div>
-  );
-}
+// ─────────────────────────────── صفحه ───────────────────────────────
 
-function Facts({ risk }: { risk: RiskDetail }) {
-  return (
-    <Card className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
-      <CardHeader icon={<FileText />} title="مشخصات" as="h2" />
-      <CardContent>
-        <dl className="flex flex-col divide-y divide-line">
-          <Fact label="خدمت">
-            {risk.service &&
-              (risk.service.href ? <AppLink href={risk.service.href}>{risk.service.name}</AppLink> : risk.service.name)}
-          </Fact>
-          <Fact label="سناریو">
-            {risk.scenario && (
-              <span className="flex flex-wrap items-center gap-2">
-                <AppLink href={risk.scenario.href}>{risk.scenario.title}</AppLink>
-                {risk.scenario.changed && <Badge tone="warning">نسخه‌ی تازه‌تری دارد</Badge>}
-              </span>
-            )}
-          </Fact>
-          <Fact label="عامل آغازگر">{risk.initiator && <Prose>{risk.initiator}</Prose>}</Fact>
-          {risk.scenario_snapshot && Object.keys(risk.scenario_snapshot).length > 0 && (
-            <Fact label="مسیر مشخص تحقق">{risk.realization_path && <Prose>{risk.realization_path}</Prose>}</Fact>
-          )}
-          {(!risk.scenario_snapshot || Object.keys(risk.scenario_snapshot).length === 0) && (
-            <>
-              <Fact label="دامنه">{risk.scope && <Prose>{risk.scope}</Prose>}</Fact>
-              <Fact label="واحد شمارش">{risk.count_unit}</Fact>
-              <Fact label="طبقه‌ی اطلاعات">{risk.data_class?.label}</Fact>
-              <Fact label="برچسب CIA">{risk.cia && <bdi className="code">{risk.cia}</bdi>}</Fact>
-            </>
-          )}
-          <Fact label="بانک‌ها">{risk.customers.length > 0 && risk.customers.join("، ")}</Fact>
-          <Fact label="برچسب‌ها">
-            {risk.tags.length > 0 && (
-              <ul className="flex flex-wrap gap-1.5">
-                {risk.tags.map((tag) => (
-                  <li key={tag}>
-                    <Badge>{tag}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Fact>
-          <Fact label="کنترل‌ها">
-            {risk.controls.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {risk.controls.map((control) => (
-                  <li key={control.code} className="flex items-baseline gap-2">
-                    <bdi className="code text-xs text-muted">{control.code}</bdi>
-                    {control.href ? <AppLink href={control.href}>{control.title}</AppLink> : control.title}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Fact>
-          <Fact label="پیوندها">
-            {risk.links.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {risk.links.map((link) => {
-                  const url = safeExternalUrl(link.url);
-                  return (
-                    <li key={`${link.kind}-${link.ref}`} className="flex flex-wrap items-baseline gap-x-2">
-                      <span>
-                        {link.kind}:{" "}
-                        {url ? (
-                          <a
-                            href={url}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                            className="text-accent-text hover:underline"
-                          >
-                            <bdi>{link.ref}</bdi>
-                            <span className="sr-only"> (در برگه‌ی تازه)</span>
-                          </a>
-                        ) : (
-                          <bdi>{link.ref}</bdi>
-                        )}
-                      </span>
-                      {link.edit_url && (
-                        <AppLink href={link.edit_url} className="text-xs">
-                          ویرایش<span className="sr-only"> پیوند {link.ref}</span>
-                        </AppLink>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Fact>
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
+/** نشانی‌هایی که جنگو و ستون «اقدام بعدی» با # به پرونده می‌دهند. */
+const HASH_TABS: Partial<Record<string, Tab>> = {
+  "#attachments": "files",
+  "#comments": "files",
+  "#treatment": "treatment",
+  "#evidence": "evidence",
+  "#assessments": "assessments",
+  "#questions": "questions",
+  "#timeline": "timeline",
+};
 
 export function RiskDetailPage() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
+  const { hash } = useLocation();
   const risk = useQuery({ queryKey: ["risk", id], queryFn: ({ signal }) => get<RiskDetail>(`risks/${id}/`, signal) });
   useTitle(risk.data ? `${risk.data.code} ${risk.data.title}` : "پرونده‌ی ریسک");
-
-  const asked = params.get("tab");
-  // بعد از ذخیره‌ی پیوست یا نظر، جنگو به #attachments یا #comments همان پرونده برمی‌گرداند.
-  const { hash } = useLocation();
-  const fromHash: Partial<Record<string, Tab>> = {
-    "#attachments": "evidence",
-    "#comments": "comments",
-    "#treatment": "treatment",
-    "#evidence": "evidence",
-  };
-  const tab: Tab = TABS.includes(asked as Tab) ? (asked as Tab) : (fromHash[hash] ?? "overview");
 
   if (risk.isPending) return <PageSkeleton rows={6} />;
   if (risk.isError) {
@@ -686,23 +1052,16 @@ export function RiskDetailPage() {
   }
 
   const data = risk.data;
-  const counts: Record<Tab, number> = {
-    overview: 0,
-    workflow: data.workflow.timeline.length + data.workflow.questions.length,
+  const asked = params.get("tab");
+  const fromHash = hash === "#workflow" && data.status.value === "questions" ? "questions" : HASH_TABS[hash];
+  const tab: Tab = TABS.includes(asked as Tab) ? (asked as Tab) : (fromHash ?? "overview");
+  const counts: Partial<Record<Tab, number>> = {
     assessments: data.assessments.length,
-    treatment: data.treatment.acceptances.length + (data.treatment.current_plan ? 1 : 0),
-    evidence: data.evidence.length + data.attachments.length,
-    comments: data.comments.length,
+    controls: data.controls.length,
+    evidence: data.evidence.length,
+    questions: data.workflow.questions.length,
+    files: data.attachments.length + data.comments.length,
   };
-  const labels: Record<Tab, string> = {
-    overview: "شرح",
-    workflow: "گردش کار",
-    assessments: "ارزیابی‌ها",
-    treatment: "مواجهه",
-    evidence: "شواهد و پیوست‌ها",
-    comments: "نظرها",
-  };
-  const openQuestions = data.workflow.questions.filter((question) => question.is_open).length;
 
   function selectTab(value: string) {
     const next = new URLSearchParams(params);
@@ -712,89 +1071,65 @@ export function RiskDetailPage() {
   }
 
   return (
-    <article className="flex flex-col gap-6">
+    <article className="flex flex-col gap-4">
       <Breadcrumb
         items={[
           { label: "رجیستر ریسک", to: "/risks" },
           { label: data.code, code: true },
         ]}
       />
-      <Hero risk={data} />
-      <Actions risk={data} />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <Tabs value={tab} onValueChange={selectTab} className="min-w-0">
-          <TabsList aria-label="بخش‌های پرونده">
-            {TABS.map((name) => (
-              <TabsTrigger key={name} value={name} count={counts[name] ? formatNumber(counts[name]) : undefined}>
-                {labels[name]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <TabsContent value="overview" className="flex flex-col gap-4">
-            {openQuestions > 0 && (
-              <Alert tone="warning" title={`${formatNumber(openQuestions)} پرسش ارزیابی منتظر جواب است.`}>
-                <button
-                  type="button"
-                  className="text-accent-text hover:underline"
-                  onClick={() => selectTab("workflow")}
-                >
-                  دیدن پرسش‌ها در گردش کار
-                </button>
-              </Alert>
-            )}
-            <Card>
-              <CardHeader
-                icon={<FileText />}
-                title={
-                  data.scenario_snapshot && Object.keys(data.scenario_snapshot).length ? "سناریوی ثبت‌شده" : "شرح ریسک"
-                }
-                as="h2"
-              />
-              <CardContent className="flex flex-col gap-3">
-                <Prose>{data.description}</Prose>
-                {data.additional_notes && (
-                  <>
-                    <h3 className="text-sm font-semibold">توضیحات اضافه</h3>
-                    <Prose>{data.additional_notes}</Prose>
-                  </>
-                )}
-                {data.count_exclusions && (
-                  <p className="rounded-lg bg-surface px-3 py-2 text-xs text-muted">
-                    موارد خارج از شمارش: {data.count_exclusions}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="workflow" className="flex flex-col gap-4">
-            <h2 className="sr-only">{labels.workflow}</h2>
-            <Questions risk={data} />
-            <Timeline risk={data} />
-            {counts.workflow === 0 && (
-              <EmptyState as="h3" icon={<History />} title="هنوز جابه‌جایی‌ای در گردش کار ندارد" />
-            )}
-          </TabsContent>
-          <TabsContent value="assessments">
-            <h2 className="sr-only">{labels.assessments}</h2>
-            <Assessments risk={data} />
-          </TabsContent>
-          <TabsContent value="treatment">
-            <h2 className="sr-only">{labels.treatment}</h2>
-            <Treatment risk={data} />
-          </TabsContent>
-          <TabsContent value="evidence">
-            <h2 className="sr-only">{labels.evidence}</h2>
-            <Evidence risk={data} />
-          </TabsContent>
-          <TabsContent value="comments">
-            <h2 className="sr-only">{labels.comments}</h2>
-            <Comments record={data} as="h3" />
-          </TabsContent>
-        </Tabs>
-        <aside aria-label="مشخصات ریسک">
-          <Facts risk={data} />
-        </aside>
-      </div>
+      <RecordHeader risk={data} />
+      <Stepper steps={data.stepper} />
+      {data.banner && <DeadlineBanner banner={data.banner} active={data.is_active} onTab={selectTab} />}
+      <Tabs value={tab} onValueChange={selectTab} className="min-w-0">
+        <TabsList aria-label="بخش‌های پرونده" className="gap-5 px-0">
+          {TABS.map((name) => (
+            <TabsTrigger key={name} value={name} count={counts[name] ? fa(counts[name]) : undefined}>
+              {TAB_LABELS[name]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="overview">
+          <h2 className="sr-only">{TAB_LABELS.overview}</h2>
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22.5rem]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <LatestResultCard latest={data.latest} />
+              <AssessmentsCard risk={data} onCompare={() => selectTab("assessments")} />
+              <ControlsCard risk={data} />
+              <DescriptionCard risk={data} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              <TimelineCard entries={data.timeline} />
+              <EvidenceCard risk={data} limit={SUMMARY_EVIDENCE} onAll={() => selectTab("evidence")} />
+              <LinksCard risk={data} />
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="assessments">
+          <AssessmentsCard risk={data} selectable />
+        </TabsContent>
+        <TabsContent value="treatment">
+          <h2 className="sr-only">{TAB_LABELS.treatment}</h2>
+          <Treatment risk={data} />
+        </TabsContent>
+        <TabsContent value="controls">
+          <ControlsCard risk={data} as="h2" />
+        </TabsContent>
+        <TabsContent value="evidence">
+          <EvidenceCard risk={data} as="h2" />
+        </TabsContent>
+        <TabsContent value="questions">
+          <Questions risk={data} />
+        </TabsContent>
+        <TabsContent value="timeline">
+          <TimelineCard entries={data.timeline} full />
+        </TabsContent>
+        <TabsContent value="files" className="flex flex-col gap-4">
+          <h2 className="sr-only">{TAB_LABELS.files}</h2>
+          <Attachments record={data} as="h3" />
+          <Comments record={data} as="h3" />
+        </TabsContent>
+      </Tabs>
     </article>
   );
 }

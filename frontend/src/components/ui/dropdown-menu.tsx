@@ -58,6 +58,17 @@ export function DropdownMenuRadioItem({ className, children, ...props }: Compone
   );
 }
 
+export function DropdownMenuCheckboxItem({ className, children, ...props }: ComponentProps<typeof Menu.CheckboxItem>) {
+  return (
+    <Menu.CheckboxItem className={cn(item, "pe-8", className)} {...props}>
+      {children}
+      <Menu.ItemIndicator className="absolute end-2.5 flex items-center">
+        <Check className="text-brand!" />
+      </Menu.ItemIndicator>
+    </Menu.CheckboxItem>
+  );
+}
+
 export function DropdownMenuLabel({ className, ...props }: ComponentProps<typeof Menu.Label>) {
   return <Menu.Label className={cn("px-2.5 pt-1.5 pb-1 text-xs text-muted", className)} {...props} />;
 }

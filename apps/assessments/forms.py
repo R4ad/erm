@@ -144,8 +144,17 @@ class ImpactDetailForm(BootstrapFormMixin, forms.Form):
         if scale.code in UNITS:
             del self.fields["unit"]  # واحد S و F ثابت است
             self.fields["actual_value"].label = f"مقدار واقعی ({UNITS[scale.code]})"
+            self.fields["actual_value"].help_text = (
+                "زیان ناخالص برآوردی برای همین ذی‌نفع" if scale.code == FINANCIAL_SCALE else "مدت اختلال برای همین ذی‌نفع"
+            )
         if scale.code != FINANCIAL_SCALE:
             del self.fields["basis"]
+        else:
+            self.fields["basis"].help_text = (
+                "درآمد عملیاتی تأییدشده‌ی ۱۲ ماه اخیر داتین"
+                if customer is None
+                else "از پرونده‌ی بانک خوانده می‌شود و در همین ردیف می‌ماند"
+            )
         self.suggestion = self.compute_suggestion()
 
     @staticmethod

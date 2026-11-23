@@ -1,11 +1,17 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
+import { Card, CardHeader } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, Textarea } from "@/components/ui/field";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { Alert } from "@/components/ui/states";
+import { useRouteOf } from "@/features/session/links";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { faText } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import type { CodeRef, FormField } from "@/lib/types";
 
 // تکه‌های مشترک صفحه‌های پرونده (ارزیابی، طرح مواجهه، اقدام و پذیرش): بخش‌های شماره‌دار با پیوند #، فهرست
@@ -162,5 +168,64 @@ export function CodeLinks({ items }: { items: CodeRef[] }) {
         </AppLink>
       ))}
     </span>
+  );
+}
+
+/** یک کار در منوی «کارهای دیگر» پرونده؛ صفحه‌ای که هنوز در ری‌اکت نیست با برچسب صفحه‌ی فعلی باز می‌شود. */
+export function MenuLink({ href, label, icon }: { href: string; label: string; icon: IconName }) {
+  const route = useRouteOf()(href);
+  const content = (
+    <>
+      <Icon name={icon} size={16} />
+      {label}
+    </>
+  );
+  return (
+    <DropdownMenuItem asChild>
+      {route ? (
+        <Link to={route} viewTransition>
+          {content}
+        </Link>
+      ) : (
+        <a href={href}>
+          {content}
+          <span className="sr-only">({t("shell.classic")})</span>
+        </a>
+      )}
+    </DropdownMenuItem>
+  );
+}
+
+/** یک قلم سطر مشخصات زیر عنوان پرونده (فیگما ۰۴ تا ۰۷): آیکون، برچسب و مقدار. درون <dl> می‌آید. */
+export function MetaItem({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Icon name={icon} size={14} className="text-ink-3" />
+      <dt className="text-xs text-ink-3">{label}:</dt>
+      <dd className="text-xs font-medium text-ink">{children}</dd>
+    </div>
+  );
+}
+
+/** کارتی که خودش یک ناحیه‌ی نام‌دار است تا با فهرست ناحیه‌ها پیدا شود. */
+export function Panel({
+  title,
+  description,
+  actions,
+  className,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <Card role="region" aria-labelledby={id} className={className}>
+      <CardHeader as="h2" titleId={id} title={title} description={description} actions={actions} />
+      {children}
+    </Card>
   );
 }

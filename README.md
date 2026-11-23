@@ -41,6 +41,28 @@ docker compose --profile prod up -d --build
 docker compose exec web python manage.py createsuperuser
 ```
 
+### پشت nginx دیگر (HTTPS مشترک)
+
+اگر روی سرور پروژه‌ی دیگری پورت‌های 80 و 443 را دارد، nginx همان پروژه با نام دامنه‌ی جدا درخواست‌های سامانه را
+به nginx سامانه می‌فرستد. در ‎`.env` سامانه:
+
+```dotenv
+COMPOSE_FILE=docker-compose.yml:docker/behind-proxy.yml
+FRONT_PROXY_NETWORK=<شبکه‌ی Docker آن nginx، مثلاً other-project_default>
+HTTP_BIND=127.0.0.1:8081
+BEHIND_HTTPS_PROXY=True
+CSRF_TRUSTED_ORIGINS=https://erm.example.local
+ALLOWED_HOSTS=erm.example.local,localhost,127.0.0.1
+```
+
+این کارها را می‌کند:
+- nginx سامانه پورت 80 سرور را نمی‌گیرد و فقط روی `127.0.0.1:8081` باز است.
+- nginx سامانه به شبکه‌ی آن پروژه وصل می‌شود و آن‌جا با نام `erm-nginx` پیدا می‌شود.
+- نشانی کاربر و HTTPS بودن درخواست از سرآیندهای پروکسی جلویی خوانده می‌شود (`docker/nginx/nginx-behind-proxy.conf`).
+
+در nginx جلویی یک `server` با `server_name` همان نام و `proxy_pass http://erm-nginx:80` لازم است که
+`X-Forwarded-Proto https` و `X-Forwarded-For` را بفرستد.
+
 ## توسعه روی سیستم خودتان
 
 فقط پایگاه داده را با Docker بالا بیاورید (بدون پروفایل prod فقط `db` اجرا می‌شود):
@@ -76,6 +98,40 @@ pipenv run python manage.py check_schema
 مهاجرتی که در شاخه‌ای push شده، حتی اگر شاخه هنوز ادغام نشده، دیگر از نو ساخته یا ویرایش نمی‌شود؛ هر تغییر مدل
 مهاجرت تازه می‌گیرد. پایگاهی که نسخه‌ی قبلی را اجرا کرده، آن مهاجرت را اجراشده می‌داند و نسخه‌ی تازه را هیچ‌وقت
 اجرا نمی‌کند.
+
+## توسعه روی سرور
+
+`docker-compose.dev.yml` محیط توسعه‌ی کامل را با Docker بالا می‌آورد: پایگاه داده‌ی جدا، Django با `runserver` و رابط
+با `npm run dev`. هر دو روی کد همان پوشه کار می‌کنند و تغییرها بلافاصله دیده می‌شوند. روی سرور فقط Docker لازم
+است، نه پایتون و نه Node. این محیط را در پوشه‌ای جدا از نسخه‌ی تستی بگذارید (مثلاً `/opt/erm-dev`) و در ‎`.env` همان
+پوشه بنویسید:
+
+```dotenv
+COMPOSE_FILE=docker-compose.dev.yml
+ALLOWED_HOSTS=localhost,127.0.0.1
+```
+
+بعد:
+
+```bash
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+```
+
+رابط فقط روی `127.0.0.1:5173` سرور باز است، پس `DEBUG` روشن به شبکه نمی‌رسد. از راه تونل SSH باز می‌شود. VS Code با
+Remote-SSH این تونل را خودش می‌سازد، یا با `ssh -L 5173:127.0.0.1:5173 <سرور>`. بعد `http://localhost:5173/app/` را
+باز کنید. اگر پورت 5173 روی سرور گرفته است، در ‎`.env` بنویسید `DEV_PORT=5174`.
+
+تست‌ها و بررسی‌ها داخل همان کانتینرها اجرا می‌شوند:
+
+```bash
+docker compose exec web pytest
+docker compose exec frontend npm test
+docker compose exec frontend npm run lint
+```
+
+`Pipfile.lock` اگر عوض شد، `docker compose up -d --build` لازم است. `package-lock.json` اگر عوض شد،
+`docker compose restart frontend` کافی است.
 
 ## رابط تازه (React)
 

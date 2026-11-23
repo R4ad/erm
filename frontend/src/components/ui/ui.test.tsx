@@ -38,7 +38,7 @@ describe("Button", () => {
         <a href="/app/risks">رجیستر</a>
       </Button>,
     );
-    expect(screen.getByRole("link", { name: "رجیستر" })).toHaveClass("bg-accent");
+    expect(screen.getByRole("link", { name: "رجیستر" })).toHaveClass("bg-brand");
   });
 });
 
@@ -77,7 +77,7 @@ describe("LevelBadge", () => {
 
   it("says when a risk has not been assessed", () => {
     render(<LevelBadge level={null} />);
-    expect(screen.getByText("ارزیابی نشده")).toBeInTheDocument();
+    expect(screen.getByText("ارزیابی‌نشده")).toBeInTheDocument();
   });
 });
 

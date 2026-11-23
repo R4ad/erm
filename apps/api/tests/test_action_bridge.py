@@ -9,12 +9,13 @@ from django.utils import timezone
 
 from apps.accounts.roles import Role
 from apps.actions import acceptance as acc
-from apps.actions.models import RiskAcceptance, TreatmentAction
+from apps.actions.forms import ActionForm
+from apps.actions.models import MonitoringNotice, RiskAcceptance, TreatmentAction
 from apps.actions.services import approve_plan
 from apps.actions.tests import test_acceptance as acceptance_tests
 from apps.actions.tests import test_treatment as treatment
 from apps.api.routes import spa_route
-from apps.assessments.models import Assessment
+from apps.assessments.models import Assessment, Path
 from apps.catalog.tests.factories import make_user
 from apps.core.jalali import to_jalali
 from apps.risks.models import Evidence
@@ -106,8 +107,8 @@ def test_treatment_pages_have_react_routes(plan):
 
 def test_the_plan_waits_for_its_rules_then_the_owner_approves_it(api, grc, owner, assignee, verifier, plan):
     data = page(api(grc), plan.get_absolute_url()).json()
-    assert data["title"] == "طرح مواجهه: کاهش"
-    assert data["plan"]["state"] == {"value": "pending", "label": "منتظر تأیید مالک"}
+    assert data["title"] == f"طرح مواجهه — {plan.risk.title}"
+    assert data["plan"]["state"] == {"value": "pending", "label": "منتظر تأیید مالک ریسک"}
     assert data["plan"]["level"]["name"] == "بالا" and data["plan"]["plan_required"] is True
     approval = data["approval"]
     assert approval["approve_url"] is None and any("دست‌کم یک اقدام" in item for item in approval["problems"])
@@ -119,7 +120,12 @@ def test_the_plan_waits_for_its_rules_then_the_owner_approves_it(api, grc, owner
     target_for(plan, grc)
     # عضو GRC طرح را تأیید نمی‌کند؛ فقط می‌بیند که منتظر مالک ریسک است.
     approval = page(api(grc), plan.get_absolute_url()).json()["approval"]
-    assert approval == {"problems": [], "approve_url": None, "message": "", "waiting_for_owner": True}
+    assert {key: approval[key] for key in ("problems", "approve_url", "message", "waiting_for_owner")} == {
+        "problems": [],
+        "approve_url": None,
+        "message": "",
+        "waiting_for_owner": True,
+    }
     approval = page(api(owner), plan.get_absolute_url()).json()["approval"]
     assert approval["approve_url"] == reverse("actions:plan_approve", args=[plan.pk])
     assert "شما مالک این ریسک هستید" in approval["message"]
@@ -133,6 +139,115 @@ def test_the_plan_waits_for_its_rules_then_the_owner_approves_it(api, grc, owner
     row = data["actions"][0]
     assert row["code"] == action.code and row["status"]["value"] == ST.APPROVED
     assert row["owner"]["name"] == "رضا مالکی" and row["due"]["days_left"] is not None
+
+
+def test_the_plan_page_carries_the_figma_07_parts(api, grc, owner, assignee, verifier, plan):
+    """گزینه‌ها، جاری ← هدف، فهرست تأیید با برآورد، مهلت به روز کاری و زمان‌بندی اقدام‌ها با مسیر و بُعد پیامد."""
+    data = page(api(grc), plan.get_absolute_url()).json()
+    options = data["options"]
+    assert [item["value"] for item in options["items"]] == ["reduce", "avoid", "transfer", "accept"]
+    assert options["items"][0]["selected"] and options["items"][3]["disabled"]
+    assert "پذیرش" in options["note"] and "بالا" in options["note"]
+    assert data["compare"]["target"] is None and data["compare"]["needs_target"] is True
+    checks = data["approval"]["checks"]
+    assert {"label": "هر گزینه جز پذیرش دست‌کم یک اقدام دارد", "state": "fail"} in checks
+    assert {"label": "گزینه‌ی کاهش: ارزیابی هدف ثبت نشده است", "state": "fail"} in checks
+    assert data["approval"]["estimate"] is None and data["timeline"] is None
+    assert data["approval"]["owner"]["name"] == "رضا مالکی"
+    assert data["approval"]["owner_state"] == {"value": "pending", "label": "منتظر"}
+    assert data["plan"]["deadline"]["working_days"] >= 0 and data["plan"]["deadline"]["overdue"] is False
+    assert data["plan"]["author"] == {"id": grc.pk, "name": "سارا احمدی", "role": Role.GRC_MEMBER}
+
+    first = Path.objects.create(assessment=plan.assessment, name="ورود مستقیم", description="-", b0=4, b0_rationale="-")
+    second = Path.objects.create(
+        assessment=plan.assessment, name="حساب اضطراری", description="-", b0=3, b0_rationale="-"
+    )
+    treatment.make_action(
+        plan,
+        grc,
+        owner,
+        assignee,
+        verifier,
+        path=second,
+        cost=5_200_000_000,
+        person_hours=300,
+        start_date=date(2026, 11, 25),
+        due_date=date(2027, 1, 29),
+    )
+    scale = plan.assessment.method_version.scales.get(code="S")
+    treatment.make_action(
+        plan,
+        grc,
+        owner,
+        assignee,
+        verifier,
+        mechanism="impact",
+        dimension=scale,
+        start_date=date(2027, 1, 1),
+        due_date=date(2027, 2, 15),
+    )
+    target_for(plan, grc)
+    Assessment.objects.filter(pk=plan.target_assessment_id).update(
+        target_due=date(2027, 4, 4), assumptions="B مسیر ۲ به ۲", score_high=6
+    )
+    data = page(api(grc), plan.get_absolute_url()).json()
+    assert data["compare"]["target"]["is_approved"] and data["compare"]["target"]["due"]["jalali"] == "1406/01/15"
+    assert data["compare"]["target"]["assumptions"] == "B مسیر ۲ به ۲"
+    assert data["compare"]["target"]["level"]["name"] == "متوسط"
+    states = {check["label"]: check["state"] for check in data["approval"]["checks"]}
+    assert states["گزینه‌ی کاهش: ارزیابی هدف تأییدشده دارد"] == "ok"
+    assert states["هزینه و نفرساعت برای 1 از 2 اقدام"] == "warn"
+    assert data["approval"]["estimate"] == "5٫2 میلیارد ریال · 300 نفرساعت"
+    rows = data["actions"]
+    assert rows[0]["effect"] == {
+        "label": "مسیر 2 · B",
+        "kind": "likelihood",
+        "title": "امکان تحقق مسیر 2: حساب اضطراری",
+    }
+    assert rows[1]["effect"]["label"] == "پیامد S" and rows[1]["effect"]["kind"] == "impact"
+    assert [row["missing_cost"] for row in rows] == [False, True]
+    assert rows[0]["verifier"]["name"] == "لیلا آزمون" and rows[0]["acceptance"] == "آزمون مسیر"
+    timeline = data["timeline"]
+    assert timeline["label"] == "1405"
+    assert [month["label"] for month in timeline["months"]][-3:] == ["آذر", "دی", "بهمن"]
+    assert round(sum(month["width"] for month in timeline["months"])) == 100
+    for row in rows:
+        assert 0 <= row["bar"]["start"] and row["bar"]["start"] + row["bar"]["width"] <= 100.01
+    assert rows[0]["bar"]["start"] < rows[1]["bar"]["start"]
+    assert first.pk  # مسیر اول شماره‌ی ۱ را نگه می‌دارد، پس مسیر دوم «مسیر 2» است
+
+
+def test_the_plan_writer_reminds_the_owner_once_a_day(api, grc, owner, assignee, verifier, plan):
+    remind_url = reverse("actions:plan_remind", args=[plan.pk])
+    assert page(api(owner), plan.get_absolute_url()).json()["remind_url"] is None
+    assert send(api(owner), remind_url, {}).status_code in (400, 403)
+    assert page(api(grc), plan.get_absolute_url()).json()["remind_url"] == remind_url
+
+    first = send(api(grc), remind_url, {})
+    assert first.status_code == 200 and "یادآوری برای رضا مالکی فرستاده شد" in first.json()["message"]
+    notice = MonitoringNotice.objects.get(recipient=owner)
+    assert plan.risk.code in notice.message and notice.href == plan.get_absolute_url()
+    again = send(api(grc), remind_url, {})
+    assert again.status_code == 200 and "امروز یک بار" in again.json()["message"]
+    assert MonitoringNotice.objects.filter(recipient=owner).count() == 1
+
+    treatment.make_action(plan, grc, owner, assignee, verifier)
+    target_for(plan, grc)
+    approve_plan(plan, owner)
+    assert page(api(grc), plan.get_absolute_url()).json()["remind_url"] is None
+
+
+def test_the_action_path_belongs_to_the_base_assessment_and_only_to_b(grc, owner, assignee, verifier, plan):
+    own = Path.objects.create(assessment=plan.assessment, name="ورود مستقیم", description="-", b0=4, b0_rationale="-")
+    other = treatment.approved(treatment.make_risk(owner, "ریسک دیگر"), grc, "بالا", 12)
+    foreign = Path.objects.create(assessment=other, name="بیگانه", description="-", b0=4, b0_rationale="-")
+    data = treatment.action_data(owner, assignee, verifier)
+    form = ActionForm({**data, "path": own.pk, "mechanism": "a"}, plan=plan)
+    assert not form.is_valid() and "مسیر تحقق فقط برای سازوکار B است." in str(form.errors)
+    form = ActionForm({**data, "path": foreign.pk}, plan=plan)
+    assert not form.is_valid() and "path" in form.errors
+    form = ActionForm({**data, "path": own.pk}, plan=plan)
+    assert form.is_valid(), form.errors
 
 
 def test_an_action_moves_with_the_moves_its_person_may_make(api, grc, owner, assignee, verifier, risk, plan):
@@ -208,12 +323,26 @@ def test_an_acceptance_is_submitted_signed_and_revoked_through_its_views(api, gr
     assert data["acceptance"]["state"]["value"] == "draft" and data["problems"] == []
     assert data["submit_url"] == reverse("actions:acceptance_submit", args=[acceptance.pk])
     assert data["cap"]["until"] is not None and data["level"]["name"] == "پایین"
-    assert [row["authority"] for row in data["signatures"]] == ["owner"]
+    steps = data["signatures"]
+    assert [row["authority"] for row in steps] == ["owner", "unit_manager", "committee", "senior_management"]
+    assert [row["required"] for row in steps] == [True, False, False, False]
+    assert steps[2]["reason"] == "فقط برای سطح بالا و بحرانی" and steps[0]["who"] == "رضا مالکی"
+    assert data["signers"] == "سطح پایین: مالک ریسک"
+    assert data["acceptance"]["kind"] == "پذیرش عادی" and data["acceptance"]["locked"] is False
+    assert data["acceptance"]["approvals"] == 0 and data["acceptance"]["required"] == 1
+    assert data["acceptance"]["decision_preview"].startswith(f"ریسک باقیمانده‌ی {risk.code}")
+    marks = data["validity"]["marks"]
+    assert [mark["key"] for mark in marks][0] == "start" and marks[-1]["key"] == "end"
+    assert {"first", "second"} <= {mark["key"] for mark in marks}
+    assert all(0 <= mark["at"] <= 100 for mark in marks)
+    assert data["title"] == f"پذیرش ریسک باقیمانده — {risk.title}"
     assert data["sign_forms"] == [] and data["revoke"] is None
 
     assert send(api(grc), data["submit_url"], {}).status_code == 200
     data = page(api(owner), acceptance.get_absolute_url()).json()
     assert data["signatures"][0]["waiting"] and data["submit_url"] is None
+    assert data["signatures"][0]["mine"] and data["signatures"][0]["who"] == "رضا مالکی (شما)"
+    assert data["acceptance"]["locked"] is True
     sign = data["sign_forms"][0]
     assert sign["authority"] == "owner" and sign["label"] == "مالک ریسک"
     assert [field["name"] for field in sign["fields"]] == ["authority", "note"]
@@ -229,6 +358,8 @@ def test_an_acceptance_is_submitted_signed_and_revoked_through_its_views(api, gr
     data = page(api(grc), acceptance.get_absolute_url()).json()
     assert data["acceptance"]["state"]["value"] == "active" and data["acceptance"]["decision_text"]
     assert data["signatures"][0]["signature"]["approved"] and data["signatures"][0]["signature"]["by"]["name"]
+    assert data["signatures"][0]["signature"]["channel"] == "خودش در سامانه"
+    assert data["acceptance"]["approvals"] == 1 and data["acceptance"]["decision_preview"] == ""
     assert data["revoke"]["url"] == reverse("actions:acceptance_revoke", args=[acceptance.pk])
     assert [field["name"] for field in data["revoke"]["fields"]] == ["reason"]
 
@@ -269,8 +400,26 @@ def test_the_senior_management_letter_is_sent_as_multipart(client, grc, owner, u
     assert response.status_code == 200, response.json()
     signature = acceptance.signatures.get()
     assert signature.letter.original_name == "letter.pdf"
-    row = next(item for item in page(client, acceptance.get_absolute_url()).json()["signatures"] if item["signature"])
+    data = page(client, acceptance.get_absolute_url()).json()
+    row = next(item for item in data["signatures"] if item["signature"])
     assert row["signature"]["reference_kind"] == "نامه" and row["signature"]["letter"]
+    assert row["signature"]["channel"] == "ثبت از روی نامه"
+    assert data["signers"] == "سطح متوسط: مالک ریسک + یکی از مدیران خود واحد ریسک + مجوز مدیریت ارشد"
+    manager = next(item for item in data["signatures"] if item["authority"] == "unit_manager")
+    assert manager["who"].startswith("مدیران واحد") and "مینا مدیر" in manager["who"]
+    assert manager["candidates"]["names"] == ["مینا مدیر"]
+
+
+def test_the_unit_manager_signs_in_their_own_step(api, grc, owner, unit_manager):
+    risk = acceptance_tests.risk_at(owner, grc, "متوسط", 6)
+    unit_manager.managed_units.add(risk.org_unit)
+    acceptance = acceptance_tests.make_acceptance(risk, grc)
+    acc.submit_acceptance(acceptance, grc)
+    data = page(api(unit_manager), acceptance.get_absolute_url()).json()
+    step = next(item for item in data["signatures"] if item["authority"] == "unit_manager")
+    assert step["mine"] and step["waiting"] and step["who"] == f"مینا مدیر (شما) · {risk.org_unit} · نه واحد بالادست"
+    assert [form["authority"] for form in data["sign_forms"]] == ["unit_manager"]
+    assert data["acceptance"]["state"]["value"] == "pending" and data["acceptance"]["required"] == 2
 
 
 def test_the_plan_and_acceptance_forms_open_through_the_bridge(api, grc, owner, plan):

@@ -144,6 +144,15 @@ class TreatmentAction(TimeStampedModel):
         related_name="+",
         help_text="فقط وقتی اقدام یک بُعد پیامد را تغییر می‌دهد.",
     )
+    path = models.ForeignKey(
+        "assessments.Path",
+        verbose_name="مسیر تحقق",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="treatment_actions",
+        help_text="برای سازوکار B: مسیری از ارزیابی مبنا که اقدام امکان تحققش را کم می‌کند.",
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="مالک اقدام", on_delete=models.PROTECT, related_name="owned_actions"
     )
@@ -174,6 +183,12 @@ class TreatmentAction(TimeStampedModel):
     acceptance_criteria = models.TextField(
         "معیار قبولی", help_text="گزارش اجرا، آزمون پوشش، نتیجه‌ی مانور یا تست مسیر، و آستانه‌ی قبول."
     )
+    test_setting = models.CharField(
+        "شرایط آزمون",
+        max_length=300,
+        blank=True,
+        help_text="محیط و پنجره‌ی آزمون یا مانور، مثلاً «مانور در پنجره‌ی تغییر شبانه · محیط تولید با ترافیک کنترل‌شده».",
+    )
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.PLANNED, editable=False)
     evidence = models.ManyToManyField(
         "risks.Evidence", verbose_name="شاهد اجرا", blank=True, related_name="treatment_actions"
@@ -196,6 +211,7 @@ class TreatmentAction(TimeStampedModel):
                 condition=Q(mechanism="impact", dimension__isnull=False) | (~Q(mechanism="impact") & Q(dimension=None)),
                 name="action_dimension_only_for_impact",
             ),
+            models.CheckConstraint(condition=Q(path=None) | Q(mechanism="b"), name="action_path_only_for_b"),
             models.CheckConstraint(condition=~Q(verifier=F("assignee")), name="action_verifier_not_assignee"),
             models.CheckConstraint(condition=~Q(verifier=F("owner")), name="action_verifier_not_owner"),
             models.CheckConstraint(condition=~Q(deliverable="") & ~Q(acceptance_criteria=""), name="action_testable"),
@@ -247,6 +263,67 @@ class ActionUpdate(TimeStampedModel):
     @property
     def changes_status(self):
         return self.from_status != self.to_status
+
+
+class ActionCriterion(models.Model):
+    """یک معیار قبولی سنجش‌پذیر اقدام (فیگما ۲۴): هدف، نتیجه‌ی اندازه‌گیری و وضعیت. معیار «خارج از دامنه» نتیجه‌ی
+    اقدام را مخدوش نمی‌کند و برایش اقدام پیگیری جدا ساخته می‌شود. معیاری که «سنجه‌ی اثر» است (مثل زمان بازگردانی)
+    مقدار پیش از اقدام را هم دارد تا اثر اقدام بر بُعد پیامد کنار ارزیابی مبنا دیده شود."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "سنجیده نشده"
+        PASSED = "passed", "قبول"
+        FAILED = "failed", "رد"
+        OUT_OF_SCOPE = "out_of_scope", "خارج از دامنه"
+
+    action = models.ForeignKey(TreatmentAction, verbose_name="اقدام", on_delete=models.CASCADE, related_name="criteria")
+    title = models.CharField("معیار قبولی", max_length=200)
+    target = models.CharField("هدف", max_length=200, blank=True, help_text="مثلاً «حداکثر ۲۰ دقیقه».")
+    result = models.CharField("نتیجه‌ی اندازه‌گیری", max_length=200, blank=True)
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.PENDING)
+    note = models.TextField("توضیح", blank=True, help_text="برای «خارج از دامنه»: چرا، و پیگیری‌اش چیست.")
+    measures_effect = models.BooleanField(
+        "سنجه‌ی اثر", default=False, help_text="سنجه‌ای که اثر اقدام بر بُعد پیامد را نشان می‌دهد."
+    )
+    baseline = models.CharField("مقدار پیش از اقدام", max_length=100, blank=True, help_text="مثلاً «۷۵ دقیقه».")
+
+    class Meta:
+        verbose_name = "معیار قبولی اقدام"
+        verbose_name_plural = "معیارهای قبولی اقدام"
+        ordering = ["action", "pk"]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def in_scope(self):
+        return self.status != self.Status.OUT_OF_SCOPE
+
+
+class ActionTestRun(TimeStampedModel):
+    """یک اجرای آزمون یا مانور اقدام. اجرای ناموفق پاک نمی‌شود تا تاریخچه‌ی آزمون و اقدام اصلاحی دیده شود."""
+
+    action = models.ForeignKey(
+        TreatmentAction, verbose_name="اقدام", on_delete=models.CASCADE, related_name="test_runs"
+    )
+    performed_on = models.DateField("تاریخ اجرا")
+    passed = models.BooleanField("موفق")
+    outcome = models.CharField("نتیجه", max_length=100, blank=True, help_text="مثلاً «۱۷ دقیقه».")
+    description = models.TextField("شرح", help_text="چه اجرا شد، چه دیده شد و ناظر.")
+    evidence = models.ForeignKey(
+        "risks.Evidence", verbose_name="گزارش اجرا", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="ثبت‌کننده", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = "اجرای آزمون اقدام"
+        verbose_name_plural = "اجراهای آزمون اقدام"
+        ordering = ["action", "performed_on", "pk"]
+
+    def __str__(self):
+        return f"{self.action.code} · {self.performed_on}"
 
 
 class RiskAcceptance(TimeStampedModel):
@@ -461,6 +538,9 @@ class Reassessment(TimeStampedModel):
     می‌کند. بازسنجی ویرایش و حذف نمی‌شود."""
 
     class Decision(models.TextChoices):
+        # پایش فعال (فیگما ۲۵): هدف طرح محقق شده و ریسک در سطح هدف با بازبینی دوره‌ای سطحش پایش می‌شود؛ مثل
+        # پذیرش، طرح دور تازه گزینه‌ی پذیرش دارد.
+        MONITOR = "monitor", "پایش فعال"
         ACCEPT = "accept", "پذیرش ریسک باقیمانده"
         CONTINUE = "continue", "ادامه‌ی اصلاح"
 
@@ -557,3 +637,22 @@ class MonitoringNotice(TimeStampedModel):
         verbose_name_plural = "اعلان‌های پایش"
         ordering = ["-created_at", "-pk"]
         constraints = [models.UniqueConstraint(fields=["recipient", "event_key"], name="monitor_notice_once")]
+
+
+class NoticePreference(models.Model):
+    """کانال‌های دریافت اعلان پایش هر کاربر (فیگما ۲۰). اعلان درون سامانه همیشه ثبت می‌شود؛ ایمیل و پیامک و یادآوری
+    به جانشین ترجیح کاربر است و با پیکربندی درگاه ارسال به کار می‌رود."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notice_preference", verbose_name="کاربر"
+    )
+    email = models.BooleanField("ایمیل سازمانی (خلاصه‌ی روزانه)", default=True)
+    sms = models.BooleanField("پیامک (فقط محرک فوری و بحرانی)", default=True)
+    delegate = models.BooleanField("یادآوری به جانشین هنگام تفویض", default=False)
+
+    class Meta:
+        verbose_name = "ترجیح اعلان"
+        verbose_name_plural = "ترجیح‌های اعلان"
+
+    def __str__(self):
+        return f"ترجیح اعلان {self.user}"

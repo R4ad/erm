@@ -11,13 +11,14 @@ from apps.accounts.roles import Role
 from apps.assessments.models import Assessment
 from apps.assessments.services import create_assessment
 from apps.audit.models import AuditEvent
-from apps.catalog.tests.factories import make_user
+from apps.catalog.models import Customer
+from apps.catalog.tests.factories import make_service, make_user
 from apps.core.jalali import to_jalali
 from apps.methodology.models import MethodVersion
 from apps.organization.models import OrgUnit
 from apps.questionnaires.models import Option, PendingRisk, Question, Questionnaire, Response
 from apps.risks.models import Risk, RiskCategory
-from apps.workflow.models import RiskQuestion
+from apps.workflow.models import RiskQuestion, StatusTransition
 
 pytestmark = pytest.mark.django_db
 
@@ -61,6 +62,15 @@ def make_risk(title, unit, **fields):
     return Risk.objects.create(title=title, **values)
 
 
+# کارکرد، رویداد، شرایط و پیامد پیش از ارسال پاسخ کلاسیک لازم‌اند (فیگما ۱۰).
+REQUIRED_FIXED = {
+    "functions": "تسویه‌ی روزانه",
+    "disruptive_event": "قطع شبکه",
+    "conditions": "خرابی سوئیچ",
+    "consequence": "توقف تسویه",
+}
+
+
 def make_questionnaire():
     questionnaire = Questionnaire.objects.create(title="شناسایی ریسک عملیات", is_active=True)
     text = Question.objects.create(
@@ -87,23 +97,26 @@ def test_the_session_has_the_user_menu_and_a_csrf_cookie(api, manager, system_ad
 
     assert data["user"]["name"] == "مریم کاظمی"
     assert "مدیر واحد" in " ".join(data["user"]["roles"])
-    titles = [group["title"] for group in data["navigation"]]
-    assert "مدیریت سامانه" not in titles
-    routes = {item["route"] for group in data["navigation"] for item in group["items"] if item["route"]}
-    assert {"/", "/risks", "/questionnaires", "/questionnaires/risk-questions", "/risks/evidence"} <= routes
-    assert {"/questionnaires/manage", "/questionnaires/responses", "/actions/notices", "/controls"} <= routes
-    assert {"/catalog/services", "/catalog/commitments", "/units", "/method"} <= routes
-    # صفحه‌ای که هنوز فقط در جنگو است پیوند جنگو می‌ماند.
-    classic = {item["key"] for group in data["navigation"] for item in group["items"] if not item["route"]}
-    assert "reports:management" in classic
-    keys = [item["key"] for group in data["navigation"] for item in group["items"]]
+    # منوی فیگما: «میز کار» و سه ماژول یک چرخه با گام‌های شماره‌دار.
+    nav = data["navigation"]
+    assert nav["desk"]["title"] == "میز کار"
+    assert [module["key"] for module in nav["modules"]] == ["assessment", "treatment", "config"]
+    links = nav["desk"]["items"] + [item for module in nav["modules"] for item in module["items"]]
+    routes = {item["route"] for item in links if item["route"]}
+    assert {"/", "/risks", "/actions/notices", "/identification", "/analysis", "/evaluation"} <= routes
+    assert {"/treatment/required", "/treatment/board", "/treatment/targets", "/units", "/method"} <= routes
+    notices = next(item for item in links if item["key"] == "actions:notices")
+    assert notices["tone"] == "gold" and notices["count"] is None  # بدون اعلان نخوانده شمارنده نمی‌آید
+    keys = [item["key"] for item in links]
     assert "risks:risk_list" in keys and len(keys) == len(set(keys))
+    assert "accounts:user_list" not in keys  # «تعریف کاربر و نقش» فقط برای مدیر سامانه
+    assert data["cycle"]["year"] >= 1405 and data["cycle"]["assessed"] <= data["cycle"]["total"]
     assert data["logout_url"] == reverse("api:logout")
     assert data["csrf_token"]
     assert data["today"]["weekday"]
 
-    admin_titles = [group["title"] for group in api(system_admin).get(reverse("api:session")).json()["navigation"]]
-    assert "مدیریت سامانه" in admin_titles
+    admin_nav = api(system_admin).get(reverse("api:session")).json()["navigation"]
+    assert "accounts:user_list" in [item["key"] for item in admin_nav["modules"][2]["items"]]
 
 
 def test_writes_need_the_csrf_token_like_django_forms(client, manager, unit):
@@ -187,6 +200,102 @@ def test_the_risk_detail_has_the_dossier_and_jalali_dates(api, grc, manager, uni
     assert owner_view["actions"]["edit"] is None
 
 
+def test_the_risk_record_has_the_figma_stepper_banner_and_timeline(api, grc, manager, unit):
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.QUESTIONS, owner=manager,
+                     channel=Risk.Channel.QUESTIONNAIRE)
+    RiskQuestion.objects.create(
+        risk=risk, text="آخرین آزمون بازیابی کی بود؟", asked_by=grc, due=timezone.localdate() + datetime.timedelta(days=7)
+    )
+
+    data = api(grc).get(reverse("api:risk_detail", args=[risk.pk])).json()
+    states = [(step["status"], step["state"]) for step in data["stepper"]]
+    assert states == [
+        ("questions", "current"), ("registered", "todo"), ("assessment", "todo"), ("treatment_plan", "todo"),
+        ("treatment", "todo"), ("review", "todo"), ("closed", "todo"),
+    ]
+    assert data["stepper"][0]["date"]["jalali"] == to_jalali(timezone.localdate(risk.created_at))
+    assert data["banner"]["title"].startswith("مهلت جواب پرسش‌ها: ")
+    assert data["banner"]["tab"] == "questions"
+    assert data["timeline"] == [
+        {
+            "status": "questions", "label": "در پاسخ به پرسش‌ها", "from": None,
+            "reason": "ساخته‌شده از پاسخ پرسشنامه‌ی واحد عملیات", "meeting_date": None, "by": None,
+            "role": "سامانه", "at": data["timeline"][0]["at"],
+        }
+    ]
+    back = data["workflow"]["transitions"][0]
+    assert back["name"] == "back_to_register"
+    assert back["problems"]  # پرسش باز است، پس برگشت به رجیستر هنوز مسدود است
+    assert data["latest"] is None
+
+    # ریسکی که از رجیستر شروع شد، مرحله‌ی پرسش‌ها را نگذرانده است.
+    registered = make_risk("نشت داده", unit, status=Risk.Status.ASSESSMENT)
+    StatusTransition.objects.create(
+        risk=registered, from_status=Risk.Status.REGISTERED, to_status=Risk.Status.ASSESSMENT, created_by=grc,
+        reason="ارسال جهت ارزیابی",
+    )
+    data = api(grc).get(reverse("api:risk_detail", args=[registered.pk])).json()
+    assert [step["state"] for step in data["stepper"]][:3] == ["skipped", "done", "current"]
+    assert [entry["label"] for entry in data["timeline"]] == ["در ارزیابی", "ثبت‌شده در رجیستر"]
+    assert data["timeline"][0]["role"] == "عضو GRC"
+    assert data["banner"] is None
+
+    rejected = make_risk("ریسک ردشده", unit, status=Risk.Status.REJECTED)
+    steps = api(grc).get(reverse("api:risk_detail", args=[rejected.pk])).json()["stepper"]
+    assert (steps[-1]["status"], steps[-1]["state"]) == ("rejected", "done")
+
+
+def test_the_risk_record_explains_the_latest_result_and_rates_controls(api, grc, unit):
+    from apps.controls.models import Control, ControlAssessment, IsoControl
+    from apps.risks.models import Evidence
+
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.TREATMENT_PLAN, owner=grc)
+    approve(risk, grc, "بالا")
+    Assessment.objects.filter(risk=risk).update(
+        likelihood_low=3, likelihood_high=3, impact_low=4, impact_high=4, score_low=12, score_high=12,
+        base_level=level("بالا"),
+    )
+    StatusTransition.objects.create(
+        risk=risk, from_status=Risk.Status.ASSESSMENT, to_status=Risk.Status.TREATMENT_PLAN, created_by=grc
+    )
+    owner = make_user("control-owner")
+    tested = Control.objects.create(title="مدیریت تغییر", objective="CAB", kind=Control.Kind.PREVENTIVE,
+                                    owner=owner, operated_by="datin", is_key=True)
+    tested.iso_controls.add(IsoControl.objects.get(code="8.32"))
+    untested = Control.objects.create(title="مانور بازیابی", objective="مانور", kind=Control.Kind.RECOVERY,
+                                      owner=owner, operated_by="datin")
+    risk.controls.add(tested, untested)
+    proof = Evidence.objects.create(title="سوابق CAB", kind=Evidence.Kind.TEST, summary="-", source="-",
+                                    observed_on=timezone.localdate(), reliability="high", owner=grc)
+    test = ControlAssessment(
+        control=tested, method_version=MethodVersion.objects.get(number=1), scope="تولید", exists=True,
+        operating_ok=True, test_to=timezone.localdate() - datetime.timedelta(days=5), e=2,
+        rationale="اثر محدود", created_by=grc,
+    )
+    test.save()
+    test.evidence.add(proof)
+
+    data = api(grc).get(reverse("api:risk_detail", args=[risk.pk])).json()
+    latest = data["latest"]
+    assert (latest["likelihood"], latest["impact"], latest["score"]) == (3, 4, 12)
+    assert latest["level"]["name"] == "بالا"
+    assert "سطح پایه‌ی امتیاز ۱۲ «بالا» است" in latest["explanation"]
+    assert latest["note"].startswith("بدون نشان «رویداد در حال وقوع»")
+    controls = {row["code"]: row for row in data["controls"]}
+    assert controls[tested.code] | {"href": None} == {
+        "code": tested.code, "title": "مدیریت تغییر", "kind": "پیشگیرانه", "iso": ["A.8.32"], "is_key": True,
+        "e": 2, "no_valid_evidence": False, "problem": None, "href": None,
+    }
+    assert controls[untested.code]["e"] == 1
+    assert controls[untested.code]["no_valid_evidence"] is True
+    assert data["controls"][0]["code"] == tested.code  # کنترل کلیدی اول
+    assert data["assessments"][0]["detail"].startswith("مبنای تصمیم · ")
+    banner = data["banner"]
+    assert banner["title"].startswith("مهلت ثبت طرح مواجهه: ")
+    assert banner["text"].endswith("طرح هنوز ثبت نشده است.")
+    assert data["key_evidence_age"] > 0
+
+
 def test_my_work_lists_the_risk_questions_waiting_for_the_unit_manager(api, grc, manager, unit):
     risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.QUESTIONS)
     question = RiskQuestion.objects.create(
@@ -204,6 +313,28 @@ def test_my_work_lists_the_risk_questions_waiting_for_the_unit_manager(api, grc,
 
     staff = make_user("staff")
     assert api(staff).get(reverse("api:my_work")).json()["sections"] == []
+
+
+def test_my_work_puts_every_task_in_one_queue_with_kpis(api, grc, manager, unit):
+    risk = make_risk("قطع درگاه پرداخت", unit, status=Risk.Status.QUESTIONS)
+    RiskQuestion.objects.create(risk=risk, text="آخرین آزمون بازیابی کی بود؟", asked_by=grc, due=datetime.date(2026, 11, 9))
+
+    data = api(manager).get(reverse("api:my_work")).json()
+
+    [task] = data["tasks"]
+    assert task["category"] == "questions"
+    assert task["code"] == risk.code
+    assert task["cta"] == "پاسخ"
+    assert task["route"] == "/questionnaires/risk-questions"
+    assert {row["key"]: row["count"] for row in data["categories"]} == {
+        "actions": 0, "signoff": 0, "assessments": 0, "questions": 1, "acceptances": 0,
+    }
+    assert data["kpis"]["waiting"]["count"] == 1
+    assert data["kpis"]["to_verify"]["count"] == 0
+    assert data["plans"] == [] and data["acceptances"] == []
+
+    empty = api(make_user("staff")).get(reverse("api:my_work")).json()
+    assert empty["tasks"] == [] and empty["kpis"]["waiting"]["note"] == "کاری منتظر شما نیست"
 
 
 def test_a_unit_manager_answers_a_risk_question(api, grc, manager, unit):
@@ -262,9 +393,11 @@ def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
 
     blocked = client.put(url, {**payload, "submit": True}, content_type="application/json")
     assert blocked.status_code == 400
-    assert list(blocked.json()["errors"]) == [f"question_{text.pk}"]
+    # کارکرد، رویداد، شرایط و پیامد (فیگما ۱۰) و سؤال‌های اجباری پیش از ارسال جواب لازم دارند.
+    assert set(blocked.json()["errors"]) == {"disruptive_event", "conditions", "consequence", f"question_{text.pk}"}
     assert Response.objects.get(pk=response.pk).status == Response.Status.DRAFT
 
+    payload["fixed"] |= REQUIRED_FIXED
     payload["answers"][str(text.pk)] = "تسویه با بانک‌ها"
     submitted = client.put(url, {**payload, "submit": True}, content_type="application/json")
     assert submitted.status_code == 200
@@ -274,6 +407,38 @@ def test_a_unit_manager_starts_saves_and_submits_a_response(api, manager, unit):
     assert response.pending_risks.get().status == PendingRisk.Status.PENDING
     assert submitted.json()["response"]["can_edit"] is False
     assert client.put(url, payload, content_type="application/json").status_code == 403
+
+
+def test_the_response_has_figma_sections_deadline_limit_and_attachments(api, manager, unit):
+    from django.utils import timezone
+
+    from apps.questionnaires.services import response_due
+    from apps.workcalendar.workdays import add_working_days
+
+    questionnaire, *_ = make_questionnaire()
+    client = api(manager)
+    created = client.post(
+        reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
+    )
+    url = reverse("api:response_detail", args=[created.json()["id"]])
+    data = client.get(url).json()
+    sections = [(item["name"], item["section"], item["required"]) for item in data["fixed"]]
+    assert sections[0] == ("functions", "functions", True)
+    assert [name for name, section, _ in sections if section == "session"] == Response.FIXED_ITEMS[1:]
+    assert len(sections) - 1 == 8
+    assert {name for name, _, required in sections if required} == set(Response.REQUIRED_FIXED)
+    assert next(item for item in data["fixed"] if item["name"] == "disruptive_event")["expected"] == "رویداد مخل"
+    assert (data["function_slots"], data["text_limit"], data["attach_limit_mb"]) == (5, 1000, 20)
+    due = add_working_days(timezone.localdate(), 5)
+    assert data["due"]["iso"] == due.isoformat() and data["due"]["days_left"] == (due - timezone.localdate()).days
+    assert data["saved_at"]["iso"] and data["attach_url"] and data["attachments"] == []
+
+    too_long = client.put(url, {"fixed": {"mission": "ا" * 1001}}, content_type="application/json")
+    assert too_long.status_code == 400 and "mission" in too_long.json()["errors"]
+
+    response = Response.objects.get(pk=created.json()["id"])
+    response.status = Response.Status.SUBMITTED
+    assert response_due(response) is None
 
 
 def test_the_start_form_refuses_a_second_open_response_for_the_same_unit(api, manager, unit):
@@ -295,7 +460,7 @@ def test_a_submitted_response_keeps_showing_an_option_deactivated_later(api, man
         reverse("api:response_start", args=[questionnaire.pk]), {"org_unit": unit.pk}, content_type="application/json"
     )
     url = reverse("api:response_detail", args=[created.json()["id"]])
-    payload = {"answers": {str(text.pk): "تسویه", str(single.pk): risky.pk}}
+    payload = {"fixed": REQUIRED_FIXED, "answers": {str(text.pk): "تسویه", str(single.pk): risky.pk}}
 
     Option.objects.filter(pk=safe.pk).update(is_active=False)
     editable = client.get(url).json()
@@ -491,3 +656,117 @@ def test_the_register_sorts_by_code_and_by_current_level(api, grc, unit):
     assert codes("-level") == ([low.code, critical.code, unrated.code], "-level")
     assert codes("code") == (sorted([low.code, unrated.code, critical.code]), "code")
     assert codes("nonsense") == ([critical.code, unrated.code, low.code], "newest")
+
+
+def test_the_register_shows_active_risks_with_pipeline_and_tab_counts(api, grc, unit):
+    owner = make_user("owner", first_name="رضا", last_name="مالکی")
+    mine = make_risk("قطع درگاه پرداخت", unit, owner=grc)
+    planning = make_risk("نشت داده", unit, owner=owner, status=Risk.Status.TREATMENT_PLAN)
+    # عامل آغازگر و مسیر تحقق نوشته نشده، پس هر سه ریسک فعال «نیازمند تکمیل»اند.
+    incomplete = make_risk("ریسک بی‌مالک فعال", unit, owner=make_user("gone", is_active=False))
+    closed = make_risk("ریسک بسته", unit, status=Risk.Status.CLOSED)
+    make_risk("ریسک ردشده", unit, status=Risk.Status.REJECTED)
+
+    data = api(grc).get(reverse("api:risk_list")).json()
+    assert {row["code"] for row in data["results"]} == {mine.code, planning.code, incomplete.code}
+    assert data["active"] == 3
+    assert data["closed"] == 2
+    assert data["tabs"] == {
+        "all": 3, "mine": 1, "assessment": 0, "treatment_plan": 1, "incomplete": 3, "unowned": 1,
+    }
+    pipeline = {step["status"]: step["count"] for step in data["pipeline"]}
+    assert pipeline["registered"] == 2
+    assert pipeline["closed"] == 1
+    assert data["can_send_to_assessment"] is True
+
+    rows = {row["code"]: row for row in data["results"]}
+    assert rows[incomplete.code]["owner"] is None
+    assert rows[incomplete.code]["next_action"]["label"] == "بدون مالک فعال"
+    assert rows[planning.code]["next_action"]["label"] == "نوشتن طرح مواجهه"
+    assert rows[planning.code]["next_action"]["tone"] == "danger"
+    assert rows[mine.code]["next_action"]["label"] == "تکمیل اطلاعات ریسک"
+    assert rows[mine.code]["scenario"] is None
+
+    data = api(grc).get(reverse("api:risk_list"), {"status": Risk.Status.CLOSED}).json()
+    assert [row["code"] for row in data["results"]] == [closed.code]
+    assert data["results"][0]["next_action"] is None
+
+
+def test_the_register_filters_by_level_owner_and_several_categories(api, grc, unit):
+    t2 = RiskCategory.objects.exclude(code="T1").order_by("code").first()
+    rated = make_risk("قطع درگاه پرداخت", unit, owner=grc)
+    other = make_risk("نشت داده", unit, owner=grc, category=t2)
+    orphan = make_risk("ریسک بی‌مالک", unit)
+    approve(rated, grc, "بحرانی")
+
+    def codes(params):
+        response = api(grc).get(reverse("api:risk_list"), params)
+        assert response.status_code == 200, response.json()
+        return {row["code"] for row in response.json()["results"]}
+
+    critical = str(level("بحرانی").rank)
+    assert codes({"level": critical}) == {rated.code}
+    assert codes({"level": "none"}) == {other.code, orphan.code}
+    assert codes({"owner": "none"}) == {orphan.code}
+    assert codes({"owner": str(grc.pk)}) == {rated.code, other.code}
+    t1 = RiskCategory.objects.get(code="T1")
+    assert codes({"category": [str(t2.pk)]}) == {other.code}
+    assert codes({"category": [str(t1.pk), str(t2.pk)]}) == {rated.code, other.code, orphan.code}
+
+    filters = api(grc).get(reverse("api:risk_filters")).json()
+    assert {"value": critical, "label": level("بحرانی").name} in filters["level"]["choices"]
+    assert filters["owner"]["choices"][0]["value"] in ("", "none")
+    assert len(filters["category"]["choices"]) == RiskCategory.objects.count()
+
+
+def test_the_register_exports_the_filtered_or_selected_risks(api, grc, unit):
+    first = make_risk("قطع درگاه پرداخت", unit)
+    make_risk("نشت داده", unit)
+
+    response = api(grc).get(reverse("api:risk_export"))
+    assert response.status_code == 200
+    assert response["Content-Disposition"] == 'attachment; filename="risk-register.xlsx"'
+    assert response.content[:2] == b"PK"
+
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    selected = api(grc).get(reverse("api:risk_export"), {"ids": [str(first.pk)]})
+    sheet = load_workbook(BytesIO(selected.content)).active
+    assert sheet.sheet_view.rightToLeft is True
+    assert [row[0].value for row in sheet.iter_rows(min_row=2)] == [first.code]
+
+
+def test_the_register_sends_selected_risks_to_assessment(api, grc, unit, manager):
+    owner = make_user("owner")
+    service = make_service("SRV-1", org_unit=unit)
+    ready = make_risk("قطع درگاه پرداخت", unit, owner=owner, service=service)
+    ready.customers.add(Customer.objects.create(name="بانک ملت"))
+    missing = make_risk("نشت داده", unit)
+    wrong = make_risk("ریسک در ارزیابی", unit, status=Risk.Status.ASSESSMENT)
+    url = reverse("api:risk_bulk_transition")
+
+    response = api(grc).post(
+        url,
+        {"transition": "send_to_assessment", "ids": [ready.pk, missing.pk, wrong.pk], "reason": "فرض قابل آزمون"},
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["done"] == [ready.code]
+    failed = {row["code"]: row["problems"] for row in data["failed"]}
+    assert set(failed) == {missing.code, wrong.code}
+    assert "خدمت ریسک تعیین نشده است." in failed[missing.code]
+    ready.refresh_from_db()
+    assert ready.status == Risk.Status.ASSESSMENT
+
+    rejected = api(grc).post(url, {"transition": "reject", "ids": [wrong.pk]}, content_type="application/json")
+    assert rejected.status_code == 400
+
+    # مدیر واحد این انتقال را ندارد؛ همه‌ی ریسک‌ها با دلیل برمی‌گردند و چیزی تغییر نمی‌کند.
+    assert api(manager).get(reverse("api:risk_list")).json()["can_send_to_assessment"] is False
+    data = api(manager).post(
+        url, {"transition": "send_to_assessment", "ids": [missing.pk]}, content_type="application/json"
+    ).json()
+    assert data["done"] == []

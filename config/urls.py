@@ -34,6 +34,7 @@ urlpatterns = [
     path("controls/", include("apps.controls.urls")),
     path("assessments/", include("apps.assessments.urls")),
     path("actions/", include("apps.actions.urls")),
+    path("committee/", include("apps.committee.urls")),
     path("reports/", include("apps.reports.urls")),
     path("api/", include("apps.api.urls")),
     path("app/", spa.index, name="spa"),

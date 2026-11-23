@@ -129,60 +129,73 @@ def outcome(assessment):
 def submission_problems(assessment, computation=None):
     """قاعده‌های مسدودکننده‌ی بخش ۲۳ و بخش ۲۴، به‌اضافه‌ی جواب س۸۱، س۸۲ و س۸۷. فهرست خالی یعنی ارزیابی برای کنترل
     کیفیت و تأیید آماده است. مقدار «نامعلوم» با دلیل رسیدگی‌شده است و ارزیابی را فقط «ناقص» می‌کند."""
+    # ترتیب را نگه می‌دارد و تکرار را حذف می‌کند، چون بعضی ایرادها از دو راه می‌رسند.
+    return list(dict.fromkeys(problem for _, problem in submission_checks(assessment, computation)))
+
+
+def submission_checks(assessment, computation=None):
+    """همان قاعده‌های submission_problems، هر ایراد با گروهش، تا فهرست «بررسی‌های پیش از تأیید» هر گروه را با
+    برقرار یا برقرارنبودنش نشان دهد. گروه‌ها: owner، scope، initiator، paths، impacts، impact_evidence،
+    escalation و engine."""
     computation = computation or compute(assessment)
     risk = assessment.risk
     problems = []
+
+    def add(group, problem):
+        problems.append((group, problem))
+
     if not risk.owner_id or not risk.owner.is_active:
-        problems.append("ریسک مالک حقیقی فعال ندارد.")
+        add("owner", "ریسک مالک حقیقی فعال ندارد.")
     if not risk.service_id:
-        problems.append("خدمت ریسک تعیین نشده است.")
+        add("owner", "خدمت ریسک تعیین نشده است.")
     if not risk.customers.exists():
-        problems.append("هیچ بانکی برای ریسک تعیین نشده است.")
+        add("owner", "هیچ بانکی برای ریسک تعیین نشده است.")
     if assessment.kind in assessment.KINDS_NEEDING_ASSUMPTIONS and not assessment.assumptions.strip():
-        problems.append("فرض‌های ارزیابی نوشته نشده است.")
+        add("scope", "فرض‌های ارزیابی نوشته نشده است.")
     if assessment.kind == Assessment.Kind.TARGET and not assessment.target_due:
-        problems.append("موعد تحقق هدف ثبت نشده است (بخش ۱۷).")
+        add("scope", "موعد تحقق هدف ثبت نشده است (بخش ۱۷).")
     from apps.methodology.models import MethodParameter
     from apps.methodology.services import parameter
 
     default_horizon = parameter(assessment.method_version, MethodParameter.Key.HORIZON)
     if assessment.horizon_months != default_horizon and not assessment.horizon_rationale.strip():
-        problems.append("افق متفاوت از پیش‌فرض روش باید دلیل داشته باشد (بخش ۱۳).")
+        add("scope", "افق متفاوت از پیش‌فرض روش باید دلیل داشته باشد (بخش ۱۳).")
 
     likelihood = computation.likelihood
     if not assessment.a_recorded:
-        problems.append("A ثبت نشده است.")
+        add("initiator", "A ثبت نشده است.")
     if not likelihood.paths:
-        problems.append("دست‌کم یک مسیر تحقق لازم است (بخش ۱۵).")
-    problems.extend(likelihood.blockers)
+        add("paths", "دست‌کم یک مسیر تحقق لازم است (بخش ۱۵).")
+    for blocker in likelihood.blockers:
+        add("paths", blocker)
     for row in likelihood.paths:
         path = row.path
         if path.b0 is not None and not path.b0_confidence:
-            problems.append(f"اطمینان B0 مسیر «{path.name}» ثبت نشده است.")
+            add("paths", f"اطمینان B0 مسیر «{path.name}» ثبت نشده است.")
         for item in row.controls:
             control_assessment = item.control_assessment
             if item.e >= 2 and not control_assessment.confidence:
-                problems.append(f"اطمینان E در {control_assessment.code} ثبت نشده است.")
+                add("paths", f"اطمینان E در {control_assessment.code} ثبت نشده است.")
 
     impacts = computation.impacts
     if impacts.missing:
-        problems.append(f"سطح این خانه‌های پروفایل پیامد ثبت نشده است: {'، '.join(impacts.missing)}.")
+        add("impacts", f"سطح این خانه‌های پروفایل پیامد ثبت نشده است: {'، '.join(impacts.missing)}.")
     for impact, detail in impacts.cells:
         if detail is None:
             continue
         label = f"{impact.dimension} برای {impact.stakeholder}"
         if not detail.rationale.strip():
-            problems.append(f"پیامد {label} دلیل ندارد.")
+            add("impacts", f"پیامد {label} دلیل ندارد.")
         if detail.level is not None and not detail.confidence:
-            problems.append(f"اطمینان پیامد {label} ثبت نشده است.")
+            add("impacts", f"اطمینان پیامد {label} ثبت نشده است.")
         if detail.level and not detail.evidence.exists():
-            problems.append(f"پیامد {label} شاهد ندارد.")
+            add("impact_evidence", f"پیامد {label} شاهد ندارد.")
 
     if assessment.has_escalation_flag:
         if not assessment.escalation_rationale.strip():
-            problems.append("قاعده‌ی تقدم بدون دلیل ثبت شده است.")
+            add("escalation", "قاعده‌ی تقدم بدون دلیل ثبت شده است.")
         if not assessment.escalation_evidence.exists():
-            problems.append("قاعده‌ی تقدم بدون شاهد ثبت شده است.")
-    problems.extend(computation.outcome.problems)
-    # ترتیب را نگه می‌دارد و تکرار را حذف می‌کند، چون بعضی ایرادها از دو راه می‌رسند.
-    return list(dict.fromkeys(problems))
+            add("escalation", "قاعده‌ی تقدم بدون شاهد ثبت شده است.")
+    for problem in computation.outcome.problems:
+        add("engine", problem)
+    return problems

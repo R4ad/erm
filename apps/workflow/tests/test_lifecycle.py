@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.urls import reverse
 
 from apps.accounts.roles import Role
+from apps.assessments.services import creation_problems
 from apps.catalog.models import Customer
 from apps.catalog.tests.factories import make_service, make_user
 from apps.organization.models import OrgUnit
@@ -112,6 +113,30 @@ def test_sending_for_assessment_needs_what_makes_a_scenario_assessable(client, g
     record = StatusTransition.objects.get()
     assert (record.from_status, record.to_status, record.created_by) == (S.REGISTERED, S.ASSESSMENT, grc)
     assert ready.history.first().history_user == grc
+
+
+def test_the_category_is_needed_before_assessment(client, grc, owner):
+    """فرم شناسایی دسته نمی‌گیرد؛ ریسک بی‌دسته در رجیستر می‌ماند تا عضو GRC دسته را تعیین کند و بعد ارزیابی شود."""
+    risk = make_risk(owner=owner, ready=True)
+    Risk.objects.filter(pk=risk.pk).update(category=None)
+    risk.refresh_from_db()
+    message = "دسته‌ی اصلی ریسک تعیین نشده است؛ آن را در ویرایش ریسک انتخاب کنید."
+    client.force_login(grc)
+
+    assert message in client.get(transition_url(risk, "send_to_assessment")).context["problems"]
+    with pytest.raises(WorkflowError) as refused:
+        perform_transition(risk, get_transition("send_to_assessment"), grc, reason="فرض قابل آزمون")
+    assert message in refused.value.problems
+    # ریسک قدیمی بی‌دسته‌ای که به‌هرحال «در ارزیابی» است هم ارزیابی تازه نمی‌گیرد.
+    Risk.objects.filter(pk=risk.pk).update(status=S.ASSESSMENT)
+    risk.refresh_from_db()
+    assert any("دسته‌ی اصلی" in problem for problem in creation_problems(risk))
+
+    Risk.objects.filter(pk=risk.pk).update(status=S.REGISTERED, category=RiskCategory.objects.get(code="T2"))
+    risk.refresh_from_db()
+    perform_transition(risk, get_transition("send_to_assessment"), grc, reason="فرض قابل آزمون")
+    assert risk.status == S.ASSESSMENT
+    assert not any("دسته‌ی اصلی" in problem for problem in creation_problems(risk))
 
 
 def test_linked_evidence_replaces_the_testable_assumption(grc, owner):

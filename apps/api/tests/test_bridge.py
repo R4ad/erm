@@ -110,8 +110,8 @@ def test_django_addresses_map_to_their_react_routes():
     assert spa_route("/risks/7/#comments") == "/risks/7#comments"
     assert spa_route("/actions/mine/") == "/"
     assert spa_route("/risks/coverage/3/1/") == "/risks/coverage/3/1"
+    assert spa_route("/reports/?start=1405/01/01") == "/reports?start=1405/01/01"
     # صفحه‌ای که هنوز فقط در جنگو است، یا نشانی‌ای که اصلاً نیست، پیوند معمولی جنگو می‌ماند.
-    assert spa_route("/reports/") is None
     assert spa_route("/audit/export/?event=login") is None  # فایل Excel همیشه از خود جنگو
     assert spa_route("/no-such-page/") is None
     assert spa_route("") is None
@@ -235,7 +235,7 @@ def test_only_listed_pages_open_through_the_bridge(api, grc, system_admin):
     client = api(system_admin)
 
     # صفحه‌ای که در فهرست فرم‌ها نیست (حتی برای مدیر سامانه) انگار وجود ندارد.
-    assert form(client, "/accounts/users/new/").status_code == 404
+    assert form(client, "/accounts/login/").status_code == 404
     assert form(client, "/risks/").status_code == 404
     assert page(client, "/risks/new/").status_code == 404
     assert form(client, "/no-such-page/").status_code == 404
@@ -453,6 +453,87 @@ def test_the_coverage_grid_links_each_cell_back_to_the_same_view(api, grc):
     viewer = make_user("viewer", Role.VIEWER)
     assert page(api(viewer), "/risks/coverage/").json()["can_edit"] is False
 
+
+
+def test_the_risk_universe_has_tabs_row_coverage_and_cell_actions(api, grc):
+    critical = make_service("SRV-1", is_critical=True)
+    done = make_service("SRV-2")
+    t1, t2 = RiskCategory.objects.get(code="T1"), RiskCategory.objects.get(code="T2")
+    for category in RiskCategory.objects.filter(is_active=True):
+        Coverage.objects.create(
+            service=done,
+            category=category,
+            status=Coverage.Status.REVIEWED,
+            reviewed_by=grc,
+            reviewed_on=timezone.localdate(),
+        )
+    Coverage.objects.filter(service=done, category=t2).update(status=Coverage.Status.NOT_RELEVANT, reason="داده ندارد")
+    scenario = RiskScenario.objects.create(
+        title="قطع خدمت", event="رویداد", conditions="شرط", consequence="پیامد", category=t1, service=critical
+    )
+
+    data = page(api(grc), "/risks/coverage/").json()
+    assert data["tabs"] == {"all": 2, "critical": 1, "incomplete": 1}
+    assert data["size"] == 25 and data["export_url"] == "/api/risks/coverage/export/"
+    rows = {row["service"]["code"]: row for row in data["results"]}
+    total = RiskCategory.objects.filter(is_active=True).count()
+    assert (rows["SRV-1"]["done"], rows["SRV-1"]["total"]) == (0, total)
+    assert (rows["SRV-2"]["done"], rows["SRV-2"]["total"]) == (total, total)
+    first, second = rows["SRV-1"]["cells"][:2]
+    # یک سناریو برای همین خدمت و دسته: ثبت ریسک مستقیم از آن؛ وگرنه کتابخانه با همان خدمت و دسته.
+    assert first["create_risk_url"] == f"/risks/new/?scenario={scenario.pk}"
+    assert second["create_risk_url"] == f"/risks/scenarios/?service={critical.pk}&category={t2.pk}"
+    relevant, skipped = rows["SRV-2"]["cells"][:2]
+    assert relevant["reviewed_by"]["name"] and relevant["reviewed_on"]["jalali"]
+    assert skipped["reason"] == "داده ندارد" and skipped["create_risk_url"] is None
+
+    tabbed = page(api(grc), "/risks/coverage/?state=incomplete&size=1").json()
+    assert [row["service"]["code"] for row in tabbed["results"]] == ["SRV-1"] and tabbed["size"] == 1
+    assert tabbed["export_url"] == "/api/risks/coverage/export/?state=incomplete"
+    viewer = page(api(make_user("viewer", Role.VIEWER)), "/risks/coverage/").json()
+    assert viewer["results"][0]["cells"][0]["create_risk_url"] is None
+
+
+def test_show_more_grows_the_page_instead_of_paging(api, grc):
+    for number in range(30):
+        make_service(f"SRV-{number:02d}")
+    assert len(page(api(grc), "/risks/coverage/").json()["results"]) == 25
+    data = page(api(grc), "/risks/coverage/?size=50").json()
+    assert len(data["results"]) == 30 and data["pages"] == 1 and data["size"] == 50
+    assert page(api(grc), "/risks/coverage/?size=9999").json()["size"] == 200
+
+
+def test_the_risk_universe_exports_to_excel_with_the_same_filters(api, grc):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    make_service("SRV-1", is_critical=True)
+    make_service("SRV-2")
+    response = api(grc).get(reverse("api:coverage_export"), {"is_critical": "yes"})
+    assert response.status_code == 200
+    assert response["Content-Disposition"] == 'attachment; filename="risk-universe.xlsx"'
+    sheet = load_workbook(BytesIO(response.content)).active
+    rows = list(sheet.values)
+    assert rows[0][:4] == ("کد خدمت", "خدمت یا فرایند", "واحد", "حیاتی") and rows[0][-1] == "پوشش"
+    assert [row[0] for row in rows[1:]] == ["SRV-1"]
+    assert rows[1][4] == "در انتظار بررسی" and rows[1][-1].startswith("0 از ")
+
+
+def test_the_scenario_library_filters_by_service(api, grc):
+    one, two = make_service("SRV-1"), make_service("SRV-2")
+    category = RiskCategory.objects.first()
+    for service in (one, two):
+        RiskScenario.objects.create(
+            title=f"سناریو {service.code}",
+            event="رویداد",
+            conditions="شرط",
+            consequence="پیامد",
+            category=category,
+            service=service,
+        )
+    data = page(api(grc), f"/risks/scenarios/?service={two.pk}").json()
+    assert [row["title"] for row in data["results"]] == ["سناریو SRV-2"]
 
 def test_categories_and_change_requests_list_like_their_pages(api, grc, owner):
     data = page(api(grc), "/risks/categories/").json()

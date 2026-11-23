@@ -168,7 +168,8 @@ def test_unit_managers_answer_for_their_units_only(client, questionnaire, unit, 
     client.force_login(manager)
 
     home = client.get(reverse("questionnaires:answer_home"))
-    assert list(home.context["questionnaires"]) == [Questionnaire.objects.get(is_structured=True)]
+    # پرسشنامه‌ی کلاسیک (فیگما ۱۰) و شاخه‌ای هر دو فهرست می‌شوند؛ پیش‌نویس غیرفعال نه.
+    assert set(home.context["questionnaires"]) == {questionnaire, Questionnaire.objects.get(is_structured=True)}
     assert home.context["can_answer"] is True
 
     url = reverse("questionnaires:response_start", args=[questionnaire.pk])

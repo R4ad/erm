@@ -1,0 +1,22 @@
+# وقتی nginx پروژه‌ی دیگری روی همین سرور پورت‌های 80 و 443 و گواهی TLS را دارد و درخواست‌های نام سامانه را به
+# nginx سامانه می‌فرستد. nginx سامانه به شبکه‌ی Docker آن پروژه هم وصل می‌شود و آن‌جا با نام erm-nginx پیدا می‌شود.
+#
+# روی سرور، در .env:
+#   COMPOSE_FILE=docker-compose.yml:docker/behind-proxy.yml
+#   FRONT_PROXY_NETWORK=<شبکه‌ی nginx جلویی، مثلاً isms-review-center_default>
+#   HTTP_BIND=127.0.0.1:8081
+#   BEHIND_HTTPS_PROXY=True
+#   CSRF_TRUSTED_ORIGINS=https://<نام سامانه>
+services:
+  nginx:
+    volumes:
+      - ./docker/nginx/nginx-behind-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default: {}
+      front:
+        aliases: [erm-nginx]
+
+networks:
+  front:
+    external: true
+    name: ${FRONT_PROXY_NETWORK:?FRONT_PROXY_NETWORK را در .env بنویسید}

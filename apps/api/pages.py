@@ -23,7 +23,7 @@ from .methodology import METHODOLOGY_PAGES
 from .monitoring import MONITORING_PAGES
 from .questionnaire_pages import QUESTIONNAIRE_PAGES
 from .records import record_parts
-from .rows import coverage_cell, evidence_row, risk_brief, risk_ref
+from .rows import coverage_cell, coverage_create_url, evidence_row, risk_brief, risk_ref
 
 
 def evidence_list(context, request):
@@ -121,14 +121,22 @@ def category_list(context, request):
 
 
 def coverage(context, request):
-    """جدول «خدمت × دسته‌ی» جهان ریسک. ویرایش هر خانه با ?next= به همین صفحه و همین فیلترها برمی‌گردد."""
+    """جدول «خدمت × دسته‌ی» جهان ریسک (فیگما ۰۹). ویرایش هر خانه با ?next= به همین صفحه و همین فیلترها برمی‌گردد."""
     categories = list(context["categories"])
     can_edit = context["can_edit"]
+    scenarios = context["scenarios"]
     back = urlencode({"next": request.get_full_path()})
     rows = []
     for service, cells in context["rows"]:
         row_cells = [
-            coverage_cell(cell, service, category, can_edit, back)
+            coverage_cell(
+                cell,
+                service,
+                category,
+                can_edit,
+                back,
+                coverage_create_url(service, category, scenarios) if context["can_create_risk"] else None,
+            )
             for category, cell in zip(categories, cells, strict=True)
         ]
         rows.append(
@@ -142,16 +150,27 @@ def coverage(context, request):
                     "href": service.get_absolute_url(),
                 },
                 "cells": row_cells,
+                "done": sum(1 for cell in cells if not cell.is_pending),
+                "total": len(cells),
             }
         )
+    # خروجی Excel همان فیلترها را می‌گیرد، بی‌صفحه‌بندی.
+    query = request.GET.copy()
+    for key in ("page", "size"):
+        query.pop(key, None)
+    export = reverse("api:coverage_export")
+    page = context["page_obj"]
     return {
         "title": "جهان ریسک",
         **listing(context, rows),
         "categories": [{"id": item.pk, "code": item.code, "name": item.name} for item in categories],
         "critical": context["critical"],
         "counts": context["counts"],
+        "tabs": context["tabs"],
+        "size": page.paginator.per_page if page else len(rows),
         "can_edit": can_edit,
         "categories_url": reverse("risks:category_list"),
+        "export_url": f"{export}?{query.urlencode()}" if query else export,
     }
 
 

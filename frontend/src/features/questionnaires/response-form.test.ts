@@ -13,7 +13,7 @@ describe("response form values", () => {
     const values = valuesFrom(saved);
     expect(values.answers).toEqual({ q1: "متن", q2: "12", q3: ["21", "22"] });
     expect(payloadFrom(values, saved.questions, true)).toEqual({
-      fixed: { functions: "" },
+      fixed: { functions: "", disruptive_event: "", dependencies: "پایگاه داده‌ی مرکزی" },
       new_item: "",
       answers: { "1": "متن", "2": 12, "3": [21, 22] },
       submit: true,

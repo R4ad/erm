@@ -53,6 +53,8 @@ def creation_problems(risk, kind=None):
             problems.append(f"ارزیابی {Assessment.Kind(kind).label} فقط وقتی ریسک {labels} است ثبت می‌شود.")
     elif not any(risk.status in statuses for statuses in ASSESSABLE_STATUSES.values()):
         problems.append("ارزیابی فقط وقتی ریسک «در ارزیابی» یا «برنامه‌ی درمان» است ثبت می‌شود.")
+    if not risk.category_id:
+        problems.append("دسته‌ی اصلی ریسک تعیین نشده است؛ پیش از ارزیابی آن را در ویرایش ریسک انتخاب کنید.")
     if active_version() is None:
         problems.append("هیچ نسخه‌ی روشی فعال نیست.")
     return problems
@@ -212,7 +214,21 @@ def suggest_financial(loss, basis, scale):
     shown = f"{percent:.4f}".rstrip("0").rstrip(".")
     if level is None:
         return Suggestion(None, f"زیان {shown} درصد مبنای مالی است و در مرزهای جدول F نمی‌افتد.")
-    return Suggestion(level.value, f"زیان {shown} درصد مبنای مالی است.")
+    return Suggestion(
+        level.value,
+        f"زیان ناخالص {rials(loss)} برابر {shown} درصد مبنای مالی تأییدشده است "
+        f"(مرزهای جدول F نسخه‌ی روش {scale.version.number}).",
+    )
+
+
+def rials(amount):
+    """مبلغ ریالی خوانا: ۴۲ میلیارد ریال به جای ۴۲۰۰۰۰۰۰۰۰۰."""
+    amount = Decimal(amount)
+    for size, name in ((10**12, "هزار میلیارد"), (10**9, "میلیارد"), (10**6, "میلیون")):
+        if amount >= size:
+            shown = f"{amount / size:.2f}".rstrip("0").rstrip(".").replace(".", "٫")  # ممیز فارسی
+            return f"{shown} {name} ریال"
+    return f"{int(amount):,} ریال"
 
 
 def suggest(scale, actual_value, basis, facts, fraction):

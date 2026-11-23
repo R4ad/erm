@@ -50,12 +50,15 @@ def all_questions_answered(risk, data):
 
 def ready_for_assessment(risk, data):
     """قاعده‌ی پذیرش ورودی بخش ۴ سند v5 (جواب س۴۸): سناریوی قابل ارزیابی هدف، رویداد، دامنه‌ی خدمت و مشتری، مالک
-    و یک شاهد یا فرض قابل آزمون دارد. نبود شاهد دلیل رد نیست؛ آن وقت فرض قابل آزمون نوشته می‌شود."""
+    و یک شاهد یا فرض قابل آزمون دارد. نبود شاهد دلیل رد نیست؛ آن وقت فرض قابل آزمون نوشته می‌شود. دسته را فرم
+    شناسایی نمی‌گیرد و عضو GRC پیش از ارزیابی در فرم ویرایش ریسک تعیین می‌کند."""
     problems = []
     if not risk.description.strip():
         problems.append("شرح ریسک (هدف و رویداد) نوشته نشده است.")
     if not risk.service_id:
         problems.append("خدمت ریسک تعیین نشده است.")
+    if not risk.category_id:
+        problems.append("دسته‌ی اصلی ریسک تعیین نشده است؛ آن را در ویرایش ریسک انتخاب کنید.")
     if not risk.customers.exists():
         problems.append("هیچ بانکی برای ریسک تعیین نشده است.")
     if not risk.owner_id:

@@ -6,8 +6,8 @@ import { extendTailwindMerge } from "tailwind-merge";
 const merge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ["heading", "title", "display"],
-      shadow: ["card", "pop"],
+      text: ["heading", "title", "display", "h1", "h2", "h3", "stat", "kpi"],
+      shadow: ["card", "pop", "focus"],
     },
   },
 });

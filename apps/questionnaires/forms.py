@@ -1,4 +1,5 @@
 from django import forms
+from django.core.validators import MaxLengthValidator
 from django.db.models import Exists, OuterRef
 from django.forms import inlineformset_factory
 
@@ -149,6 +150,13 @@ class ResponseStartForm(BootstrapFormMixin, forms.ModelForm):
         return data
 
 
+def limit_text(field):
+    """سقف نویسه‌ی جواب هر پرسش (فیگما ۱۰: «۱۴۸ / ۱۰۰۰ نویسه»)."""
+    field.max_length = Response.TEXT_LIMIT
+    field.validators.append(MaxLengthValidator(Response.TEXT_LIMIT))
+    field.widget.attrs["maxlength"] = Response.TEXT_LIMIT
+
+
 class ResponseAnswerForm(BootstrapFormMixin, forms.ModelForm):
     """فرم پاسخ: قلم‌های ثابت (کارکردها و پرسش‌های جلسه‌ی بخش ۴)، یک فیلد برای هر سؤال فعال و «مورد جدید». فیلد سؤال‌ها در فرم اجباری
     نیستند تا پیش‌نویس نیمه‌کاره ذخیره شود؛ سؤال‌های اجباری هنگام ارسال چک می‌شوند."""
@@ -161,6 +169,8 @@ class ResponseAnswerForm(BootstrapFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["new_item"].widget.attrs["rows"] = 4
+        for name in Response.FIXED_ITEMS:
+            limit_text(self.fields[name])
         response = self.instance
         answers = {answer.question_id: answer for answer in response.answers.prefetch_related("options")}
         self.questions = list(response.questionnaire.active_questions())
@@ -171,7 +181,9 @@ class ResponseAnswerForm(BootstrapFormMixin, forms.ModelForm):
             if question.kind == Question.Kind.TEXT:
                 # فیلدهای سؤال بعد از BootstrapFormMixin ساخته می‌شوند، پس کلاسشان را خودمان می‌گذاریم.
                 field = forms.CharField(
-                    required=False, widget=forms.Textarea(attrs={"rows": 2, "class": "form-control"})
+                    required=False,
+                    max_length=Response.TEXT_LIMIT,
+                    widget=forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
                 )
                 initial = answer.text if answer else ""
             elif question.kind == Question.Kind.MULTIPLE:

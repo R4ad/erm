@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Applicability, Control, ControlAssessment, IsoControl
+from .models import Applicability, Control, ControlAssessment, ControlTestSample, IsoControl
 
 
 @admin.register(IsoControl)
@@ -38,8 +38,15 @@ class ApplicabilityAdmin(SimpleHistoryAdmin):
         return False
 
 
+class ControlTestSampleInline(admin.TabularInline):
+    model = ControlTestSample
+    extra = 0
+    fields = ("reference", "occurred_on", "path", "performer", "passed", "note")
+
+
 @admin.register(ControlAssessment)
 class ControlAssessmentAdmin(SimpleHistoryAdmin):
+    inlines = [ControlTestSampleInline]
     list_display = ("code", "control", "e", "test_to", "valid_until", "suspended")
     list_filter = ("e", "suspended")
     search_fields = ("code", "control__code", "control__title")

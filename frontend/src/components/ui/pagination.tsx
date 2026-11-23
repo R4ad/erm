@@ -22,40 +22,45 @@ interface PaginationProps {
   pages: number;
   onChange: (page: number) => void;
   label?: string;
+  /** متن «صفحه‌ی x از y» کنار دکمه‌ها؛ صفحه‌ای که پانویس خودش را دارد آن را خاموش می‌کند. */
+  status?: boolean;
 }
 
-export function Pagination({ page, pages, onChange, label = t("pager.label") }: PaginationProps) {
+// صفحه‌بندی فیگما: مربع‌های ۳۲ با حاشیه، صفحه‌ی فعلی پر با رنگ برند، «…» برای صفحه‌های جاافتاده.
+export function Pagination({ page, pages, onChange, label = t("pager.label"), status = true }: PaginationProps) {
   if (pages <= 1) return null;
   const item =
-    "inline-grid h-9 min-w-9 place-items-center rounded-lg px-2 text-sm tabular transition-colors duration-150 " +
-    "hover:bg-surface hover:text-fg disabled:pointer-events-none disabled:opacity-40";
+    "inline-grid size-8 place-items-center rounded-md border border-line-strong bg-panel text-sm text-ink tabular " +
+    "transition-colors duration-150 hover:bg-subtle disabled:pointer-events-none disabled:opacity-40";
   return (
     <nav aria-label={label} className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted" aria-live="polite">
-        {t("pager.status", { page: formatNumber(page), pages: formatNumber(pages) })}
-      </p>
-      <ul className="flex items-center gap-1 text-muted">
+      {status && (
+        <p className="text-xs text-ink-3" aria-live="polite">
+          {t("pager.status", { page: formatNumber(page), pages: formatNumber(pages) })}
+        </p>
+      )}
+      <ul className="flex items-center gap-1.5">
         <li>
           <button
             type="button"
-            className={cn(item, "gap-1 px-3")}
+            className={item}
             disabled={page <= 1}
+            aria-label={t("pager.previous")}
             onClick={() => onChange(page - 1)}
           >
             <ChevronRight aria-hidden className="size-4 ltr:-scale-x-100" />
-            <span className="max-sm:sr-only">{t("pager.previous")}</span>
           </button>
         </li>
         {pageWindow(page, pages).map((n, index) =>
           n === "gap" ? (
-            <li key={`gap-${index}`} aria-hidden className="px-1">
+            <li key={`gap-${index}`} aria-hidden className={cn(item, "pointer-events-none")}>
               …
             </li>
           ) : (
             <li key={n} className="max-sm:hidden">
               <button
                 type="button"
-                className={cn(item, n === page && "bg-accent-soft font-semibold text-accent-text hover:bg-accent-soft")}
+                className={cn(item, n === page && "border-brand bg-brand font-semibold text-on-brand hover:bg-brand")}
                 aria-current={n === page ? "page" : undefined}
                 aria-label={t("pager.page", { page: formatNumber(n) })}
                 onClick={() => onChange(n)}
@@ -68,11 +73,11 @@ export function Pagination({ page, pages, onChange, label = t("pager.label") }: 
         <li>
           <button
             type="button"
-            className={cn(item, "gap-1 px-3")}
+            className={item}
             disabled={page >= pages}
+            aria-label={t("pager.next")}
             onClick={() => onChange(page + 1)}
           >
-            <span className="max-sm:sr-only">{t("pager.next")}</span>
             <ChevronLeft aria-hidden className="size-4 ltr:-scale-x-100" />
           </button>
         </li>

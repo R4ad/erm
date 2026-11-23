@@ -4,28 +4,33 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/cn";
 
+// کامپوننت «Button» فیگما: Primary، Secondary، Ghost و Danger در دو اندازه‌ی md (۳۶) و sm (۳۲)، گوشه‌ی ۸، متن ۱۳.
+// آیکون ۱۸ (md) یا ۱۶ (sm) بعد از متن در ترتیب راست‌به‌چپ می‌آید، یعنی سمت راست متن.
+
 const base =
-  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-medium whitespace-nowrap select-none " +
-  "transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out " +
-  "active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 " +
+  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md whitespace-nowrap select-none " +
+  "transition-[background-color,border-color,color,box-shadow] duration-150 ease-out " +
+  "focus-visible:outline-none focus-visible:shadow-focus " +
+  "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 " +
   "[&_svg]:pointer-events-none [&_svg]:shrink-0";
 
 const variants = {
-  primary:
-    "bg-accent text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(0_0_0/0.3)] hover:bg-accent-hover",
-  secondary: "border border-line bg-surface text-fg shadow-card hover:border-line-strong hover:bg-elevated",
-  outline: "border border-line-strong bg-transparent text-fg hover:bg-surface",
-  ghost: "bg-transparent text-muted hover:bg-surface hover:text-fg",
-  danger: "bg-danger-soft text-danger border border-danger/30 hover:bg-danger/20",
-  link: "h-auto rounded-md px-0 text-accent-text underline-offset-4 hover:underline active:translate-y-0",
+  primary: "bg-brand text-on-brand hover:bg-brand-hover",
+  secondary: "border border-line-strong bg-panel text-ink hover:bg-subtle",
+  outline: "border border-line-strong bg-panel text-ink hover:bg-subtle",
+  ghost: "bg-transparent text-brand hover:bg-brand-subtle",
+  /** دکمه‌ی آیکونی کم‌رنگ (بستن، منوی بیشتر). */
+  quiet: "bg-transparent text-ink-2 hover:bg-subtle hover:text-ink",
+  danger: "bg-danger-solid text-on-brand hover:bg-danger",
+  link: "h-auto rounded-sm px-0 text-brand underline-offset-4 hover:underline",
 } as const;
 
 const sizes = {
-  sm: "h-8 px-3 text-xs [&_svg]:size-3.5",
-  md: "h-10 px-4 text-sm [&_svg]:size-4",
-  lg: "h-12 px-5 text-base [&_svg]:size-[1.125rem]",
-  icon: "size-10 [&_svg]:size-[1.125rem]",
-  "icon-sm": "size-8 rounded-lg [&_svg]:size-4",
+  sm: "h-8 px-3 text-sm font-medium [&_svg]:size-4",
+  md: "h-9 px-4 text-sm font-semibold [&_svg]:size-[1.125rem]",
+  lg: "h-10 px-5 text-base font-semibold [&_svg]:size-[1.125rem]",
+  icon: "size-9 [&_svg]:size-[1.125rem]",
+  "icon-sm": "size-8 [&_svg]:size-4",
 } as const;
 
 export type ButtonVariant = keyof typeof variants;

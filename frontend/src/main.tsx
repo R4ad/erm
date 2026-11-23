@@ -1,5 +1,5 @@
-import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/vazirmatn/wght.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./styles/index.css";
 
 import { setNonce } from "get-nonce";
@@ -10,12 +10,10 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { createQueryClient } from "./app/query-client";
 import { Providers } from "./app/providers";
 import { routes } from "./app/routes";
-import { applyStoredTheme } from "./lib/theme";
 
 // قفل اسکرول پنجره‌های Radix یک <style> می‌سازد؛ با nonce صفحه، CSP آن را می‌پذیرد.
 const nonce = document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.nonce;
 if (nonce) setNonce(nonce);
-applyStoredTheme();
 
 const router = createBrowserRouter(routes, { basename: "/app" });
 const queryClient = createQueryClient();

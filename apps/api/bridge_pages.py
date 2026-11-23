@@ -141,6 +141,7 @@ FORM_PAGES = {
     "organization:unit_update": None,
     "workcalendar:holiday_create": None,
     "workcalendar:holiday_update": None,
+    "accounts:user_create": None,
     "accounts:staff_import": staff_import_form,
 }
 
@@ -160,6 +161,7 @@ POST_ONLY_PAGES = {
     "assessments:referral",
     "assessments:path_delete",
     "actions:plan_approve",
+    "actions:plan_remind",
     "actions:action_move",
     "actions:acceptance_submit",
     "actions:acceptance_sign",

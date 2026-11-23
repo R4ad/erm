@@ -359,3 +359,35 @@ class ControlAssessment(TimeStampedModel):
         else:
             self.valid_until = None
         super().save(*args, **kwargs)
+
+
+class ControlTestSample(models.Model):
+    """یک نمونه‌ی آزموده در آزمون اثربخشی کنترل (فیگما ۲۲): مثلاً یک انتشار، یک حساب یا یک تغییر، با مسیر یا حالت
+    اجرایی که از آن آمده و نتیجه. استثنا شرح می‌خواهد. مسیرهای آزموده و نرخ موفقیت از همین ردیف‌ها خوانده می‌شوند؛
+    E همچنان با شرط‌های بخش ۱۶ تعیین می‌شود و میانگین خوب شکست یک مسیر را نمی‌پوشاند."""
+
+    assessment = models.ForeignKey(
+        ControlAssessment, verbose_name="آزمون", on_delete=models.CASCADE, related_name="samples"
+    )
+    reference = models.CharField("شناسه‌ی نمونه", max_length=60, help_text="مثلاً شناسه‌ی انتشار یا تیکت تغییر.")
+    occurred_on = models.DateField("تاریخ")
+    path = models.CharField(
+        "مسیر یا حالت اجرا",
+        max_length=100,
+        help_text="مثلاً «انتشار عادی» یا «انتشار اضطراری»؛ مسیرهای آزموده از این می‌آیند.",
+    )
+    performer = models.CharField("انجام‌دهنده‌ی کنترل", max_length=150, blank=True)
+    passed = models.BooleanField("موفق", default=True)
+    note = models.TextField("شرح استثنا", blank=True)
+
+    class Meta:
+        verbose_name = "نمونه‌ی آزمون کنترل"
+        verbose_name_plural = "نمونه‌های آزمون کنترل"
+        ordering = ["assessment", "occurred_on", "pk"]
+        constraints = [
+            models.CheckConstraint(condition=Q(passed=True) | ~Q(note=""), name="control_sample_exception_described"),
+            models.UniqueConstraint(fields=["assessment", "reference"], name="control_sample_unique_reference"),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} ({'موفق' if self.passed else 'استثنا'})"

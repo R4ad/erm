@@ -19,6 +19,20 @@ def missing_required(response):
     return [question for question in required if question.pk not in answered]
 
 
+def missing_fixed(response):
+    """پرسش‌های ثابت اجباری (Response.REQUIRED_FIXED) که هنوز جواب ندارند."""
+    return [name for name in Response.REQUIRED_FIXED if not getattr(response, name).strip()]
+
+
+def response_due(response):
+    """مهلت پاسخ: پیش‌نویس پنج روز کاری از آغاز (فیگما ۱۰) و برگشت‌خورده مهلت برگشت. ارسال‌شده مهلت ندارد."""
+    if response.status == Response.Status.RETURNED:
+        return response.return_due
+    if response.status == Response.Status.DRAFT:
+        return add_working_days(timezone.localdate(response.created_at), RETURN_WORKING_DAYS)
+    return None
+
+
 def save_answer(response, question, value):
     """جواب یک سؤال را ذخیره می‌کند. value برای سؤال متنی متن است و برای بقیه فهرست گزینه‌ها."""
     answer, _ = Answer.objects.get_or_create(response=response, question=question)

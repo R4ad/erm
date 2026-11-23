@@ -62,6 +62,9 @@ function Header({ data }: { data?: ActionDetail }) {
                 طرح مواجهه
               </AppLink>
             )}
+            <AppLink href={`/actions/${data.action.id}/verify/`} button={{ variant: "secondary" }}>
+              آزمون و تأیید نتیجه
+            </AppLink>
           </>
         )
       }

@@ -107,8 +107,9 @@ def test_grc_records_the_reassessment_and_the_decision_sets_the_next_option(
     risk, plan = round_one
     action = make_action(plan, grc, owner, assignee, verifier)
     fresh = new_round(risk, grc, "متوسط", 6)
-    client.force_login(owner)
-    assert client.get(reverse("actions:reassessment_create", args=[plan.pk])).status_code == 403
+    # تصمیم پس از اقدام با مالک ریسک یا GRC است (فیگما ۲۵)؛ مجری اقدام آن را ثبت نمی‌کند.
+    client.force_login(assignee)
+    assert client.get(reverse("actions:reassessment_create", args=[plan.pk])).status_code in (403, 404)
 
     client.force_login(grc)
     url = reverse("actions:reassessment_create", args=[plan.pk])

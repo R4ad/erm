@@ -78,6 +78,7 @@ const FORM_ROUTES = [
   "units/:pk/edit",
   "holidays/new",
   "holidays/:pk/edit",
+  "accounts/users/new",
 ];
 
 const formPage = async () => ({ Component: keyedByPath((await import("@/features/forms/FormPage")).FormPage) });
@@ -108,6 +109,12 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import("@/features/my-work/MyWorkPage")).MyWorkPage }),
           },
           {
+            path: "reports",
+            lazy: async () => ({
+              Component: (await import("@/features/reports/ManagementReportPage")).ManagementReportPage,
+            }),
+          },
+          {
             path: "risks",
             lazy: async () => ({ Component: (await import("@/features/risks/RiskListPage")).RiskListPage }),
           },
@@ -127,7 +134,9 @@ export const routes: RouteObject[] = [
           },
           {
             path: "risks/scenarios",
-            lazy: async () => ({ Component: (await import("@/features/scenarios/ScenarioPages")).ScenarioListPage }),
+            lazy: async () => ({
+              Component: (await import("@/features/scenarios/ScenarioLibraryPage")).ScenarioLibraryPage,
+            }),
           },
           {
             path: "risks/scenarios/:id",
@@ -206,7 +215,7 @@ export const routes: RouteObject[] = [
           {
             path: "actions/plans/:plan_pk/reassess",
             lazy: async () => ({
-              Component: keyedByPath((await import("@/features/actions/ReassessmentPage")).ReassessmentPage),
+              Component: keyedByPath((await import("@/features/actions/PostActionPage")).PostActionPage),
             }),
           },
           {
@@ -228,7 +237,7 @@ export const routes: RouteObject[] = [
           {
             path: "controls/effectiveness/:pk",
             lazy: async () => ({
-              Component: keyedByPath((await import("@/features/controls/ControlPages")).ControlAssessmentDetailPage),
+              Component: keyedByPath((await import("@/features/controls/ControlTestPage")).ControlTestPage),
             }),
           },
           {
@@ -281,23 +290,55 @@ export const routes: RouteObject[] = [
           },
           {
             path: "units",
-            lazy: async () => ({ Component: (await import("@/features/organization/UnitListPage")).UnitListPage }),
+            lazy: async () => ({ Component: (await import("@/features/organization/OrgChartPage")).OrgChartPage }),
+          },
+          {
+            path: "units/ad-sync",
+            lazy: async () => ({ Component: (await import("@/features/organization/AdSyncPage")).AdSyncPage }),
           },
           {
             path: "method",
             lazy: async () => ({
-              Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
+              Component: keyedByPath(
+                (await import("@/features/methodology/MethodDefinitionPage")).MethodDefinitionPage,
+              ),
             }),
           },
           {
             path: "method/:number",
+            lazy: async () => ({
+              Component: keyedByPath(
+                (await import("@/features/methodology/MethodDefinitionPage")).MethodDefinitionPage,
+              ),
+            }),
+          },
+          {
+            path: "method/:number/diff",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/MethodDiffPage")).MethodDiffPage),
+            }),
+          },
+          {
+            path: "method/:number/impact/:code",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/methodology/ImpactLevelsPage")).ImpactLevelsPage),
+            }),
+          },
+          {
+            path: "method/:number/reference",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/methodology/MethodPage")).MethodPage),
             }),
           },
           {
             path: "accounts/users",
-            lazy: async () => ({ Component: (await import("@/features/admin/UserListPage")).UserListPage }),
+            lazy: async () => ({ Component: (await import("@/features/admin/UsersRolesPage")).UsersRolesPage }),
+          },
+          {
+            path: "accounts/users/:id",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/admin/UserProfilePage")).UserProfilePage),
+            }),
           },
           {
             path: "accounts/staff-import",
@@ -317,7 +358,9 @@ export const routes: RouteObject[] = [
           },
           {
             path: "actions/notices",
-            lazy: async () => ({ Component: (await import("@/features/monitoring/MonitoringPages")).NoticeListPage }),
+            lazy: async () => ({
+              Component: (await import("@/features/monitoring/MonitoringInboxPage")).MonitoringInboxPage,
+            }),
           },
           {
             path: "actions/reviews/:pk",
@@ -329,6 +372,14 @@ export const routes: RouteObject[] = [
             path: "actions/:pk",
             lazy: async () => ({
               Component: keyedByPath((await import("@/features/actions/ActionDetailPage")).ActionDetailPage),
+            }),
+          },
+          {
+            path: "actions/:pk/verify",
+            lazy: async () => ({
+              Component: keyedByPath(
+                (await import("@/features/actions/ActionVerificationPage")).ActionVerificationPage,
+              ),
             }),
           },
           ...FORM_ROUTES.map((path) => ({ path, lazy: formPage })),
@@ -388,6 +439,52 @@ export const routes: RouteObject[] = [
             path: "questionnaires/:id/start",
             lazy: async () => ({
               Component: keyedById((await import("@/features/questionnaires/ResponseStartPage")).ResponseStartPage),
+            }),
+          },
+          {
+            path: "treatment/board",
+            lazy: async () => ({
+              Component: (await import("@/features/treatment/TreatmentBoardPage")).TreatmentBoardPage,
+            }),
+          },
+          {
+            path: "treatment/targets",
+            lazy: async () => ({
+              Component: (await import("@/features/treatment/TargetRisksPage")).TargetRisksPage,
+            }),
+          },
+          {
+            path: "treatment/required",
+            lazy: async () => ({
+              Component: (await import("@/features/treatment/ActionRequiredPage")).ActionRequiredPage,
+            }),
+          },
+          {
+            path: "evaluation",
+            lazy: async () => ({ Component: (await import("@/features/evaluation/EvaluationPage")).EvaluationPage }),
+          },
+          {
+            path: "committee",
+            lazy: async () => ({ Component: (await import("@/features/committee/CommitteePage")).CommitteePage }),
+          },
+          {
+            path: "committee/:pk",
+            lazy: async () => ({
+              Component: keyedByPath((await import("@/features/committee/CommitteePage")).CommitteePage),
+            }),
+          },
+          {
+            path: "analysis",
+            lazy: async () => ({ Component: (await import("@/features/analysis/AnalysisPage")).AnalysisIndexPage }),
+          },
+          {
+            path: "analysis/:pk",
+            lazy: async () => ({ Component: (await import("@/features/analysis/AnalysisPage")).AnalysisPage }),
+          },
+          {
+            path: "identification",
+            lazy: async () => ({
+              Component: (await import("@/features/identification/IdentificationPage")).IdentificationPage,
             }),
           },
           {

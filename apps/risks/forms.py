@@ -1,9 +1,10 @@
 import copy
 
 from django import forms
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.catalog.forms import (
     OwnerChoiceField,
@@ -29,7 +30,7 @@ from .models import (
     RiskScenario,
     Tag,
 )
-from .permissions import can_edit_register
+from .permissions import can_edit_register, visible_risks
 from .services import (
     active_categories,
     active_risks,
@@ -195,6 +196,10 @@ class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
         label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد، عنوان یا رویداد"})
     )
     category = forms.ModelChoiceField(RiskCategory.objects.all(), label="دسته", required=False, empty_label="همه")
+    # «ثبت ریسک برای این خانه»ی جهان ریسک کتابخانه را با همان خدمت و دسته باز می‌کند.
+    service = forms.ModelChoiceField(
+        Service.objects.filter(is_active=True), label="خدمت", required=False, empty_label="همه"
+    )
     status = forms.ChoiceField(label="وضعیت", required=False, choices=STATUS_CHOICES)
 
     def filter(self, scenarios):
@@ -203,6 +208,8 @@ class ScenarioFilterForm(BootstrapFormMixin, forms.Form):
             scenarios = scenarios.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(event__icontains=word))
         if data["category"]:
             scenarios = scenarios.filter(category=data["category"])
+        if data["service"]:
+            scenarios = scenarios.filter(service=data["service"])
         if data["status"]:
             scenarios = scenarios.filter(is_active=data["status"] == "active")
         return scenarios
@@ -260,7 +267,8 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         }
         help_texts = {
             "org_unit": "اگر خالی بماند، واحد مالک خدمت گذاشته می‌شود. دسترسی مدیر واحد به ریسک از همین واحد است.",
-            "category": "اگر خالی بماند، دسته‌ی سناریوی مرجع گذاشته می‌شود.",
+            "category": "اگر خالی بماند، دسته‌ی سناریوی مرجع گذاشته می‌شود. ریسک بی‌دسته ثبت می‌شود، ولی پیش از "
+            "ارسال جهت ارزیابی دسته لازم است.",
             "customers": "برای انتخاب چند بانک، Ctrl (در مک Cmd) را نگه دارید و کلیک کنید.",
             "cia_a": "برچسب‌های CIA نشان می‌دهند کدام ویژگی امنیت اطلاعات درگیر است؛ امتیاز جدا نمی‌گیرند.",
         }
@@ -281,9 +289,11 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["controls"].queryset = Control.objects.filter(
             Q(is_active=True) | Q(pk__in=current_controls)
         ).order_by("code")
-        # واحد و دسته از خدمت و سناریو پر می‌شوند؛ اگر هیچ‌کدام نباشد clean خطا می‌دهد.
+        # واحد و دسته از خدمت و سناریو پر می‌شوند؛ واحدِ بی‌خدمت خطاست، ولی دسته می‌تواند تا پیش از ارزیابی خالی
+        # بماند (مثل ریسکی که از فرم شناسایی آمده است).
         self.fields["org_unit"].required = False
         self.fields["category"].required = False
+        self.fields["category"].empty_label = "هنوز تعیین نشده"
         if risk.pk:
             self.fields["tag_names"].initial = "، ".join(tag.name for tag in risk.tags.all())
 
@@ -303,11 +313,8 @@ class RiskForm(BootstrapFormMixin, forms.ModelForm):
                 data["org_unit"] = service.org_unit
             else:
                 self.add_error("org_unit", "واحد را انتخاب کنید، یا خدمت را تا واحد مالک آن گذاشته شود.")
-        if not data.get("category") and "category" not in self.errors:
-            if scenario:
-                data["category"] = scenario.category
-            else:
-                self.add_error("category", "دسته را انتخاب کنید، یا سناریوی مرجع را تا دسته‌ی آن گذاشته شود.")
+        if not data.get("category") and "category" not in self.errors and scenario:
+            data["category"] = scenario.category
         category = data.get("category")
         if service and category:
             # ریسک در خانه‌ای که «نامرتبط» ثبت شده تناقض است؛ تصمیم «نامرتبط» بی‌صدا عوض نمی‌شود.
@@ -378,8 +385,10 @@ class ScenarioRiskCreateForm(RiskForm):
 class RiskFilterForm(BootstrapFormMixin, forms.Form):
     q = forms.CharField(label="جست‌وجو", required=False, widget=forms.TextInput(attrs={"placeholder": "کد یا عنوان"}))
     status = forms.ChoiceField(label="وضعیت", required=False, choices=[("", "همه")] + Risk.Status.choices)
-    category = forms.ModelChoiceField(RiskCategory.objects.all(), label="دسته", required=False, empty_label="همه")
+    level = forms.ChoiceField(label="سطح تصمیم", required=False)
+    category = forms.ModelMultipleChoiceField(RiskCategory.objects.all(), label="دسته", required=False)
     service = ServiceChoiceField(Service.objects.none(), label="خدمت", required=False, empty_label="همه")
+    owner = forms.ChoiceField(label="مالک", required=False)
     unit = UnitChoiceField(OrgUnit.objects.all(), label="واحد", required=False, empty_label="همه‌ی واحدها")
     tag = forms.ModelChoiceField(Tag.objects.all(), label="برچسب", required=False, empty_label="همه")
     channel = forms.ChoiceField(label="کانال ورود", required=False, choices=[("", "همه")] + Risk.Channel.choices)
@@ -388,20 +397,51 @@ class RiskFilterForm(BootstrapFormMixin, forms.Form):
     )
 
     def __init__(self, *args, user, **kwargs):
+        from apps.methodology.services import active_version
+
         super().__init__(*args, **kwargs)
         # فقط خدمت‌هایی که کاربر می‌بیند در فهرست می‌آیند، تا نام خدمت‌های دیگر لو نرود.
         self.fields["service"].queryset = visible_services(user)
+        version = active_version()
+        levels = sorted(version.risk_levels.all(), key=lambda level: -level.rank) if version else []
+        self.fields["level"].choices = (
+            [("", "همه")] + [(str(level.rank), level.name) for level in levels] + [("none", "ارزیابی‌نشده")]
+        )
+        # مالک‌ها فقط از ریسک‌هایی که کاربر می‌بیند؛ «بدون مالک» یعنی خالی یا مالک غیرفعال.
+        owners = (
+            User.objects.filter(owned_risks__in=visible_risks(user)).distinct().order_by("first_name", "last_name")
+        )
+        self.fields["owner"].choices = (
+            [("", "همه"), ("none", "بدون مالک")]
+            + [(str(owner.pk), owner.get_full_name() or owner.username) for owner in owners]
+        )
 
     def filter(self, risks):
+        from apps.assessments.models import Assessment
+
         data = self.cleaned_data
         for word in data["q"].split():
             risks = risks.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(description__icontains=word))
         if data["status"]:
             risks = risks.filter(status=data["status"])
+        if data["level"]:
+            # سطح فعلی ریسک: سطح تصمیم آخرین ارزیابی جاری تأییدشده.
+            latest = Assessment.objects.filter(
+                risk=OuterRef("pk"), kind=Assessment.Kind.CURRENT, status=Assessment.Status.APPROVED
+            ).order_by("-approved_at", "-pk")
+            risks = risks.annotate(current_rank=Subquery(latest.values("decision_level__rank")[:1]))
+            if data["level"] == "none":
+                risks = risks.filter(current_rank__isnull=True)
+            else:
+                risks = risks.filter(current_rank=int(data["level"]))
         if data["category"]:
-            risks = risks.filter(category=data["category"])
+            risks = risks.filter(category__in=data["category"])
         if data["service"]:
             risks = risks.filter(service=data["service"])
+        if data["owner"] == "none":
+            risks = risks.filter(Q(owner__isnull=True) | Q(owner__is_active=False))
+        elif data["owner"]:
+            risks = risks.filter(owner_id=int(data["owner"]))
         if data["unit"]:
             risks = risks.filter(org_unit__in=get_subtree_ids(data["unit"]))
         if data["tag"]:

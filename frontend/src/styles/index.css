@@ -1,136 +1,190 @@
 @import "tailwindcss";
 
 /* ───────────────────────── توکن‌ها ─────────────────────────
-   رنگ‌ها فقط این‌جا تعریف می‌شوند و کامپوننت‌ها فقط نام نقش را می‌شناسند (bg-panel، text-muted، border-line).
-   تم تیره پیش‌فرض است؛ data-theme روی <html> را ThemeProvider می‌گذارد (تیره، روشن، یا پیرو سیستم). */
+   همه از فیگما (کالکشن‌های «ERM / Color» و «ERM / Dimension»، مود Light؛ فایل z9nJXkSW8DzSlAXV6RmeHL). کامپوننت‌ها
+   فقط نام نقش را می‌شناسند. نام‌های قدیمی (panel، surface، fg، muted، accent، ...) نام دیگر همین توکن‌ها هستند تا
+   صفحه‌هایی که هنوز بازنویسی نشده‌اند هم رنگ‌های فیگما را بگیرند. */
 
-:root,
-[data-theme="dark"] {
-  color-scheme: dark;
-  --canvas: #09090b;
-  --panel: #111114;
-  --surface: #18181b;
-  --elevated: #202024;
-  --fg: #fafafa;
-  --muted: #a1a1aa;
-  --faint: #71717a; /* فقط آیکون و تزئین؛ برای متن کنتراست کافی ندارد */
-  --line: #27272a;
-  --line-strong: #3f3f46;
-
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-fg: #ffffff;
-  --accent-text: #a78bfa;
-  --accent-soft: rgb(139 92 246 / 0.14);
-  --accent-line: rgb(139 92 246 / 0.45);
-
-  --success: #4ade80;
-  --success-soft: rgb(74 222 128 / 0.12);
-  --warning: #fbbf24;
-  --warning-soft: rgb(251 191 36 / 0.12);
-  --danger: #f87171;
-  --danger-soft: rgb(248 113 113 / 0.12);
-  --info: #60a5fa;
-  --info-soft: rgb(96 165 250 / 0.12);
-
-  --ring: #a78bfa;
-  --overlay: rgb(0 0 0 / 0.62);
-  --glow: rgb(124 58 237 / 0.16);
-  --highlight: rgb(255 255 255 / 0.045);
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-2: 0 12px 32px -12px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.35);
-}
-
-[data-theme="light"] {
+:root {
   color-scheme: light;
-  --canvas: #fafafa;
-  --panel: #ffffff;
-  --surface: #f4f4f5;
-  --elevated: #ffffff;
-  --fg: #09090b;
-  --muted: #52525b;
-  --faint: #a1a1aa;
-  --line: #e4e4e7;
-  --line-strong: #d4d4d8;
 
-  --accent: #6d28d9;
-  --accent-hover: #5b21b6;
-  --accent-fg: #ffffff;
-  --accent-text: #6d28d9;
-  --accent-soft: rgb(109 40 217 / 0.08);
-  --accent-line: rgb(109 40 217 / 0.32);
+  /* سطح */
+  --bg-canvas: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-muted: #e8ecf1;
+  /* منو */
+  --bg-sidebar: #0b1628;
+  --bg-sidebar-hover: #15233b;
+  --bg-sidebar-active: #1b2c4a;
+  /* متن */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-on-dark: #f8fafc;
+  --text-on-dark-muted: #94a3b8;
+  --text-on-brand: #ffffff;
+  /* برند و تأکید */
+  --brand-primary: #1e3a8a;
+  --brand-primary-hover: #1e40af;
+  --brand-subtle: #eef2ff;
+  --brand-subtle-strong: #c7d2fe;
+  --accent-gold: #a16207;
+  --accent-gold-subtle: #fef3c7;
+  --accent-gold-bright: #eab308;
+  /* حاشیه */
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #0369a1;
+  /* وضعیت */
+  --status-info: #0369a1;
+  --status-info-subtle: #e0f2fe;
+  --status-success: #15803d;
+  --status-success-subtle: #dcfce7;
+  --status-warning: #b45309;
+  --status-warning-subtle: #fef3c7;
+  --status-danger: #b91c1c;
+  --status-danger-solid: #dc2626;
+  --status-danger-subtle: #fee2e2;
+  /* سطح ریسک (پایین سبز، متوسط زرد، بالا نارنجی، بحرانی قرمز؛ همیشه با برچسب متنی) */
+  --risk-low: #16a34a;
+  --risk-low-bg: #dcfce7;
+  --risk-low-fg: #166534;
+  --risk-medium: #eab308;
+  --risk-medium-bg: #fef9c3;
+  --risk-medium-fg: #854d0e;
+  --risk-high: #ea580c;
+  --risk-high-bg: #ffedd5;
+  --risk-high-fg: #9a3412;
+  --risk-critical: #dc2626;
+  --risk-critical-bg: #fee2e2;
+  --risk-critical-fg: #991b1b;
+  --risk-none: #94a3b8;
+  --risk-none-bg: #f1f5f9;
+  --risk-none-fg: #475569;
 
-  --success: #15703a;
-  --success-soft: rgb(21 112 58 / 0.08);
-  --warning: #9f4a06;
-  --warning-soft: rgb(159 74 6 / 0.09);
-  --danger: #b91c1c;
-  --danger-soft: rgb(185 28 28 / 0.07);
-  --info: #1d4ed8;
-  --info-soft: rgb(29 78 216 / 0.07);
-
-  --ring: #6d28d9;
-  --overlay: rgb(9 9 11 / 0.42);
-  --glow: rgb(109 40 217 / 0.07);
-  --highlight: rgb(255 255 255 / 0.8);
-  --shadow-1: 0 1px 2px rgb(9 9 11 / 0.06);
-  --shadow-2: 0 16px 36px -14px rgb(9 9 11 / 0.22), 0 2px 6px rgb(9 9 11 / 0.06);
+  --overlay: rgb(15 23 42 / 0.45);
+  /* سایه‌ها: Elevation/1 — Card، Elevation/2 — Popover، Focus/Ring */
+  --elevation-1: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -6px rgb(15 23 42 / 0.07);
+  --elevation-2: 0 2px 6px rgb(15 23 42 / 0.06), 0 20px 48px -12px rgb(15 23 42 / 0.14);
+  --focus-ring: 0 0 0 3px rgb(3 105 161 / 0.35);
 }
-
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
-  --color-canvas: var(--canvas);
-  --color-panel: var(--panel);
-  --color-surface: var(--surface);
-  --color-elevated: var(--elevated);
-  --color-fg: var(--fg);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-fg: var(--accent-fg);
-  --color-accent-text: var(--accent-text);
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-line: var(--accent-line);
-  --color-success: var(--success);
-  --color-success-soft: var(--success-soft);
-  --color-warning: var(--warning);
-  --color-warning-soft: var(--warning-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-info: var(--info);
-  --color-info-soft: var(--info-soft);
-  --color-ring: var(--ring);
+  --color-canvas: var(--bg-canvas);
+  --color-panel: var(--bg-surface);
+  --color-subtle: var(--bg-subtle);
+  --color-sunken: var(--bg-muted);
+  --color-nav: var(--bg-sidebar);
+  --color-nav-hover: var(--bg-sidebar-hover);
+  --color-nav-active: var(--bg-sidebar-active);
+
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-3: var(--text-tertiary);
+  --color-on-dark: var(--text-on-dark);
+  --color-on-dark-muted: var(--text-on-dark-muted);
+  --color-on-brand: var(--text-on-brand);
+
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-subtle-strong: var(--brand-subtle-strong);
+  --color-gold: var(--accent-gold);
+  --color-gold-subtle: var(--accent-gold-subtle);
+  --color-gold-bright: var(--accent-gold-bright);
+
+  --color-line: var(--border-default);
+  --color-line-strong: var(--border-strong);
+  --color-focus: var(--border-focus);
+
+  --color-info: var(--status-info);
+  --color-info-subtle: var(--status-info-subtle);
+  --color-success: var(--status-success);
+  --color-success-subtle: var(--status-success-subtle);
+  --color-warning: var(--status-warning);
+  --color-warning-subtle: var(--status-warning-subtle);
+  --color-danger: var(--status-danger);
+  --color-danger-solid: var(--status-danger-solid);
+  --color-danger-subtle: var(--status-danger-subtle);
+
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-bg: var(--risk-low-bg);
+  --color-risk-low-fg: var(--risk-low-fg);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-bg: var(--risk-medium-bg);
+  --color-risk-medium-fg: var(--risk-medium-fg);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-bg: var(--risk-high-bg);
+  --color-risk-high-fg: var(--risk-high-fg);
+  --color-risk-critical: var(--risk-critical);
+  --color-risk-critical-bg: var(--risk-critical-bg);
+  --color-risk-critical-fg: var(--risk-critical-fg);
+  --color-risk-none: var(--risk-none);
+  --color-risk-none-bg: var(--risk-none-bg);
+  --color-risk-none-fg: var(--risk-none-fg);
+
+  /* نام‌های قدیمی همین توکن‌ها */
+  --color-surface: var(--bg-subtle);
+  --color-elevated: var(--bg-surface);
+  --color-fg: var(--text-primary);
+  --color-muted: var(--text-secondary);
+  --color-faint: var(--text-tertiary);
+  --color-accent: var(--brand-primary);
+  --color-accent-hover: var(--brand-primary-hover);
+  --color-accent-fg: var(--text-on-brand);
+  --color-accent-text: var(--brand-primary);
+  --color-accent-soft: var(--brand-subtle);
+  --color-accent-line: var(--brand-subtle-strong);
+  --color-success-soft: var(--status-success-subtle);
+  --color-warning-soft: var(--status-warning-subtle);
+  --color-danger-soft: var(--status-danger-subtle);
+  --color-info-soft: var(--status-info-subtle);
+  --color-ring: var(--border-focus);
   --color-overlay: var(--overlay);
 
-  --shadow-card: inset 0 1px 0 var(--highlight), var(--shadow-1);
-  --shadow-pop: inset 0 1px 0 var(--highlight), var(--shadow-2);
+  --shadow-card: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-focus: var(--focus-ring);
 }
 
 @theme {
-  /* Inter برای حروف لاتین و کدها؛ هر نویسه‌ی فارسی که Inter ندارد از Vazirmatn می‌آید. */
-  --font-sans: "Inter Variable", "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-code: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Vazirmatn برای همه‌ی متن‌ها و رقم‌های فارسی؛ IBM Plex Mono برای کدها (RK-1405-0012، AS-…، TR-…). */
+  --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* متن فارسی فاصله‌ی سطر بیشتری از لاتین می‌خواهد؛ عنوان‌ها روان با عرض صفحه بزرگ می‌شوند. */
+  /* استایل‌های متن فیگما: Caption 12/18 · Label و Body Small 13/20 · Body 14/24 · H3 15/24 · H2 18/28 · H1 22/34 ·
+     Display 28/40 · Stat 20/28 · KPI 32/40 */
   --text-xs: 0.75rem;
-  --text-xs--line-height: 1.65;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.75;
-  --text-base: 0.9375rem;
-  --text-base--line-height: 1.8;
-  --text-heading: clamp(1rem, 0.95rem + 0.2vw, 1.0625rem);
-  --text-heading--line-height: 1.6;
-  --text-title: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
-  --text-title--line-height: 1.5;
-  --text-display: clamp(1.5rem, 1.15rem + 1.5vw, 2.25rem);
-  --text-display--line-height: 1.4;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.5rem;
+  --text-h3: 0.9375rem;
+  --text-h3--line-height: 1.5rem;
+  --text-h2: 1.125rem;
+  --text-h2--line-height: 1.75rem;
+  --text-h1: 1.375rem;
+  --text-h1--line-height: 2.125rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.5rem;
+  --text-stat: 1.25rem;
+  --text-stat--line-height: 1.75rem;
+  --text-kpi: 2rem;
+  --text-kpi--line-height: 2.5rem;
+  /* نام‌های قدیمی */
+  --text-heading: 0.9375rem;
+  --text-heading--line-height: 1.5rem;
+  --text-title: 1.375rem;
+  --text-title--line-height: 2.125rem;
 
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1.125rem;
+  /* گوشه‌ها: radius/sm 4 · md 8 · lg 10 · xl 16 · full */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-2xl: 16px;
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -220,8 +274,8 @@
 
 @layer base {
   html {
-    background-color: var(--canvas);
-    color: var(--fg);
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     font-size: 100%;
     -webkit-font-smoothing: antialiased;
@@ -229,7 +283,9 @@
     text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
     scrollbar-gutter: stable;
-    --topbar-h: 3.75rem;
+    /* قاب صفحه‌ی فیگما: نوار بالا ۵۶، منوی کناری ۲۴۰، حاشیه‌ی محتوا ۳۲ */
+    --topbar-h: 3.5rem;
+    --sidebar-w: 15rem;
     --gutter: 1rem;
   }
 
@@ -247,13 +303,9 @@
 
   body {
     min-height: 100dvh;
-    font-size: var(--text-sm);
-    line-height: var(--text-sm--line-height);
-    /* نور بنفش کم‌رنگ بالای صفحه؛ فقط تزئین است و پشت همه‌چیز می‌ماند. */
-    background:
-      radial-gradient(60rem 28rem at 85% -12rem, var(--glow), transparent 70%),
-      radial-gradient(40rem 20rem at 0% -10rem, var(--glow), transparent 75%), var(--canvas);
-    background-attachment: fixed;
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    background-color: var(--bg-canvas);
   }
 
   /* حروف فارسی به هم چسبیده‌اند؛ هر فاصله‌ی حرف (tracking) پیوندشان را می‌شکند. */
@@ -265,7 +317,6 @@
   h2,
   h3,
   h4 {
-    font-weight: 650;
     text-wrap: balance;
   }
 
@@ -274,19 +325,19 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--border-focus);
     outline-offset: 2px;
   }
 
   ::selection {
-    background-color: var(--accent-line);
-    color: var(--fg);
+    background-color: var(--brand-subtle-strong);
+    color: var(--text-primary);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--muted);
-    opacity: 0.8;
+    color: var(--text-tertiary);
+    opacity: 1;
   }
 
   ol.list-persian {
@@ -298,11 +349,10 @@
   }
 }
 
-/* کد رکوردها (RK-1405-0012) لاتین و چپ‌به‌راست است. رقم هم‌عرض (tnum) در Inter خط تیره را هم پهن می‌کند، پس
-   برای کد خاموش است. */
+/* کد رکوردها (RK-1405-0012) لاتین و چپ‌به‌راست با IBM Plex Mono است. */
 @utility code {
   font-family: var(--font-code);
-  font-feature-settings: "cv11";
+  font-weight: 500;
   direction: ltr;
   unicode-bidi: isolate;
   white-space: nowrap;
@@ -313,13 +363,13 @@
 }
 
 @utility glass {
-  background-color: color-mix(in oklab, var(--canvas) 72%, transparent);
-  backdrop-filter: saturate(1.6) blur(16px);
-  -webkit-backdrop-filter: saturate(1.6) blur(16px);
+  background-color: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 @utility skeleton {
-  background-image: linear-gradient(90deg, var(--surface) 0%, var(--elevated) 50%, var(--surface) 100%);
+  background-image: linear-gradient(90deg, var(--bg-subtle) 0%, var(--bg-muted) 50%, var(--bg-subtle) 100%);
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
 }
@@ -352,10 +402,10 @@
     text-align: start;
     font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--muted);
+    color: var(--text-secondary);
     white-space: nowrap;
-    background-color: var(--panel);
-    border-bottom: 1px solid var(--line);
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
   }
 
   /* سرسطر (th در tbody) مثل خانه‌ی عادی است، فقط برای صفحه‌خوان سرسطر است؛ مثل نام خدمت در جدول جهان ریسک. */
@@ -364,7 +414,7 @@
     padding: 0.8125rem 1rem;
     vertical-align: middle;
     text-align: start;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border-default);
   }
 
   /* جدول پهن (مثل جهان ریسک با یک ستون برای هر دسته) در عرض متوسط افقی جابه‌جا می‌شود. */
@@ -383,7 +433,7 @@
   }
 
   .data-table tbody tr:hover {
-    background-color: color-mix(in oklab, var(--surface) 70%, transparent);
+    background-color: color-mix(in oklab, var(--bg-subtle) 70%, transparent);
   }
 
   .data-table tbody tr:last-child td,
@@ -399,7 +449,7 @@
   .data-matrix thead th:first-child {
     position: sticky;
     inset-inline-start: 0;
-    background-color: var(--panel);
+    background-color: var(--bg-surface);
   }
 
   .data-matrix tbody th[scope="row"] {
@@ -431,7 +481,7 @@
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 0.375rem 1rem;
       padding: 0.875rem 1rem;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--border-default);
     }
 
     .data-table:not(.data-matrix) tbody tr:last-child {
@@ -449,7 +499,7 @@
 
     .data-table:not(.data-matrix) td[data-label]::before {
       content: attr(data-label);
-      color: var(--muted);
+      color: var(--text-secondary);
       font-size: var(--text-xs);
       min-width: 4.5rem;
     }
@@ -495,6 +545,86 @@
   }
 }
 
+/*
+ * ویزارد شناسایی ریسک. گام تازه از سمتی می‌آید که در ترتیب گام‌ها هست: «بعدی» از پایان خط (چپ در راست‌به‌چپ) و
+ * «قبلی» از شروع خط؛ پس جهت translateX در راست‌به‌چپ برعکس است. گام قبلی بی‌حرکت کنار می‌رود تا فوکوس و تایپ منتظر
+ * انیمیشن نمانند، و اولین گام هنگام باز شدن صفحه حرکت ندارد (data-direction="none").
+ */
+.wizard-step {
+  --wizard-shift: 1rem;
+  animation: wizard-step-in 200ms var(--ease-out) both;
+}
+
+.wizard-step:dir(rtl) {
+  --wizard-shift: -1rem;
+}
+
+.wizard-step[data-direction="back"] {
+  --wizard-shift: -1rem;
+}
+
+.wizard-step[data-direction="back"]:dir(rtl) {
+  --wizard-shift: 1rem;
+}
+
+.wizard-step[data-direction="none"] {
+  animation: none;
+}
+
+@keyframes wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--wizard-shift));
+  }
+}
+
+/* نوار پیشرفت ویزارد از شروع خط پر می‌شود. */
+.wizard-progress {
+  transform-origin: left center;
+  transition: transform 220ms var(--ease-out);
+}
+
+.wizard-progress:dir(rtl) {
+  transform-origin: right center;
+}
+
+/*
+ * جزء جمله‌ی «الگوی ثبت سناریو» که گام فعلی کاملش می‌کند مثل ماژیک علامت می‌خورد: زمینه در جهت خواندن (از شروع
+ * خط) کشیده می‌شود. box-decoration-break زمینه و فاصله را در هر سطر جزء دوسطری تکرار می‌کند.
+ */
+.scenario-token {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 100% 100%;
+  transition:
+    color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.scenario-token:dir(rtl) {
+  background-position: right center;
+}
+
+.scenario-token[data-active] {
+  background-image: linear-gradient(var(--brand-subtle-strong), var(--brand-subtle-strong));
+  box-shadow: inset 0 -2px 0 var(--brand-primary);
+  animation: token-mark 220ms var(--ease-out);
+}
+
+@keyframes token-mark {
+  from {
+    background-size: 0% 100%;
+  }
+}
+
+@keyframes wizard-step-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -510,11 +640,25 @@
   ::view-transition-new(*) {
     animation: none !important;
   }
+
+  /* بدون جابه‌جایی: گام تازه فقط پدیدار می‌شود، نوار پیشرفت و علامت جزء جمله بی‌کشیدن عوض می‌شوند و فقط رنگ
+     بازخورد می‌دهد. */
+  .wizard-step {
+    animation-name: wizard-step-fade;
+  }
+
+  .wizard-progress {
+    transition-property: none;
+  }
+
+  .scenario-token[data-active] {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .glass {
-    background-color: var(--canvas);
+    background-color: var(--bg-surface);
     backdrop-filter: none;
   }
 }

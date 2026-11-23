@@ -18,7 +18,6 @@ import { AcceptanceDetailPage } from "./AcceptanceDetailPage";
 import { ActionDetailPage } from "./ActionDetailPage";
 import { AcceptanceListPage, ActionListPage } from "./ListPages";
 import { PlanDetailPage } from "./PlanDetailPage";
-import { ReassessmentPage } from "./ReassessmentPage";
 
 const done = { message: "انجام شد.", redirect: null };
 
@@ -82,29 +81,51 @@ describe("AcceptanceListPage", () => {
 });
 
 describe("PlanDetailPage", () => {
-  it("shows the plan with its base and target assessments and lets the owner approve it after a confirmation", async () => {
+  it("shows the Figma 07 plan: options, current → target, checks and a timeline of the actions", async () => {
+    pageAt("/actions/plans/1/", planDetail());
+    renderPage(<PlanDetailPage />, { path: "/actions/plans/1", route: "/actions/plans/:pk" });
+    expect(
+      await screen.findByRole("heading", { name: "طرح مواجهه — ریسک آزمون شماره‌ی ۱", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("منتظر تأیید مالک ریسک")).toBeInTheDocument();
+    expect(screen.getByText("مهلت طرح: ۳ روز کاری")).toBeInTheDocument();
+    expect(screen.getByText("سارا محمدی (عضو GRC)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "افزودن اقدام" })).toHaveAttribute("href", "/actions/plans/1/actions/new");
+    expect(screen.getByRole("link", { name: "ویرایش طرح" })).toHaveAttribute("href", "/actions/plans/1/edit");
+    expect(screen.queryByRole("button", { name: "یادآوری به مالک" })).not.toBeInTheDocument();
+
+    const options = screen.getByRole("region", { name: "گزینه‌ی مواجهه" });
+    const items = within(options).getAllByRole("listitem");
+    expect(items.map((item) => item.getAttribute("aria-current"))).toEqual(["true", null, null, null]);
+    expect(items[3]).toHaveTextContent("برای این سطح ممکن نیست");
+
+    const compare = screen.getByRole("region", { name: "جاری ← هدف" });
+    expect(within(compare).getByRole("link", { name: "AS-1405-0002" })).toHaveAttribute("href", "/assessments/2");
+    expect(compare).toHaveTextContent("موعد تحقق هدف ۱۴۰۶/۰۱/۱۵");
+
+    const approval = screen.getByRole("region", { name: "تأیید مالک ریسک" });
+    expect(approval).toHaveTextContent("مالک ریسک · مدیر عملیات زیرساخت");
+    const checks = within(approval).getByRole("list", { name: "شرط‌های تأیید طرح" });
+    expect(within(checks).getAllByRole("listitem").at(-1)).toHaveTextContent(
+      "هزینه و نفرساعت برای ۱ از ۲ اقدام (هشدار)",
+    );
+    expect(approval).toHaveTextContent("۸٫۴ میلیارد ریال · ۶۲۰ نفرساعت");
+
+    const actions = screen.getByRole("region", { name: "اقدام‌ها (۲)" });
+    const table = within(actions).getByRole("table", { name: "اقدام‌های طرح با زمان‌بندی" });
+    expect(within(table).getByRole("columnheader", { name: /زمان‌بندی ۱۴۰۵/ })).toBeInTheDocument();
+    const late = within(table).getByRole("link", { name: "به‌روزرسانی BIA و توافق RTO با بانک‌ها" }).closest("tr")!;
+    expect(late).toHaveTextContent("پیامد C");
+    expect(late).toHaveTextContent("هزینه ثبت نشده");
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("مسیر ۱ · B");
+    await expectNoAxeViolations();
+  });
+
+  it("lets the owner approve the plan after a confirmation", async () => {
     const answer = deferred();
     const api = pageAt("/actions/plans/1/", planDetail(), answer.promise);
     const { user } = renderPage(<PlanDetailPage />, { path: "/actions/plans/1", route: "/actions/plans/:pk" });
-    expect(await screen.findByRole("heading", { name: "طرح مواجهه: کاهش", level: 1 })).toBeInTheDocument();
-    expect(screen.getByText("منتظر تأیید مالک")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "AS-1405-0002" })).toHaveAttribute("href", "/assessments/2");
-    expect(screen.getByText(/برای این سطح طرح مواجهه الزامی است/)).toBeInTheDocument();
-
-    const actions = screen.getByRole("region", { name: "اقدام‌ها" });
-    expect(within(actions).getByRole("link", { name: "اقدام تازه" })).toHaveAttribute(
-      "href",
-      "/actions/plans/1/actions/new",
-    );
-    expect(within(actions).getByText("برنامه‌ریزی")).toBeInTheDocument();
-    const acceptances = screen.getByRole("region", { name: "پذیرش" });
-    expect(within(acceptances).getByRole("link", { name: "پذیرش زمان‌دار" })).toHaveAttribute(
-      "href",
-      "/actions/risks/1/acceptance/new",
-    );
-    await expectNoAxeViolations();
-
-    const approval = screen.getByRole("region", { name: "تأیید مالک ریسک" });
+    const approval = await screen.findByRole("region", { name: "تأیید مالک ریسک" });
     await user.click(within(approval).getByRole("button", { name: "تأیید طرح" }));
     const dialog = await screen.findByRole("alertdialog", { name: /تأیید شود؟/ });
     expect(api.callsTo("POST forms/")).toHaveLength(0);
@@ -115,28 +136,45 @@ describe("PlanDetailPage", () => {
     expect(await screen.findByText("طرح تأیید شد.", { exact: true })).toBeInTheDocument();
   });
 
-  it("lists what is missing before approval and tells others that the owner approves", async () => {
-    pageAt(
+  it("lets the plan writer remind the owner and shows failed checks without an approve button", async () => {
+    const api = pageAt(
       "/actions/plans/1/",
       planDetail({
         approval: {
+          ...planDetail().approval,
           problems: ["دست‌کم یک اقدام لازم است."],
           approve_url: null,
           message: "",
           waiting_for_owner: false,
+          checks: [{ label: "هر گزینه جز پذیرش دست‌کم یک اقدام دارد", state: "fail" }],
+          estimate: null,
         },
         actions: [],
-        add_action_url: null,
+        timeline: null,
+        remind_url: "/actions/plans/1/remind/",
         edit_url: null,
       }),
     );
-    renderPage(<PlanDetailPage />, { path: "/actions/plans/1", route: "/actions/plans/:pk" });
+    const { user } = renderPage(<PlanDetailPage />, { path: "/actions/plans/1", route: "/actions/plans/:pk" });
     const approval = await screen.findByRole("region", { name: "تأیید مالک ریسک" });
-    expect(approval).toHaveTextContent("پیش از تأیید مالک ریسک لازم است:");
-    expect(approval).toHaveTextContent("دست‌کم یک اقدام لازم است.");
+    expect(approval).toHaveTextContent("هر گزینه جز پذیرش دست‌کم یک اقدام دارد (برقرار نیست)");
     expect(within(approval).queryByRole("button")).not.toBeInTheDocument();
+    expect(approval).not.toHaveTextContent("برآورد کل");
     expect(screen.getByText("هنوز اقدامی ثبت نشده است.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "ویرایش" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "ویرایش طرح" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "یادآوری به مالک" }));
+    await waitFor(() => expect(sent(api)).toEqual([{ path: "/actions/plans/1/remind/", body: { values: {} } }]));
+  });
+
+  it("switches the actions between the timeline and the plain table", async () => {
+    pageAt("/actions/plans/1/", planDetail());
+    const { user } = renderPage(<PlanDetailPage />, { path: "/actions/plans/1", route: "/actions/plans/:pk" });
+    const actions = await screen.findByRole("region", { name: "اقدام‌ها (۲)" });
+    await user.click(within(actions).getByRole("button", { name: "نمای جدول" }));
+    expect(within(actions).getByRole("table", { name: "اقدام‌های این طرح" })).toBeInTheDocument();
+    expect(within(actions).queryByRole("table", { name: "اقدام‌های طرح با زمان‌بندی" })).not.toBeInTheDocument();
+    await user.click(within(actions).getByRole("button", { name: "نمای زمان‌بندی" }));
+    expect(within(actions).getByRole("table", { name: "اقدام‌های طرح با زمان‌بندی" })).toBeInTheDocument();
   });
 
   it("shows the reassessment comparison when a new current assessment is approved", async () => {
@@ -144,8 +182,13 @@ describe("PlanDetailPage", () => {
     pageAt(
       "/actions/plans/1/",
       planDetail({
-        plan: { ...planDetail().plan, state: { value: "approved", label: "تأییدشده‌ی مالک" } },
-        approval: { problems: [], approve_url: null, message: "", waiting_for_owner: false },
+        plan: { ...planDetail().plan, state: { value: "approved", label: "تأییدشده‌ی مالک ریسک" }, deadline: null },
+        approval: {
+          ...planDetail().approval,
+          approve_url: null,
+          message: "",
+          owner_state: { value: "approved", label: "تأیید شد" },
+        },
         reassess_url: "/actions/plans/1/reassess/",
         comparison,
       }),
@@ -158,7 +201,8 @@ describe("PlanDetailPage", () => {
     );
     const table = within(section).getByRole("table", { name: /مقایسه‌ی ارزیابی مبنا، تازه و هدف/ });
     expect(within(table).getAllByRole("columnheader")).toHaveLength(4);
-    expect(screen.queryByRole("region", { name: "تأیید مالک ریسک" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/مهلت طرح:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "تأیید مالک ریسک" })).toHaveTextContent("تأیید شد");
   });
 });
 
@@ -220,27 +264,58 @@ describe("ActionDetailPage", () => {
 });
 
 describe("AcceptanceDetailPage", () => {
-  it("signs as senior management with the letter file sent as multipart", async () => {
+  it("shows the locked sheet, the four signature steps and the validity period (Figma 08)", async () => {
+    pageAt("/actions/acceptances/2/", acceptanceDetail());
+    renderPage(<AcceptanceDetailPage />, { path: "/actions/acceptances/2", route: "/actions/acceptances/:pk" });
+    expect(
+      await screen.findByRole("heading", { name: "پذیرش ریسک باقیمانده — ریسک آزمون متوسط", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("منتظر امضا · ۱ از ۳")).toBeInTheDocument();
+    expect(screen.getByText("پذیرش عادی")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "مشاهده‌ی ارزیابی" })).toHaveAttribute("href", "/assessments/4");
+    expect(screen.getByText(/متن پذیرش پس از ارسال برای امضا قفل است/)).toBeInTheDocument();
+
+    const sheet = screen.getByRole("region", { name: "برگه‌ی پذیرش" });
+    expect(sheet).toHaveTextContent("قفل‌شده");
+    expect(sheet).toHaveTextContent("محدودیت مشتری بررسی‌شده");
+    expect(sheet).toHaveTextContent("متن تصمیم — پس از آخرین تأیید نوشته می‌شود");
+    expect(sheet).toHaveTextContent("عبور از حد تحمل مشتری اختیار پذیرش عمومی را محدود کرده است.");
+
+    const steps = within(screen.getByRole("region", { name: "امضاها" })).getAllByRole("listitem");
+    expect(steps).toHaveLength(4);
+    expect(steps[0]).toHaveTextContent("تأیید شد");
+    expect(steps[0]).toHaveTextContent("خودش در سامانه");
+    expect(steps[0]).toHaveTextContent("«شروط را می‌پذیرم.»");
+    expect(steps[1]).toHaveTextContent("مدیران واحد «واحد آزمون»: مدیر آزمون");
+    expect(steps[1]).toHaveTextContent("منتظر امضا");
+    expect(steps[2]).toHaveTextContent("لازم نیست");
+    expect(steps[3]).toHaveTextContent("منتظر امضای شما");
+
+    const validity = screen.getByRole("region", { name: "دوره‌ی اعتبار" });
+    const marks = within(validity).getAllByRole("listitem");
+    expect(marks.map((mark) => mark.textContent)).toEqual([
+      "آغاز۱۴۰۵/۰۸/۱۳",
+      "امروز۱۴۰۵/۰۸/۲۱",
+      "یادآوری ۱۰ روزه۱۴۰۵/۰۸/۲۳",
+      "یادآوری ۵ روزه۱۴۰۵/۰۸/۲۸",
+      "پایان اعتبار۱۴۰۵/۰۹/۰۳",
+    ]);
+    await expectNoAxeViolations();
+  });
+
+  it("signs as senior management inside its step, with the letter file sent as multipart", async () => {
     const api = pageAt("/actions/acceptances/2/", acceptanceDetail());
     const { user } = renderPage(<AcceptanceDetailPage />, {
       path: "/actions/acceptances/2",
       route: "/actions/acceptances/:pk",
     });
-    expect(await screen.findByRole("heading", { name: "پذیرش AC-1405-0002", level: 1 })).toBeInTheDocument();
-    expect(screen.getByText("عبور از حد تحمل مشتری اختیار پذیرش عمومی را محدود کرده است.")).toBeInTheDocument();
-    const signatures = screen.getByRole("list", { name: "امضاهای لازم" });
-    const rows = within(signatures).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("تأیید");
-    expect(rows[1]).toHaveTextContent("مدیران واحد «واحد آزمون»: مدیر آزمون");
-    expect(rows[2]).toHaveTextContent("منتظر");
-    await expectNoAxeViolations();
-
-    const box = screen.getByRole("region", { name: "امضای شما به‌عنوان مدیریت ارشد" });
+    const box = await screen.findByRole("group", { name: "امضای شما به‌عنوان مدیریت ارشد" });
     expect(box).toHaveTextContent("تصمیم مدیریت ارشد را از روی نامه‌ی رسمی ثبت می‌کنید.");
+    expect(within(box).getByRole("radio", { name: "تأیید پذیرش با شروط بالا" })).toBeChecked();
     await user.type(within(box).getByRole("textbox", { name: "شماره‌ی نامه" }), "۱۲/۳۴۵");
     const letter = new File(["%PDF-1.4"], "letter.pdf", { type: "application/pdf" });
     await user.upload(within(box).getByLabelText("فایل نامه"), letter);
-    await user.click(within(box).getByRole("button", { name: "تأیید پذیرش" }));
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
     const dialog = await screen.findByRole("alertdialog", { name: "پذیرش AC-1405-0002 را تأیید می‌کنید؟" });
     await user.click(within(dialog).getByRole("button", { name: "تأیید پذیرش" }));
     await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
@@ -252,6 +327,33 @@ describe("AcceptanceDetailPage", () => {
     expect(body.get("decision")).toBe("approve");
     expect(body.get("reference")).toBe("۱۲/۳۴۵");
     expect((body.get("letter") as File).name).toBe("letter.pdf");
+  });
+
+  it("asks for a reason before a rejection is sent", async () => {
+    const api = pageAt("/actions/acceptances/2/", acceptanceDetail());
+    const { user } = renderPage(<AcceptanceDetailPage />, {
+      path: "/actions/acceptances/2",
+      route: "/actions/acceptances/:pk",
+    });
+    const box = await screen.findByRole("group", { name: "امضای شما به‌عنوان مدیریت ارشد" });
+    await user.click(within(box).getByRole("radio", { name: "رد با دلیل (پذیرش بسته می‌شود)" }));
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
+    const note = within(box).getByRole("textbox", { name: /توضیح \(برای رد الزامی است\)/ });
+    expect(note).toHaveFocus();
+    expect(box).toHaveTextContent("برای رد پذیرش دلیل را بنویسید.");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await user.type(note, "نامه‌ی مدیریت نرسیده است");
+    await user.click(within(box).getByRole("button", { name: "ثبت امضا" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "پذیرش AC-1405-0002 رد شود؟" });
+    await user.click(within(dialog).getByRole("button", { name: "رد پذیرش" }));
+    await waitFor(() => expect(api.callsTo("POST forms/")).toHaveLength(1));
+    // بی‌فایل، بدنه JSON است و همان مقدارهای فرم را می‌برد.
+    const { values } = api.callsTo("POST forms/")[0]!.body as { values: Record<string, unknown> };
+    expect(values).toMatchObject({
+      authority: "senior_management",
+      decision: "reject",
+      note: "نامه‌ی مدیریت نرسیده است",
+    });
   });
 
   it("revokes with a reason after a confirmation", async () => {
@@ -280,6 +382,7 @@ describe("AcceptanceDetailPage", () => {
           ...acceptanceDetail().acceptance,
           state: { value: "active", label: "معتبر" },
           decision_text: "ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.",
+          decision_preview: "",
           days_left: 12,
         },
         sign_forms: [],
@@ -287,31 +390,10 @@ describe("AcceptanceDetailPage", () => {
       }),
     );
     renderPage(<AcceptanceDetailPage />, { path: "/actions/acceptances/2", route: "/actions/acceptances/:pk" });
-    expect(await screen.findByText("ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.")).toBeInTheDocument();
+    const sheet = await screen.findByRole("region", { name: "برگه‌ی پذیرش" });
+    expect(sheet).toHaveTextContent("«ریسک آزمون تا ۱۴۰۵/۰۹/۰۳ پذیرفته شد.»");
+    expect(sheet).not.toHaveTextContent("پس از آخرین تأیید");
     expect(screen.getByText("۱۲ روز تا پایان اعتبار مانده است.")).toBeInTheDocument();
     expect(screen.queryByText("لغو پذیرش")).not.toBeInTheDocument();
-  });
-});
-
-describe("ReassessmentPage", () => {
-  it("shows the comparison and the open actions next to the decision form", async () => {
-    mockApi({ "GET forms/": reassessmentForm(), "POST forms/": done });
-    renderPage(<ReassessmentPage />, {
-      path: "/actions/plans/1/reassess",
-      route: "/actions/plans/:plan_pk/reassess",
-    });
-    expect(
-      await screen.findByRole("heading", { name: "بازسنجی طرح مواجهه‌ی RK-1405-0001 (کاهش)", level: 1 }),
-    ).toBeInTheDocument();
-    const table = screen.getByRole("table", { name: /مقایسه‌ی ارزیابی مبنا، ارزیابی تازه و هدف ریسک RK-1405-0001/ });
-    expect(
-      within(table)
-        .getAllByRole("columnheader")
-        .map((cell) => cell.textContent?.slice(0, 12)),
-    ).toHaveLength(4);
-    expect(screen.getByText(/این اقدام‌ها هنوز تأیید نشده‌اند/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "TR-1405-0001" })).toHaveAttribute("href", "/actions/1");
-    expect(screen.getByRole("button", { name: "ثبت بازسنجی" })).toBeInTheDocument();
-    await expectNoAxeViolations();
   });
 });

@@ -10,8 +10,8 @@ export const locale = {
 export type Direction = "rtl" | "ltr";
 
 const fa = {
-  "app.name": "مدیریت ریسک",
-  "app.tagline": "سامانه‌ی مدیریت ریسک سازمانی",
+  "app.name": "مدیریت ریسک سازمانی",
+  "app.tagline": "ERM · داتین",
   "shell.skip": "رفتن به محتوای صفحه",
   "shell.menu": "منو",
   "shell.closeMenu": "بستن منو",
@@ -19,7 +19,7 @@ const fa = {
   "shell.collapse": "جمع کردن منو",
   "shell.expand": "باز کردن منو",
   "shell.search": "جست‌وجوی ریسک",
-  "shell.searchPlaceholder": "جست‌وجوی کد یا عنوان ریسک",
+  "shell.searchPlaceholder": "جستجوی کد، عنوان ریسک یا خدمت…",
   "shell.classic": "در صفحه‌های فعلی سامانه باز می‌شود",
   "shell.classicHome": "صفحه‌های فعلی سامانه",
   "shell.account": "حساب کاربری",

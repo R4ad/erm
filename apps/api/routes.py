@@ -23,6 +23,10 @@ SPA_PAGES = {
     "assessments:assessment_list": "/assessments",
     "assessments:candidates": "/assessments/new",
     "workflow:question_list": "/questionnaires/risk-questions",
+    "reports:management": "/reports",
+    "committee:current": "/committee",
+    "committee:meeting": "/committee/{pk}",
+    "actions:action_verify": None,
     "risks:risk_list": None,
     "risks:risk_detail": None,
     # صفحه‌های خواندنی و فرم‌هایی که React با همان view جنگو نشان می‌دهد (bridge.py)، همه با نشانی خود جنگو.

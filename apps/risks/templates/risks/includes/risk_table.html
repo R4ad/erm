@@ -19,7 +19,7 @@
           <td class="text-nowrap"><a href="{{ risk.get_absolute_url }}">{{ risk.code }}</a></td>
           <td>{{ risk.title }}</td>
           {% if not hide_service %}<td class="text-nowrap">{{ risk.service.code|default:"-" }}</td>{% endif %}
-          <td class="text-nowrap" title="{{ risk.category.name }}">{{ risk.category.code }}</td>
+          <td class="text-nowrap" title="{{ risk.category.name|default:'بدون دسته' }}">{{ risk.category.code|default:"-" }}</td>
           <td>{% if risk.owner %}{{ risk.owner.get_full_name|default:risk.owner.username }}{% else %}-{% endif %}</td>
           <td class="text-nowrap">{% include "risks/includes/risk_status.html" %}</td>
         </tr>

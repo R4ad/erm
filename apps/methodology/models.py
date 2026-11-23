@@ -74,11 +74,27 @@ class MethodVersion(TimeStampedModel):
     impact_guidance = models.TextField("اصول ارزیابی پیامد", blank=True, help_text=PARAGRAPHS_HELP)
     decision_guidance = models.TextField("قواعد امتیاز و سطح تصمیم", blank=True, help_text=PARAGRAPHS_HELP)
     acceptance_guidance = models.TextField("اشتهای ریسک و پذیرش", blank=True, help_text=PARAGRAPHS_HELP)
+    effective_from = models.DateField(
+        "تاریخ اجرای پیشنهادی",
+        null=True,
+        blank=True,
+        help_text="روزی که متولی روش برای اجرای این نسخه پیشنهاد می‌کند؛ اجرا همچنان با فعال‌سازی است.",
+    )
     approval_ref = models.CharField("شماره‌ی نامه‌ی تصویب", max_length=100, blank=True)
     approved_on = models.DateField("تاریخ نامه‌ی تصویب", null=True, blank=True)
     approval_recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="ثبت‌کننده‌ی تصویب",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    # ارسال پیش‌نویس برای بازبینی و تصویب (فیگما ۱۷): پس از ارسال، پیش‌نویس در رابط ویرایش نمی‌شود.
+    submitted_at = models.DateTimeField("زمان ارسال برای تصویب", null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="ارسال‌کننده",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -151,6 +167,11 @@ class MethodVersion(TimeStampedModel):
     def is_trial(self):
         """نسخه‌ای که بدون تصویب به کار رفته است. فقط نسخه‌ی ۱ می‌تواند چنین باشد (س۱۲ قدم ۸)."""
         return self.status in (self.Status.ACTIVE, self.Status.ARCHIVED) and self.approved_on is None
+
+    @property
+    def is_editable_draft(self):
+        """پیش‌نویسی که هنوز برای تصویب فرستاده نشده است."""
+        return self.is_draft and self.submitted_at is None
 
     @property
     def can_record_approval(self):
@@ -227,6 +248,9 @@ class ScaleLevel(models.Model):
     value = models.PositiveSmallIntegerField("سطح")
     name = models.CharField("نام", max_length=200, blank=True)
     criteria = models.TextField("معیار", blank=True)
+    tags = models.CharField(
+        "برچسب‌ها", max_length=300, blank=True, help_text="برچسب‌های کوتاه نمایش سطح، جدا با «؛»؛ معیار را عوض نمی‌کنند."
+    )
     lower = models.DecimalField("کران پایین", max_digits=12, decimal_places=4, null=True, blank=True)
     upper = models.DecimalField("کران بالا", max_digits=12, decimal_places=4, null=True, blank=True)
 
@@ -552,3 +576,27 @@ PARAMETER_UNITS = {
     MethodParameter.Key.CALIBRATION_EXACT: "درصد",
     MethodParameter.Key.CALIBRATION_WITHIN_ONE: "درصد",
 }
+
+
+class MethodSimulation(models.Model):
+    """یک اجرای «شبیه‌سازی اثر» نسخه‌ی پیشنهادی روی ارزیابی‌های جاری (فیگما ۲۶). رکورد ارزیابی‌ها عوض نمی‌شود؛ فقط
+    زمان، اجراکننده و خلاصه‌ی شمارش‌ها برای گردش تصویب ثبت می‌شود."""
+
+    version = models.ForeignKey(
+        MethodVersion, verbose_name="نسخه‌ی پیشنهادی", on_delete=models.CASCADE, related_name="simulations"
+    )
+    base = models.ForeignKey(MethodVersion, verbose_name="نسخه‌ی مبنا", on_delete=models.PROTECT, related_name="+")
+    run_at = models.DateTimeField("زمان اجرا", auto_now_add=True)
+    run_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="اجراکننده", on_delete=models.PROTECT, related_name="+"
+    )
+    assessments = models.PositiveIntegerField("ارزیابی‌های شبیه‌سازی‌شده")
+    summary = models.JSONField("خلاصه", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "شبیه‌سازی اثر نسخه"
+        verbose_name_plural = "شبیه‌سازی‌های اثر نسخه"
+        ordering = ["-run_at", "-pk"]
+
+    def __str__(self):
+        return f"شبیه‌سازی v{self.version.number} روی v{self.base.number}"
