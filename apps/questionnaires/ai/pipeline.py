@@ -28,7 +28,7 @@ from .. import notices
 from ..models import AiRun, PendingRisk, Response
 from ..services import settle
 from . import validation
-from .grouping import build_input
+from .grouping import build_input, impact_id, path_id
 from .providers import ProviderError, get_provider
 
 PROMPT_VERSION = "v3"
@@ -210,19 +210,16 @@ class Runner:
             self.finish(AiRun.Status.SUCCEEDED, follow_up_questions=output["follow_up_questions"])
 
     def archive_open_drafts(self):
-        """پیش‌نویس‌های بررسی‌نشده‌ی اجرای قبلی بایگانی می‌شوند؛ با save تا در تاریخچه‌ی هر پیش‌نویس بمانند."""
-        for draft in PendingRisk.objects.filter(response=self.response, status=PendingRisk.Status.PENDING):
-            draft.status = PendingRisk.Status.ARCHIVED
-            draft.save(update_fields=["status", "updated_at"])
+        archive_pending(self.response)
 
     def save_drafts(self, groups, by_impact, similar):
         categories = {category.name: category for category in RiskCategory.objects.filter(is_active=True)}
         unit = self.response.org_unit
         owner = unit_owner(unit, self.response.respondent)
         for instance, consequence, paths in groups:
-            key = f"I{instance.number}"
+            key = impact_id(instance)
             risk = by_impact[key]
-            numbers = {f"P{path.number}": path.number for path in paths}
+            numbers = {path_id(path): path.number for path in paths}
             PendingRisk.objects.create(
                 response=self.response,
                 ai_run=self.run,
@@ -259,6 +256,26 @@ def run_identification(run):
         runner.fail(tracking_code(error.status), str(error))
     except Exception as error:  # noqa: BLE001 - هر خطای پیش‌بینی‌نشده اجرا را با کد پیگیری می‌بندد
         runner.fail(tracking_code(500), repr(error)[:1000])
+
+
+def archive_pending(response, user=None):
+    """پیش‌نویس‌های بررسی‌نشده بایگانی می‌شوند؛ با save تا در تاریخچه‌ی هر پیش‌نویس بمانند."""
+    for draft in PendingRisk.objects.filter(response=response, status=PendingRisk.Status.PENDING):
+        draft.status = PendingRisk.Status.ARCHIVED
+        draft._history_user = user
+        draft.save(update_fields=["status", "updated_at"])
+
+
+def cancel(run, now=None):
+    """لغو اجرای در صف یا در حال اجرا که ردیفش قفل شده است. کارگر بین مرحله‌ها لغو را می‌بیند و نتیجه‌ای ثبت
+    نمی‌کند."""
+    run.status = AiRun.Status.CANCELLED
+    run.finished_at = now or timezone.now()
+    run.save(update_fields=["status", "finished_at", "updated_at"])
+
+
+def latest_succeeded(response):
+    return response.ai_runs.filter(status=AiRun.Status.SUCCEEDED).order_by("-finished_at", "-pk").first()
 
 
 def stale_after():

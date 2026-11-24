@@ -19,6 +19,9 @@ import { AiChip } from "./AiPanel";
 // روز کاری. هر پرسش با مداد ویرایش می‌شود؛ پرسش دلخواهی که خالی بماند کنار می‌رود و پرسش AI خالی‌شده به پیشنهاد
 // برمی‌گردد. متن‌ها از copy.md و جدول تأییدشده‌ی بخش ۱۰ docs/implementation-plan.md است.
 
+const TITLE = "بازگرداندن پاسخنامه برای تکمیل";
+const describe = (respondent: string) =>
+  `پرسش‌های انتخاب‌شده برای ${respondent} فرستاده می‌شود و وضعیت پاسخنامه «بازگشت برای تکمیل اطلاعات» می‌شود.`;
 const DEFAULT_MESSAGE = "لطفاً پرسش‌های زیر را تکمیل کنید تا سناریوهای ریسک این خدمت دقیق‌تر ثبت شوند.";
 const TEXT_LIMIT = 1000;
 
@@ -219,8 +222,8 @@ function ReturnForm({ id, respondent, options, onClose, onReturned }: ReturnForm
 
   return (
     <DialogContent
-      title="بازگرداندن پاسخنامه برای تکمیل"
-      description={`پرسش‌های انتخاب‌شده برای ${respondent} فرستاده می‌شود و وضعیت پاسخنامه «بازگشت برای تکمیل اطلاعات» می‌شود.`}
+      title={TITLE}
+      description={describe(respondent)}
       footer={
         <>
           <p className="me-auto text-xs text-ink-3" aria-live="polite">
@@ -343,8 +346,8 @@ function ReturnBody({ id, respondent, onClose }: { id: string; respondent: strin
   }
   return (
     <DialogContent
-      title="بازگرداندن پاسخنامه برای تکمیل"
-      description={`پرسش‌های انتخاب‌شده برای ${respondent} فرستاده می‌شود و وضعیت پاسخنامه «بازگشت برای تکمیل اطلاعات» می‌شود.`}
+      title={TITLE}
+      description={describe(respondent)}
       footer={
         <Button variant="secondary" className="ms-auto" onClick={onClose}>
           انصراف

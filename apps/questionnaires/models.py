@@ -75,7 +75,17 @@ class Response(TimeStampedModel):
         return self.code
 
     def get_absolute_url(self):
-        return f"/app/identification/responses/{self.pk}"
+        return f"/app{self.review_route}"
+
+    @property
+    def review_route(self):
+        """مسیر SPA «بررسی یک پاسخنامه» (12a)."""
+        return f"/identification/responses/{self.pk}"
+
+    @property
+    def answer_route(self):
+        """مسیر SPA ویزارد پاسخ برای پاسخ‌دهنده‌ی پیش‌نویس یا پاسخنامه‌ی بازگشتی."""
+        return f"/questionnaire-answers?response={self.pk}"
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -305,6 +315,3 @@ class PendingRisk(TimeStampedModel):
     def __str__(self):
         return self.title or f"ریسک پیشنهادی {self.pk}"
 
-    @property
-    def is_pending(self):
-        return self.status == self.Status.PENDING

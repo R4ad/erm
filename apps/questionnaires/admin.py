@@ -21,6 +21,7 @@ class ResponseAdmin(NoDeleteAdmin):
 @admin.register(PendingRisk)
 class PendingRiskAdmin(NoDeleteAdmin):
     list_display = ("__str__", "response", "status", "risk")
+    list_select_related = ("response", "risk")
     list_filter = ("status",)
     raw_id_fields = ("response", "ai_run", "consequence", "risk", "duplicate_of", "decided_by", "owner")
 
@@ -29,6 +30,7 @@ class PendingRiskAdmin(NoDeleteAdmin):
 class AiRunAdmin(admin.ModelAdmin):
     list_display = ("__str__", "status", "stage", "provider", "model", "prompt_version", "error_code", "created_at")
     list_filter = ("status", "provider")
+    list_select_related = ("response",)
     raw_id_fields = ("response", "requested_by")
 
     def has_delete_permission(self, request, obj=None):

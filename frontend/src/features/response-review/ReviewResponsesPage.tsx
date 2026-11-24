@@ -20,7 +20,8 @@ import { ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { get } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { ago, fa } from "@/lib/format";
+import { STEPS } from "@/features/questionnaire-answers/answers";
+import { ago, fa, shortDate } from "@/lib/format";
 import { useDebouncedValue, useNow, useTitle } from "@/lib/hooks";
 import type {
   Deadline,
@@ -42,7 +43,6 @@ const TABS: { value: "" | ResponseStatusValue; label: string }[] = [
   { value: "reviewed", label: "بررسی‌شده" },
   { value: "draft", label: "پیش‌نویس" },
 ];
-const STEP_COUNT = 8;
 const TABLE_ID = "all-responses";
 
 export function ReviewResponsesPage() {
@@ -310,7 +310,7 @@ function QueueCard({ card, urgent }: { card: ReviewQueueCard; urgent: boolean })
       </p>
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-3">
         <span className="text-xs text-ink-3 tabular">
-          {card.submitted_at && `ارسال ${fa(card.submitted_at.jalali)}`}
+          {card.submitted_at && `ارسال ${shortDate(card.submitted_at)}`}
         </span>
         <Link
           to={card.route}
@@ -327,7 +327,7 @@ function QueueCard({ card, urgent }: { card: ReviewQueueCard; urgent: boolean })
 
 function RowSummary({ row }: { row: ReviewRow }) {
   if (row.status.value === "draft") {
-    return <>{`در حال تکمیل · گام ${fa(row.step)} از ${fa(STEP_COUNT)}`}</>;
+    return <>{`در حال تکمیل · گام ${fa(row.step)} از ${fa(STEPS.length)}`}</>;
   }
   if (row.status.value === "returned" && row.return_note) {
     return <>{`بازگشت: ${row.return_note}`}</>;

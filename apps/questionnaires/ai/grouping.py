@@ -7,7 +7,7 @@
 
 from apps.risks.models import RiskCategory
 
-from ..answers import impact_types
+from ..answers import impact_labels, type_labels
 from ..models import PendingRisk
 
 
@@ -51,7 +51,7 @@ def approved_consequences(response):
 def build_input(response):
     """(payload، گروه‌ها). payload همان شیء ورودی بخش ۳ است؛ گروه‌ها برای ذخیره‌ی پیش‌نویس‌ها کنار آن برمی‌گردند."""
     record = response.service_records.first()
-    labels = {item["value"]: item["label"] for item in impact_types()}
+    labels = impact_labels()
     done = approved_consequences(response)
     groups = [group for group in complete_groups(response) if group[1].pk not in done]
     payload = {
@@ -65,7 +65,7 @@ def build_input(response):
                 "impact_id": impact_id(instance),
                 "impact": {
                     "text": consequence.description,
-                    "type": "، ".join(labels.get(code, code) for code in consequence.impact_types),
+                    "type": type_labels(consequence.impact_types, labels),
                     "scope": instance.scope,
                 },
                 "target_event": {"event_id": event_id(instance), "text": instance.event},

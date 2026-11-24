@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { ConfirmDialog, Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { Field, Textarea } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, get, post } from "@/lib/api";
 import { fa } from "@/lib/format";
 import type { ReviewRisk, RiskComparison, RiskComparisonSide } from "@/lib/types";
@@ -184,9 +185,9 @@ export function CompareDialog({
             </table>
           ) : (
             <div aria-hidden className="flex flex-col gap-3">
-              <div className="skeleton h-3 w-3/4 rounded-lg" />
-              <div className="skeleton h-3 w-1/2 rounded-lg" />
-              <div className="skeleton h-3 w-2/3 rounded-lg" />
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
             </div>
           )}
           <div className="flex flex-wrap justify-end gap-2 pt-2">

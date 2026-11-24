@@ -1,15 +1,14 @@
+import { STEPS, isBasic } from "@/features/questionnaire-answers/answers";
 import { fa } from "@/lib/format";
 import type { AiRunFacts, BasicAnswerKey, Person, ReviewRisk, ReviewRisks } from "@/lib/types";
 
 // متن‌های مشترک صفحه‌ی «بررسی یک پاسخنامه» (12a تا 12c)، عیناً از docs/design/copy.md و جدول تأییدشده‌ی
 // docs/implementation-plan.md (بخش ۱۰).
 
-export const BASIC_LABELS: Record<BasicAnswerKey, string> = {
-  service: "خدمت",
-  objective: "هدف یا تعهد",
-  conditions: "عامل و وضعیت",
-  responsibility: "داتین یا مشتری",
-};
+/** برچسب چهار پرسش پایه، همان برچسب گام‌های ویزارد. */
+export const BASIC_LABELS = Object.fromEntries(
+  STEPS.filter((step) => isBasic(step.key)).map((step) => [step.key, step.label]),
+) as Record<BasicAnswerKey, string>;
 
 /** «۱»، «۱ و ۳»، «۱، ۲ و ۳». */
 export function numberList(numbers: number[]): string {

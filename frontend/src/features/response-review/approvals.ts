@@ -28,18 +28,26 @@ export function useDeferredApprovals(responseId: string | undefined) {
     setApproving(new Map([...waiting.current].map(([id, item]) => [id, item.at])));
   }
 
-  async function send(id: number, keepalive: boolean) {
-    const item = waiting.current.get(id);
-    if (!item || item.sent) return;
-    item.sent = true;
+  async function post(id: number, keepalive: boolean) {
     try {
       await request(`pending-risks/${id}/approve/`, { method: "POST", body: {}, keepalive });
     } catch {
       toast({ title: "ثبت ریسک انجام نشد؛ ریسک دوباره منتظر تصمیم شماست.", tone: "danger" });
     }
-    // کارت تا خواندن دوباره‌ی ریسک‌ها «تأیید شد» می‌ماند تا بین دو حالت چشمک نزند.
+  }
+
+  async function send(ids: number[], keepalive: boolean) {
+    const due = ids.filter((id) => {
+      const item = waiting.current.get(id);
+      if (!item || item.sent) return false;
+      item.sent = true;
+      return true;
+    });
+    if (!due.length) return;
+    await Promise.all(due.map((id) => post(id, keepalive)));
+    // کارت تا خواندن دوباره‌ی ریسک‌ها «تأیید شد» می‌ماند تا بین دو حالت چشمک نزند؛ یک بار برای همه‌ی تأییدها.
     await queryClient.invalidateQueries({ queryKey: ["response-review", responseId] });
-    waiting.current.delete(id);
+    due.forEach((id) => waiting.current.delete(id));
     changed();
   }
 
@@ -58,7 +66,7 @@ export function useDeferredApprovals(responseId: string | undefined) {
       tone: "success",
       duration: UNDO_MS,
       action: { label: "بازگردانی", onClick: () => undo(id) },
-      onDismiss: () => void send(id, false),
+      onDismiss: () => void send([id], false),
     });
     waiting.current.set(id, { at: new Date().toISOString(), close, sent: false });
     changed();
@@ -68,7 +76,10 @@ export function useDeferredApprovals(responseId: string | undefined) {
   function flush(keepalive = false) {
     const due = [...waiting.current].filter(([, item]) => !item.sent);
     due.forEach(([, item]) => item.close());
-    return Promise.all(due.map(([id]) => send(id, keepalive)));
+    return send(
+      due.map(([id]) => id),
+      keepalive,
+    );
   }
 
   const leave = useEffectEvent(() => void flush(true));

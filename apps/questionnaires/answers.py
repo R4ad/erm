@@ -46,8 +46,21 @@ NO_DESCRIPTION = "شرح پیامد را بنویسید."
 FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
 
+def fa(value):
+    return str(value).translate(FA_DIGITS)
+
+
 def too_long(limit):
     return f"حداکثر {limit:,} نویسه.".replace(",", "٬").translate(FA_DIGITS)
+
+
+def impact_labels():
+    return {item["value"]: item["label"] for item in impact_types()}
+
+
+def type_labels(codes, labels):
+    """نام بُعدهای انتخاب‌شده‌ی پیامد، با «، »؛ کدی که در روش فعال نیست همان کد می‌ماند."""
+    return "، ".join(labels.get(code, code) for code in codes)
 
 
 def impact_types():

@@ -10,7 +10,6 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response as ApiResponse
 
 from apps.questionnaires.answers import (
-    FA_DIGITS,
     IMPACT_LIMIT,
     MAX_PATHS,
     PATH_LIMIT,
@@ -18,6 +17,7 @@ from apps.questionnaires.answers import (
     answer_values,
     blank_values,
     clean_values,
+    fa,
     impact_types,
     save_values,
     start_response,
@@ -27,7 +27,7 @@ from apps.questionnaires.answers import (
     summary,
 )
 from apps.questionnaires.models import Response, ServiceRecord
-from apps.questionnaires.permissions import visible_responses
+from apps.questionnaires.permissions import can_edit_response, visible_responses
 from apps.questionnaires.returning import identify_resubmitted
 from apps.risks.identification import answer_unit, can_answer, managed_units
 
@@ -53,9 +53,7 @@ def editable_responses(user):
 
 
 def response_route(response, user):
-    if response.is_editable and response.respondent_id == user.pk:
-        return f"/questionnaire-answers?response={response.pk}"
-    return f"/identification/responses/{response.pk}"
+    return response.answer_route if can_edit_response(user, response) else response.review_route
 
 
 def response_payload(response):
@@ -161,7 +159,7 @@ class QuestionnaireAnswersView(ApiView):
                 errors = submit_errors(values) | errors
             if errors:
                 message = (
-                    f"{str(len(errors)).translate(FA_DIGITS)} پرسش اجباری بی‌پاسخ مانده است؛ پیش از ارسال آن‌ها را کامل کنید."
+                    f"{fa(len(errors))} پرسش اجباری بی‌پاسخ مانده است؛ پیش از ارسال آن‌ها را کامل کنید."
                     if submit
                     else "پیش‌نویس ذخیره نشد."
                 )

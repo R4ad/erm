@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type Location, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,11 @@ import type {
 } from "@/lib/types";
 
 import {
-  BASIC_KEYS,
   STEPS,
   eventGroups,
   fieldId,
   impactOf,
+  isBasic,
   newKey,
   sharedBy,
   sharedMessage,
@@ -33,7 +33,6 @@ import {
   stepOfField,
   stepProblems,
   tidy,
-  type BasicKey,
   type Errors,
   type StepKey,
 } from "./answers";
@@ -87,7 +86,7 @@ export function AnswerWizard({
   const [errors, setErrors] = useState<Errors>({});
   const [index, setIndex] = useState(() => Math.min(Math.max((data.response?.step ?? 1) - 1, 0), STEPS.length - 1));
   const [direction, setDirection] = useState<"forward" | "back" | "none">("none");
-  const [focusRequest, setFocusRequest] = useState<{ field: string; n: number } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ field: string } | null>(null);
   const [sent, setSent] = useState<{ response: AnswerResponse; summary: AnswerSummary } | null>(null);
   // مسیرهایی که «انتخاب از رویدادهای قبلی» را زده‌اند و رویداد مسیر خودشان کنار گذاشته شده است؛ متن آن رویداد اینجا
   // می‌ماند تا برگشت به «رویداد جدید» آن را برگرداند.
@@ -101,16 +100,22 @@ export function AnswerWizard({
   const needsUnit = !response && data.units.length > 0;
   const dirty = !sent && JSON.stringify(values) !== saved;
 
-  function allProblems(current = values): Errors {
-    const found: Errors = Object.assign({}, ...STEPS.map((item) => stepProblems(current, item.key)));
-    if (needsUnit && !unit) found.org_unit = [UNIT_REQUIRED];
-    return found;
-  }
-
   function problemsOf(key: StepKey): Errors {
     const found = stepProblems(values, key);
     if (key === "service" && needsUnit && !unit) found.org_unit = [UNIT_REQUIRED];
     return found;
+  }
+
+  // خطاهای هر گام یک بار در هر رندر، برای وضعیت گام‌نما، چیپ «آماده‌ی ارسال» و ارسال.
+  const stepErrors = Object.fromEntries(STEPS.map((item) => [item.key, problemsOf(item.key)])) as Record<
+    StepKey,
+    Errors
+  >;
+  const problems: Errors = Object.assign({}, ...Object.values(stepErrors));
+
+  /** فیلد پرسش یا خطا بعد از رندر بعدی فوکوس می‌گیرد؛ هر درخواست شیء تازه است، پس درخواست تکراری هم اجرا می‌شود. */
+  function focusField(field: string) {
+    setFocusRequest({ field });
   }
 
   // فیلد پرسش یا خطا بعد از هر جابه‌جایی فوکوس می‌گیرد، نه هنگام باز شدن صفحه.
@@ -139,10 +144,7 @@ export function AnswerWizard({
     const next = Math.max(0, Math.min(target, STEPS.length - 1));
     if (next !== index) setDirection(next > index ? "forward" : "back");
     setIndex(next);
-    setFocusRequest((current) => ({
-      field: field ?? primaryField(STEPS[next]?.key ?? "review"),
-      n: (current?.n ?? 0) + 1,
-    }));
+    focusField(field ?? primaryField(STEPS[next]?.key ?? "review"));
   }
 
   /** اولین فیلد خطادار به ترتیب گام‌ها؛ ویزارد به همان گام می‌رود. */
@@ -191,7 +193,7 @@ export function AnswerWizard({
       }),
       "paths",
     );
-    setFocusRequest((current) => ({ field: `paths.${path.key}`, n: (current?.n ?? 0) + 1 }));
+    focusField(`paths.${path.key}`);
   }
 
   function removePath(key: string) {
@@ -203,10 +205,7 @@ export function AnswerWizard({
     const position = values.paths.findIndex((path) => path.key === key);
     const following = values.paths[position + 1] ?? values.paths[position - 1];
     update((current) => tidy({ ...current, paths: current.paths.filter((path) => path.key !== key) }), `paths.${key}`);
-    setFocusRequest((current) => ({
-      field: following ? `paths.${following.key}` : "paths-add",
-      n: (current?.n ?? 0) + 1,
-    }));
+    focusField(following ? `paths.${following.key}` : "paths-add");
   }
 
   function setEventText(event: string, text: string) {
@@ -258,7 +257,7 @@ export function AnswerWizard({
       nextSet.delete(pathKey);
       return nextSet;
     });
-    setFocusRequest((current) => ({ field: `paths.${pathKey}.event`, n: (current?.n ?? 0) + 1 }));
+    focusField(`paths.${pathKey}.event`);
   }
 
   function chooseEvent(pathKey: string, event: string) {
@@ -356,10 +355,9 @@ export function AnswerWizard({
   }
 
   function trySubmit() {
-    const found = allProblems();
-    if (Object.keys(found).length) {
-      setErrors((current) => ({ ...current, ...found }));
-      showFirstError(found);
+    if (Object.keys(problems).length) {
+      setErrors((current) => ({ ...current, ...problems }));
+      showFirstError(problems);
       return;
     }
     if (!save.isPending) save.mutate({ submit: true, values: tidy(values) });
@@ -377,32 +375,33 @@ export function AnswerWizard({
     onSent(null);
     setDirection("none");
     setIndex(0);
-    setFocusRequest((current) => ({ field: "service", n: (current?.n ?? 0) + 1 }));
+    focusField("service");
   }
 
   // Ctrl+S پیش‌نویس را ذخیره می‌کند. Enter در ورودی یک‌خطی گام به گام بعد می‌رود (در متن چندخطی خط تازه است) و در
   // بازبینی، بیرون از دکمه و پیوند، ارسال می‌کند.
-  useEffect(() => {
-    function onKey(event: globalThis.KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        saveDraft();
-        return;
-      }
-      if (event.key !== "Enter" || sent || event.isComposing || event.shiftKey || event.ctrlKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.matches("input[data-enter-next]")) {
-        event.preventDefault();
-        next();
-        return;
-      }
-      if (step.key !== "review" || target?.closest("button, a, input, textarea, select, [role='dialog']")) return;
+  const onKey = useEffectEvent((event: globalThis.KeyboardEvent) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
-      trySubmit();
+      saveDraft();
+      return;
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    if (event.key !== "Enter" || sent || event.isComposing || event.shiftKey || event.ctrlKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches("input[data-enter-next]")) {
+      event.preventDefault();
+      next();
+      return;
+    }
+    if (step.key !== "review" || target?.closest("button, a, input, textarea, select, [role='dialog']")) return;
+    event.preventDefault();
+    trySubmit();
   });
+  useEffect(() => {
+    const listener = (event: globalThis.KeyboardEvent) => onKey(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
 
   // همین صفحه با پاسخنامه‌ی دیگر (مثلاً ردیفی از جدول) فرم را از نو می‌سازد، جز نشانی‌ای که همین فرم رفته است.
   const replacesForm = (current: Location, nextLocation: Location) =>
@@ -412,11 +411,11 @@ export function AnswerWizard({
   function status(key: StepKey): StepStatus {
     if (Object.keys(errors).some((name) => errors[name]?.length && stepOfField(name) === key)) return "error";
     if (key === "review") return "todo";
-    if (!(BASIC_KEYS as string[]).includes(key) && !values.paths.length) return "todo";
-    return Object.keys(problemsOf(key)).length ? "todo" : "done";
+    if (!isBasic(key) && !values.paths.length) return "todo";
+    return Object.keys(stepErrors[key]).length ? "todo" : "done";
   }
 
-  const missing = Object.keys(allProblems()).length;
+  const missing = Object.keys(problems).length;
   const chip = sent
     ? { label: "ارسال‌شده", tone: "success" as const }
     : step.key === "review" && !missing
@@ -507,10 +506,10 @@ export function AnswerWizard({
           <>
             <div className="overflow-x-clip border-t border-line px-4 py-7 sm:px-6">
               <section key={step.key} className="wizard-step" data-direction={direction} aria-label={step.label}>
-                {(BASIC_KEYS as string[]).includes(step.key) ? (
+                {isBasic(step.key) ? (
                   <BasicStep
-                    name={step.key as BasicKey}
-                    value={values[step.key as BasicKey]}
+                    name={step.key}
+                    value={values[step.key]}
                     limit={data.limits.text}
                     errors={errors}
                     onChange={(value) => update((current) => ({ ...current, [step.key]: value }), step.key)}

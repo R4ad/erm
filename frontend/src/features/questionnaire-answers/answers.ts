@@ -20,6 +20,10 @@ export type StepKey = (typeof STEPS)[number]["key"];
 export type BasicKey = "service" | "objective" | "conditions" | "responsibility";
 export const BASIC_KEYS: BasicKey[] = ["service", "objective", "conditions", "responsibility"];
 
+export function isBasic(key: string): key is BasicKey {
+  return (BASIC_KEYS as string[]).includes(key);
+}
+
 export const BASIC: Record<BasicKey, { question: string; hint: string }> = {
   service: {
     question: "موضوع بررسی کدام خدمت یا فرآیند است؟",
@@ -107,8 +111,8 @@ export function summary(values: AnswerValues): AnswerSummary {
 /** مشکل‌هایی که رفتن به گام بعد یا ارسال را نگه می‌دارند، برای یک گام. */
 export function stepProblems(values: AnswerValues, step: StepKey): Errors {
   if (step === "review") return {};
-  if ((BASIC_KEYS as string[]).includes(step)) {
-    return values[step as BasicKey].trim() ? {} : { [step]: [MESSAGES.required] };
+  if (isBasic(step)) {
+    return values[step].trim() ? {} : { [step]: [MESSAGES.required] };
   }
   const found: Errors = {};
   if (step === "paths") {
@@ -141,7 +145,7 @@ export function stepProblems(values: AnswerValues, step: StepKey): Errors {
 
 /** گام هر فیلد خطادار، برای رفتن به همان گام. */
 export function stepOfField(name: string): StepKey {
-  if ((BASIC_KEYS as string[]).includes(name)) return name as BasicKey;
+  if (isBasic(name)) return name;
   // واحد پاسخنامه‌ی تازه کنار پرسش خدمت انتخاب می‌شود.
   if (name === "org_unit") return "service";
   if (name.startsWith("impacts.")) return "impacts";
@@ -168,5 +172,3 @@ export function sharedBy(values: AnswerValues, key: string): number | null {
 
 export const sharedMessage = (number: number) =>
   `رویداد این مسیر در مسیر ${fa(number)} هم انتخاب شده است؛ اول آن مسیر را تغییر دهید.`;
-
-export const tooLong = (limit: number) => `حداکثر ${fa(limit)} نویسه.`;

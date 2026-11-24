@@ -5,8 +5,10 @@
 
 import json
 
-TITLE_LIMIT = 120
-IMPACT_TYPE_LIMIT = 200  # PendingRisk.impact_type
+from ..models import PendingRisk
+
+TITLE_LIMIT = PendingRisk.TITLE_LIMIT
+IMPACT_TYPE_LIMIT = PendingRisk._meta.get_field("impact_type").max_length
 QUESTION_LIMIT = 5
 CONFIDENCE = ("high", "medium", "low")
 RISK_FIELDS = (

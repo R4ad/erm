@@ -8,21 +8,17 @@ from django.utils import timezone
 from apps.actions.models import MonitoringNotice
 from apps.core.jalali import to_jalali
 
-from .answers import FA_DIGITS
+from .answers import fa
 from .models import AiRun, PendingRisk, Response
 from .permissions import can_manage_questionnaires
 
 
-def fa(value):
-    return str(value).translate(FA_DIGITS)
-
-
 def review_href(response):
-    return f"/app/identification/responses/{response.pk}"
+    return response.get_absolute_url()
 
 
 def answer_href(response):
-    return f"/app/questionnaire-answers?response={response.pk}"
+    return f"/app{response.answer_route}"
 
 
 def stamp():

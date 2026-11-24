@@ -394,22 +394,20 @@ function RiskCard({ data, risk, actions }: { data: ResponseReview; risk: ReviewR
 
 function CompactRisk({ risk, onSelect }: { risk: ReviewRisk; onSelect?: () => void }) {
   const approved = risk.status.value === "converted";
-  const chip = approved ? (
-    <span className="inline-flex h-[1.375rem] items-center gap-1 rounded-full bg-success-subtle px-2 text-xs font-medium text-success">
-      <CircleCheck aria-hidden className="size-3.5" />
-      {risk.status.label}
-    </span>
-  ) : (
-    <span
-      className={cn(
-        "inline-flex h-[1.375rem] items-center gap-1 rounded-full px-2 text-xs font-medium",
-        risk.status.value === "pending" ? "bg-tangerine-subtle text-tangerine" : "bg-subtle text-ink-2",
-      )}
-    >
-      {risk.status.value === "pending" && <Sparkles aria-hidden className="size-3.5" />}
-      {risk.status.label}
-    </span>
-  );
+  const chip =
+    risk.status.value === "pending" ? (
+      <AiChip>{risk.status.label}</AiChip>
+    ) : (
+      <span
+        className={cn(
+          "inline-flex h-[1.375rem] items-center gap-1 rounded-full px-2 text-xs font-medium",
+          approved ? "bg-success-subtle text-success" : "bg-subtle text-ink-2",
+        )}
+      >
+        {approved && <CircleCheck aria-hidden className="size-3.5" />}
+        {risk.status.label}
+      </span>
+    );
   const now = useNow();
   const source = sourceText(risk, false);
   let meta: ReactNode = source;

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
-import { PageSkeleton } from "@/components/ui/skeleton";
+import { PageSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage, get, post } from "@/lib/api";
@@ -71,8 +71,8 @@ function HistoryCard({ events }: { events: ReviewHistoryEvent[] | undefined }) {
         </ol>
       ) : (
         <div aria-hidden className="flex flex-col gap-3">
-          <div className="skeleton h-3 w-3/4 rounded-lg" />
-          <div className="skeleton h-3 w-1/2 rounded-lg" />
+          <Skeleton className="h-3 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
         </div>
       )}
     </Card>
@@ -128,12 +128,13 @@ export function ResponseReviewPage() {
   const risks = useQuery({
     queryKey: [...key, "risks"],
     queryFn: ({ signal }) => get<ReviewRisks>(`questionnaire-responses/${id}/risks/`, signal),
-    enabled: Boolean(data),
+    // هم‌زمان با سربرگ خوانده می‌شوند، نه بعد از آن.
+    enabled: id != null,
   });
   const history = useQuery({
     queryKey: [...key, "history"],
     queryFn: ({ signal }) => get<{ events: ReviewHistoryEvent[] }>(`questionnaire-responses/${id}/history/`, signal),
-    enabled: Boolean(data),
+    enabled: id != null,
   });
 
   const runId = data?.run?.id;
@@ -146,21 +147,18 @@ export function ResponseReviewPage() {
   });
   const run = runQuery.data?.id === runId ? runQuery.data : (data?.run ?? null);
 
-  // با پایان اجرای شناسایی (موفق، خالی، خطا یا لغو) ریسک‌ها، تاریخچه و سربرگ دوباره خوانده می‌شوند.
+  // پایان اجرای شناسایی (موفق، خالی، خطا یا لغو): برای صفحه‌خوان اعلام می‌شود و ریسک‌ها، تاریخچه و سربرگ دوباره
+  // خوانده می‌شوند. نتیجه‌ای که با بارگذاری صفحه آمده پایان تازه نیست.
   const active = Boolean(run?.active);
-  const wasActive = useRef(active);
-  useEffect(() => {
-    if (wasActive.current && !active) void queryClient.invalidateQueries({ queryKey: ["response-review", id] });
-    wasActive.current = active;
-  }, [active, id, queryClient]);
-
-  // همان پایان برای صفحه‌خوان اعلام می‌شود؛ نتیجه‌ای که با بارگذاری صفحه آمده اعلام نمی‌شود.
   const [seen, setSeen] = useState({ id: run?.id, active });
   const [finished, setFinished] = useState<AiRunState | null>(null);
   if (seen.id !== run?.id || seen.active !== active) {
     setSeen({ id: run?.id, active });
     if (run && seen.id === run.id && seen.active && !active) setFinished(run);
   }
+  useEffect(() => {
+    if (finished) void queryClient.invalidateQueries({ queryKey: ["response-review", id] });
+  }, [finished, id, queryClient]);
 
   function showRun(next: AiRunState) {
     queryClient.setQueryData(["ai-run", next.id], next);

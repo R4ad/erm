@@ -10,11 +10,20 @@ from apps.risks.identification import narrative
 from apps.risks.models import Risk
 
 from . import notices
+from .answers import EMPTY_PATH
 from .models import AiRun, PendingRisk, Response
 
 P = PendingRisk.Status
 # فیلدهای متنی 12d که کارشناس ویرایش می‌کند، با مقدار پیشنهادی AI برای «بازگرداندن پیشنهاد AI».
 TEXT_FIELDS = ("title", "initiating_factor", "target_event", "impact")
+# پیام فیلد خالی فرم 12d؛ هم در «ذخیره‌ی پیش‌نویس» و هم در تأیید.
+REQUIRED_MESSAGES = {
+    "title": "عنوان ریسک را بنویسید.",
+    "initiating_factor": "عامل آغازگر را بنویسید.",
+    "target_event": "رویداد هدف را بنویسید.",
+    "impact": "پیامد را بنویسید.",
+}
+OWNER_REQUIRED = "مالک ریسک را انتخاب کنید."
 
 
 class DecisionError(Exception):
@@ -41,20 +50,14 @@ def ai_values(draft):
 
 def missing_fields(draft):
     errors = {}
-    messages = {
-        "title": "عنوان ریسک را بنویسید.",
-        "initiating_factor": "عامل آغازگر را بنویسید.",
-        "target_event": "رویداد هدف را بنویسید.",
-        "impact": "پیامد را بنویسید.",
-    }
-    for name, message in messages.items():
+    for name, message in REQUIRED_MESSAGES.items():
         if not getattr(draft, name).strip():
             errors[name] = [message]
     for item in draft.paths:
         if not item["text"].strip():
-            errors[f"paths.{item['number']}"] = ["شرح این مسیر تحقق را بنویسید."]
+            errors[f"paths.{item['number']}"] = [EMPTY_PATH]
     if draft.owner_unit_id is None:
-        errors["owner_unit"] = ["مالک ریسک را انتخاب کنید."]
+        errors["owner_unit"] = [OWNER_REQUIRED]
     return errors
 
 

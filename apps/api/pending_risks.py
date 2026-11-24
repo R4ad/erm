@@ -7,16 +7,23 @@ from rest_framework import status as http
 from rest_framework.response import Response as ApiResponse
 
 from apps.organization.models import OrgUnit
-from apps.questionnaires.answers import PATH_LIMIT, TEXT_LIMIT, too_long
+from apps.questionnaires.answers import EMPTY_PATH, PATH_LIMIT, TEXT_LIMIT, too_long
 from apps.questionnaires.models import PendingRisk
-from apps.questionnaires.services import DecisionError, approve, reject, save_draft
+from apps.questionnaires.services import (
+    OWNER_REQUIRED,
+    REQUIRED_MESSAGES,
+    DecisionError,
+    approve,
+    reject,
+    save_draft,
+)
 from apps.risks.identification import pick_owner, unit_managers
 from apps.risks.models import RiskCategory
 from apps.risks.permissions import visible_risks
 
 from . import formatting as fmt
 from .base import ApiView
-from .response_review import draft_payload, get_response, require_reviewer, reviewable
+from .response_review import draft_payload, get_response, require_reviewer, reviewable, visible_similar
 
 LIMITS = {
     "title": PendingRisk.TITLE_LIMIT,
@@ -47,13 +54,7 @@ def clean_changes(draft, data):
     if not isinstance(data, dict):
         raise DecisionError("بدنه‌ی درخواست نادرست است.")
     errors, changes = {}, {}
-    required = {
-        "title": "عنوان ریسک را بنویسید.",
-        "initiating_factor": "عامل آغازگر را بنویسید.",
-        "target_event": "رویداد هدف را بنویسید.",
-        "impact": "پیامد را بنویسید.",
-    }
-    for name, message in required.items():
+    for name, message in REQUIRED_MESSAGES.items():
         if name not in data:
             continue
         value = data[name] if isinstance(data[name], str) else ""
@@ -73,7 +74,7 @@ def clean_changes(draft, data):
         for number in sorted(numbers):
             text = texts.get(number, "")
             if not text:
-                errors[f"paths.{number}"] = ["شرح این مسیر تحقق را بنویسید."]
+                errors[f"paths.{number}"] = [EMPTY_PATH]
             elif len(text) > PATH_LIMIT:
                 errors[f"paths.{number}"] = [too_long(PATH_LIMIT)]
         changes["paths"] = [{"number": number, "text": text} for number, text in texts.items()]
@@ -84,7 +85,7 @@ def clean_changes(draft, data):
     if "owner_unit" in data:
         unit = pick(OrgUnit.objects.filter(is_active=True), data["owner_unit"], errors, "owner_unit", "این واحد فعال نیست.")
         if unit is None and "owner_unit" not in errors:
-            errors["owner_unit"] = ["مالک ریسک را انتخاب کنید."]
+            errors["owner_unit"] = [OWNER_REQUIRED]
         changes["owner_unit"] = unit
     if "owner" in data:
         changes["owner"] = pick(
@@ -103,10 +104,12 @@ def failure(error):
     return ApiResponse(body, status=code)
 
 
-def fresh(draft):
-    return PendingRisk.objects.select_related(
+def fresh(user, draft):
+    """پیش‌نویس ذخیره‌شده با همان شکل فهرست 12c."""
+    draft = PendingRisk.objects.select_related(
         "consequence__risk_instance", "category", "owner_unit", "owner", "risk", "decided_by"
     ).get(pk=draft.pk)
+    return draft_payload(draft, visible_similar(user, [draft]))
 
 
 class PendingRiskView(ApiView):
@@ -118,7 +121,7 @@ class PendingRiskView(ApiView):
             saved = save_draft(draft, request.user, clean_changes(draft, request.data))
         except DecisionError as error:
             return failure(error)
-        return ApiResponse(draft_payload(fresh(saved)))
+        return ApiResponse(fresh(request.user, saved))
 
 
 class PendingRiskApproveView(ApiView):
@@ -131,7 +134,7 @@ class PendingRiskApproveView(ApiView):
             approved = approve(draft, request.user, changes)
         except DecisionError as error:
             return failure(error)
-        return ApiResponse(draft_payload(fresh(approved)))
+        return ApiResponse(fresh(request.user, approved))
 
 
 class PendingRiskRejectView(ApiView):
@@ -144,7 +147,7 @@ class PendingRiskRejectView(ApiView):
             rejected = reject(draft, request.user, reason if isinstance(reason, str) else "")
         except DecisionError as error:
             return failure(error)
-        return ApiResponse(draft_payload(fresh(rejected)))
+        return ApiResponse(fresh(request.user, rejected))
 
 
 class DecisionOptionsView(ApiView):

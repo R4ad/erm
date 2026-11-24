@@ -311,7 +311,7 @@ def response_tasks(user):
     S = QuestionnaireResponse.Status
     rows = []
     for response in QuestionnaireResponse.objects.filter(respondent=user, status=S.RETURNED).select_related("org_unit"):
-        route = f"/questionnaire-answers?response={response.pk}"
+        route = response.answer_route
         rows.append(task(
             f"response-{response.pk}", "questions", f"تکمیل پاسخنامه‌ی {response.code}", "پاسخنامه",
             response.org_unit.name, response.code, f"/app{route}", icon="file-text",
@@ -321,7 +321,7 @@ def response_tasks(user):
     if can_manage_questionnaires(user):
         waiting = visible_responses(user).filter(status=S.SUBMITTED).select_related("org_unit")
         for response in waiting:
-            route = f"/identification/responses/{response.pk}"
+            route = response.review_route
             rows.append(task(
                 f"review-response-{response.pk}", "questions", f"بررسی پاسخنامه‌ی {response.code}", "پاسخنامه",
                 response.org_unit.name, response.code, f"/app{route}", icon="file-text",

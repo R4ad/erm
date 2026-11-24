@@ -9,9 +9,10 @@ from django.utils import timezone
 from apps.workcalendar.workdays import add_working_days, holidays_after
 
 from . import notices
-from .ai.pipeline import request_identification
-from .answers import FA_DIGITS
-from .models import AiRun, PendingRisk, Response
+from .ai.grouping import event_id, impact_id, path_id
+from .ai.pipeline import archive_pending, cancel, latest_succeeded, request_identification
+from .answers import BASIC_FIELDS, fa
+from .models import AiRun, Response
 from .services import DecisionError
 
 # مهلت پیش‌فرض تکمیل (تصمیم ۴ برنامه) و گزینه‌های فهرست «مهلت تکمیل».
@@ -20,11 +21,6 @@ RETURN_DAY_CHOICES = range(1, 11)
 # بیشتر از این پرسش فرستاده نمی‌شود؛ رابط «افزودن پرسش دلخواه» را بعد از دهمین پرسش غیرفعال می‌کند.
 MAX_RETURN_QUESTIONS = 10
 SOURCES = ("ai", "custom")
-BASIC_COUNT = 4
-
-
-def fa(value):
-    return str(value).translate(FA_DIGITS)
 
 
 def fa_list(numbers):
@@ -37,26 +33,26 @@ def fa_list(numbers):
 
 def about_targets(response):
     """شناسه‌های ورودی LLM (P، E، I و Q) ← برچسب «درباره‌ی …» و گامی از ویزارد که چیپ پاسخ‌دهنده به آن می‌رود."""
-    targets = {f"Q{n}": (f"پرسش {fa(n)}", n) for n in range(1, BASIC_COUNT + 1)}
+    targets = {f"Q{n}": (f"پرسش {fa(n)}", n) for n in range(1, len(BASIC_FIELDS) + 1)}
     record = response.service_records.prefetch_related("risk_instances__paths").first()
     if record is None:
         return targets
     for instance in record.risk_instances.all():
         numbers = sorted(path.number for path in instance.paths.all())
-        for number in numbers:
-            targets[f"P{number}"] = (f"مسیر تحقق {fa(number)}", 5)
-        targets[f"E{instance.number}"] = (f"رویداد {fa(instance.number)}", 6)
+        for path in instance.paths.all():
+            targets[path_id(path)] = (f"مسیر تحقق {fa(path.number)}", 5)
+        targets[event_id(instance)] = (f"رویداد {fa(instance.number)}", 6)
         if numbers:
             paths = f"مسیرهای {fa_list(numbers)}" if len(numbers) > 1 else f"مسیر {fa(numbers[0])}"
-            targets[f"I{instance.number}"] = (f"پیامد {fa(instance.number)} · {paths}", 7)
+            targets[impact_id(instance)] = (f"پیامد {fa(instance.number)} · {paths}", 7)
         else:
-            targets[f"I{instance.number}"] = (f"پیامد {fa(instance.number)}", 7)
+            targets[impact_id(instance)] = (f"پیامد {fa(instance.number)}", 7)
     return targets
 
 
 def suggested_questions(response, targets=None):
     """پرسش‌های تکمیلی پیشنهادی آخرین اجرای موفق؛ پرسشی که به بخش ناشناخته‌ای اشاره کند بی‌برچسب می‌آید."""
-    run = response.ai_runs.filter(status=AiRun.Status.SUCCEEDED).order_by("-finished_at", "-pk").first()
+    run = latest_succeeded(response)
     if run is None:
         return []
     targets = targets if targets is not None else about_targets(response)
@@ -100,13 +96,8 @@ def return_response(response, user, questions, message, due):
         raise DecisionError("فقط پاسخنامه‌ی در انتظار بررسی بازگردانده می‌شود.")
     now = timezone.now()
     for run in response.ai_runs.select_for_update().filter(status__in=AiRun.ACTIVE_STATUSES):
-        run.status = AiRun.Status.CANCELLED
-        run.finished_at = now
-        run.save(update_fields=["status", "finished_at", "updated_at"])
-    for draft in response.pending_risks.filter(status=PendingRisk.Status.PENDING):
-        draft.status = PendingRisk.Status.ARCHIVED
-        draft._history_user = user
-        draft.save(update_fields=["status", "updated_at"])
+        cancel(run, now)
+    archive_pending(response, user)
     targets = about_targets(response)
     response.status = Response.Status.RETURNED
     response.return_questions = [stored_question(item, targets) for item in questions[:MAX_RETURN_QUESTIONS]]

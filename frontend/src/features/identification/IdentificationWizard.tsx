@@ -100,7 +100,7 @@ export function IdentificationWizard({ data, onDraftSaved }: { data: PageData; o
   const [index, setIndex] = useState(0);
   // جهت آخرین جابه‌جایی برای CSS؛ گام اول هنگام باز شدن صفحه حرکت ندارد.
   const [direction, setDirection] = useState<"forward" | "back" | "none">("none");
-  const [focusRequest, setFocusRequest] = useState<{ field: string; n: number } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ field: string } | null>(null);
   const shell = useRef<HTMLDivElement>(null);
   // جایی که خود ویزارد بعد از جواب سرور به آن می‌رود و هشدار «تغییرات ذخیره نشده» (LeaveGuard) جلویش را نمی‌گیرد:
   // leaving برای ریسک تازه (این فرم کنار می‌رود)، ownSearch برای ?draft= پیش‌نویسی که همین
@@ -205,10 +205,7 @@ export function IdentificationWizard({ data, onDraftSaved }: { data: PageData; o
     const next = Math.max(0, Math.min(target, steps.length - 1));
     if (next !== index) setDirection(next > index ? "forward" : "back");
     setIndex(next);
-    setFocusRequest((current) => ({
-      field: field ?? primaryField(steps[next]?.key ?? REVIEW),
-      n: (current?.n ?? 0) + 1,
-    }));
+    setFocusRequest({ field: field ?? primaryField(steps[next]?.key ?? REVIEW) });
   }
 
   function primaryField(key: StepKey) {
@@ -219,7 +216,7 @@ export function IdentificationWizard({ data, onDraftSaved }: { data: PageData; o
     const found = problems(step.key);
     if (Object.keys(found).length) {
       setErrors((current) => ({ ...current, ...found }));
-      setFocusRequest((current) => ({ field: primaryField(step.key), n: (current?.n ?? 0) + 1 }));
+      setFocusRequest({ field: primaryField(step.key) });
       return;
     }
     goTo(index + 1);

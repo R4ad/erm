@@ -14,13 +14,12 @@ export const DialogClose = RadixDialog.Close;
 
 const overlay =
   "fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in";
-const panel =
-  "fixed left-1/2 top-1/2 z-50 grid w-[min(32rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] gap-4 overflow-y-auto rounded-2xl border border-line bg-elevated p-6 shadow-pop " +
-  "-translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-fade-out data-[state=open]:animate-pop-in";
-
-const sectioned =
-  "fixed left-1/2 top-1/2 z-50 grid w-[min(40rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-modal border border-line bg-elevated shadow-pop " +
-  "-translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-fade-out data-[state=open]:animate-pop-in";
+// وسط صفحه با inset-0 و m-auto، که در راست‌به‌چپ و چپ‌به‌راست یکی است؛ h-fit تا inset ارتفاع را نکشد.
+const base =
+  "fixed inset-0 z-50 m-auto grid h-fit max-h-[calc(100dvh-2rem)] rounded-modal border border-line bg-elevated shadow-pop " +
+  "data-[state=closed]:animate-fade-out data-[state=open]:animate-pop-in";
+const panel = cn(base, "w-[min(32rem,calc(100vw-2rem))] gap-4 overflow-y-auto p-6");
+const sectioned = cn(base, "w-[min(40rem,calc(100vw-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden");
 
 interface DialogContentProps extends Omit<ComponentProps<typeof RadixDialog.Content>, "title"> {
   title: ReactNode;
@@ -31,43 +30,20 @@ interface DialogContentProps extends Omit<ComponentProps<typeof RadixDialog.Cont
 
 export function DialogContent({ title, description, footer, className, children, ...props }: DialogContentProps) {
   const focus = useReturnFocus();
-  if (footer !== undefined) {
-    return (
-      <RadixDialog.Portal>
-        <RadixDialog.Overlay className={overlay} />
-        <RadixDialog.Content className={cn(sectioned, className)} {...focus} {...props}>
-          <div className="flex items-start gap-4 border-b border-line px-6 pt-5 pb-4">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <RadixDialog.Title className="text-h2 font-bold text-ink">{title}</RadixDialog.Title>
-              {description ? (
-                <RadixDialog.Description className="text-sm leading-[1.375rem] text-ink-2">
-                  {description}
-                </RadixDialog.Description>
-              ) : null}
-            </div>
-            <RadixDialog.Close asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={t("action.close")}>
-                <X />
-              </Button>
-            </RadixDialog.Close>
-          </div>
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 py-[1.125rem]">{children}</div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line bg-subtle px-6 py-4">
-            {footer}
-          </div>
-        </RadixDialog.Content>
-      </RadixDialog.Portal>
-    );
-  }
+  const form = footer !== undefined;
   return (
     <RadixDialog.Portal>
       <RadixDialog.Overlay className={overlay} />
-      <RadixDialog.Content className={cn(panel, className)} {...focus} {...props}>
-        <div className="flex items-start gap-4">
+      <RadixDialog.Content className={cn(form ? sectioned : panel, className)} {...focus} {...props}>
+        <div className={cn("flex items-start gap-4", form && "border-b border-line px-6 pt-5 pb-4")}>
           <div className="flex flex-1 flex-col gap-1.5">
-            <RadixDialog.Title className="text-title font-semibold">{title}</RadixDialog.Title>
+            <RadixDialog.Title className={form ? "text-h2 font-bold text-ink" : "text-title font-semibold"}>
+              {title}
+            </RadixDialog.Title>
             {description ? (
-              <RadixDialog.Description className="text-sm text-muted">{description}</RadixDialog.Description>
+              <RadixDialog.Description className={cn("text-sm text-ink-2", form && "leading-[1.375rem]")}>
+                {description}
+              </RadixDialog.Description>
             ) : null}
           </div>
           <RadixDialog.Close asChild>
@@ -76,7 +52,16 @@ export function DialogContent({ title, description, footer, className, children,
             </Button>
           </RadixDialog.Close>
         </div>
-        {children}
+        {form ? (
+          <>
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 py-[1.125rem]">{children}</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line bg-subtle px-6 py-4">
+              {footer}
+            </div>
+          </>
+        ) : (
+          children
+        )}
       </RadixDialog.Content>
     </RadixDialog.Portal>
   );
@@ -122,7 +107,7 @@ export function ConfirmDialog({
         <AlertDialog.Content className={panel} {...focus}>
           <div className="flex flex-col gap-1.5">
             <AlertDialog.Title className="text-title font-semibold">{title}</AlertDialog.Title>
-            <AlertDialog.Description className="text-sm text-muted">{description}</AlertDialog.Description>
+            <AlertDialog.Description className="text-sm text-ink-2">{description}</AlertDialog.Description>
           </div>
           {children}
           <div className="flex flex-wrap justify-end gap-2 pt-2">

@@ -4,14 +4,13 @@
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework import status as http
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response as ApiResponse
 
 from apps.questionnaires.ai import grouping
-from apps.questionnaires.ai.pipeline import registry, request_identification
-from apps.questionnaires.answers import FA_DIGITS, answer_values, impact_types
+from apps.questionnaires.ai.pipeline import cancel, latest_succeeded, registry, request_identification
+from apps.questionnaires.answers import BASIC_FIELDS, answer_values, fa, impact_labels, type_labels
 from apps.questionnaires.models import AiRun, PendingRisk, Response
 from apps.questionnaires.permissions import can_manage_questionnaires, visible_responses
 from apps.questionnaires.services import TEXT_FIELDS, ai_values
@@ -23,7 +22,6 @@ from .questionnaire_answers import response_status
 
 S = Response.Status
 P = PendingRisk.Status
-BASICS = ("service", "objective", "conditions", "responsibility")
 
 
 def reviewable(user):
@@ -39,14 +37,10 @@ def require_reviewer(user):
         raise PermissionDenied("بررسی پاسخنامه با کارشناس ریسک است.")
 
 
-def type_labels(codes, labels):
-    return "، ".join(labels.get(code, code) for code in codes)
-
-
 def chains(response):
     """هر مسیر با رویدادش و پیامد آن رویداد. رویداد مشترک شماره‌ی نخستین مسیرش را دارد و پیامدش فقط آن‌جا می‌آید."""
     values = answer_values(response)
-    labels = {item["value"]: item["label"] for item in impact_types()}
+    labels = impact_labels()
     record = response.service_records.first()
     instances = {}
     if record is not None:
@@ -82,7 +76,7 @@ def chains(response):
                 ),
             }
         )
-    basics = [{"number": n, "key": key, "text": values[key]} for n, key in enumerate(BASICS, start=1)]
+    basics = [{"number": n, "key": key, "text": values[key]} for n, key in enumerate(BASIC_FIELDS, start=1)]
     distinct = len({row["event"]["number"] for row in rows if row["impact"] and row["impact"]["text"]})
     answered = sum(1 for item in basics if item["text"].strip()) + sum(
         1 for part in ("paths", "events", "impacts") if values[part]
@@ -145,20 +139,26 @@ def risk_route(risk):
     return f"/risks/{risk.pk}"
 
 
-def edited(draft):
+def edited(draft, suggested):
     """آیا کارشناس متنی را از پیشنهاد AI تغییر داده است؛ برای برچسب «ویرایش‌شده»."""
-    if not draft.ai_original:
+    if suggested is None:
         return False
-    suggested = ai_values(draft)
     return any(getattr(draft, name) != suggested[name] for name in TEXT_FIELDS) or [
         item["text"] for item in draft.paths
     ] != [item["text"] for item in suggested["paths"]]
 
 
-def draft_payload(draft, visible=None):
-    """visible: شناسه‌ی ریسک‌های مشابهی که بیننده می‌بیند؛ None برای کارشناس ریسک که همه‌ی رجیستر را می‌بیند."""
+def visible_similar(user, drafts):
+    """ریسک مشابه از کل رجیستر پیدا شده است؛ پاسخ‌دهنده و ممیز دامنه‌دار فقط ریسک‌هایی را می‌بینند که اجازه دارند."""
+    ids = {item["id"] for draft in drafts for item in draft.similar_risks}
+    return set(visible_risks(user).filter(pk__in=ids).values_list("pk", flat=True)) if ids else set()
+
+
+def draft_payload(draft, visible):
+    """visible: شناسه‌ی ریسک‌های مشابهی که بیننده می‌بیند (visible_similar)."""
     instance = draft.consequence.risk_instance if draft.consequence_id else None
-    suggested = (draft.ai_original or {}).get("category")
+    suggested = ai_values(draft) if draft.ai_original else None
+    ai_category = (draft.ai_original or {}).get("category")
     return {
         "id": draft.pk,
         "status": fmt.choice(draft, "status"),
@@ -170,7 +170,7 @@ def draft_payload(draft, visible=None):
         "impact_type": draft.impact_type,
         "impact_scope": draft.impact_scope,
         "category": {"id": draft.category_id, "name": draft.category.name} if draft.category_id else None,
-        "category_suggested": bool(draft.category_id) and draft.category.name == suggested,
+        "category_suggested": bool(draft.category_id) and draft.category.name == ai_category,
         "owner_unit": {"id": draft.owner_unit_id, "name": draft.owner_unit.name} if draft.owner_unit_id else None,
         "owner": fmt.person(draft.owner),
         "confidence": fmt.choice(draft, "confidence"),
@@ -190,10 +190,10 @@ def draft_payload(draft, visible=None):
                 "route": f"/risks/{item['id']}",
             }
             for item in draft.similar_risks
-            if visible is None or item["id"] in visible
+            if item["id"] in visible
         ],
-        "edited": edited(draft),
-        "suggested": ai_values(draft) if draft.ai_original else None,
+        "edited": edited(draft, suggested),
+        "suggested": suggested,
         "risk": {"code": draft.risk.code, "route": risk_route(draft.risk)} if draft.risk_id else None,
         "decided_by": fmt.person(draft.decided_by),
         "decided_at": fmt.moment(draft.decided_at),
@@ -244,12 +244,8 @@ class ResponseRisksView(ApiView):
     def get(self, request, pk):
         response = get_response(request.user, pk)
         drafts = list(current_drafts(response))
-        # ریسک مشابه از کل رجیستر پیدا شده است؛ پاسخ‌دهنده و ممیز دامنه‌دار فقط ریسک‌هایی را می‌بینند که اجازه دارند.
-        similar = {item["id"] for draft in drafts for item in draft.similar_risks}
-        visible = set(visible_risks(request.user).filter(pk__in=similar).values_list("pk", flat=True))
-        run = (
-            response.ai_runs.filter(status=AiRun.Status.SUCCEEDED).order_by("-finished_at", "-pk").first()
-        )
+        visible = visible_similar(request.user, drafts)
+        run = latest_succeeded(response)
         return ApiResponse(
             {
                 "risks": [draft_payload(draft, visible) for draft in drafts],
@@ -277,7 +273,9 @@ class AiIdentificationView(ApiView):
 
 
 def get_run(user, pk):
-    return get_object_or_404(AiRun.objects.filter(response__in=reviewable(user)).select_related("response"), pk=pk)
+    # ورودی و خروجی خام مدل در polling لازم نیست.
+    runs = AiRun.objects.filter(response__in=reviewable(user)).select_related("response")
+    return get_object_or_404(runs.defer("input", "raw_output", "validation_errors", "follow_up_questions"), pk=pk)
 
 
 class AiRunView(ApiView):
@@ -296,9 +294,7 @@ class AiRunCancelView(ApiView):
         with transaction.atomic():
             locked = AiRun.objects.select_for_update().get(pk=run.pk)
             if locked.is_active:
-                locked.status = AiRun.Status.CANCELLED
-                locked.finished_at = timezone.now()
-                locked.save(update_fields=["status", "finished_at", "updated_at"])
+                cancel(locked)
         return ApiResponse(run_payload(locked))
 
 
@@ -324,7 +320,7 @@ def response_events(response):
                 events.append(event(text, record.history_date, actor, "info"))
             elif record.status == S.RETURNED:
                 count = len(record.return_questions or [])
-                text = f"برای تکمیل بازگردانده شد · {str(count).translate(FA_DIGITS)} پرسش"
+                text = f"برای تکمیل بازگردانده شد · {fa(count)} پرسش"
                 events.append(event(text, record.history_date, record.history_user, "warning"))
         previous = record
     return events
@@ -336,8 +332,7 @@ def run_events(response):
     for run in runs.prefetch_related("drafts"):
         at = run.finished_at or run.updated_at
         if run.status == AiRun.Status.SUCCEEDED:
-            count = str(len(run.drafts.all())).translate(FA_DIGITS)
-            events.append(event(f"شناسایی هوشمند · {count} ریسک پیشنهاد شد", at, tone="tangerine"))
+            events.append(event(f"شناسایی هوشمند · {fa(len(run.drafts.all()))} ریسک پیشنهاد شد", at, tone="tangerine"))
         elif run.status == AiRun.Status.EMPTY:
             events.append(event("شناسایی هوشمند · ریسکی ساخته نشد", at))
         else:

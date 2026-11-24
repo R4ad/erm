@@ -15,21 +15,13 @@ from apps.questionnaires.permissions import can_manage_questionnaires, visible_r
 
 from . import formatting as fmt
 from .base import ApiView
-from .questionnaire_answers import response_route, response_status, with_answers
+from .questionnaire_answers import response_row, with_answers
 
 PAGE_SIZE = 8
 QUEUE_SIZE = 4
 SEARCH_LIMIT = 100
 S = Response.Status
 TABS = [S.SUBMITTED, S.RETURNED, S.IDENTIFIED, S.REVIEWED, S.DRAFT]
-
-
-def review_route(response):
-    return f"/identification/responses/{response.pk}"
-
-
-def submitted_day(response):
-    return fmt.day(timezone.localdate(response.submitted_at)) if response.submitted_at else None
 
 
 def queue_card(response):
@@ -41,9 +33,9 @@ def queue_card(response):
         "summary": counts,
         "org_unit": response.org_unit.name,
         "respondent": fmt.person(response.respondent),
-        "submitted_at": submitted_day(response),
+        "submitted_at": fmt.day(response.submitted_at),
         "review_due": fmt.deadline(response.review_due),
-        "route": review_route(response),
+        "route": response.review_route,
     }
 
 
@@ -66,7 +58,6 @@ def return_note(response):
 
 
 def table_row(response, user, can_review):
-    service, counts = stored_summary(response)
     pending = list(response.pending_risks.all())
     decided = [item for item in pending if item.status != PendingRisk.Status.ARCHIVED]
     if response.status == S.SUBMITTED and can_review:
@@ -76,20 +67,11 @@ def table_row(response, user, can_review):
     else:
         action = None
     return {
-        "id": response.pk,
-        "code": response.code,
-        "service": service,
-        "summary": counts,
-        "step": response.wizard_step,
-        "org_unit": response.org_unit.name,
-        "status": response_status(response),
-        "respondent": fmt.person(response.respondent),
-        "updated_at": fmt.moment(response.updated_at),
+        **response_row(response, user),
         "review_due": fmt.deadline(response.review_due) if response.status == S.SUBMITTED else None,
         "return_note": return_note(response) if response.status == S.RETURNED else "",
         "risks": [item.risk.code for item in pending if item.risk_id],
         "all_dismissed": bool(decided) and all(item.status == PendingRisk.Status.DISMISSED for item in decided),
-        "route": response_route(response, user),
         "action": action,
     }
 
