@@ -23,6 +23,7 @@ from django.utils import timezone
 from apps.risks.identification import unit_owner
 from apps.risks.models import Risk, RiskCategory
 
+from .. import notices
 from ..models import AiRun, PendingRisk, Response
 from . import validation
 from .grouping import build_input
@@ -107,6 +108,7 @@ class Runner:
         self.run.finished_at = now
         self.run.duration_ms = int((now - self.run.started_at).total_seconds() * 1000)
         self.run.save()
+        notices.run_finished(self.run)
 
     def ask(self, provider, payload):
         """پاسخ معتبر مدل، با یک تلاش دوباره همراه فهرست خطاها؛ در غیر این صورت ProviderError با وضعیت ۴۲۲."""

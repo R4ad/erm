@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.risks.identification import narrative
 from apps.risks.models import Risk
 
+from . import notices
 from .models import AiRun, PendingRisk, Response
 
 P = PendingRisk.Status
@@ -185,3 +186,4 @@ def settle(response, user):
     response.reviewed_at = timezone.now()
     response._history_user = user
     response.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+    notices.settled(response)

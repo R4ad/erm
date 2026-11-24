@@ -3,7 +3,8 @@
 بازسنجی بخش ۲۱ روش؛ و کانال‌های دریافت.
 
 اعلان‌ها را همان زمان‌بند پایش (actions.monitoring) می‌سازد و کلید رویدادشان می‌گوید از کدام بازبینی، پذیرش یا اقدام
-آمده‌اند؛ این‌جا فقط همان رکورد خوانده و به شکل کارت فیگما درمی‌آید."""
+آمده‌اند؛ این‌جا فقط همان رکورد خوانده و به شکل کارت فیگما درمی‌آید. اعلان‌های شناسایی از پاسخنامه
+(apps/questionnaires/notices.py) ریسک ندارند و موضوعشان پاسخنامه است."""
 
 from datetime import timedelta
 
@@ -19,6 +20,7 @@ from apps.controls.models import ControlAssessment
 from apps.core.jalali import to_jalali
 from apps.methodology.models import MethodParameter
 from apps.methodology.services import active_version, parameter
+from apps.questionnaires.permissions import visible_responses
 from apps.risks.models import Risk
 from apps.risks.permissions import visible_risks
 from apps.workcalendar.workdays import add_period
@@ -79,6 +81,42 @@ def ago(created, now):
     return None
 
 
+def visible_notices(user):
+    """اعلان‌های کاربر که موضوعشان (ریسک یا پاسخنامه) هنوز برایش دیدنی است."""
+    return MonitoringNotice.objects.filter(recipient=user).filter(
+        Q(risk__in=visible_risks(user)) | Q(risk__isnull=True, response__in=visible_responses(user))
+    )
+
+
+# کلید اعلان‌های پاسخنامه ← (آیکون، لحن). کلید اجرای شناسایی وضعیت پایانش را دارد (ai-run:{pk}:{status}).
+RESPONSE_CARDS = {
+    "succeeded": ("lightning", "info"),
+    "empty": ("file-text", "neutral"),
+    "failed": ("x-circle", "danger"),
+    "returned": ("file-text", "warning"),
+    "resubmitted": ("file-text", "info"),
+    "identified": ("check-square", "info"),
+    "reviewed": ("check-square", "neutral"),
+}
+
+
+def response_card(notice):
+    """کارت اعلان پاسخنامه: پیام همان عنوان است و دکمه به بررسی پاسخنامه یا ویزارد پاسخ‌دهنده می‌رود."""
+    parts = notice.event_key.split(":")
+    icon, tone = RESPONSE_CARDS.get(parts[2] if len(parts) > 2 else "", ("bell", "neutral"))
+    route = notice.href.removeprefix("/app") if notice.href.startswith("/app/") else None
+    return {
+        "tab": "other",
+        "icon": icon,
+        "tone": tone,
+        "title": notice.message,
+        "body": "",
+        "chips": [notice.response.code] if notice.response else [],
+        "mine": True,
+        "cta": {"label": "مشاهده", "href": notice.href, "route": route, "icon": "arrow-left", "primary": False},
+    }
+
+
 def related(notices):
     """رکورد پشت هر اعلان، از روی پیشوند کلید رویداد، با یک پرس‌وجو برای هر نوع."""
     ids = {"review": set(), "acceptance": set(), "action": set()}
@@ -100,6 +138,15 @@ def related(notices):
 def card(notice, records, today, now):
     """کارت فیگما برای یک اعلان: نوع (زبانه)، آیکون، عنوان، شرح، برچسب‌ها و دکمه‌ی کار."""
     risk = notice.risk
+    if risk is None:
+        key, label = group_of(notice.created_at, today)
+        return {
+            "id": notice.pk,
+            **response_card(notice),
+            "group": {"key": key, "label": label},
+            "created": {"iso": notice.created_at.isoformat(), "ago": ago(notice.created_at, now)},
+            "unread": notice.read_at is None,
+        }
     prefix, _, rest = notice.event_key.partition(":")
     head = rest.split(":")[0]
     pk = int(head) if head.isdigit() else None
@@ -253,9 +300,7 @@ def page(request):
     today, now = timezone.localdate(), timezone.now()
     risks = visible_risks(user)
     notices = list(
-        MonitoringNotice.objects.filter(recipient=user, risk__in=risks)
-        .select_related("risk__owner")
-        .order_by("-created_at", "-pk")[:200]
+        visible_notices(user).select_related("risk__owner", "response").order_by("-created_at", "-pk")[:200]
     )
     records = related(notices)
     for review in records["review"].values():
@@ -305,9 +350,7 @@ class NoticeReadView(ApiView):
     """خواندن یک اعلان (با باز کردن کارش) یا همه‌ی اعلان‌های نخوانده."""
 
     def post(self, request, pk=None):
-        notices = MonitoringNotice.objects.filter(
-            recipient=request.user, risk__in=visible_risks(request.user), read_at__isnull=True
-        )
+        notices = visible_notices(request.user).filter(read_at__isnull=True)
         if pk is not None:
             get_object_or_404(MonitoringNotice, pk=pk, recipient=request.user)
             notices = notices.filter(pk=pk)

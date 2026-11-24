@@ -103,9 +103,7 @@ function TaskRow({ task }: { task: WorkTask }) {
           )}
         </p>
       </div>
-      <div className="hidden w-24 shrink-0 md:flex">
-        <LevelBadge level={task.level} />
-      </div>
+      <div className="hidden w-24 shrink-0 md:flex">{task.rated !== false && <LevelBadge level={task.level} />}</div>
       <div className="hidden w-[6.875rem] shrink-0 sm:flex">
         <DueLabel value={task.due} text={task.due_text} emptyText={task.no_due} />
       </div>

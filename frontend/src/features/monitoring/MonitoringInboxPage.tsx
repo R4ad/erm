@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { AppLink } from "@/components/ui/app-link";
 import { Button } from "@/components/ui/button";
@@ -84,10 +85,17 @@ function NoticeRow({ notice, onOpen }: { notice: InboxNotice; onOpen: (notice: I
         size="sm"
         className="shrink-0 self-start ps-3 sm:ms-0"
       >
-        <AppLink href={notice.cta.href} onClick={() => onOpen(notice)}>
-          <Icon name={icon(notice.cta.icon, "arrow-left")} />
-          {notice.cta.label}
-        </AppLink>
+        {notice.cta.route ? (
+          <Link to={notice.cta.route} viewTransition onClick={() => onOpen(notice)}>
+            <Icon name={icon(notice.cta.icon, "arrow-left")} />
+            {notice.cta.label}
+          </Link>
+        ) : (
+          <AppLink href={notice.cta.href} onClick={() => onOpen(notice)}>
+            <Icon name={icon(notice.cta.icon, "arrow-left")} />
+            {notice.cta.label}
+          </AppLink>
+        )}
       </Button>
     </li>
   );

@@ -140,6 +140,8 @@ export interface WorkTask {
   cta: string;
   cta_style: "primary" | "secondary" | "ghost";
   level: Level | null;
+  /** false: موضوع کار ریسک نیست (پاسخنامه) و سطحی نشان داده نمی‌شود. */
+  rated?: boolean;
   due: Deadline | null;
   due_text: string | null;
   no_due: string;
@@ -2517,7 +2519,8 @@ export interface InboxNotice {
   created: { iso: string; ago: string | null };
   unread: boolean;
   mine: boolean;
-  cta: { label: string; href: string; icon: string; primary: boolean };
+  /** route: مسیر React اعلانی که صفحه‌ی جنگو ندارد (اعلان‌های پاسخنامه). */
+  cta: { label: string; href: string; route?: string | null; icon: string; primary: boolean };
 }
 
 export interface NoticeChannels {

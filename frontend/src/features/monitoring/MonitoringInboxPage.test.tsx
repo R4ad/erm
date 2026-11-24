@@ -132,6 +132,37 @@ describe("MonitoringInboxPage", () => {
     await waitFor(() => expect(screen.getByRole("switch", { name: "پیامک" })).not.toBeChecked());
   });
 
+  it("opens a questionnaire response notice in the app and marks it read", async () => {
+    const user = userEvent.setup();
+    const answered = notice(9, {
+      tab: "other",
+      icon: "lightning",
+      tone: "info",
+      title: "شناسایی هوشمند پاسخنامه‌ی QR-1405-0109 انجام شد · ۲ ریسک پیشنهاد شد",
+      body: "",
+      chips: ["QR-1405-0109"],
+      cta: {
+        label: "مشاهده",
+        href: "/app/identification/responses/109",
+        route: "/identification/responses/109",
+        icon: "arrow-left",
+        primary: false,
+      },
+    });
+    const api = mockApi({
+      "GET monitoring/inbox/": inbox({ notices: [answered] }),
+      "POST monitoring/inbox/9/read/": { page: inbox({ unread: 0, notices: [{ ...answered, unread: false }] }) },
+    });
+    render();
+
+    const link = await screen.findByRole("link", { name: /مشاهده/ });
+    expect(link).toHaveAttribute("href", "/identification/responses/109");
+    expect(screen.getByText("QR-1405-0109")).toBeInTheDocument();
+    await user.click(link);
+    expect(screen.getByTestId("location")).toHaveTextContent("/identification/responses/109");
+    await waitFor(() => expect(api.callsTo("POST monitoring/inbox/9/read/")).toHaveLength(1));
+  });
+
   it("shows an error state", async () => {
     mockApi({ "GET monitoring/inbox/": reply(500, { detail: "خطا" }) });
     render();

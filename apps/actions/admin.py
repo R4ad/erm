@@ -137,7 +137,7 @@ class RiskReviewAdmin(SimpleHistoryAdmin):
 
 @admin.register(MonitoringNotice)
 class MonitoringNoticeAdmin(SimpleHistoryAdmin):
-    list_display = ("recipient", "risk", "created_at", "read_at")
+    list_display = ("recipient", "risk", "response", "created_at", "read_at")
 
     def has_add_permission(self, request):
         return False

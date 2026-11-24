@@ -97,6 +97,38 @@ describe("app shell", () => {
     await expectNoAxeViolations();
   });
 
+  it("lists a returned questionnaire response without a risk level", async () => {
+    const work = myWork();
+    const [question] = work.tasks.filter((task) => task.key === "question-4");
+    work.tasks = [
+      {
+        ...question!,
+        key: "response-4",
+        title: "تکمیل پاسخنامه‌ی QR-1405-0109",
+        kind: "پاسخنامه",
+        code: "QR-1405-0109",
+        href: "/app/questionnaire-answers?response=4",
+        route: "/questionnaire-answers?response=4",
+        icon: "file-text",
+        cta_style: "primary",
+        level: null,
+        rated: false,
+      },
+    ];
+    api({ "GET my-work/": work });
+    renderApp();
+
+    const queue = await screen.findByRole("region", { name: "صف کارها" });
+    const row = within(queue)
+      .getByRole("link", { name: /تکمیل پاسخنامه‌ی/ })
+      .closest("li")!;
+    expect(within(row).getByRole("link", { name: /تکمیل پاسخنامه‌ی/ })).toHaveAttribute(
+      "href",
+      "/questionnaire-answers?response=4",
+    );
+    expect(row).not.toHaveTextContent("ارزیابی‌نشده");
+  });
+
   it("jumps to register search with the / key", async () => {
     api();
     const { router, user } = renderApp();

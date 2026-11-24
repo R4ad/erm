@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.workcalendar.workdays import add_working_days, holidays_after, is_working_day
 
+from . import notices
 from .ai.pipeline import request_identification
 from .answers import FA_DIGITS
 from .models import AiRun, PendingRisk, Response
@@ -113,9 +114,12 @@ def return_response(response, user, questions, message, due):
     response.return_due = due
     response._history_user = user
     response.save(update_fields=["status", "return_questions", "return_message", "return_due", "updated_at"])
+    notices.returned(response)
     return response
 
 
 def identify_resubmitted(response, user):
-    """بعد از ارسال دوباره‌ی پاسخنامه‌ی بازگشتی، شناسایی هوشمند خودکار در صف می‌رود."""
+    """بعد از ارسال دوباره‌ی پاسخنامه‌ی بازگشتی، کارشناسی که آن را بازگردانده بود اعلان می‌گیرد و شناسایی هوشمند
+    خودکار در صف می‌رود."""
+    notices.resubmitted(response)
     return request_identification(response, user)

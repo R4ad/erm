@@ -8,6 +8,8 @@ from apps.actions.acceptance import required_authorities
 from apps.actions.models import RiskAcceptance, TreatmentAction
 from apps.actions.mywork import my_work
 from apps.core.jalali import to_jalali
+from apps.questionnaires.models import Response as QuestionnaireResponse
+from apps.questionnaires.permissions import can_manage_questionnaires, visible_responses
 from apps.workcalendar.workdays import working_days_between
 
 from . import formatting as fmt
@@ -211,7 +213,8 @@ CATEGORIES = [
 
 
 def task(key, category, title, kind, context, code, href, *, icon, tone, cta, cta_style="secondary", level=None,
-         due=None, due_text=None, route=None, no_due="بدون مهلت"):
+         due=None, due_text=None, route=None, no_due="بدون مهلت", rated=True):
+    """rated=False برای کاری که موضوعش ریسک نیست (پاسخنامه) و ستون سطح ریسکش خالی می‌ماند."""
     return {
         "key": key,
         "category": category,
@@ -226,6 +229,7 @@ def task(key, category, title, kind, context, code, href, *, icon, tone, cta, ct
         "cta": cta,
         "cta_style": cta_style,
         "level": fmt.level(level),
+        "rated": rated,
         "due": fmt.deadline(due),
         "due_text": due_text,
         "no_due": no_due,
@@ -302,6 +306,30 @@ def plan_due_text(due, short=False):
     return f"{fmt_fa(days)} روز کاری" if short else f"مهلت طرح: {fmt_fa(days)} روز کاری"
 
 
+def response_tasks(user):
+    """پاسخنامه‌های بازگشتی برای پاسخ‌دهنده با مهلت تکمیل، و صف «در انتظار بررسی» برای کارشناس ریسک با مهلت بررسی."""
+    S = QuestionnaireResponse.Status
+    rows = []
+    for response in QuestionnaireResponse.objects.filter(respondent=user, status=S.RETURNED).select_related("org_unit"):
+        route = f"/questionnaire-answers?response={response.pk}"
+        rows.append(task(
+            f"response-{response.pk}", "questions", f"تکمیل پاسخنامه‌ی {response.code}", "پاسخنامه",
+            response.org_unit.name, response.code, f"/app{route}", icon="file-text",
+            tone=due_tone(response.return_due), cta="پاسخ", cta_style="primary", due=response.return_due, route=route,
+            rated=False,
+        ))
+    if can_manage_questionnaires(user):
+        waiting = visible_responses(user).filter(status=S.SUBMITTED).select_related("org_unit")
+        for response in waiting:
+            route = f"/identification/responses/{response.pk}"
+            rows.append(task(
+                f"review-response-{response.pk}", "questions", f"بررسی پاسخنامه‌ی {response.code}", "پاسخنامه",
+                response.org_unit.name, response.code, f"/app{route}", icon="file-text",
+                tone=due_tone(response.review_due), cta="بررسی", due=response.review_due, route=route, rated=False,
+            ))
+    return rows
+
+
 def tasks(user, work):
     rows = [action_task(action) for action in work["my_actions"]]
     rows += [action_task(action, verify=True) for action in work["to_verify"]]
@@ -364,6 +392,7 @@ def tasks(user, work):
             reverse("workflow:question_answer", args=[question.pk]), icon="chat", tone="neutral", cta="پاسخ",
             due=question.due, route="/questionnaires/risk-questions",
         ))
+    rows += response_tasks(user)
     pending = RiskAcceptance.objects.filter(status=RiskAcceptance.Status.PENDING, follow_up_by=user)
     rows += [acceptance_followup(acceptance) for acceptance in pending.select_related("risk", "assessment__decision_level")]
 

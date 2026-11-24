@@ -622,10 +622,21 @@ class RiskReview(TimeStampedModel):
 
 
 class MonitoringNotice(TimeStampedModel):
-    """اعلان داخلی پایدار؛ کلید یکتا مانع تکرار در اجرای زمان‌بند است."""
+    """اعلان داخلی پایدار؛ کلید یکتا مانع تکرار در اجرای زمان‌بند است. موضوع اعلان یک ریسک است یا (برای شناسایی از
+    پاسخنامه، پیش از آن‌که ریسکی باشد) یک پاسخنامه."""
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="risk_notices")
-    risk = models.ForeignKey("risks.Risk", on_delete=models.PROTECT, related_name="monitoring_notices")
+    risk = models.ForeignKey(
+        "risks.Risk", on_delete=models.PROTECT, related_name="monitoring_notices", null=True, blank=True
+    )
+    response = models.ForeignKey(
+        "questionnaires.Response",
+        on_delete=models.PROTECT,
+        related_name="notices",
+        null=True,
+        blank=True,
+        verbose_name="پاسخنامه",
+    )
     event_key = models.CharField(max_length=180)
     message = models.TextField("پیام")
     href = models.CharField("پیوند", max_length=250)
@@ -636,7 +647,12 @@ class MonitoringNotice(TimeStampedModel):
         verbose_name = "اعلان پایش"
         verbose_name_plural = "اعلان‌های پایش"
         ordering = ["-created_at", "-pk"]
-        constraints = [models.UniqueConstraint(fields=["recipient", "event_key"], name="monitor_notice_once")]
+        constraints = [
+            models.UniqueConstraint(fields=["recipient", "event_key"], name="monitor_notice_once"),
+            models.CheckConstraint(
+                condition=Q(risk__isnull=False) | Q(response__isnull=False), name="monitor_notice_has_subject"
+            ),
+        ]
 
 
 class NoticePreference(models.Model):
