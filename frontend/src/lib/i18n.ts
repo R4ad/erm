@@ -10,8 +10,7 @@ export const locale = {
 export type Direction = "rtl" | "ltr";
 
 const fa = {
-  "app.name": "مدیریت ریسک سازمانی",
-  "app.tagline": "ERM · داتین",
+  "app.name": "همیار امن داتین",
   "shell.skip": "رفتن به محتوای صفحه",
   "shell.menu": "منو",
   "shell.closeMenu": "بستن منو",

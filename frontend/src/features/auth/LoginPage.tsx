@@ -80,9 +80,7 @@ export function LoginPage() {
             <LogoMark size={40} className="text-brand" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-h1 font-bold text-ink">ورود به سامانه</h1>
-              <p className="text-sm text-ink-2">
-                {t("app.name")} · {t("app.tagline")}
-              </p>
+              <p className="text-sm text-ink-2">{t("app.name")}</p>
             </div>
           </div>
 

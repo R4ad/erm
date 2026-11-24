@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}سامانه مدیریت ریسک{% endblock %}</title>
+  <title>{% block title %}همیار امن داتین{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'vendor/bootstrap.rtl.min.css' %}">
   <link rel="stylesheet" href="{% static 'vendor/jalalidatepicker.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
@@ -12,7 +12,7 @@
 <body>
   <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-4">
     <div class="container">
-      <a class="navbar-brand" href="{% url 'core:home' %}">مدیریت ریسک</a>
+      <a class="navbar-brand" href="{% url 'core:home' %}">همیار امن داتین</a>
 
       {% if user.is_authenticated %}
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-menu"
