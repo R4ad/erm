@@ -3223,3 +3223,101 @@ export interface QuestionnaireResponsesPage {
   rows: ReviewRow[];
   page: { number: number; pages: number; size: number; count: number; start: number; end: number };
 }
+
+/** «بررسی یک پاسخنامه» (12a تا 12c): هر مسیر با رویدادش و پیامد آن رویداد. رویداد مشترک shared_with دارد (شماره‌ی
+ * نخستین مسیرش) و پیامدش فقط روی همان مسیر می‌آید. */
+export interface AnswerChain {
+  path: { number: number; text: string };
+  event: { number: number | null; text: string; shared_with: number | null };
+  impact: { number: number | null; text: string; type: string; scope: string } | null;
+}
+
+export type BasicAnswerKey = "service" | "objective" | "conditions" | "responsibility";
+
+/** عددهای متن مرحله‌های پنل «در حال شناسایی». */
+export interface AiRunFacts {
+  answers: number;
+  paths: number;
+  impacts: number;
+  risks: number;
+  registry: number;
+}
+
+export type AiRunStatus = "queued" | "running" | "succeeded" | "empty" | "failed" | "cancelled";
+
+export interface AiRunState {
+  id: number;
+  status: AiRunStatus;
+  stage: number;
+  stages: number;
+  active: boolean;
+  error_code: string;
+  prompt_version: string;
+  created_at: Moment;
+  finished_at: Moment | null;
+  facts: AiRunFacts;
+}
+
+export interface ResponseReview {
+  id: number;
+  code: string;
+  status: ResponseStatus;
+  service: string;
+  org_unit: string;
+  respondent: Person;
+  submitted_at: Moment | null;
+  can_review: boolean;
+  next: { id: number; route: string } | null;
+  answers: {
+    questions: number;
+    paths: number;
+    impacts: number;
+    basics: { number: number; key: BasicAnswerKey; text: string }[];
+    chains: AnswerChain[];
+  };
+  run: AiRunState | null;
+  facts: AiRunFacts;
+  manual_route: string;
+}
+
+export type ReviewRiskStatus = "pending" | "converted" | "dismissed";
+
+/** ریسک پیشنهادی شناسایی هوشمند («پیش‌نویس AI») با منبعش در پاسخنامه. */
+export interface ReviewRisk {
+  id: number;
+  status: { value: ReviewRiskStatus; label: string };
+  title: string;
+  initiating_factor: string;
+  paths: { number: number; text: string }[];
+  target_event: string;
+  impact: string;
+  impact_type: string;
+  impact_scope: string;
+  category: { id: number; name: string } | null;
+  category_suggested: boolean;
+  owner_unit: { id: number; name: string } | null;
+  owner: Person | null;
+  confidence: { value: "high" | "medium" | "low"; label: string } | null;
+  confidence_reason: string;
+  gaps: string[];
+  source: { paths: number[]; event: number | null; impact: number | null };
+  similar: { id: number; code: string; title: string; percent: number; route: string }[];
+  edited: boolean;
+  risk: { code: string; route: string } | null;
+  decided_by: Person | null;
+  decided_at: Moment | null;
+  dismiss_reason: string;
+}
+
+export interface ReviewRisks {
+  risks: ReviewRisk[];
+  counts: { total: number; approved: number; dismissed: number; pending: number };
+  analysed_at: Moment | null;
+}
+
+export interface ReviewHistoryEvent {
+  text: string;
+  actor: Person | null;
+  at: Moment;
+  tone: "neutral" | "info" | "warning" | "success" | "danger" | "tangerine";
+}

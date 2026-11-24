@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "apps.core",
     "apps.accounts",
     "apps.organization",
@@ -180,3 +181,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "EXCEPTION_HANDLER": "apps.api.base.exception_handler",
 }
+
+# شناسایی هوشمند ریسک از پاسخنامه (apps/questionnaires/ai). mock بدون شبکه است و برای توسعه و تست؛ openai_compatible
+# برای سرورهای داخلی سازگار با OpenAI (vLLM، Ollama). نام پاسخ‌دهنده به LLM فرستاده نمی‌شود.
+LLM_PROVIDER = env("LLM_PROVIDER", default="mock")
+LLM_BASE_URL = env("LLM_BASE_URL", default="")
+LLM_MODEL = env("LLM_MODEL", default="")
+LLM_API_KEY = env("LLM_API_KEY", default="")
+LLM_TIMEOUT_MS = env.int("LLM_TIMEOUT_MS", default=60000)
+# کمینه‌ی شباهت سه‌حرفی (۰ تا ۱) برای هشدار «مشابه ریسک موجود».
+RISK_SIMILARITY_THRESHOLD = env.float("RISK_SIMILARITY_THRESHOLD", default=0.3)

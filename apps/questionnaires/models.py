@@ -138,19 +138,123 @@ class PathConsequence(TimeStampedModel):
         constraints = [models.UniqueConstraint(fields=["risk_instance"], name="one_consequence_per_event")]
 
 
-class PendingRisk(TimeStampedModel):
-    """ریسک پیشنهادی از یک پاسخنامه که کارشناس ریسک باید تعیین تکلیفش کند؛ یا آن را به ریسک رجیستر تبدیل می‌کند یا
-    با دلیل رد می‌کند. حذف نمی‌شود."""
+class AiRun(TimeStampedModel):
+    """یک اجرای شناسایی هوشمند روی یک پاسخنامه. کارگر run_ai_identification اجراهای صف را برمی‌دارد و مرحله‌ی جاری
+    (۱ تا ۵، همان مرحله‌های پنل 12b) را این‌جا می‌نویسد تا رابط با polling نشان دهد. ورودی، هش ورودی، خروجی خام،
+    خطاهای اعتبارسنجی، نسخه‌ی پرامپت و مدل برای پیگیری نگه داشته می‌شوند؛ نام پاسخ‌دهنده در ورودی نیست."""
 
     class Status(models.TextChoices):
-        PENDING = "pending", "در انتظار"
-        CONVERTED = "converted", "ثبت در رجیستر"
-        DISMISSED = "dismissed", "کنار گذاشته"
+        QUEUED = "queued", "در صف"
+        RUNNING = "running", "در حال شناسایی"
+        SUCCEEDED = "succeeded", "انجام شد"
+        EMPTY = "empty", "ریسکی ساخته نشد"
+        FAILED = "failed", "انجام نشد"
+        CANCELLED = "cancelled", "لغو شد"
+
+    ACTIVE_STATUSES = [Status.QUEUED, Status.RUNNING]
+    STAGES = 5
+
+    response = models.ForeignKey(Response, verbose_name="پاسخنامه", on_delete=models.CASCADE, related_name="ai_runs")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="درخواست‌کننده",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.QUEUED)
+    stage = models.PositiveSmallIntegerField("مرحله", default=0)
+    prompt_version = models.CharField("نسخه‌ی پرامپت", max_length=20, blank=True)
+    provider = models.CharField("سرویس‌دهنده", max_length=40, blank=True)
+    model = models.CharField("مدل", max_length=120, blank=True)
+    input_hash = models.CharField("هش ورودی", max_length=64, blank=True)
+    input = models.JSONField("ورودی", default=dict, blank=True)
+    raw_output = models.TextField("خروجی خام", blank=True)
+    validation_errors = models.JSONField("خطاهای اعتبارسنجی", default=list, blank=True)
+    attempts = models.PositiveSmallIntegerField("دفعات تلاش", default=0)
+    error_code = models.CharField("کد پیگیری", max_length=20, blank=True)
+    error_message = models.TextField("شرح خطا", blank=True)
+    follow_up_questions = models.JSONField("پرسش‌های تکمیلی پیشنهادی", default=list, blank=True)
+    started_at = models.DateTimeField("شروع", null=True, blank=True)
+    finished_at = models.DateTimeField("پایان", null=True, blank=True)
+    duration_ms = models.PositiveIntegerField("مدت (میلی‌ثانیه)", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "اجرای شناسایی هوشمند"
+        verbose_name_plural = "اجراهای شناسایی هوشمند"
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["status", "created_at"])]
+
+    def __str__(self):
+        return f"{self.response} · {self.get_status_display()}"
+
+    @property
+    def is_active(self):
+        return self.status in self.ACTIVE_STATUSES
+
+
+class PendingRisk(TimeStampedModel):
+    """ریسک پیشنهادی شناسایی هوشمند («پیش‌نویس AI») برای یک پیامد پاسخنامه. کارشناس ریسک آن را ویرایش، تأیید (تبدیل به
+    ریسک رجیستر) یا با دلیل رد می‌کند؛ بازگرداندن پاسخنامه یا «تحلیل دوباره» پیش‌نویس بررسی‌نشده را بایگانی می‌کند.
+    حذف نمی‌شود. ai_original خروجی خام مدل برای همین ریسک است، برای «بازگرداندن پیشنهاد AI» و برچسب «ویرایش‌شده»."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "پیش‌نویس AI"
+        CONVERTED = "converted", "تأیید شد · آنالیز ریسک"
+        DISMISSED = "dismissed", "رد شد"
+        ARCHIVED = "archived", "بایگانی"
+
+    class Confidence(models.TextChoices):
+        HIGH = "high", "اطمینان بالا"
+        MEDIUM = "medium", "اطمینان متوسط"
+        LOW = "low", "اطمینان پایین"
+
+    TITLE_LIMIT = 120
 
     response = models.ForeignKey(Response, verbose_name="پاسخ", on_delete=models.CASCADE, related_name="pending_risks")
+    ai_run = models.ForeignKey(
+        AiRun, verbose_name="اجرای شناسایی", on_delete=models.PROTECT, null=True, blank=True, related_name="drafts"
+    )
+    consequence = models.ForeignKey(
+        PathConsequence,
+        verbose_name="پیامد منبع",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pending_risks",
+    )
+    title = models.CharField("عنوان", max_length=TITLE_LIMIT, blank=True)
+    initiating_factor = models.TextField("عامل آغازگر", blank=True)
+    paths = models.JSONField("مسیرهای تحقق", default=list, blank=True, help_text="[{path_id, number, text}]")
+    target_event = models.TextField("رویداد هدف", blank=True)
+    impact = models.TextField("پیامد", blank=True)
+    impact_type = models.CharField("نوع پیامد", max_length=200, blank=True)
+    impact_scope = models.TextField("دامنه‌ی پیامد", blank=True)
     category = models.ForeignKey(
         "risks.RiskCategory", verbose_name="دسته", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
+    owner_unit = models.ForeignKey(
+        "organization.OrgUnit",
+        verbose_name="واحد مالک",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="مالک ریسک (شخص)",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    confidence = models.CharField("اطمینان", max_length=10, choices=Confidence.choices, blank=True)
+    confidence_reason = models.TextField("دلیل اطمینان", blank=True)
+    gaps = models.JSONField("کمبودها", default=list, blank=True)
+    ai_original = models.JSONField("پیشنهاد AI", default=dict, blank=True)
+    similar_risks = models.JSONField("ریسک‌های مشابه", default=list, blank=True)
     status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.PENDING)
     risk = models.ForeignKey(
         "risks.Risk",
@@ -199,7 +303,7 @@ class PendingRisk(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"ریسک پیشنهادی {self.pk}"
+        return self.title or f"ریسک پیشنهادی {self.pk}"
 
     @property
     def is_pending(self):

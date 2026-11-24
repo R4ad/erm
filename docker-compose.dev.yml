@@ -33,6 +33,22 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # شناسایی هوشمند ریسک: اجراهای صف (AiRun) را برمی‌دارد. با LLM_PROVIDER=mock بدون شبکه کار می‌کند.
+  # بالا آوردن جدا: docker compose up -d ai (به سرویس‌های دیگر دست نمی‌زند).
+  ai:
+    image: erm-web:dev
+    command: ["python", "manage.py", "run_ai_identification", "--watch", "--interval", "2"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     image: node:22-slim
     working_dir: /app/frontend

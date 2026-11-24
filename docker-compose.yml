@@ -55,6 +55,20 @@ services:
     restart: unless-stopped
     profiles: ["prod"]
 
+  # شناسایی هوشمند ریسک از پاسخنامه؛ تنظیمات LLM_* در ‎.env (‎.env.example).
+  ai:
+    build: .
+    image: erm-web:local
+    command: ["python", "manage.py", "run_ai_identification", "--watch", "--interval", "2"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["prod"]
+
   nginx:
     image: nginx:stable
     ports:

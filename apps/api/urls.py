@@ -2,7 +2,7 @@ from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
-from . import questionnaire_answers, questionnaire_responses, reports, risk_questions, risks, session, treatment, treatment_board, treatment_targets
+from . import questionnaire_answers, questionnaire_responses, reports, response_review, risk_questions, risks, session, treatment, treatment_board, treatment_targets
 from . import ad_sync, identification_sources, impact_levels, method_diff, user_profile
 
 app_name = "api"
@@ -42,6 +42,26 @@ urlpatterns = [
         questionnaire_responses.QuestionnaireResponsesView.as_view(),
         name="questionnaire_responses",
     ),
+    path(
+        "questionnaire-responses/<int:pk>/", response_review.ResponseReviewView.as_view(), name="response_review"
+    ),
+    path(
+        "questionnaire-responses/<int:pk>/risks/",
+        response_review.ResponseRisksView.as_view(),
+        name="response_review_risks",
+    ),
+    path(
+        "questionnaire-responses/<int:pk>/history/",
+        response_review.ResponseHistoryView.as_view(),
+        name="response_review_history",
+    ),
+    path(
+        "questionnaire-responses/<int:pk>/ai-identification/",
+        response_review.AiIdentificationView.as_view(),
+        name="response_ai_identification",
+    ),
+    path("ai-runs/<int:pk>/", response_review.AiRunView.as_view(), name="ai_run"),
+    path("ai-runs/<int:pk>/cancel/", response_review.AiRunCancelView.as_view(), name="ai_run_cancel"),
     path("analysis/", analysis.AnalysisIndexView.as_view(), name="analysis_index"),
     path("analysis/<int:pk>/", analysis.AnalysisView.as_view(), name="analysis"),
     path("evaluation/", evaluation.EvaluationView.as_view(), name="evaluation"),

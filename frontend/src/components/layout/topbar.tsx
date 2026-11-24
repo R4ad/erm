@@ -106,7 +106,7 @@ function TopbarCrumbs() {
             <Fragment key={`${crumb.label}-${index}`}>
               <li className={cn("min-w-0 truncate", last ? "font-semibold text-ink" : "text-ink-2")}>
                 {crumb.to && !last ? (
-                  <Link to={crumb.to} viewTransition className="rounded-sm hover:text-ink">
+                  <Link to={crumb.to} viewTransition className="rounded-sm py-0.5 hover:text-ink">
                     {label}
                   </Link>
                 ) : (

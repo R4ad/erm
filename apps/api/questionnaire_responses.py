@@ -68,6 +68,7 @@ def return_note(response):
 def table_row(response, user, can_review):
     service, counts = stored_summary(response)
     pending = list(response.pending_risks.all())
+    decided = [item for item in pending if item.status != PendingRisk.Status.ARCHIVED]
     if response.status == S.SUBMITTED and can_review:
         action = "review"
     elif response.status != S.DRAFT or response.respondent_id == user.pk:
@@ -87,7 +88,7 @@ def table_row(response, user, can_review):
         "review_due": fmt.deadline(response.review_due) if response.status == S.SUBMITTED else None,
         "return_note": return_note(response) if response.status == S.RETURNED else "",
         "risks": [item.risk.code for item in pending if item.risk_id],
-        "all_dismissed": bool(pending) and all(item.status == PendingRisk.Status.DISMISSED for item in pending),
+        "all_dismissed": bool(decided) and all(item.status == PendingRisk.Status.DISMISSED for item in decided),
         "route": response_route(response, user),
         "action": action,
     }

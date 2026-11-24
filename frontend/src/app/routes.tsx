@@ -448,6 +448,12 @@ export const routes: RouteObject[] = [
             }),
           },
           {
+            path: "identification/responses/:id",
+            lazy: async () => ({
+              Component: (await import("@/features/response-review/ResponseReviewPage")).ResponseReviewPage,
+            }),
+          },
+          {
             path: "identification/sources/:source",
             lazy: async () => ({
               Component: (await import("@/features/identification/ComingSoonPage")).ComingSoonPage,

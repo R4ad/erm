@@ -36,6 +36,11 @@ import type {
   IdentificationPage,
   IdentificationSources,
   QuestionnaireResponsesPage,
+  AiRunState,
+  ResponseReview,
+  ReviewHistoryEvent,
+  ReviewRisk,
+  ReviewRisks,
   ReviewQueueCard,
   ReviewRow,
   IdentificationValues,
@@ -6947,5 +6952,150 @@ export function questionnaireResponses(
     ],
     page: { number: 1, pages: 4, size: 8, count: 30, start: 1, end: 8 },
     ...overrides,
+  };
+}
+
+/** «بررسی یک پاسخنامه» با داده‌ی فریم 12a: سه مسیر، مسیر ۳ رویداد ۱ را دوباره استفاده می‌کند. */
+export function responseReview(overrides: Partial<ResponseReview> = {}): ResponseReview {
+  const facts = { answers: 7, paths: 3, impacts: 2, risks: 2, registry: 148 };
+  return {
+    id: 109,
+    code: "QR-1405-0109",
+    status: STATUS.submitted as ResponseReview["status"],
+    service: "پرداخت اینترنتی",
+    org_unit: "پرداخت الکترونیک",
+    respondent: { id: 7, name: "مریم صادقی" },
+    submitted_at: minutesAgo(121),
+    can_review: true,
+    next: { id: 110, route: "/identification/responses/110" },
+    answers: {
+      questions: 7,
+      paths: 3,
+      impacts: 2,
+      basics: [
+        { number: 1, key: "service", text: "پرداخت اینترنتی (درگاه پرداخت شاپرک)" },
+        {
+          number: 2,
+          key: "objective",
+          text: "پردازش تراکنش‌های پرداخت اینترنتی با دسترس‌پذیری ۹۹٫۹٪ طبق توافق سطح خدمت با بانک‌ها",
+        },
+        { number: 3, key: "conditions", text: "وابستگی کامل ارتباط با شاپرک به یک دیتاسنتر و یک لینک ارتباطی اصلی" },
+        { number: 4, key: "responsibility", text: "مشترک — زیرساخت در اختیار داتین است و تصمیم ارتقا با بانک" },
+      ],
+      chains: [
+        {
+          path: { number: 1, text: "قطعی لینک ارتباطی اصلی با شاپرک و سوئیچ‌نشدن خودکار به لینک پشتیبان" },
+          event: { number: 1, text: "توقف کامل پردازش تراکنش‌های پرداخت اینترنتی", shared_with: null },
+          impact: {
+            number: 1,
+            text: "دسترسی‌نداشتن مشتریان به پرداخت، جریمه‌ی توافق سطح خدمت و آسیب به اعتبار",
+            type: "مالی و اعتباری",
+            scope: "همه‌ی بانک‌های طرف قرارداد",
+          },
+        },
+        {
+          path: { number: 2, text: "افزایش ناگهانی بار تراکنش در مناسبت‌ها و پاسخ‌گو نبودن سرورها" },
+          event: { number: 2, text: "کندی شدید و خطای زمان‌پایان در تراکنش‌ها", shared_with: null },
+          impact: {
+            number: 2,
+            text: "تراکنش‌های ناموفق و افزایش شکایت مشتریان",
+            type: "عملیاتی",
+            scope: "سه بانک بزرگ",
+          },
+        },
+        {
+          path: { number: 3, text: "خرابی تجهیزات شبکه‌ی دیتاسنتر اصلی و نبود افزونگی سخت‌افزاری" },
+          event: { number: 1, text: "توقف کامل پردازش تراکنش‌های پرداخت اینترنتی", shared_with: 1 },
+          impact: null,
+        },
+      ],
+    },
+    run: null,
+    facts,
+    manual_route: "/identification/manual",
+    ...overrides,
+  };
+}
+
+export function aiRun(overrides: Partial<AiRunState> = {}): AiRunState {
+  return {
+    id: 31,
+    status: "running",
+    stage: 3,
+    stages: 5,
+    active: true,
+    error_code: "",
+    prompt_version: "v3",
+    created_at: minutesAgo(0),
+    finished_at: null,
+    facts: { answers: 7, paths: 3, impacts: 2, risks: 2, registry: 148 },
+    ...overrides,
+  };
+}
+
+/** ریسک ۱ فریم 12c (منتظر تصمیم، با هشدار مشابه). */
+export function reviewRisk(overrides: Partial<ReviewRisk> = {}): ReviewRisk {
+  return {
+    id: 501,
+    status: { value: "pending", label: "پیش‌نویس AI" },
+    title: "توقف پرداخت اینترنتی بر اثر قطع ارتباط با شاپرک",
+    initiating_factor: "وابستگی کامل ارتباط با شاپرک به یک دیتاسنتر و یک لینک اصلی",
+    paths: [
+      { number: 1, text: "قطعی لینک اصلی و سوئیچ‌نشدن خودکار به لینک پشتیبان" },
+      { number: 3, text: "خرابی تجهیزات شبکه‌ی دیتاسنتر و نبود افزونگی" },
+    ],
+    target_event: "توقف کامل پردازش تراکنش‌های پرداخت اینترنتی",
+    impact: "دسترسی‌نداشتن مشتریان به پرداخت، جریمه‌ی توافق سطح خدمت و آسیب به اعتبار",
+    impact_type: "مالی و اعتباری",
+    impact_scope: "همه‌ی بانک‌های طرف قرارداد",
+    category: { id: 1, name: "فناوری اطلاعات" },
+    category_suggested: true,
+    owner_unit: { id: 4, name: "پرداخت الکترونیک" },
+    owner: { id: 7, name: "مریم صادقی" },
+    confidence: { value: "high", label: "اطمینان بالا" },
+    confidence_reason: "عامل، دو مسیر، رویداد و پیامد صریح و سازگار آمده‌اند.",
+    gaps: [],
+    source: { paths: [1, 3], event: 1, impact: 1 },
+    similar: [
+      { id: 47, code: "RK-1405-0047", title: "قطع درگاه پرداخت بر اثر خرابی لینک", percent: 78, route: "/risks/47" },
+    ],
+    edited: false,
+    risk: null,
+    decided_by: null,
+    decided_at: null,
+    dismiss_reason: "",
+    ...overrides,
+  };
+}
+
+/** پنل «ریسک‌های پیشنهادی» فریم 12c: یکی منتظر تصمیم و یکی تأییدشده. */
+export function reviewRisks(overrides: Partial<ReviewRisks> = {}): ReviewRisks {
+  return {
+    risks: [
+      reviewRisk(),
+      reviewRisk({
+        id: 502,
+        status: { value: "converted", label: "تأیید شد · آنالیز ریسک" },
+        title: "توقف پرداخت اینترنتی در اوج بار تراکنش‌ها",
+        paths: [{ number: 2, text: "افزایش ناگهانی بار تراکنش در مناسبت‌ها و پاسخ‌گو نبودن سرورها" }],
+        source: { paths: [2], event: 2, impact: 2 },
+        similar: [],
+        risk: { code: "RK-1405-0061", route: "/risks/61" },
+        decided_by: { id: 3, name: "سارا محمدی" },
+        decided_at: minutesAgo(0),
+      }),
+    ],
+    counts: { total: 2, approved: 1, dismissed: 0, pending: 1 },
+    analysed_at: minutesAgo(6),
+    ...overrides,
+  };
+}
+
+export function reviewHistory(events?: ReviewHistoryEvent[]): { events: ReviewHistoryEvent[] } {
+  return {
+    events: events ?? [
+      { text: "برای بررسی ارسال شد", actor: { id: 7, name: "مریم صادقی" }, at: minutesAgo(121), tone: "info" },
+      { text: "پیش‌نویس ایجاد شد", actor: { id: 7, name: "مریم صادقی" }, at: minutesAgo(60 * 26), tone: "neutral" },
+    ],
   };
 }
