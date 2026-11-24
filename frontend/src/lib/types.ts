@@ -3190,3 +3190,36 @@ export interface AnswerSaveResult {
 export interface IdentificationSources {
   responses: { pending: number; returned: number; identified: number; url: string };
 }
+
+/** کارت صف «در انتظار بررسی» (11a). */
+export interface ReviewQueueCard {
+  id: number;
+  code: string;
+  service: string;
+  summary: AnswerSummary;
+  org_unit: string;
+  respondent: Person | null;
+  submitted_at: Day | null;
+  review_due: Deadline | null;
+  route: string;
+}
+
+/** ردیف جدول «همه‌ی پاسخنامه‌ها» (11a). action: «بررسی» برای کارشناس، «مشاهده»، یا هیچ (پیش‌نویس دیگران). */
+export interface ReviewRow extends ResponseRow {
+  review_due: Deadline | null;
+  return_note: string;
+  risks: string[];
+  all_dismissed: boolean;
+  action: "review" | "view" | null;
+}
+
+export interface QuestionnaireResponsesPage {
+  can_review: boolean;
+  queue: { count: number; overdue: number; cards: ReviewQueueCard[] } | null;
+  year: number;
+  year_total: number;
+  counts: Record<"all" | ResponseStatusValue, number>;
+  units: Choice[];
+  rows: ReviewRow[];
+  page: { number: number; pages: number; size: number; count: number; start: number; end: number };
+}

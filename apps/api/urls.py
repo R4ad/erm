@@ -2,7 +2,7 @@ from django.urls import path
 
 from . import analysis, assessment_workspace, auth, bridge, evaluation, identification, method_definition, mywork
 from . import action_verification, committee, post_action, control_test, monitoring_inbox, org_chart, scenario_library, user_roles
-from . import questionnaire_answers, reports, risk_questions, risks, session, treatment, treatment_board, treatment_targets
+from . import questionnaire_answers, questionnaire_responses, reports, risk_questions, risks, session, treatment, treatment_board, treatment_targets
 from . import ad_sync, identification_sources, impact_levels, method_diff, user_profile
 
 app_name = "api"
@@ -36,6 +36,11 @@ urlpatterns = [
         "questionnaire-answers/",
         questionnaire_answers.QuestionnaireAnswersView.as_view(),
         name="questionnaire_answers",
+    ),
+    path(
+        "questionnaire-responses/",
+        questionnaire_responses.QuestionnaireResponsesView.as_view(),
+        name="questionnaire_responses",
     ),
     path("analysis/", analysis.AnalysisIndexView.as_view(), name="analysis_index"),
     path("analysis/<int:pk>/", analysis.AnalysisView.as_view(), name="analysis"),

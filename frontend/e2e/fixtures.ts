@@ -48,6 +48,7 @@ function defaults(): Record<string, Handler | unknown> {
     "GET risks/1/": data.riskDetail(),
     "GET risk-questions/": data.riskQuestions(),
     "GET identification/sources/": data.identificationSources(),
+    "GET questionnaire-responses/": data.questionnaireResponses(),
     "GET questionnaire-answers/": (call: ApiCall) =>
       call.query.get("response")
         ? data.questionnaireAnswers({

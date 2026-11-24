@@ -35,6 +35,9 @@ import type {
   HolidayList,
   IdentificationPage,
   IdentificationSources,
+  QuestionnaireResponsesPage,
+  ReviewQueueCard,
+  ReviewRow,
   IdentificationValues,
   ImpactRow,
   Level,
@@ -6775,4 +6778,174 @@ export function questionnaireAnswers(overrides: Partial<QuestionnaireAnswersData
 
 export function identificationSources(): IdentificationSources {
   return { responses: { pending: 8, returned: 3, identified: 12, url: "/identification/responses" } };
+}
+
+const minutesAgo = (minutes: number) => ({
+  iso: new Date(Date.now() - minutes * 60_000).toISOString(),
+  jalali: "1405/09/02 10:00",
+});
+const due = (days: number) => ({ iso: "2026-11-23", jalali: "1405/09/02", days_left: days, overdue: days < 0 });
+const STATUS = {
+  draft: { value: "draft", label: "پیش‌نویس", tone: "neutral" },
+  submitted: { value: "submitted", label: "در انتظار بررسی", tone: "info" },
+  returned: { value: "returned", label: "بازگشت برای تکمیل اطلاعات", tone: "warning" },
+  identified: { value: "identified", label: "شناسایی‌شده", tone: "success" },
+  reviewed: { value: "reviewed", label: "بررسی‌شده", tone: "brand" },
+} as const;
+
+export function queueCard(overrides: Partial<ReviewQueueCard> = {}): ReviewQueueCard {
+  return {
+    id: 97,
+    code: "QR-1405-0097",
+    service: "پایانه‌های فروشگاهی",
+    summary: { paths: 3, events: 2, impacts: 2 },
+    org_unit: "پرداخت الکترونیک",
+    respondent: { id: 21, name: "نرگس احمدی" },
+    submitted_at: { iso: "2026-11-18", jalali: "1405/08/27" },
+    review_due: due(-4),
+    route: "/identification/responses/97",
+    ...overrides,
+  };
+}
+
+export function reviewRow(overrides: Partial<ReviewRow> = {}): ReviewRow {
+  return {
+    ...responseRow(),
+    review_due: null,
+    return_note: "",
+    risks: [],
+    all_dismissed: false,
+    action: "view",
+    ...overrides,
+  };
+}
+
+/** صفحه‌ی «بررسی پاسخنامه‌ها» با داده‌ی فریم 11a. */
+export function questionnaireResponses(
+  overrides: Partial<QuestionnaireResponsesPage> = {},
+): QuestionnaireResponsesPage {
+  return {
+    can_review: true,
+    queue: {
+      count: 8,
+      overdue: 1,
+      cards: [
+        queueCard(),
+        queueCard({
+          id: 101,
+          code: "QR-1405-0101",
+          service: "سامانه‌ی چکاوک",
+          summary: { paths: 2, events: 1, impacts: 1 },
+          org_unit: "عملیات بانکی",
+          respondent: { id: 22, name: "امیر حسینی" },
+          submitted_at: { iso: "2026-11-19", jalali: "1405/08/28" },
+          review_due: due(0),
+          route: "/identification/responses/101",
+        }),
+        queueCard({
+          id: 103,
+          code: "QR-1405-0103",
+          service: "مدیریت نقدینگی",
+          summary: { paths: 1, events: 1, impacts: 1 },
+          org_unit: "خزانه‌داری",
+          respondent: { id: 23, name: "کاوه رستمی" },
+          submitted_at: { iso: "2026-11-20", jalali: "1405/08/29" },
+          review_due: due(2),
+          route: "/identification/responses/103",
+        }),
+        queueCard({
+          id: 105,
+          code: "QR-1405-0105",
+          service: "احراز هویت مشتریان",
+          summary: { paths: 2, events: 2, impacts: 2 },
+          org_unit: "کانال‌های دیجیتال",
+          respondent: { id: 24, name: "لیلا مرادی" },
+          submitted_at: { iso: "2026-11-20", jalali: "1405/08/29" },
+          review_due: due(2),
+          route: "/identification/responses/105",
+        }),
+      ],
+    },
+    year: 1405,
+    year_total: 30,
+    counts: { all: 30, submitted: 8, returned: 3, identified: 12, reviewed: 2, draft: 5 },
+    units: [
+      { value: "3", label: "عملیات زیرساخت" },
+      { value: "4", label: "پرداخت الکترونیک" },
+    ],
+    rows: [
+      reviewRow({
+        id: 114,
+        code: "QR-1405-0114",
+        service: "صدور ضمانت‌نامه",
+        step: 4,
+        org_unit: "امور اعتباری",
+        status: STATUS.draft,
+        respondent: { id: 25, name: "پریسا نیک‌نام" },
+        updated_at: minutesAgo(10),
+        route: "/identification/responses/114",
+        action: null,
+      }),
+      reviewRow({
+        id: 113,
+        code: "QR-1405-0113",
+        service: "انتقال وجه ساتنا",
+        org_unit: "عملیات زیرساخت",
+        respondent: { id: 7, name: "سارا محمدی" },
+        updated_at: minutesAgo(60),
+        route: "/identification/responses/113",
+        review_due: due(3),
+        action: "review",
+      }),
+      reviewRow({ review_due: due(3), action: "review" }),
+      reviewRow({
+        id: 104,
+        code: "QR-1405-0104",
+        service: "سامانه‌ی پایا",
+        summary: { paths: 1, events: 1, impacts: 0 },
+        org_unit: "عملیات بانکی",
+        status: STATUS.returned,
+        respondent: { id: 11, name: "علی رضایی" },
+        route: "/identification/responses/104",
+        return_note: "پیامد رویداد ۱ ناقص است",
+      }),
+      reviewRow({
+        id: 98,
+        code: "QR-1405-0098",
+        service: "کارت و سوئیچ",
+        summary: { paths: 4, events: 3, impacts: 3 },
+        org_unit: "زیرساخت شبکه",
+        status: STATUS.identified,
+        respondent: { id: 12, name: "زهرا کریمی" },
+        updated_at: { iso: "2026-11-23T08:00:00Z", jalali: "1405/09/02 11:30" },
+        route: "/identification/responses/98",
+        risks: ["RK-1405-0058"],
+      }),
+      reviewRow({
+        id: 97,
+        code: "QR-1405-0097",
+        service: "پایانه‌های فروشگاهی",
+        org_unit: "پرداخت الکترونیک",
+        respondent: { id: 21, name: "نرگس احمدی" },
+        updated_at: { iso: "2026-11-18T08:00:00Z", jalali: "1405/08/27 11:30" },
+        route: "/identification/responses/97",
+        review_due: due(-4),
+        action: "review",
+      }),
+      reviewRow({
+        id: 88,
+        code: "QR-1405-0088",
+        service: "حواله‌ی ارزی",
+        summary: { paths: 2, events: 1, impacts: 1 },
+        org_unit: "امور ارزی",
+        status: STATUS.reviewed,
+        respondent: { id: 26, name: "مهدی فرهادی" },
+        updated_at: { iso: "2026-11-16T08:00:00Z", jalali: "1405/08/25 11:30" },
+        route: "/identification/responses/88",
+        all_dismissed: true,
+      }),
+    ],
+    page: { number: 1, pages: 4, size: 8, count: 30, start: 1, end: 8 },
+    ...overrides,
+  };
 }
