@@ -195,3 +195,23 @@ def test_options_and_comparison(client, sara, respondent, unit, response, drafts
     assert (data["existing"]["target_event"], data["existing"]["impact"]) == ("قطع درگاه", "تراکنش ناموفق")
     other = Risk.objects.create(title="دیگر", description="—", channel=Risk.Channel.IDENTIFICATION, org_unit=unit)
     assert client.get(api(f"{draft.pk}/similar/?risk={other.pk}")).status_code == 404
+
+
+def test_similar_risks_are_listed_only_when_the_viewer_may_see_them(client, sara, respondent, unit, response, drafts):
+    elsewhere = OrgUnit.objects.create(name="منابع انسانی")
+    own = Risk.objects.create(title="قطع درگاه", description="—", channel=Risk.Channel.IDENTIFICATION, org_unit=unit)
+    hidden = Risk.objects.create(
+        title="نشت حقوق کارکنان", description="—", channel=Risk.Channel.IDENTIFICATION, org_unit=elsewhere
+    )
+    drafts[0].similar_risks = [
+        {"id": risk.pk, "code": risk.code, "title": risk.title, "similarity": 0.5} for risk in (own, hidden)
+    ]
+    drafts[0].save()
+
+    def similar(user):
+        client.force_login(user)
+        risks = client.get(f"/api/questionnaire-responses/{response.pk}/risks/").json()["risks"]
+        return [item["code"] for item in next(card for card in risks if card["id"] == drafts[0].pk)["similar"]]
+
+    assert similar(sara) == [own.code, hidden.code]
+    assert similar(respondent) == [own.code]

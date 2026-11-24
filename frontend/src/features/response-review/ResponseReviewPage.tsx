@@ -13,7 +13,7 @@ import { ErrorState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage, get, post } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { ago } from "@/lib/format";
+import { ago, fa } from "@/lib/format";
 import { useNow, useTitle } from "@/lib/hooks";
 import type { AiRunState, ResponseReview, ReviewHistoryEvent, ReviewRisk, ReviewRisks } from "@/lib/types";
 import { useSession } from "@/features/session/session";
@@ -79,6 +79,29 @@ function HistoryCard({ events }: { events: ReviewHistoryEvent[] | undefined }) {
   );
 }
 
+/** متن اعلان پایان شناسایی هوشمند (جدول بخش ۱۰) برای صفحه‌خوان؛ لغو toast خودش را دارد. */
+function RunFinished({ run, code }: { run: AiRunState; code: string }) {
+  const response = <bdi className="code">{code}</bdi>;
+  if (run.status === "succeeded")
+    return (
+      <>
+        شناسایی هوشمند پاسخنامه‌ی {response} انجام شد · {fa(run.facts.risks)} ریسک پیشنهاد شد
+      </>
+    );
+  if (run.status === "empty") return <>شناسایی هوشمند پاسخنامه‌ی {response} ریسکی نساخت</>;
+  if (run.status === "failed")
+    return (
+      <>
+        شناسایی هوشمند پاسخنامه‌ی {response} انجام نشد · کد پیگیری <bdi className="code">{run.error_code}</bdi>
+      </>
+    );
+  return null;
+}
+
+function decisionFocus() {
+  return document.querySelector<HTMLElement>("[data-risk-title]") ?? document.getElementById("ai-results-title");
+}
+
 export function ResponseReviewPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -131,6 +154,14 @@ export function ResponseReviewPage() {
     wasActive.current = active;
   }, [active, id, queryClient]);
 
+  // همان پایان برای صفحه‌خوان اعلام می‌شود؛ نتیجه‌ای که با بارگذاری صفحه آمده اعلام نمی‌شود.
+  const [seen, setSeen] = useState({ id: run?.id, active });
+  const [finished, setFinished] = useState<AiRunState | null>(null);
+  if (seen.id !== run?.id || seen.active !== active) {
+    setSeen({ id: run?.id, active });
+    if (run && seen.id === run.id && seen.active && !active) setFinished(run);
+  }
+
   function showRun(next: AiRunState) {
     queryClient.setQueryData(["ai-run", next.id], next);
     queryClient.setQueryData<ResponseReview>(key, (current) => (current ? { ...current, run: next } : current));
@@ -158,15 +189,28 @@ export function ResponseReviewPage() {
   const [comparing, setComparing] = useState<{ risk: ReviewRisk; similarId: number } | null>(null);
   const [returning, setReturning] = useState(false);
 
-  if (detail.isPending) return <PageSkeleton />;
-  if (detail.isError) return <ErrorState error={detail.error} retry={() => void detail.refetch()} />;
-  if (!data) return null;
-
   const shown = risks.data && withApprovals(risks.data, approvals.approving, user);
   const list = shown?.risks ?? [];
   const pending = list.filter((risk) => risk.status.value === "pending");
   const selected = pending.find((risk) => risk.id === selectedId) ?? pending[0] ?? null;
   const editing = pending.find((risk) => risk.id === editingId) ?? null;
+
+  // تصمیم یا انتخاب، کارت بزرگ را عوض می‌کند و دکمه‌ای که فوکوس داشت از صفحه می‌رود؛ فوکوس به عنوان ریسک بعدیِ منتظر
+  // تصمیم (یا عنوان پنل وقتی ریسکی نمانده) می‌رود. نخستین نمایش فوکوس را جابه‌جا نمی‌کند.
+  const selectedKey = selected?.id ?? null;
+  const lastSelected = useRef(selectedKey);
+  useEffect(() => {
+    const previous = lastSelected.current;
+    lastSelected.current = selectedKey;
+    if (previous == null || previous === selectedKey) return;
+    const focused = document.activeElement;
+    if (focused && focused !== document.body && focused.isConnected) return;
+    decisionFocus()?.focus();
+  }, [selectedKey]);
+
+  if (detail.isPending) return <PageSkeleton />;
+  if (detail.isError) return <ErrorState error={detail.error} retry={() => void detail.refetch()} />;
+  if (!data) return null;
 
   const actions: RiskActions = {
     compare: (risk) => risk.similar[0] && setComparing({ risk, similarId: risk.similar[0].id }),
@@ -242,6 +286,9 @@ export function ResponseReviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <p role="status" className="sr-only">
+        {finished && <RunFinished run={finished} code={data.code} />}
+      </p>
       <header className="flex flex-col gap-3">
         <Link
           to="/identification/responses"
@@ -293,10 +340,12 @@ export function ResponseReviewPage() {
         risk={editing}
         onOpenChange={(open) => !open && setEditingId(null)}
         onApprove={approvals.approve}
+        returnFocus={decisionFocus}
       />
       <RejectDialog
         risk={rejecting}
         onOpenChange={(open) => !open && setRejecting(null)}
+        returnFocus={decisionFocus}
         onRejected={() => {
           setRejecting(null);
           toast({ title: "ریسک پیشنهادی رد شد.", tone: "success" });

@@ -6,7 +6,7 @@
 from django.db import transaction
 from django.utils import timezone
 
-from apps.workcalendar.workdays import add_working_days, holidays_after, is_working_day
+from apps.workcalendar.workdays import add_working_days, holidays_after
 
 from . import notices
 from .ai.pipeline import request_identification
@@ -77,8 +77,8 @@ def deadline_choices(today=None):
 
 
 def valid_due(due, today=None):
-    today = today or timezone.localdate()
-    return due > today and is_working_day(due)
+    """مهلت یکی از گزینه‌های مودال است: ۱ تا ۱۰ روز کاری بعد از امروز."""
+    return due in {day for _, day in deadline_choices(today)}
 
 
 def stored_question(item, targets):
@@ -112,8 +112,11 @@ def return_response(response, user, questions, message, due):
     response.return_questions = [stored_question(item, targets) for item in questions[:MAX_RETURN_QUESTIONS]]
     response.return_message = message
     response.return_due = due
+    response.returned_at = now
     response._history_user = user
-    response.save(update_fields=["status", "return_questions", "return_message", "return_due", "updated_at"])
+    response.save(
+        update_fields=["status", "return_questions", "return_message", "return_due", "returned_at", "updated_at"]
+    )
     notices.returned(response)
     return response
 

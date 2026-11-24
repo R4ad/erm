@@ -312,7 +312,12 @@ function RiskCard({ data, risk, actions }: { data: ResponseReview; risk: ReviewR
           </span>
         )}
       </div>
-      <h3 id={`risk-${risk.id}-title`} className="text-h3 font-semibold text-ink">
+      <h3
+        id={`risk-${risk.id}-title`}
+        data-risk-title
+        tabIndex={-1}
+        className="text-h3 font-semibold text-ink focus-visible:outline-none"
+      >
         {risk.title}
       </h3>
       <dl className="flex flex-col gap-2.5">
@@ -487,7 +492,11 @@ export function ResultsCard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles aria-hidden className="size-[1.125rem] text-tangerine" />
-            <h2 id="ai-results-title" className="text-h3 font-semibold text-ink">
+            <h2
+              id="ai-results-title"
+              tabIndex={-1}
+              className="text-h3 font-semibold text-ink focus-visible:outline-none"
+            >
               ریسک‌های پیشنهادی
             </h2>
             <span className="inline-flex h-[1.375rem] min-w-[1.375rem] items-center justify-center rounded-full bg-subtle px-1.5 text-xs font-medium text-ink-2">

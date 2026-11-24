@@ -94,6 +94,8 @@ interface ConfirmDialogProps {
   /** دکمه‌ی تأیید غیرفعال، مثلاً وقتی شرط کار هنوز برقرار نیست و دلیلش در description آمده است. */
   confirmDisabled?: boolean;
   onConfirm: () => void;
+  /** جای فوکوس بعد از بستن وقتی دکمه‌ی بازکننده دیگر در صفحه نیست. */
+  returnFocus?: () => HTMLElement | null;
   children?: ReactNode;
 }
 
@@ -109,9 +111,10 @@ export function ConfirmDialog({
   loading = false,
   confirmDisabled = false,
   onConfirm,
+  returnFocus,
   children,
 }: ConfirmDialogProps) {
-  const focus = useReturnFocus();
+  const focus = useReturnFocus(returnFocus);
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>

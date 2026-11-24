@@ -11,6 +11,7 @@
 import hashlib
 import json
 import secrets
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -25,6 +26,7 @@ from apps.risks.models import Risk, RiskCategory
 
 from .. import notices
 from ..models import AiRun, PendingRisk, Response
+from ..services import settle
 from . import validation
 from .grouping import build_input
 from .providers import ProviderError, get_provider
@@ -86,9 +88,10 @@ class Runner:
         self.response = run.response
 
     def stage(self, number):
-        """مرحله را ثبت می‌کند؛ اگر کاربر در این فاصله لغو کرده باشد اجرا همین‌جا رها می‌شود."""
+        """مرحله را ثبت می‌کند؛ اگر اجرا در این فاصله لغو یا به‌عنوان اجرای بی‌کارگر بسته شده باشد همین‌جا رها
+        می‌شود."""
         status = AiRun.objects.filter(pk=self.run.pk).values_list("status", flat=True).first()
-        if status == AiRun.Status.CANCELLED:
+        if status not in AiRun.ACTIVE_STATUSES:
             raise Cancelled
         self.run.stage = number
         self.run.save(update_fields=["stage", "updated_at"])
@@ -97,7 +100,7 @@ class Runner:
         """قفل ردیف اجرا داخل تراکنش؛ اگر کاربر لغو کرده باشد اجرا رها می‌شود. endpoint لغو هم همین ردیف را قفل می‌کند،
         پس لغو و ثبت نتیجه هم‌زمان رخ نمی‌دهند."""
         status = AiRun.objects.select_for_update().filter(pk=self.run.pk).values_list("status", flat=True).first()
-        if status == AiRun.Status.CANCELLED:
+        if status not in AiRun.ACTIVE_STATUSES:
             raise Cancelled
 
     def finish(self, status, **fields):
@@ -109,6 +112,30 @@ class Runner:
         self.run.duration_ms = int((now - self.run.started_at).total_seconds() * 1000)
         self.run.save()
         notices.run_finished(self.run)
+
+    def fail(self, code, message):
+        """«انجام نشد» با کد پیگیری، زیر همان قفل ردیف؛ اجرایی که در این فاصله لغو شده لغوشده می‌ماند."""
+        with transaction.atomic():
+            try:
+                self.lock()
+            except Cancelled:
+                return
+            self.finish(AiRun.Status.FAILED, error_code=code, error_message=message)
+
+    def settle_decided(self):
+        """اجرای خالی پیشنهاد تازه نمی‌آورد. اگر تکلیف همه‌ی پیشنهادهای پیشین روشن است (مثلاً بعد از ارسال دوباره همه‌ی
+        پیامدها ریسک تأییدشده دارند)، بررسی پاسخنامه همین‌جا به نام آخرین تصمیم‌گیرنده تمام می‌شود."""
+        if not Response.objects.filter(pk=self.response.pk, status=Response.Status.SUBMITTED).exists():
+            return
+        last = (
+            PendingRisk.objects.filter(response=self.response, decided_by__isnull=False)
+            .exclude(status=PendingRisk.Status.ARCHIVED)
+            .select_related("decided_by")
+            .order_by("-decided_at", "-pk")
+            .first()
+        )
+        if last is not None:
+            settle(self.response, last.decided_by)
 
     def ask(self, provider, payload):
         """پاسخ معتبر مدل، با یک تلاش دوباره همراه فهرست خطاها؛ در غیر این صورت ProviderError با وضعیت ۴۲۲."""
@@ -162,6 +189,7 @@ class Runner:
                 self.lock()
                 self.archive_open_drafts()
                 self.finish(AiRun.Status.EMPTY)
+                self.settle_decided()
             return
 
         self.stage(3)
@@ -228,13 +256,29 @@ def run_identification(run):
     except Cancelled:
         return
     except ProviderError as error:
-        runner.finish(AiRun.Status.FAILED, error_code=tracking_code(error.status), error_message=str(error))
+        runner.fail(tracking_code(error.status), str(error))
     except Exception as error:  # noqa: BLE001 - هر خطای پیش‌بینی‌نشده اجرا را با کد پیگیری می‌بندد
-        runner.finish(AiRun.Status.FAILED, error_code=tracking_code(500), error_message=repr(error)[:1000])
+        runner.fail(tracking_code(500), repr(error)[:1000])
+
+
+def stale_after():
+    """اجرایی که بیش از دو بار مهلت مدل و دو دقیقه «در حال اجرا» مانده، کارگرش از کار افتاده است."""
+    return timedelta(milliseconds=2 * settings.LLM_TIMEOUT_MS, minutes=2)
+
+
+def reap_stale(response=None):
+    """اجراهای «در حال اجرا»ی بی‌کارگر (مثلاً با توقف سرویس ai وسط اجرا) با کد پیگیری ۵۰۴ «انجام نشد» می‌شوند تا
+    پنل، صف و اجرای دوباره گیر نکنند."""
+    stale = AiRun.objects.filter(status=AiRun.Status.RUNNING, started_at__lt=timezone.now() - stale_after())
+    if response is not None:
+        stale = stale.filter(response=response)
+    for run in stale.select_related("response"):
+        Runner(run).fail(tracking_code(504), "کارگر شناسایی پیش از پایان اجرا متوقف شد.")
 
 
 def request_identification(response, user):
     """اجرای تازه در صف؛ اگر اجرایی در صف یا در حال اجراست همان برمی‌گردد."""
+    reap_stale(response)
     with transaction.atomic():
         locked = Response.objects.select_for_update().get(pk=response.pk)
         active = locked.ai_runs.filter(status__in=AiRun.ACTIVE_STATUSES).first()
@@ -245,6 +289,7 @@ def request_identification(response, user):
 
 def next_queued():
     """اجرای بعدی صف با قفل ردیف، تا چند کارگر یک اجرا را دو بار برندارند."""
+    reap_stale()
     with transaction.atomic():
         run = (
             AiRun.objects.select_for_update(skip_locked=True)

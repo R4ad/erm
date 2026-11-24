@@ -6,6 +6,7 @@
 import json
 
 TITLE_LIMIT = 120
+IMPACT_TYPE_LIMIT = 200  # PendingRisk.impact_type
 QUESTION_LIMIT = 5
 CONFIDENCE = ("high", "medium", "low")
 RISK_FIELDS = (
@@ -88,7 +89,7 @@ def _risk(risk, index, groups, categories, errors):
     impact = risk["impact"]
     if _keys(impact, ("text", "type", "scope"), f"{where}.impact", errors):
         for key in ("text", "type", "scope"):
-            _text(impact[key], f"{where}.impact.{key}", errors)
+            _text(impact[key], f"{where}.impact.{key}", errors, IMPACT_TYPE_LIMIT if key == "type" else None)
 
     if group is None:
         errors.append(f"{where}.impact_id «{impact_id}» در risk_groups نیست.")

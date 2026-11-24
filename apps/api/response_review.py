@@ -15,6 +15,7 @@ from apps.questionnaires.answers import FA_DIGITS, answer_values, impact_types
 from apps.questionnaires.models import AiRun, PendingRisk, Response
 from apps.questionnaires.permissions import can_manage_questionnaires, visible_responses
 from apps.questionnaires.services import TEXT_FIELDS, ai_values
+from apps.risks.permissions import visible_risks
 
 from . import formatting as fmt
 from .base import ApiView
@@ -105,9 +106,9 @@ def next_in_queue(user, response):
     return {"id": target, "route": f"/identification/responses/{target}"}
 
 
-def run_facts(response):
+def run_facts(response, answers=None):
     """عددهای متن مرحله‌های 12b: پاسخ‌ها و مسیرها، پیامدهای متمایز، ریسک‌هایی که ساخته می‌شوند و اندازه‌ی رجیستر."""
-    answers = chains(response)
+    answers = answers or chains(response)
     complete = grouping.complete_groups(response)
     done = grouping.approved_consequences(response)
     return {
@@ -154,7 +155,8 @@ def edited(draft):
     ] != [item["text"] for item in suggested["paths"]]
 
 
-def draft_payload(draft):
+def draft_payload(draft, visible=None):
+    """visible: شناسه‌ی ریسک‌های مشابهی که بیننده می‌بیند؛ None برای کارشناس ریسک که همه‌ی رجیستر را می‌بیند."""
     instance = draft.consequence.risk_instance if draft.consequence_id else None
     suggested = (draft.ai_original or {}).get("category")
     return {
@@ -188,6 +190,7 @@ def draft_payload(draft):
                 "route": f"/risks/{item['id']}",
             }
             for item in draft.similar_risks
+            if visible is None or item["id"] in visible
         ],
         "edited": edited(draft),
         "suggested": ai_values(draft) if draft.ai_original else None,
@@ -214,7 +217,8 @@ class ResponseReviewView(ApiView):
         response = get_response(request.user, pk)
         can_review = can_manage_questionnaires(request.user)
         service = response.service_records.first()
-        facts = run_facts(response)
+        answers = chains(response)
+        facts = run_facts(response, answers)
         return ApiResponse(
             {
                 "id": response.pk,
@@ -226,7 +230,7 @@ class ResponseReviewView(ApiView):
                 "submitted_at": fmt.moment(response.submitted_at),
                 "can_review": can_review and response.status == S.SUBMITTED,
                 "next": next_in_queue(request.user, response) if can_review else None,
-                "answers": chains(response),
+                "answers": answers,
                 "run": run_payload(latest_run(response), facts),
                 "facts": facts,
                 "manual_route": "/identification/manual",
@@ -240,12 +244,15 @@ class ResponseRisksView(ApiView):
     def get(self, request, pk):
         response = get_response(request.user, pk)
         drafts = list(current_drafts(response))
+        # ریسک مشابه از کل رجیستر پیدا شده است؛ پاسخ‌دهنده و ممیز دامنه‌دار فقط ریسک‌هایی را می‌بینند که اجازه دارند.
+        similar = {item["id"] for draft in drafts for item in draft.similar_risks}
+        visible = set(visible_risks(request.user).filter(pk__in=similar).values_list("pk", flat=True))
         run = (
             response.ai_runs.filter(status=AiRun.Status.SUCCEEDED).order_by("-finished_at", "-pk").first()
         )
         return ApiResponse(
             {
-                "risks": [draft_payload(draft) for draft in drafts],
+                "risks": [draft_payload(draft, visible) for draft in drafts],
                 "counts": {
                     "total": len(drafts),
                     "approved": sum(1 for draft in drafts if draft.status == P.CONVERTED),

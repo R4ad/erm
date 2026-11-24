@@ -83,6 +83,13 @@ describe("بررسی یک پاسخنامه (12a تا 12c)", () => {
     expect(api.callsTo("GET ai-runs/31/").length).toBeGreaterThan(0);
     expect(within(results).getByText(/۱ تأییدشده · ۱ منتظر تصمیم شما · تحلیل ۵ دقیقه پیش/)).toBeInTheDocument();
     expect(within(results).getByText("۳ مسیر تحقق ← ۲ پیامد متمایز ← ۲ ریسک")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((region) =>
+          /^شناسایی هوشمند پاسخنامه‌ی QR-1405-0109 انجام شد · ۲ ریسک پیشنهاد شد$/.test(region.textContent ?? ""),
+        ),
+    ).toBe(true);
   });
 
   it("ریسک پیشنهادی را با منبعش و ریسک تأییدشده را فشرده نشان می‌دهد و مسیرهای منبع را برجسته می‌کند (12c)", async () => {

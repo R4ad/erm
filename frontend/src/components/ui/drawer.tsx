@@ -22,6 +22,8 @@ interface DrawerContentProps {
   size?: "menu" | "panel";
   /** چیپ کنار عنوان، مثل «پیش‌نویس AI». */
   chip?: ReactNode;
+  /** جای فوکوس بعد از بستن وقتی دکمه‌ی بازکننده دیگر در صفحه نیست. */
+  returnFocus?: () => HTMLElement | null;
   className?: string;
   children: ReactNode;
 }
@@ -33,11 +35,12 @@ export function DrawerContent({
   side = "start",
   size = "menu",
   chip,
+  returnFocus,
   className,
   children,
 }: DrawerContentProps) {
   const right = (side === "start") === (locale.dir === "rtl");
-  const focus = useReturnFocus();
+  const focus = useReturnFocus(returnFocus);
   const panel = size === "panel";
   return (
     <Dialog.Portal>

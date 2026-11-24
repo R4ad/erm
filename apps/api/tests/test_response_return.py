@@ -8,10 +8,12 @@ from django.utils import timezone
 from apps.accounts.roles import Role
 from apps.catalog.tests.factories import make_user
 from apps.organization.models import OrgUnit
+from apps.questionnaires import returning
 from apps.questionnaires.ai import pipeline
 from apps.questionnaires.models import AiRun, PendingRisk, Response
 from apps.questionnaires.tests.factories import payment_response
 from apps.risks.models import Risk
+from apps.workcalendar.workdays import is_working_day
 
 pytestmark = pytest.mark.django_db
 
@@ -103,6 +105,7 @@ def test_return_archives_pending_drafts_and_keeps_decisions(client, sara, respon
     response.refresh_from_db()
     assert response.status == Response.Status.RETURNED
     assert response.return_due.isoformat() == due
+    assert response.returned_at is not None
     assert response.return_message == "لطفاً پرسش‌های زیر را تکمیل کنید."
     assert response.return_questions == [
         {"text": "سوئیچ به لینک پشتیبان چقدر طول می‌کشد؟", "ref": "P1", "about": "مسیر تحقق ۱", "step": 5, "source": "ai"},
@@ -144,6 +147,14 @@ def test_return_validates_questions_and_deadline(client, sara, response, run):
         content_type="application/json",
     )
     assert today.json()["errors"] == {"due_date": ["مهلت باید روز کاری بعد از امروز باشد."]}
+    last = returning.deadline_choices()[-1][1]
+    beyond = next(d for d in (last + datetime.timedelta(days=n) for n in range(1, 15)) if is_working_day(d))
+    far = client.post(
+        url(response, "return/"),
+        {"questions": [{"text": "پرسش"}], "due_date": beyond.isoformat()},
+        content_type="application/json",
+    )
+    assert far.json()["errors"] == {"due_date": ["مهلت باید روز کاری بعد از امروز باشد."]}
     response.refresh_from_db()
     assert response.status == Response.Status.SUBMITTED
 

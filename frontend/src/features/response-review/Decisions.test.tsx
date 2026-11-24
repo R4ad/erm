@@ -42,6 +42,8 @@ describe("تصمیم درباره‌ی ریسک‌های پیشنهادی (12c �
     expect(await screen.findByText("ریسک تأیید شد و به آنالیز ریسک رفت")).toBeInTheDocument();
     const results = screen.getByRole("region", { name: "ریسک‌های پیشنهادی" });
     expect(within(results).getByText(/۲ تأییدشده · ۰ منتظر تصمیم شما/)).toBeInTheDocument();
+    // دکمه‌ی تأیید با کارت از صفحه رفت؛ ریسک منتظر دیگری نیست، پس فوکوس روی عنوان پنل است.
+    expect(within(results).getByRole("heading", { level: 2 })).toHaveFocus();
     expect(within(results).getByRole("heading", { level: 3, name: TITLE }).parentElement).toHaveTextContent(
       "مسیر ۱ و ۳ ← پیامد ۱ · تأیید توسط کاربر آزمون، همین حالا",
     );
@@ -163,6 +165,7 @@ describe("تصمیم درباره‌ی ریسک‌های پیشنهادی (12c �
     expect(await screen.findByText("ریسک تأیید شد و به آنالیز ریسک رفت")).toBeInTheDocument();
     expect(api.callsTo("PATCH pending-risks/501/")).toHaveLength(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "ریسک‌های پیشنهادی" })).toHaveFocus());
   });
 
   it("مقایسه با ریسک موجود را کنار هم نشان می‌دهد", async () => {

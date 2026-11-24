@@ -3,16 +3,20 @@
 import io
 import json
 import urllib.error
+from datetime import timedelta
 from unittest import mock
 
 import pytest
 from django.core.management import call_command
+from django.utils import timezone
 
 from apps.accounts.roles import Role
+from apps.actions.models import MonitoringNotice
 from apps.catalog.tests.factories import make_user
 from apps.organization.models import OrgUnit
+from apps.questionnaires import services
 from apps.questionnaires.ai import grouping, pipeline, providers, validation
-from apps.questionnaires.models import AiRun, PathConsequence, PendingRisk, RiskInstance
+from apps.questionnaires.models import AiRun, PathConsequence, PendingRisk, Response, RiskInstance
 from apps.questionnaires.tests.factories import payment_response
 from apps.risks.models import Risk, RiskCategory
 
@@ -128,6 +132,7 @@ def test_the_mock_output_is_valid(payload):
         (lambda o: o["risks"][0].update(title="ت" * 121), "بیش از 120 نویسه"),
         (lambda o: o["risks"][0].update(confidence="certain"), "confidence باید"),
         (lambda o: o["risks"][0]["impact"].update(scope=""), "impact.scope خالی است"),
+        (lambda o: o["risks"][0]["impact"].update(type="ت" * 201), "impact.type بیش از 200 نویسه"),
         (lambda o: o["risks"][0].update(note="x"), "فیلدهای اضافه"),
         (lambda o: o["risks"][0].pop("gaps"), "فیلدهای الزامی"),
         (lambda o: o.update(follow_up_questions=[{"question": "چرا؟", "about": "P1", "reason": "ر"}] * 6), "حداکثر 5"),
@@ -194,6 +199,24 @@ def test_no_complete_group_ends_empty_without_calling_the_model(unit, respondent
     assert run.status == AiRun.Status.EMPTY
     assert scripted.messages == []
     assert not response.pending_risks.exists()
+    response.refresh_from_db()
+    assert response.status == Response.Status.SUBMITTED  # بی‌تصمیم؛ کارشناس آن را بازمی‌گرداند
+
+
+def test_an_empty_rerun_settles_the_response_when_every_suggestion_left_is_decided(unit, respondent, sara):
+    response = payment_response(unit, respondent)
+    run_for(response, sara)
+    first, second = response.pending_risks.order_by("pk")
+    services.approve(first, sara)
+    PathConsequence.objects.filter(pk=second.consequence_id).update(description="")
+
+    run = run_for(response, sara)
+    assert run.status == AiRun.Status.EMPTY
+    second.refresh_from_db()
+    response.refresh_from_db()
+    assert second.status == PendingRisk.Status.ARCHIVED
+    assert (response.status, response.reviewed_by) == (Response.Status.IDENTIFIED, sara)
+    assert MonitoringNotice.objects.filter(recipient=respondent, response=response).count() == 1
 
 
 def test_invalid_output_is_retried_once_with_the_errors(unit, respondent, sara):
@@ -243,6 +266,38 @@ def test_a_cancelled_run_is_dropped_between_stages(unit, respondent, sara):
     run.refresh_from_db()
     assert run.status == AiRun.Status.CANCELLED
     assert not response.pending_risks.exists()
+
+
+def test_a_run_cancelled_before_the_model_fails_stays_cancelled(unit, respondent, sara):
+    response = payment_response(unit, respondent)
+    run = pipeline.request_identification(response, sara)
+
+    class CancelThenTimeout(Scripted):
+        def complete(self, system, user, schema):
+            AiRun.objects.filter(pk=run.pk).update(status=AiRun.Status.CANCELLED)
+            raise providers.ProviderError("مهلت", status=504)
+
+    with mock.patch.object(pipeline, "get_provider", return_value=CancelThenTimeout()):
+        pipeline.run_identification(run)
+    run.refresh_from_db()
+    assert (run.status, run.error_code) == (AiRun.Status.CANCELLED, "")
+    assert not MonitoringNotice.objects.exists()
+
+
+def test_a_run_left_running_by_a_stopped_worker_fails_with_504(unit, respondent, sara, settings):
+    settings.LLM_TIMEOUT_MS = 1000
+    response = payment_response(unit, respondent)
+    stuck = pipeline.request_identification(response, sara)
+    assert pipeline.next_queued() == stuck
+    AiRun.objects.filter(pk=stuck.pk).update(started_at=timezone.now() - timedelta(minutes=3))
+
+    fresh = pipeline.request_identification(response, sara)
+    stuck.refresh_from_db()
+    assert fresh != stuck and fresh.status == AiRun.Status.QUEUED
+    assert stuck.status == AiRun.Status.FAILED and stuck.error_code.startswith("AI-504-")
+    assert MonitoringNotice.objects.get(recipient=sara).event_key == f"ai-run:{stuck.pk}:failed"
+    assert pipeline.next_queued() == fresh
+    assert pipeline.request_identification(response, sara) == fresh  # هنوز در مهلت است
 
 
 def test_rerun_archives_unreviewed_drafts_and_keeps_decided_ones(unit, respondent, sara):

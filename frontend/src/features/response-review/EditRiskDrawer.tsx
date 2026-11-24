@@ -324,12 +324,14 @@ export function EditRiskDrawer({
   risk,
   onOpenChange,
   onApprove,
+  returnFocus,
 }: {
   data: ResponseReview;
   /** ریسکی که کشو برایش باز است؛ null یعنی کشو بسته است. */
   risk: ReviewRisk | null;
   onOpenChange: (open: boolean) => void;
   onApprove: (id: number) => void;
+  returnFocus?: () => HTMLElement | null;
 }) {
   return (
     <Drawer open={risk !== null} onOpenChange={onOpenChange}>
@@ -340,6 +342,7 @@ export function EditRiskDrawer({
           side="end"
           size="panel"
           chip={<AiChip>پیش‌نویس AI</AiChip>}
+          returnFocus={returnFocus}
         >
           <EditForm key={risk.id} data={data} risk={risk} onApprove={onApprove} onClose={() => onOpenChange(false)} />
         </DrawerContent>

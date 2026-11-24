@@ -47,11 +47,13 @@ export function RejectDialog({
   risk,
   onOpenChange,
   onRejected,
+  returnFocus,
 }: {
   /** ریسکی که دیالوگ برایش باز است؛ null یعنی بسته. */
   risk: ReviewRisk | null;
   onOpenChange: (open: boolean) => void;
   onRejected: () => void;
+  returnFocus?: () => HTMLElement | null;
 }) {
   const [reason, setReason] = useState("");
   const [missing, setMissing] = useState(false);
@@ -85,6 +87,7 @@ export function RejectDialog({
       cancelLabel="انصراف"
       tone="danger"
       loading={reject.isPending}
+      returnFocus={returnFocus}
       onConfirm={() => {
         if (!risk) return;
         if (!reason.trim()) {
