@@ -34,6 +34,7 @@ import type {
   FormSchema,
   HolidayList,
   IdentificationPage,
+  IdentificationSources,
   IdentificationValues,
   ImpactRow,
   Level,
@@ -6770,4 +6771,8 @@ export function questionnaireAnswers(overrides: Partial<QuestionnaireAnswersData
     all_url: "/identification/responses",
     ...overrides,
   };
+}
+
+export function identificationSources(): IdentificationSources {
+  return { responses: { pending: 8, returned: 3, identified: 12, url: "/identification/responses" } };
 }

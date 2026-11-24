@@ -1,9 +1,12 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from apps.core.jalali import jalali_year
 from apps.core.models import TimeStampedModel
+from apps.core.services import next_code
 
 
 class Response(TimeStampedModel):
@@ -73,6 +76,11 @@ class Response(TimeStampedModel):
 
     def get_absolute_url(self):
         return f"/app/identification/responses/{self.pk}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = next_code(f"QR-{jalali_year(timezone.localdate())}")
+        super().save(*args, **kwargs)
 
     @property
     def is_editable(self):

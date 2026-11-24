@@ -431,7 +431,20 @@ export const routes: RouteObject[] = [
           {
             path: "identification",
             lazy: async () => ({
-              Component: (await import("@/features/identification/IdentificationPage")).IdentificationPage,
+              Component: (await import("@/features/identification/IdentificationSourcesPage"))
+                .IdentificationSourcesPage,
+            }),
+          },
+          {
+            path: "identification/manual",
+            lazy: async () => ({
+              Component: (await import("@/features/identification/ManualIdentificationPage")).ManualIdentificationPage,
+            }),
+          },
+          {
+            path: "identification/sources/:source",
+            lazy: async () => ({
+              Component: (await import("@/features/identification/ComingSoonPage")).ComingSoonPage,
             }),
           },
           {

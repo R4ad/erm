@@ -3185,3 +3185,8 @@ export interface AnswerSaveResult {
   recent: ResponseRow[];
   summary?: AnswerSummary;
 }
+
+/** «شناسایی ریسک» (11 v2): آمار منبع پاسخنامه‌ها از پاسخنامه‌هایی که کاربر می‌بیند. */
+export interface IdentificationSources {
+  responses: { pending: number; returned: number; identified: number; url: string };
+}

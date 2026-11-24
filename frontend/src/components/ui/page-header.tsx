@@ -15,18 +15,19 @@ interface PageHeaderProps {
   className?: string;
 }
 
-/** سرصفحه‌ی فیگما: عنوان H1 (۲۲ Bold) و توضیح ۱۳ زیرش در راست، گروه اقدام‌ها در چپ با اقدام اصلی در انتهای چپ. */
+/** سرصفحه (layout.md، پوسته): عنوان Display/28 Bold و توضیح Body/Default 14 با فاصله‌ی ۶ زیرش در راست، گروه اقدام‌ها
+ * در چپ با اقدام اصلی در انتهای چپ. */
 export function PageHeader({ title, description, breadcrumb, actions, meta, className }: PageHeaderProps) {
   usePageCrumbs(breadcrumb ?? null);
   return (
     <header className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-h1 font-bold text-ink">{title}</h1>
+            <h1 className="text-display font-bold text-ink">{title}</h1>
             {meta}
           </div>
-          {description && <p className="max-w-3xl text-sm text-ink-2">{description}</p>}
+          {description && <p className="max-w-3xl text-base text-ink-2">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

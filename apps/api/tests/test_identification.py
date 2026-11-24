@@ -131,7 +131,7 @@ def test_a_draft_stays_out_of_the_register_until_it_is_submitted(client, grc, un
     draft = IdentificationDraft.objects.get()
     assert saved.json()["draft"]["id"] == draft.pk and not Risk.objects.exists()
     row = saved.json()["recent"][0]
-    assert (row["stage"]["label"], row["code"], row["route"]) == ("پیش‌نویس", None, f"/identification?draft={draft.pk}")
+    assert (row["stage"]["label"], row["code"], row["route"]) == ("پیش‌نویس", None, f"/identification/manual?draft={draft.pk}")
     reopened = client.get(URL, {"draft": draft.pk}).json()
     assert reopened["values"]["event"] == "اعمال تغییر نامعتبر در تولید" and reopened["values"]["harm"] == ""
 

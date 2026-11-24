@@ -108,7 +108,7 @@ def draft_row(draft, lookup):
         "owner": fmt.person(lookup.owner(draft)),
         "due": None,
         "href": None,
-        "route": f"/identification?draft={draft.pk}",
+        "route": f"/identification/manual?draft={draft.pk}",
     }
 
 

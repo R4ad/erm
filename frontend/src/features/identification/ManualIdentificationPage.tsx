@@ -13,8 +13,9 @@ import { IdentificationWizard } from "./IdentificationWizard";
 import { RecentEntries } from "./RecentEntries";
 import { useWizardPage } from "./use-wizard-page";
 
-// «شناسایی ریسک»: عضو GRC و مدیر سامانه ریسک را با ویزارد شش پرسش ثبت می‌کنند. مدیر واحد سناریو را از «پاسخ به
-// پرسشنامه‌ها» می‌فرستد و اینجا فقط ورودی‌های اخیر را می‌بیند.
+// «ثبت دستی ریسک» (/identification/manual): عضو GRC و مدیر سامانه ریسک را با ویزارد شش پرسش ثبت می‌کنند. مدیر واحد
+// سناریو را از «پاسخ به پرسشنامه‌ها» می‌فرستد و اینجا فقط ورودی‌های اخیر را می‌بیند. صفحه‌ی «شناسایی ریسک» حالا منبع‌های
+// شناسایی است (IdentificationSourcesPage) و این صفحه مقصد «ثبت دستی ریسک» در بررسی پاسخنامه است.
 
 const PROCESS: { label: string; state: StepState }[] = [
   { label: "شناسایی", state: "current" },
@@ -26,16 +27,16 @@ const PROCESS: { label: string; state: StepState }[] = [
   { label: "پایش و گزارش", state: "upcoming" },
 ];
 
-export function IdentificationPage() {
-  useTitle("شناسایی ریسک");
+export function ManualIdentificationPage() {
+  useTitle("ثبت دستی ریسک");
   const { query, formKey, onDraftSaved } = useWizardPage();
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="شناسایی ریسک"
+        title="ثبت دستی ریسک"
         description="ثبت سناریو با شش پرسش جلسه‌ی شناسایی طبق الگوی بخش ۴ روش · افق پیش‌فرض ۱۲ ماه · دارایی ورودی اجباری نیست"
-        breadcrumb={[{ label: "شناسایی ریسک" }]}
+        breadcrumb={[{ label: "شناسایی ریسک", to: "/identification" }, { label: "ثبت دستی ریسک" }]}
       />
       <Card
         className="overflow-x-auto px-5 py-[0.9375rem]"

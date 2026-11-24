@@ -78,7 +78,7 @@ function identification(overrides: Partial<IdentificationPage> = {}): Identifica
         owner: null,
         due: null,
         href: null,
-        route: "/identification?draft=3",
+        route: "/identification/manual?draft=3",
       },
     ],
     scenarios_url: "/risks/scenarios/",
@@ -103,8 +103,8 @@ const answered = {
 test.describe("risk identification", () => {
   test("walks the six questions and the review from the keyboard", async ({ page, api }) => {
     api.on("GET identification/", identification());
-    await page.goto("/app/identification");
-    await expect(page.getByRole("heading", { name: "شناسایی ریسک", level: 1 })).toBeVisible();
+    await page.goto("/app/identification/manual");
+    await expect(page.getByRole("heading", { name: "ثبت دستی ریسک", level: 1 })).toBeVisible();
     const template = page.getByRole("region", { name: "الگوی ثبت سناریو" });
     await expect(template).toBeVisible();
     await expect(page.getByText("گام ۱ از ۷")).toBeVisible();
@@ -144,7 +144,7 @@ test.describe("risk identification", () => {
 
   test("keeps the scenario template in view while the page scrolls", async ({ page, api }) => {
     api.on("GET identification/", identification({ values: answered }));
-    await page.goto("/app/identification");
+    await page.goto("/app/identification/manual");
     await page.getByRole("button", { name: /گام ۷: بازبینی/ }).click();
     const template = page.getByRole("region", { name: "الگوی ثبت سناریو" });
     await expect(template).toHaveCSS("position", "sticky");
@@ -167,7 +167,7 @@ test.describe("risk identification", () => {
           errors: { harm: ["این پرسش برای ارسال اجباری است."] },
         }),
       );
-      await page.goto("/app/identification");
+      await page.goto("/app/identification/manual");
       await page.getByRole("button", { name: /گام ۷: بازبینی/ }).click();
       await page.getByRole("button", { name: "ارسال برای شناسایی" }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "ارسال برای شناسایی" }).click();
@@ -192,11 +192,11 @@ test.describe("risk identification", () => {
       },
       recent: [],
     });
-    await page.goto("/app/identification");
+    await page.goto("/app/identification/manual");
     await page.getByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }).fill("فرآیند تسویه");
     await page.keyboard.press("Control+s");
     await expect(page.getByText("پیش‌نویس ذخیره شد.", { exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/app\/identification\?draft=12$/);
+    await expect(page).toHaveURL(/\/app\/identification\/manual\?draft=12$/);
     expect(api.callsTo("POST identification/")[0]?.body).toMatchObject({
       submit: false,
       values: { subject: "فرآیند تسویه" },
@@ -205,7 +205,7 @@ test.describe("risk identification", () => {
 
   test("slides steps in reading direction and only fades them with reduced motion", async ({ page, api }) => {
     api.on("GET identification/", identification({ values: answered }));
-    await page.goto("/app/identification");
+    await page.goto("/app/identification/manual");
     const step = page.locator(".wizard-step");
     // اولین گام هنگام باز شدن صفحه حرکت ندارد.
     await expect(step).toHaveCSS("animation-name", "none");

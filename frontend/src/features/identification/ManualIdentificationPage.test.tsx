@@ -9,7 +9,7 @@ import type { IdentificationChoices, IdentificationPage as PageData, Identificat
 import { identificationParts, identificationValues } from "@/test/fixtures";
 
 import { autoUnit, entryChecks, matchTargets, narrative, stepOfField, withTarget } from "./identification";
-import { IdentificationPage } from "./IdentificationPage";
+import { ManualIdentificationPage } from "./ManualIdentificationPage";
 
 const blank = identificationValues();
 const parts = identificationParts;
@@ -111,7 +111,7 @@ function page(overrides: Partial<PageData> = {}): PageData {
   };
 }
 
-const options = { path: "/identification", route: "/identification" };
+const options = { path: "/identification/manual", route: "/identification/manual" };
 const savedDraft = {
   message: "پیش‌نویس ذخیره شد.",
   draft: {
@@ -185,12 +185,12 @@ describe("identification helpers", () => {
   });
 });
 
-describe("IdentificationPage", () => {
+describe("ManualIdentificationPage", () => {
   it("leads with identification in the lifecycle and keeps only the wizard, its template and recent entries", async () => {
     mockApi({ "GET identification/": page() });
-    renderPage(<IdentificationPage />, options);
+    renderPage(<ManualIdentificationPage />, options);
     expect(await screen.findByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "شناسایی ریسک", level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ثبت دستی ریسک", level: 1 })).toBeInTheDocument();
 
     const lifecycle = screen.getByRole("region", { name: "گام‌های فرایند مدیریت ریسک" });
     const first = within(lifecycle).getAllByRole("listitem")[0]!;
@@ -231,7 +231,7 @@ describe("IdentificationPage", () => {
 
   it("suggests services on the first question, fills the hidden target and moves on with Enter", async () => {
     const api = mockApi({ "GET identification/": page(), "POST identification/": savedDraft });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     const subject = await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ });
     await user.type(subject, "ملت");
     const suggestions = screen.getByRole("list", { name: /پیشنهاد از فهرست خدمت‌ها/ });
@@ -271,7 +271,7 @@ describe("IdentificationPage", () => {
 
   it("updates the sentence with every letter, highlights the current part and announces it politely", async () => {
     mockApi({ "GET identification/": page({ values: { ...blank, target: "1", subject: "ساتنا" } }) });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     const template = await screen.findByRole("region", { name: "الگوی ثبت سناریو" });
     expect(activeToken()).toHaveTextContent("ساتنا");
     await user.click(screen.getByRole("button", { name: /گام ۵: رویداد مشخص/ }));
@@ -291,7 +291,7 @@ describe("IdentificationPage", () => {
 
   it("jumps to any step, goes back and forth and ends with a review", async () => {
     mockApi({ "GET identification/": page({ values: answered }) });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     const nav = await screen.findByRole("navigation", { name: "گام‌های ثبت سناریو" });
     expect(within(nav).getByRole("button", { name: /گام ۲: هدف یا تعهد، پاسخ دارد/ })).toBeInTheDocument();
     await user.click(within(nav).getByRole("button", { name: /گام ۶/ }));
@@ -331,7 +331,7 @@ describe("IdentificationPage", () => {
 
   it("sends an unanswered submission to the first incomplete step", async () => {
     mockApi({ "GET identification/": page({ values: { ...answered, conditions: "", evidence: "فرض" } }) });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.click(await screen.findByRole("button", { name: /گام ۷: بازبینی/ }));
     expect(screen.getByRole("button", { name: "عامل و وضعیت" })).toBeInTheDocument(); // پرسش بی‌جواب در بازبینی
     await user.click(screen.getByRole("button", { name: "ارسال برای شناسایی" }));
@@ -351,7 +351,7 @@ describe("IdentificationPage", () => {
         },
       }),
     });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.click(await screen.findByRole("button", { name: /گام ۷: بازبینی/ }));
     await user.click(screen.getByRole("button", { name: "ارسال برای شناسایی" }));
     const dialog = await screen.findByRole("alertdialog");
@@ -379,7 +379,7 @@ describe("IdentificationPage", () => {
         errors: { subject: ["واحد مالک خدمت «ساتنا» (پرداخت) جزو واحدهایی نیست که برایشان ریسک شناسایی می‌کنید."] },
       }),
     });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.click(await screen.findByRole("button", { name: /گام ۷: بازبینی/ }));
     await user.click(screen.getByRole("button", { name: "ارسال برای شناسایی" }));
     await user.click(
@@ -401,7 +401,7 @@ describe("IdentificationPage", () => {
         }),
       }),
     });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.type(await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }), "پایا");
     await user.click(screen.getByRole("button", { name: /پایا/ }));
     await user.click(screen.getByRole("button", { name: "بعدی" }));
@@ -417,7 +417,7 @@ describe("IdentificationPage", () => {
         draft: { ...savedDraft.draft, attachments: [{ id: 3, name: "گزارش.pdf", size: 2048 }] },
       },
     });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.type(await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }), "فرآیند تازه");
     expect(screen.getByText("تغییر ذخیره‌نشده")).toBeInTheDocument();
     await user.keyboard("{Control>}s{/Control}");
@@ -428,7 +428,7 @@ describe("IdentificationPage", () => {
       draft: null,
       values: { org_unit: "", target: "", subject: "فرآیند تازه" },
     });
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/identification?draft=12"));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/identification/manual?draft=12"));
     expect(screen.queryByText("تغییر ذخیره‌نشده")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /گام ۷: بازبینی/ }));
@@ -447,7 +447,7 @@ describe("IdentificationPage", () => {
   it("keeps what was typed during a save marked unsaved, since the server never got it", async () => {
     const answer = deferred();
     const api = mockApi({ "GET identification/": page(), "POST identification/": answer.promise });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     const subject = await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ });
     await user.type(subject, "فرآیند");
     await user.keyboard("{Control>}s{/Control}");
@@ -461,7 +461,7 @@ describe("IdentificationPage", () => {
 
   it("refuses a file type the server would refuse", async () => {
     mockApi({ "GET identification/": page({ values: answered }) });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.click(await screen.findByRole("button", { name: /گام ۷: بازبینی/ }));
     const input = screen.getByLabelText(/پیوست فایل شاهد/);
     fireEvent.change(input, { target: { files: [new File(["x"], "اسکریپت.exe")] } });
@@ -470,7 +470,7 @@ describe("IdentificationPage", () => {
 
   it("asks before leaving with unsaved changes and warns the browser on unload", async () => {
     mockApi({ "GET identification/": page() });
-    const { user } = renderPage(<IdentificationPage />, {
+    const { user } = renderPage(<ManualIdentificationPage />, {
       ...options,
       routes: [{ path: "/risks/:id", element: <h1>پرونده‌ی ریسک</h1> }],
     });
@@ -484,13 +484,13 @@ describe("IdentificationPage", () => {
     await user.click(screen.getByRole("link", { name: "قطع درگاه پرداخت" }));
     const dialog = await screen.findByRole("alertdialog", { name: "تغییرات ذخیره نشده است" });
     await user.click(within(dialog).getByRole("button", { name: "ماندن در صفحه" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/identification");
+    expect(screen.getByTestId("location")).toHaveTextContent("/identification/manual");
     expect(screen.getByRole("textbox", { name: /موضوع بررسی کدام خدمت/ })).toHaveValue("ساتنا");
   });
 
   it("lets other roles see recent entries without the form", async () => {
     mockApi({ "GET identification/": page({ can_identify: false, choices: null }) });
-    renderPage(<IdentificationPage />, options);
+    renderPage(<ManualIdentificationPage />, options);
     expect(await screen.findByText("ثبت ورودی شناسایی با عضو GRC و مدیر سامانه است")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /پاسخ به پرسشنامه‌ها/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).not.toBeInTheDocument();
@@ -515,25 +515,25 @@ describe("IdentificationPage", () => {
             owner: null,
             due: null,
             href: null,
-            route: "/identification?draft=31",
+            route: "/identification/manual?draft=31",
           },
         ],
       }),
     });
-    const { user } = renderPage(<IdentificationPage />, options);
+    const { user } = renderPage(<ManualIdentificationPage />, options);
     await user.type(await screen.findByRole("textbox", { name: /موضوع بررسی کدام خدمت/ }), "سامانه‌ی پیامک");
     const recent = screen.getByRole("region", { name: "ورودی‌های اخیر شناسایی" });
     await user.click(within(recent).getByRole("link", { name: /توقف سامانه‌ی آزمون/ }));
     // نشانی فقط در ?draft= فرق دارد ولی فرم از نو ساخته می‌شود؛ نوشته‌ی ذخیره‌نشده بی‌هشدار از دست نمی‌رود.
     const dialog = await screen.findByRole("alertdialog", { name: "تغییرات ذخیره نشده است" });
     await user.click(within(dialog).getByRole("button", { name: "ماندن در صفحه" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/identification$/);
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/identification\/manual$/);
     expect(question(/موضوع بررسی کدام خدمت/)).toHaveValue("سامانه‌ی پیامک");
   });
 
   it("sends a unit manager to questionnaire answers", async () => {
     mockApi({ "GET identification/": page({ can_identify: false, can_answer: true, choices: null }) });
-    renderPage(<IdentificationPage />, options);
+    renderPage(<ManualIdentificationPage />, options);
     expect(await screen.findByText("ثبت و تکمیل ریسک در این صفحه با عضو GRC است")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /پاسخ به پرسشنامه‌ها/ })).toHaveAttribute("href", "/questionnaire-answers");
     expect(screen.queryByRole("region", { name: "پرسش‌های جلسه‌ی شناسایی" })).not.toBeInTheDocument();

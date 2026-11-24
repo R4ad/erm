@@ -18,8 +18,6 @@ import re
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.jalali import jalali_year
-from apps.core.services import next_code
 from apps.methodology.models import Scale
 from apps.methodology.services import active_version
 from apps.workcalendar.workdays import add_working_days
@@ -160,9 +158,7 @@ def submit_errors(values):
 
 
 def start_response(user, org_unit):
-    return Response.objects.create(
-        code=next_code(f"QR-{jalali_year(timezone.localdate())}"), org_unit=org_unit, respondent=user
-    )
+    return Response.objects.create(org_unit=org_unit, respondent=user)
 
 
 def save_values(response, values, step):
