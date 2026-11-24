@@ -18,13 +18,47 @@ const panel =
   "fixed left-1/2 top-1/2 z-50 grid w-[min(32rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] gap-4 overflow-y-auto rounded-2xl border border-line bg-elevated p-6 shadow-pop " +
   "-translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-fade-out data-[state=open]:animate-pop-in";
 
+const sectioned =
+  "fixed left-1/2 top-1/2 z-50 grid w-[min(40rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-modal border border-line bg-elevated shadow-pop " +
+  "-translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-fade-out data-[state=open]:animate-pop-in";
+
 interface DialogContentProps extends Omit<ComponentProps<typeof RadixDialog.Content>, "title"> {
   title: ReactNode;
   description?: ReactNode;
+  /** مودال فرم (مثل 12e): سربرگ با خط زیرین، بدنه‌ی پیمایش‌پذیر و این پانویس با زمینه‌ی subtle و خط بالایی. */
+  footer?: ReactNode;
 }
 
-export function DialogContent({ title, description, className, children, ...props }: DialogContentProps) {
+export function DialogContent({ title, description, footer, className, children, ...props }: DialogContentProps) {
   const focus = useReturnFocus();
+  if (footer !== undefined) {
+    return (
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className={overlay} />
+        <RadixDialog.Content className={cn(sectioned, className)} {...focus} {...props}>
+          <div className="flex items-start gap-4 border-b border-line px-6 pt-5 pb-4">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <RadixDialog.Title className="text-h2 font-bold text-ink">{title}</RadixDialog.Title>
+              {description ? (
+                <RadixDialog.Description className="text-sm leading-[1.375rem] text-ink-2">
+                  {description}
+                </RadixDialog.Description>
+              ) : null}
+            </div>
+            <RadixDialog.Close asChild>
+              <Button variant="ghost" size="icon-sm" aria-label={t("action.close")}>
+                <X />
+              </Button>
+            </RadixDialog.Close>
+          </div>
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 py-[1.125rem]">{children}</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line bg-subtle px-6 py-4">
+            {footer}
+          </div>
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
+    );
+  }
   return (
     <RadixDialog.Portal>
       <RadixDialog.Overlay className={overlay} />

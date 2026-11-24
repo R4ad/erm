@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquareText } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -23,6 +24,7 @@ import { EmptyCard, ErrorCard, IntroCard, ResultsCard, RunningCard, type RiskAct
 import { useDeferredApprovals } from "./approvals";
 import { CompareDialog, DecisionBar, ReanalyseButton, RejectDialog } from "./Decisions";
 import { EditRiskDrawer } from "./EditRiskDrawer";
+import { ReturnDialog } from "./ReturnDialog";
 
 // «بررسی یک پاسخنامه» (فریم‌های 12a تا 12c): سربرگ با پیوند بازگشت، ستون پاسخ‌ها در راست و ستون کناری ۴۵۲ پیکسلی
 // (پنل شناسایی هوشمند و تاریخچه) در چپ. وضعیت اجرای شناسایی تا وقتی در صف یا در حال اجراست هر ۱٫۵ ثانیه خوانده
@@ -154,6 +156,7 @@ export function ResponseReviewPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<ReviewRisk | null>(null);
   const [comparing, setComparing] = useState<{ risk: ReviewRisk; similarId: number } | null>(null);
+  const [returning, setReturning] = useState(false);
 
   if (detail.isPending) return <PageSkeleton />;
   if (detail.isError) return <ErrorState error={detail.error} retry={() => void detail.refetch()} />;
@@ -189,6 +192,19 @@ export function ResponseReviewPage() {
     />
   ) : undefined;
 
+  // تأییدهای در انتظار بازگردانی پیش از خواندن گزینه‌های 12e ثبت می‌شوند تا در یادداشت «حفظ می‌شود» بیایند و بایگانی نشوند.
+  async function openReturn() {
+    await approvals.flush();
+    setReturning(true);
+  }
+  const returnButton = (size: "sm" | "md") =>
+    data.can_review ? (
+      <Button variant="secondary" size={size} onClick={() => void openReturn()}>
+        <MessageSquareText aria-hidden />
+        بازگرداندن برای تکمیل
+      </Button>
+    ) : undefined;
+
   const side: ReactNode[] = [];
   if (run?.active) {
     side.push(
@@ -205,7 +221,7 @@ export function ResponseReviewPage() {
         />,
       );
     } else if (run?.status === "empty") {
-      side.push(<EmptyCard key="empty" data={data} />);
+      side.push(<EmptyCard key="empty" data={data} returnAction={returnButton("sm")} />);
     }
     if (shown && list.length > 0) {
       side.push(
@@ -249,6 +265,7 @@ export function ResponseReviewPage() {
           </div>
           {(data.next || data.can_review) && (
             <div className="flex flex-wrap items-center gap-2">
+              {returnButton("md")}
               {data.next ? (
                 <Link to={data.next.route} className={buttonClasses({ variant: "ghost" })}>
                   پاسخنامه‌ی بعدی
@@ -287,6 +304,7 @@ export function ResponseReviewPage() {
         }}
       />
       <CompareDialog target={comparing} onOpenChange={(open) => !open && setComparing(null)} />
+      {id && <ReturnDialog id={id} respondent={data.respondent.name} open={returning} onOpenChange={setReturning} />}
     </div>
   );
 }

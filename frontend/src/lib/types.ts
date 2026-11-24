@@ -3143,6 +3143,24 @@ export interface ReturnQuestion {
   about: string;
 }
 
+/** پرسش پیشنهادی AI در مودال 12e؛ ref شناسه‌ی ورودی LLM (مثل P1، I2، Q4) است و با پرسش برمی‌گردد. */
+export interface ReturnSuggestion extends ReturnQuestion {
+  ref: string;
+}
+
+/** گزینه‌های مودال «بازگرداندن پاسخنامه برای تکمیل» (12e). */
+export interface ReturnOptions {
+  respondent: Person;
+  suggestions: ReturnSuggestion[];
+  deadlines: { days: number; date: Day }[];
+  default_days: number;
+  /** کد ریسک‌های تأییدشده‌ی همین پاسخنامه که با بازگرداندن حفظ می‌شوند. */
+  approved: string[];
+  /** شمار پیش‌نویس‌های بررسی‌نشده که بایگانی می‌شوند. */
+  pending: number;
+  max_questions: number;
+}
+
 export interface AnswerResponse {
   id: number;
   code: string;

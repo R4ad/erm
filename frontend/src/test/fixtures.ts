@@ -40,6 +40,7 @@ import type {
   DecisionOptions,
   RiskComparison,
   ResponseReview,
+  ReturnOptions,
   ReviewHistoryEvent,
   ReviewRisk,
   ReviewRisks,
@@ -7101,6 +7102,47 @@ export function decisionOptions(): DecisionOptions {
 }
 
 /** «مقایسه با ریسک موجود» برای ریسک پیشنهادی ۵۰۱ و RK-1405-0047. */
+/** گزینه‌های مودال 12e، همان فریم: چهار پرسش AI، مهلت ۳ روز کاری تا ۱۴۰۵/۰۹/۱۰ و یک ریسک تأییدشده. */
+export function returnOptions(overrides: Partial<ReturnOptions> = {}): ReturnOptions {
+  const dates = ["2026-11-25", "2026-11-28", "2026-12-01", "2026-12-02", "2026-12-05"];
+  const jalali = ["1405/09/04", "1405/09/07", "1405/09/10", "1405/09/11", "1405/09/14"];
+  return {
+    respondent: { id: 7, name: "مریم صادقی" },
+    suggestions: [
+      {
+        text: "در مسیر تحقق ۱، سوئیچ به لینک پشتیبان اکنون چقدر طول می‌کشد و دستی انجام می‌شود یا خودکار؟",
+        ref: "P1",
+        about: "مسیر تحقق ۱",
+        step: 5,
+      },
+      {
+        text: "زیان مالی هر ساعت توقف پرداخت اینترنتی حدوداً چقدر است و جریمه‌ی توافق سطح خدمت چگونه محاسبه می‌شود؟",
+        ref: "I1",
+        about: "پیامد ۱ · مسیرهای ۱ و ۳",
+        step: 7,
+      },
+      {
+        text: "تصمیم ارتقای زیرساخت با کدام واحد بانک است و تأخیر در این تصمیم چه پیامدی برای خدمت دارد؟",
+        ref: "Q4",
+        about: "پرسش ۴",
+        step: 4,
+      },
+      {
+        text: "آیا برای اوج بار تراکنش در مناسبت‌ها آزمون بار انجام شده است؟ نتیجه‌ی آخرین آزمون چه بود؟",
+        ref: "P2",
+        about: "مسیر تحقق ۲",
+        step: 5,
+      },
+    ],
+    deadlines: dates.map((iso, index) => ({ days: index + 1, date: { iso, jalali: jalali[index] ?? "" } })),
+    default_days: 3,
+    approved: ["RK-1405-0061"],
+    pending: 1,
+    max_questions: 10,
+    ...overrides,
+  };
+}
+
 export function riskComparison(): RiskComparison {
   return {
     percent: 78,

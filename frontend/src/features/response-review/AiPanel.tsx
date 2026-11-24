@@ -304,10 +304,7 @@ function RiskCard({ data, risk, actions }: { data: ResponseReview; risk: ReviewR
       className="flex flex-col gap-3 rounded-item border-[1.5px] border-brand bg-panel px-4 py-3.5 shadow-card"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex h-[1.375rem] items-center gap-1 rounded-full bg-tangerine-subtle px-2 text-xs font-medium text-tangerine">
-          <Sparkles aria-hidden className="size-3.5" />
-          {risk.status.label}
-        </span>
+        <AiChip>{risk.status.label}</AiChip>
         {risk.confidence && (
           <span className="inline-flex items-center gap-1 text-xs text-ink-2">
             <ChartNoAxesColumnIncreasing aria-hidden strokeWidth={3} className="size-4 text-success" />
@@ -535,6 +532,16 @@ export function ResultsCard({
         با تصمیم درباره‌ی همه‌ی ریسک‌ها، پاسخنامه «شناسایی‌شده» می‌شود؛ اگر همه رد شوند، «بررسی‌شده».
       </p>
     </Card>
+  );
+}
+
+/** چیپ نارنجی «پیشنهاد AI» با sparkle (12c، 12d و 12e). */
+export function AiChip({ children = "پیشنهاد AI" }: { children?: ReactNode }) {
+  return (
+    <span className="inline-flex h-[1.375rem] items-center gap-1 rounded-full bg-tangerine-subtle px-2 text-xs font-medium text-tangerine">
+      <Sparkles aria-hidden className="size-3.5" />
+      {children}
+    </span>
   );
 }
 

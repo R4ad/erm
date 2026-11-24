@@ -84,6 +84,22 @@ test.describe("response review", () => {
     await expectAccessible(page);
   });
 
+  test("returns the response for completion with selected questions", async ({ page, api }) => {
+    api.on("POST questionnaire-responses/109/return/", { status: "returned", questions: 3 });
+    await page.goto("/app/identification/responses/109");
+    await page.getByRole("button", { name: "بازگرداندن برای تکمیل" }).click();
+    const dialog = page.getByRole("dialog", { name: "بازگرداندن پاسخنامه برای تکمیل" });
+    await expect(dialog.getByText("۴ از ۴ پرسش انتخاب شده")).toBeVisible();
+    await dialog.getByRole("checkbox").nth(3).uncheck();
+    await expect(dialog.getByRole("button", { name: "بازگرداندن با ۳ پرسش" })).toBeVisible();
+    await dialog.getByRole("button", { name: "افزودن پرسش دلخواه" }).click();
+    await expect(dialog.getByPlaceholder("پرسش خود را بنویسید")).toBeFocused();
+    await expectAccessible(page);
+    await dialog.getByRole("button", { name: "بازگرداندن با ۳ پرسش" }).click();
+    await expect(page.getByText("پاسخنامه برای تکمیل به مریم صادقی بازگردانده شد.", { exact: true })).toBeVisible();
+    expect(api.callsTo("POST questionnaire-responses/109/return/")[0]?.body).toMatchObject({ due_date: "2026-12-01" });
+  });
+
   test("shows the error state with its tracking code", async ({ page, api }) => {
     api.on("GET questionnaire-responses/109/risks/", empty);
     api.on(

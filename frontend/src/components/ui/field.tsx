@@ -172,21 +172,28 @@ function ChoiceLabel({ card, children }: { card: boolean; children: ReactNode })
   );
 }
 
+/** خود کادر انتخاب بی‌برچسب، برای ردیفی که برچسبش را با aria-labelledby می‌دهد و دکمه‌ی دیگری کنارش دارد (مثل 12e). */
+export function CheckboxControl({ className, ...props }: Omit<ComponentProps<"input">, "type">) {
+  return (
+    <span className="relative mt-[0.1875rem] inline-flex">
+      <input
+        type="checkbox"
+        className={cn(box, "rounded-sm checked:border-brand checked:bg-brand", className)}
+        {...props}
+      />
+      <Icon
+        name="check"
+        size={14}
+        className="pointer-events-none absolute inset-0 m-auto text-white opacity-0 transition-opacity peer-checked:opacity-100"
+      />
+    </span>
+  );
+}
+
 export function Checkbox({ label, description, card = false, className, ...props }: ChoiceProps) {
   return (
     <ChoiceLabel card={card}>
-      <span className="relative mt-[0.1875rem] inline-flex">
-        <input
-          type="checkbox"
-          className={cn(box, "rounded-sm checked:border-brand checked:bg-brand", className)}
-          {...props}
-        />
-        <Icon
-          name="check"
-          size={14}
-          className="pointer-events-none absolute inset-0 m-auto text-white opacity-0 transition-opacity peer-checked:opacity-100"
-        />
-      </span>
+      <CheckboxControl className={className} {...props} />
       <ChoiceText label={label} description={description} />
     </ChoiceLabel>
   );

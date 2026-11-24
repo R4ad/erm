@@ -306,16 +306,15 @@ def response_events(response):
     """ایجاد، ارسال، ارسال دوباره و بازگرداندن، از تاریخچه‌ی خود پاسخنامه."""
     events = []
     previous = None
-    submitted_before = False
     for record in response.history.order_by("history_date", "history_id").select_related("history_user"):
         actor = record.history_user or response.respondent
         if previous is None:
             events.append(event("پیش‌نویس ایجاد شد", record.history_date, actor))
         elif record.status != previous.status:
             if record.status == S.SUBMITTED:
-                text = "دوباره برای بررسی ارسال شد" if submitted_before else "برای بررسی ارسال شد"
+                again = previous.status == S.RETURNED
+                text = "دوباره برای بررسی ارسال شد" if again else "برای بررسی ارسال شد"
                 events.append(event(text, record.history_date, actor, "info"))
-                submitted_before = True
             elif record.status == S.RETURNED:
                 count = len(record.return_questions or [])
                 text = f"برای تکمیل بازگردانده شد · {str(count).translate(FA_DIGITS)} پرسش"

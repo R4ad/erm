@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Check, Lock, Pencil, Sparkles } from "lucide-react";
+import { ArrowUp, Check, Lock, Pencil } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { useToast } from "@/components/ui/toast";
 import { ApiError, errorMessage, get, patch } from "@/lib/api";
 import { fa } from "@/lib/format";
 import type { DecisionOptions, ResponseReview, ReviewRisk, ReviewRiskChanges, ReviewRiskTexts } from "@/lib/types";
+
+import { AiChip } from "./AiPanel";
 
 // «پنل ویرایش ریسک پیشنهادی» (فریم 12d): کشوی ۵۲۰ پیکسلی از سمت پایان خط (چپ). هر متنی که با پیشنهاد AI فرق دارد
 // راهنمای نارنجی «ویرایش‌شده · پیشنهاد AI: «…»» و پیوند «بازگرداندن پیشنهاد AI» می‌گیرد. دسته اختیاری است (تصمیم ۵) و
@@ -230,18 +232,7 @@ function EditForm({
           <span>{`نوع: ${risk.impact_type} · دامنه: ${risk.impact_scope}`}</span>,
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="دسته‌ی ریسک"
-            error={errors.category}
-            aside={
-              chosenCategory ? (
-                <span className="inline-flex h-[1.375rem] items-center gap-1 rounded-full bg-tangerine-subtle px-2 text-xs font-medium text-tangerine">
-                  <Sparkles aria-hidden className="size-3.5" />
-                  پیشنهاد AI
-                </span>
-              ) : undefined
-            }
-          >
+          <Field label="دسته‌ی ریسک" error={errors.category} aside={chosenCategory ? <AiChip /> : undefined}>
             <Select
               value={values.category ?? ""}
               onChange={(event) => set("category", optionalId(event.target.value))}
@@ -348,12 +339,7 @@ export function EditRiskDrawer({
           description="تغییرات شما در تاریخچه‌ی ریسک ثبت می‌شود و مقدار پیشنهادی AI هر زمان قابل بازگردانی است."
           side="end"
           size="panel"
-          chip={
-            <span className="inline-flex h-[1.375rem] items-center gap-1 rounded-full bg-tangerine-subtle px-2 text-xs font-medium text-tangerine">
-              <Sparkles aria-hidden className="size-3.5" />
-              پیش‌نویس AI
-            </span>
-          }
+          chip={<AiChip>پیش‌نویس AI</AiChip>}
         >
           <EditForm key={risk.id} data={data} risk={risk} onApprove={onApprove} onClose={() => onOpenChange(false)} />
         </DrawerContent>

@@ -28,6 +28,7 @@ from apps.questionnaires.answers import (
 )
 from apps.questionnaires.models import Response, ServiceRecord
 from apps.questionnaires.permissions import visible_responses
+from apps.questionnaires.returning import identify_resubmitted
 from apps.risks.identification import answer_unit, can_answer, managed_units
 
 from . import formatting as fmt
@@ -167,9 +168,13 @@ class QuestionnaireAnswersView(ApiView):
                 return ApiResponse({"message": message, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
             if response is None:
                 response = start_response(user, unit)
+            resubmitted = submit and response.status == Response.Status.RETURNED
             save_values(response, values, body.get("step"))
             if submit:
                 submit_response(response)
+            if resubmitted:
+                # پاسخنامه‌ی بازگشتی با ارسال دوباره خودکار شناسایی می‌شود (فقط پیامدهای بی‌ریسک تأییدشده).
+                identify_resubmitted(response, user)
         data = {"response": response_payload(response), "recent": recent_rows(user)}
         if submit:
             return ApiResponse(
