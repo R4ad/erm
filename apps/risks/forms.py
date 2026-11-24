@@ -422,7 +422,10 @@ class RiskFilterForm(BootstrapFormMixin, forms.Form):
         data = self.cleaned_data
         for word in data["q"].split():
             risks = risks.filter(Q(code__icontains=word) | Q(title__icontains=word) | Q(description__icontains=word))
-        if data["status"]:
+        if data["status"] == Risk.Status.REGISTERED:
+            # مثل شمار نوار وضعیت رجیستر: «ثبت‌شده» ریسک‌های «آنالیز ریسک» و «ارسال‌شده» را هم دارد.
+            risks = risks.filter(status__in=Risk.REGISTER_STATUSES)
+        elif data["status"]:
             risks = risks.filter(status=data["status"])
         if data["level"]:
             # سطح فعلی ریسک: سطح تصمیم آخرین ارزیابی جاری تأییدشده.

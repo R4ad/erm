@@ -37,6 +37,8 @@ import type {
   IdentificationSources,
   QuestionnaireResponsesPage,
   AiRunState,
+  DecisionOptions,
+  RiskComparison,
   ResponseReview,
   ReviewHistoryEvent,
   ReviewRisk,
@@ -7060,11 +7062,68 @@ export function reviewRisk(overrides: Partial<ReviewRisk> = {}): ReviewRisk {
       { id: 47, code: "RK-1405-0047", title: "قطع درگاه پرداخت بر اثر خرابی لینک", percent: 78, route: "/risks/47" },
     ],
     edited: false,
+    suggested: {
+      title: "توقف پرداخت اینترنتی بر اثر قطع ارتباط با شاپرک",
+      initiating_factor: "وابستگی کامل ارتباط با شاپرک به یک دیتاسنتر و یک لینک اصلی",
+      target_event: "توقف کامل پردازش تراکنش‌های پرداخت اینترنتی",
+      impact: "دسترسی‌نداشتن مشتریان به پرداخت، جریمه‌ی توافق سطح خدمت و آسیب به اعتبار",
+      paths: [
+        { number: 1, text: "قطعی لینک اصلی و سوئیچ‌نشدن خودکار به لینک پشتیبان" },
+        { number: 3, text: "خرابی تجهیزات شبکه‌ی دیتاسنتر و نبود افزونگی" },
+      ],
+    },
     risk: null,
     decided_by: null,
     decided_at: null,
     dismiss_reason: "",
     ...overrides,
+  };
+}
+
+/** گزینه‌های فرم 12d: دسته‌ها، واحدها با مدیر پیش‌فرض و کاربران. */
+export function decisionOptions(): DecisionOptions {
+  return {
+    categories: [
+      { id: 1, name: "فناوری اطلاعات" },
+      { id: 2, name: "عملیاتی" },
+    ],
+    units: [
+      { id: 4, name: "پرداخت الکترونیک", owner: 7 },
+      { id: 5, name: "زیرساخت", owner: 9 },
+    ],
+    people: [
+      { id: 3, name: "سارا محمدی" },
+      { id: 7, name: "مریم صادقی" },
+      { id: 9, name: "علی رضایی" },
+    ],
+    respondent_unit: 4,
+  };
+}
+
+/** «مقایسه با ریسک موجود» برای ریسک پیشنهادی ۵۰۱ و RK-1405-0047. */
+export function riskComparison(): RiskComparison {
+  return {
+    percent: 78,
+    suggested: {
+      title: "توقف پرداخت اینترنتی بر اثر قطع ارتباط با شاپرک",
+      initiating_factor: "وابستگی کامل ارتباط با شاپرک به یک دیتاسنتر و یک لینک اصلی",
+      paths: ["قطعی لینک اصلی و سوئیچ‌نشدن خودکار به لینک پشتیبان", "خرابی تجهیزات شبکه‌ی دیتاسنتر و نبود افزونگی"],
+      target_event: "توقف کامل پردازش تراکنش‌های پرداخت اینترنتی",
+      impact: "دسترسی‌نداشتن مشتریان به پرداخت، جریمه‌ی توافق سطح خدمت و آسیب به اعتبار",
+      category: "فناوری اطلاعات",
+    },
+    existing: {
+      id: 47,
+      code: "RK-1405-0047",
+      route: "/risks/47",
+      status: { value: "assessment", label: "در ارزیابی" },
+      title: "قطع درگاه پرداخت بر اثر خرابی لینک",
+      initiating_factor: "",
+      paths: ["خرابی لینک ارتباطی اصلی"],
+      target_event: "قطع درگاه پرداخت",
+      impact: "تراکنش‌های ناموفق",
+      category: "فناوری اطلاعات",
+    },
   };
 }
 

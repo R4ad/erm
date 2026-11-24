@@ -38,6 +38,52 @@ test.describe("response review", () => {
     await expectAccessible(page);
   });
 
+  test("approves with undo, rejects with a reason and edits in the drawer", async ({ page, api }) => {
+    api.on("POST pending-risks/501/reject/", data.reviewRisk());
+    api.on("PATCH pending-risks/501/", data.reviewRisk());
+    await page.goto("/app/identification/responses/109");
+    const card = page.getByRole("article", { name: "توقف پرداخت اینترنتی بر اثر قطع ارتباط با شاپرک" });
+    await expect(card).toBeVisible();
+
+    await card.getByRole("button", { name: "تأیید و ارسال به آنالیز" }).click();
+    await expect(page.getByText("ریسک تأیید شد و به آنالیز ریسک رفت", { exact: true })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole("button", { name: "بازگردانی" }).click();
+    await expect(page.getByText("تأیید ریسک بازگردانده شد.", { exact: true })).toBeVisible();
+    await expect(card).toBeVisible();
+    expect(api.callsTo("POST pending-risks/501/approve/")).toHaveLength(0);
+
+    await card.getByRole("button", { name: "ویرایش" }).click();
+    const drawer = page.getByRole("dialog", { name: "ویرایش ریسک پیشنهادی" });
+    await expect(drawer).toBeVisible();
+    await drawer
+      .getByRole("textbox", { name: /^عنوان ریسک/ })
+      .fill("توقف پرداخت اینترنتی بر اثر قطع ارتباط با شاپرک و دیتاسنتر");
+    await expect(drawer.getByRole("button", { name: "بازگرداندن پیشنهاد AI" })).toBeVisible();
+    await expectAccessible(page);
+    await drawer.getByRole("button", { name: "ذخیره‌ی پیش‌نویس" }).click();
+    await expect(page.getByText("تغییرات ریسک پیشنهادی ذخیره شد.", { exact: true })).toBeVisible();
+    await expect(drawer).toBeHidden();
+
+    await card.getByRole("button", { name: "رد" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "رد ریسک پیشنهادی" });
+    await dialog.getByRole("button", { name: "رد ریسک" }).click();
+    await expect(dialog.getByText("دلیل رد را بنویسید.")).toBeVisible();
+    await expectAccessible(page);
+    await dialog.getByRole("textbox").fill("تکراری");
+    await dialog.getByRole("button", { name: "رد ریسک" }).click();
+    await expect(page.getByText("ریسک پیشنهادی رد شد.", { exact: true })).toBeVisible();
+  });
+
+  test("compares with the existing risk", async ({ page }) => {
+    await page.goto("/app/identification/responses/109");
+    await page.getByRole("button", { name: "مقایسه با ریسک موجود" }).click();
+    const dialog = page.getByRole("dialog", { name: "مقایسه با ریسک موجود" });
+    await expect(dialog.getByRole("table")).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "مشاهده‌ی ریسک" })).toBeVisible();
+    await expectAccessible(page);
+  });
+
   test("shows the error state with its tracking code", async ({ page, api }) => {
     api.on("GET questionnaire-responses/109/risks/", empty);
     api.on(

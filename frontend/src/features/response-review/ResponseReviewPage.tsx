@@ -14,11 +14,15 @@ import { errorMessage, get, post } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { ago } from "@/lib/format";
 import { useNow, useTitle } from "@/lib/hooks";
-import type { AiRunState, ResponseReview, ReviewHistoryEvent, ReviewRisks } from "@/lib/types";
+import type { AiRunState, ResponseReview, ReviewHistoryEvent, ReviewRisk, ReviewRisks } from "@/lib/types";
+import { useSession } from "@/features/session/session";
 
 import { AnswersCard } from "./AnswersCard";
-import { serviceTitle } from "./review";
-import { EmptyCard, ErrorCard, IntroCard, ResultsCard, RunningCard } from "./AiPanel";
+import { serviceTitle, withApprovals } from "./review";
+import { EmptyCard, ErrorCard, IntroCard, ResultsCard, RunningCard, type RiskActions } from "./AiPanel";
+import { useDeferredApprovals } from "./approvals";
+import { CompareDialog, DecisionBar, ReanalyseButton, RejectDialog } from "./Decisions";
+import { EditRiskDrawer } from "./EditRiskDrawer";
 
 // «بررسی یک پاسخنامه» (فریم‌های 12a تا 12c): سربرگ با پیوند بازگشت، ستون پاسخ‌ها در راست و ستون کناری ۴۵۲ پیکسلی
 // (پنل شناسایی هوشمند و تاریخچه) در چپ. وضعیت اجرای شناسایی تا وقتی در صف یا در حال اجراست هر ۱٫۵ ثانیه خوانده
@@ -145,14 +149,45 @@ export function ResponseReviewPage() {
   });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { user } = useSession();
+  const approvals = useDeferredApprovals(id);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [rejecting, setRejecting] = useState<ReviewRisk | null>(null);
+  const [comparing, setComparing] = useState<{ risk: ReviewRisk; similarId: number } | null>(null);
 
   if (detail.isPending) return <PageSkeleton />;
   if (detail.isError) return <ErrorState error={detail.error} retry={() => void detail.refetch()} />;
   if (!data) return null;
 
-  const list = risks.data?.risks ?? [];
+  const shown = risks.data && withApprovals(risks.data, approvals.approving, user);
+  const list = shown?.risks ?? [];
   const pending = list.filter((risk) => risk.status.value === "pending");
   const selected = pending.find((risk) => risk.id === selectedId) ?? pending[0] ?? null;
+  const editing = pending.find((risk) => risk.id === editingId) ?? null;
+
+  const actions: RiskActions = {
+    compare: (risk) => risk.similar[0] && setComparing({ risk, similarId: risk.similar[0].id }),
+    render: data.can_review
+      ? (risk) => (
+          <DecisionBar
+            onApprove={() => approvals.approve(risk.id)}
+            onEdit={() => setEditingId(risk.id)}
+            onReject={() => setRejecting(risk)}
+          />
+        )
+      : undefined,
+  };
+  const reanalyse = data.can_review ? (
+    <ReanalyseButton
+      pending={shown?.counts.pending ?? 0}
+      starting={start.isPending}
+      onConfirm={async () => {
+        // تأییدهای ۱۰ ثانیه‌ی بازگردانی پیش از بایگانی پیش‌نویس‌ها ثبت می‌شوند تا با آن‌ها بایگانی نشوند.
+        await approvals.flush();
+        await start.mutateAsync().catch(() => undefined);
+      }}
+    />
+  ) : undefined;
 
   const side: ReactNode[] = [];
   if (run?.active) {
@@ -172,17 +207,19 @@ export function ResponseReviewPage() {
     } else if (run?.status === "empty") {
       side.push(<EmptyCard key="empty" data={data} />);
     }
-    if (risks.data && list.length > 0) {
+    if (shown && list.length > 0) {
       side.push(
         <ResultsCard
           key="results"
           data={data}
-          risks={risks.data}
+          risks={shown}
           selectedId={selected?.id ?? null}
           onSelect={setSelectedId}
+          actions={actions}
+          reanalyse={reanalyse}
         />,
       );
-    } else if (risks.data && side.length === 0 && data.can_review) {
+    } else if (shown && side.length === 0 && data.can_review) {
       side.push(<IntroCard key="intro" data={data} onStart={() => start.mutate()} starting={start.isPending} />);
     }
   }
@@ -234,6 +271,22 @@ export function ResponseReviewPage() {
           <HistoryCard events={history.data?.events} />
         </aside>
       </div>
+      <EditRiskDrawer
+        data={data}
+        risk={editing}
+        onOpenChange={(open) => !open && setEditingId(null)}
+        onApprove={approvals.approve}
+      />
+      <RejectDialog
+        risk={rejecting}
+        onOpenChange={(open) => !open && setRejecting(null)}
+        onRejected={() => {
+          setRejecting(null);
+          toast({ title: "ریسک پیشنهادی رد شد.", tone: "success" });
+          void queryClient.invalidateQueries({ queryKey: ["response-review", id] });
+        }}
+      />
+      <CompareDialog target={comparing} onOpenChange={(open) => !open && setComparing(null)} />
     </div>
   );
 }

@@ -64,7 +64,8 @@ def current_levels(risks):
     return {risk_id: levels.get(level_id) for risk_id, level_id in level_ids.items()}
 
 
-# نوار وضعیت بالای رجیستر فیگما، به ترتیب گردش کار. «ارسال‌شده» در فیگما جدا نیست و با «ثبت‌شده» شمرده می‌شود.
+# نوار وضعیت بالای رجیستر فیگما، به ترتیب گردش کار. «ارسال‌شده» و «آنالیز ریسک» در فیگما جدا نیستند و با «ثبت‌شده»
+# شمرده می‌شوند.
 PIPELINE = [
     (Risk.Status.QUESTIONS, "در پاسخ به پرسش‌ها", "question"),
     (Risk.Status.REGISTERED, "ثبت‌شده در رجیستر", "list"),
@@ -95,11 +96,11 @@ def next_action(risk, draft, plan, overdue):
         return None
     if unowned(risk):
         return {"label": "بدون مالک فعال", "icon": "user", "tone": "danger", "href": url}
-    if risk.needs_completion and risk.status in (S.REGISTERED, S.SUBMITTED, S.ASSESSMENT):
+    if risk.needs_completion and risk.status in (*Risk.REGISTER_STATUSES, S.ASSESSMENT):
         return {"label": "تکمیل اطلاعات ریسک", "icon": "pencil", "tone": "warning", "href": url}
     if risk.status == S.QUESTIONS:
         return {"label": "منتظر پاسخ پرسش‌ها", "icon": "chat", "tone": "neutral", "href": url + "#workflow"}
-    if risk.status in (S.REGISTERED, S.SUBMITTED):
+    if risk.status in Risk.REGISTER_STATUSES:
         return {"label": "ارسال جهت ارزیابی", "icon": "flow", "tone": "neutral", "href": url + "#workflow"}
     if risk.status == S.ASSESSMENT:
         if draft is None:
@@ -201,9 +202,7 @@ def register_counts(user):
     """شمار نوار وضعیت و زبانه‌های رجیستر، روی همه‌ی ریسک‌هایی که کاربر می‌بیند و بدون فیلترهای دیگر."""
     visible = visible_risks(user)
     by_status = dict(visible.values_list("status").annotate(total=Count("pk")))
-    by_status[Risk.Status.REGISTERED] = by_status.get(Risk.Status.REGISTERED, 0) + by_status.get(
-        Risk.Status.SUBMITTED, 0
-    )
+    by_status[Risk.Status.REGISTERED] = sum(by_status.get(status, 0) for status in Risk.REGISTER_STATUSES)
     active = visible.exclude(status__in=Risk.CLOSED_STATUSES)
     return {
         "pipeline": [
@@ -330,7 +329,7 @@ class RiskBulkTransitionView(ApiView):
         ids = [int(pk) for pk in request.data.get("ids", []) if str(pk).isdigit()]
         done, failed = [], []
         for risk in visible_risks(request.user).filter(pk__in=ids).order_by("code"):
-            if risk.status != transition.source:
+            if not transition.starts_from(risk.status):
                 failed.append({"code": risk.code, "problems": [f"وضعیت «{risk.get_status_display()}» است."]})
                 continue
             try:

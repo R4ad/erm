@@ -30,6 +30,8 @@ export function useFieldControl(props: { id?: string; "aria-describedby"?: strin
 
 interface FieldProps {
   label: ReactNode;
+  /** کنار برچسب در سمت پایان خط، بیرون از label: پیوند یا شمار (مثل «بازگرداندن پیشنهاد AI» در 12d). */
+  aside?: ReactNode;
   hint?: ReactNode;
   error?: string | string[];
   required?: boolean;
@@ -40,7 +42,7 @@ interface FieldProps {
 }
 
 // «Form Field» فیگما: برچسب همیشه دیده می‌شود (۱۳ Medium) و ستاره‌ی قرمز برای الزامی؛ راهنما و خطا زیر همان فیلد.
-export function Field({ label, hint, error, required = false, className, id, children }: FieldProps) {
+export function Field({ label, aside, hint, error, required = false, className, id, children }: FieldProps) {
   const generated = useId();
   const controlId = id ?? `field${generated}`;
   const messages = Array.isArray(error) ? error : error ? [error] : [];
@@ -51,10 +53,20 @@ export function Field({ label, hint, error, required = false, className, id, chi
   return (
     <FieldContext.Provider value={{ id: controlId, describedBy, invalid: messages.length > 0, required }}>
       <div className={cn("flex flex-col gap-1.5", className)}>
-        <label htmlFor={controlId} className="flex items-center gap-1 text-sm font-medium text-ink">
-          {label}
-          {required && <RequiredMark />}
-        </label>
+        {aside ? (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <label htmlFor={controlId} className="flex items-center gap-1 text-sm font-medium text-ink">
+              {label}
+              {required && <RequiredMark />}
+            </label>
+            {aside}
+          </div>
+        ) : (
+          <label htmlFor={controlId} className="flex items-center gap-1 text-sm font-medium text-ink">
+            {label}
+            {required && <RequiredMark />}
+          </label>
+        )}
         {children}
         {hint && !messages.length && (
           <p id={hintId} className="text-xs text-ink-3">

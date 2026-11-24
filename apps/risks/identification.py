@@ -304,7 +304,7 @@ def save_draft(form, draft=None, upload=None, remove=()):
 
 @transaction.atomic
 def submit_identification(form, draft=None, upload=None, remove=()):
-    """ریسک را از فرم شناسایی می‌سازد: «ثبت‌شده در رجیستر» با مالک واحد، سناریوی پیوندشده یا «مورد جدید»، و
+    """ریسک را از فرم شناسایی می‌سازد: «آنالیز ریسک» با مالک واحد، سناریوی پیوندشده یا «مورد جدید»، و
     شواهد انتخاب‌شده. دسته اگر نیامده باشد از سناریوی پیوندشده می‌آید وگرنه خالی می‌ماند تا عضو GRC تعیینش کند.
     فایل‌های شاهد پیش‌نویس و فایل تازه پیوست ریسک می‌شوند و پیش‌نویس با ارسال پاک می‌شود."""
     data = form.cleaned_data
@@ -323,7 +323,7 @@ def submit_identification(form, draft=None, upload=None, remove=()):
         source=data.get("source") or "",
         scope=intake["subject"],
         intake=intake,
-        status=Risk.Status.REGISTERED,
+        status=Risk.Status.ANALYSIS,
     )
     if scenario:
         risk.scenario = scenario

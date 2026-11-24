@@ -3303,10 +3303,52 @@ export interface ReviewRisk {
   source: { paths: number[]; event: number | null; impact: number | null };
   similar: { id: number; code: string; title: string; percent: number; route: string }[];
   edited: boolean;
+  /** مقدارهای پیشنهادی AI برای «بازگرداندن پیشنهاد AI» در 12d؛ null برای پیش‌نویسی که از AI نیامده است. */
+  suggested: ReviewRiskTexts | null;
+  /** null تا وقتی تأیید در ۱۰ ثانیه‌ی بازگردانی است و ریسک هنوز ساخته نشده. */
   risk: { code: string; route: string } | null;
   decided_by: Person | null;
   decided_at: Moment | null;
   dismiss_reason: string;
+}
+
+/** متن‌های قابل ویرایش ریسک پیشنهادی در فرم 12d. */
+export interface ReviewRiskTexts {
+  title: string;
+  initiating_factor: string;
+  target_event: string;
+  impact: string;
+  paths: { number: number; text: string }[];
+}
+
+/** بدنه‌ی «ذخیره‌ی پیش‌نویس» و «ذخیره و تأیید». */
+export interface ReviewRiskChanges extends ReviewRiskTexts {
+  category: number | null;
+  owner_unit: number | null;
+  owner: number | null;
+}
+
+export interface DecisionOptions {
+  categories: { id: number; name: string }[];
+  /** owner مدیر پیش‌فرض واحد برای «مالک ریسک (شخص)». */
+  units: { id: number; name: string; owner: number | null }[];
+  people: Person[];
+  respondent_unit: number;
+}
+
+export interface RiskComparisonSide {
+  title: string;
+  initiating_factor: string;
+  paths: string[];
+  target_event: string;
+  impact: string;
+  category: string;
+}
+
+export interface RiskComparison {
+  percent: number;
+  suggested: RiskComparisonSide;
+  existing: RiskComparisonSide & { id: number; code: string; route: string; status: { value: string; label: string } };
 }
 
 export interface ReviewRisks {

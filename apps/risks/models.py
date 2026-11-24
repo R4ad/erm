@@ -244,8 +244,11 @@ class Risk(TimeStampedModel):
 
     class Status(models.TextChoices):
         # چرخه‌ی عمر ریسک، به ترتیب جدول جواب س۱۵. انتقال‌ها و انجام‌دهنده‌ی هر کدام در قدم ۱۴ ساخته می‌شود.
-        # ریسک با «ثبت‌شده در رجیستر» به دنیا می‌آید؛ «در پاسخ به پرسش‌ها» وقتی است که برای ارزیابی پرسش تازه‌ای لازم شود.
+        # ریسک تازه با «آنالیز ریسک» به دنیا می‌آید (پاسخنامه، شناسایی دستی و هر ثبت دیگر) و مثل «ثبت‌شده در رجیستر» با
+        # «ارسال جهت ارزیابی» به ارزیابی می‌رود. «ثبت‌شده در رجیستر» برای ریسک‌های قبلی، «برگشت به رجیستر» و تفکیک می‌ماند.
+        # «در پاسخ به پرسش‌ها» وقتی است که برای ارزیابی پرسش تازه‌ای لازم شود.
         QUESTIONS = "questions", "در پاسخ به پرسش‌ها"
+        ANALYSIS = "analysis", "آنالیز ریسک"
         REGISTERED = "registered", "ثبت‌شده در رجیستر"
         SUBMITTED = "submitted", "ارسال‌شده"
         ASSESSMENT = "assessment", "در ارزیابی"
@@ -276,6 +279,8 @@ class Risk(TimeStampedModel):
 
     # ریسک ردشده یا بسته‌شده فقط سابقه است.
     CLOSED_STATUSES = [Status.REJECTED, Status.CLOSED]
+    # وضعیت‌هایی که پیش از ارزیابی‌اند و با «ارسال جهت ارزیابی» جلو می‌روند.
+    REGISTER_STATUSES = [Status.ANALYSIS, Status.REGISTERED, Status.SUBMITTED]
 
     code = models.CharField("کد", max_length=20, unique=True, editable=False)
     scenario = models.ForeignKey(
@@ -352,7 +357,7 @@ class Risk(TimeStampedModel):
     source = models.CharField("منبع شناسایی", max_length=20, choices=Source.choices, blank=True)
     # جواب‌های فرم شناسایی (فیگما ۱۱): مأموریت، اجزای الگوی سناریو، پیامد، وابستگی و شاهد، همان‌طور که واحد نوشت.
     intake = models.JSONField("ورودی شناسایی", default=dict, blank=True)
-    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.REGISTERED, editable=False)
+    status = models.CharField("وضعیت", max_length=20, choices=Status.choices, default=Status.ANALYSIS, editable=False)
     needs_completion = models.BooleanField(
         "نیازمند تکمیل",
         default=True,

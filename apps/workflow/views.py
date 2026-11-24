@@ -51,10 +51,10 @@ class TransitionView(RiskActionMixin, FormView):
         risk, transition = self.risk, self.transition
         if not can_perform(request.user, transition):
             raise PermissionDenied
-        if risk.status != transition.source:
+        if not transition.starts_from(risk.status):
             messages.error(
                 request,
-                f"«{transition.label}» از وضعیت «{Risk.Status(transition.source).label}» است و ریسک {risk.code} "
+                f"«{transition.label}» از وضعیت {transition.source_label} است و ریسک {risk.code} "
                 f"الان «{risk.get_status_display()}» است.",
             )
             return redirect(risk.get_absolute_url())

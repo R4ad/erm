@@ -44,6 +44,7 @@ SHORT_SOURCE = {Risk.Source.PERIODIC: "ارزیابی دوره‌ای"}
 # ریسک نیست (IdentificationDraft)؛ بقیه وضعیت ریسک‌اند.
 DRAFT_STAGE = {"value": "draft", "label": "پیش‌نویس"}
 STAGES = {
+    S.ANALYSIS: ("identified", "شناسایی‌شده", "info"),
     S.REGISTERED: ("identified", "شناسایی‌شده", "info"),
     S.QUESTIONS: ("returned", "بازگشت برای تکمیل", "warning"),
     S.SUBMITTED: ("assessment", "در ارزیابی", "brand"),

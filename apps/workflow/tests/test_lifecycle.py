@@ -115,6 +115,28 @@ def test_sending_for_assessment_needs_what_makes_a_scenario_assessable(client, g
     assert ready.history.first().history_user == grc
 
 
+def test_new_risks_start_in_analysis_and_go_to_assessment_like_registered_ones(client, grc, owner):
+    """ریسک تازه «آنالیز ریسک» است و ردیف ۳ («ارسال جهت ارزیابی») از آن هم شروع می‌شود، با همان شرط‌ها."""
+    unit = OrgUnit.objects.create(name="واحد تازه")
+    assert Risk.objects.create(title="تازه", description="—", channel=Risk.Channel.INTERVIEW, org_unit=unit).status == (
+        S.ANALYSIS
+    )
+    transition = get_transition("send_to_assessment")
+    assert transition.sources == (S.REGISTERED, S.ANALYSIS)
+    assert transition.source_label == "«ثبت‌شده در رجیستر» یا «آنالیز ریسک»"
+
+    risk = make_risk(owner=owner, ready=True, status=S.ANALYSIS)
+    client.force_login(grc)
+    client.post(transition_url(risk, "send_to_assessment"), {"reason": "فرض: درگاه پشتیبان جایگزین نمی‌شود."})
+    risk.refresh_from_db()
+    assert risk.status == S.ASSESSMENT
+    record = StatusTransition.objects.get()
+    assert (record.from_status, record.to_status) == (S.ANALYSIS, S.ASSESSMENT)
+
+    page = client.get(transition_url(make_risk("در ارزیابی", owner=owner, status=S.TREATMENT), "send_to_assessment"))
+    assert page.status_code == 302
+
+
 def test_the_category_is_needed_before_assessment(client, grc, owner):
     """فرم شناسایی دسته نمی‌گیرد؛ ریسک بی‌دسته در رجیستر می‌ماند تا عضو GRC دسته را تعیین کند و بعد ارزیابی شود."""
     risk = make_risk(owner=owner, ready=True)

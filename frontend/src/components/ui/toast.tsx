@@ -1,6 +1,6 @@
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import { Toast } from "radix-ui";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import { locale, t } from "@/lib/i18n";
@@ -22,9 +22,15 @@ interface ToastMessage {
   action?: ToastAction;
   /** میلی‌ثانیه؛ پیش‌فرض ۶ ثانیه. */
   duration?: number;
+  /**
+   * وقتی پیام بی‌آن‌که دکمه‌اش زده شود بسته می‌شود: پایان زمان، دکمه‌ی بستن، کشیدن یا جا دادن به پیام تازه‌تر. تأیید
+   * با «بازگردانی» با همین فرستاده می‌شود. بستن با تابعی که notify برمی‌گرداند این را صدا نمی‌زند.
+   */
+  onDismiss?: () => void;
 }
 
-type Notify = (message: Omit<ToastMessage, "id" | "tone"> & { tone?: ToastTone }) => void;
+/** پیام را نشان می‌دهد و تابعی برمی‌گرداند که آن را بی‌صدا زدن onDismiss می‌بندد. */
+type Notify = (message: Omit<ToastMessage, "id" | "tone"> & { tone?: ToastTone }) => () => void;
 
 const ToastContext = createContext<Notify | null>(null);
 
@@ -46,14 +52,36 @@ let nextId = 1;
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
+  // پیام‌هایی که کارشان تمام شده (دکمه زده شد، بسته شد یا بی‌صدا بسته شد) تا onDismiss فقط یک بار صدا زده شود.
+  const settled = useRef(new Set<number>());
+  const shown = useRef<ToastMessage[]>([]);
 
-  const notify: Notify = (message) => {
-    setMessages((current) => [...current.slice(-2), { tone: "success", ...message, id: nextId++ }]);
-  };
+  function show(next: ToastMessage[]) {
+    shown.current = next;
+    setMessages(next);
+  }
+
+  function dismissed(message: ToastMessage) {
+    if (settled.current.has(message.id)) return;
+    settled.current.add(message.id);
+    message.onDismiss?.();
+  }
 
   function remove(id: number) {
-    setMessages((current) => current.filter((message) => message.id !== id));
+    show(shown.current.filter((message) => message.id !== id));
   }
+
+  const notify: Notify = (message) => {
+    const id = nextId++;
+    const current = shown.current;
+    const evicted = current.slice(0, Math.max(0, current.length - 2));
+    show([...current.slice(-2), { tone: "success", ...message, id }]);
+    evicted.forEach(dismissed);
+    return () => {
+      settled.current.add(id);
+      remove(id);
+    };
+  };
 
   return (
     <ToastContext.Provider value={notify}>
@@ -66,7 +94,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={message.id}
               type={message.tone === "danger" ? "foreground" : "background"}
               duration={message.duration}
-              onOpenChange={(open) => !open && remove(message.id)}
+              onOpenChange={(open) => {
+                if (open) return;
+                dismissed(message);
+                remove(message.id);
+              }}
               className={cn(
                 "group pointer-events-auto relative flex w-full items-center gap-3 rounded-item bg-ink py-3 ps-3 pe-3.5 text-on-dark shadow-pop",
                 "data-[state=open]:animate-toast-in data-[state=closed]:animate-fade-out",
@@ -85,7 +117,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <span aria-hidden className="h-5 w-px shrink-0 bg-on-dark/20" />
                   <Toast.Action
                     altText={message.action.altText ?? message.action.label}
-                    onClick={message.action.onClick}
+                    onClick={() => {
+                      settled.current.add(message.id);
+                      message.action?.onClick();
+                    }}
                     className="shrink-0 rounded-sm text-sm font-semibold text-tangerine-bright hover:underline"
                   >
                     {message.action.label}

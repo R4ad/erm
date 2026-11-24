@@ -174,7 +174,7 @@ def test_submitting_registers_the_risk_with_the_unit_owner_and_template(
     assert created.status_code == 201
     risk = Risk.objects.get()
     assert created.json()["redirect"] == f"/risks/{risk.pk}"
-    assert risk.status == Risk.Status.REGISTERED
+    assert risk.status == Risk.Status.ANALYSIS
     assert (risk.channel, risk.source) == (Risk.Channel.IDENTIFICATION, Risk.Source.CHANGE)
     assert risk.owner == manager  # عضو GRC ثبت کرد، ولی مالک ریسک مدیر همان واحد است
     assert risk.title == "اعمال تغییر نامعتبر در تولید در ساتنا"

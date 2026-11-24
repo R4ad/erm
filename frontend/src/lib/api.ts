@@ -49,9 +49,11 @@ function goToLogin(loginUrl: string): Promise<never> {
 }
 
 export interface RequestOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
+  /** درخواست با بسته شدن یا ترک صفحه هم فرستاده می‌شود (fetch keepalive)، مثل تأیید در ۱۰ ثانیه‌ی بازگردانی. */
+  keepalive?: boolean;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -69,6 +71,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       credentials: "same-origin",
       signal: options.signal,
+      keepalive: options.keepalive,
       body:
         options.body === undefined ? undefined : multipart ? (options.body as FormData) : JSON.stringify(options.body),
     });
@@ -87,6 +90,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 export const get = <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal });
 export const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body });
 export const put = <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body });
+export const patch = <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body });
 
 /** نشانی endpoint پل برای یک صفحه‌ی جنگو: forms/?path=/risks/12/edit/ */
 export const bridge = (kind: "forms" | "pages", djangoPath: string) =>

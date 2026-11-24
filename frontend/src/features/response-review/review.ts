@@ -1,5 +1,5 @@
 import { fa } from "@/lib/format";
-import type { AiRunFacts, BasicAnswerKey, ReviewRisk } from "@/lib/types";
+import type { AiRunFacts, BasicAnswerKey, Person, ReviewRisk, ReviewRisks } from "@/lib/types";
 
 // متن‌های مشترک صفحه‌ی «بررسی یک پاسخنامه» (12a تا 12c)، عیناً از docs/design/copy.md و جدول تأییدشده‌ی
 // docs/implementation-plan.md (بخش ۱۰).
@@ -48,4 +48,33 @@ export const PROMPT_VERSION_LABEL = (version: string) => fa(Number(version.repla
 /** عنوان سربرگ 12a نام خدمت بدون توضیح داخل پرانتز است: «پرداخت اینترنتی (درگاه پرداخت شاپرک)» ← «پرداخت اینترنتی». */
 export function serviceTitle(service: string): string {
   return service.replace(/\s*\([^()]*\)\s*$/, "").trim() || service;
+}
+
+/**
+ * ریسک‌هایی که در ۱۰ ثانیه‌ی بازگردانی‌اند «تأیید شد · آنالیز ریسک» نشان داده می‌شوند، با نام کاربر و بدون کد RK
+ * که هنوز ساخته نشده است. شمارها هم با همین حساب می‌شوند.
+ */
+export function withApprovals(data: ReviewRisks, approving: ReadonlyMap<number, string>, me: Person): ReviewRisks {
+  if (approving.size === 0) return data;
+  const risks = data.risks.map((risk): ReviewRisk => {
+    const at = approving.get(risk.id);
+    if (at === undefined || risk.status.value !== "pending") return risk;
+    return {
+      ...risk,
+      status: { value: "converted", label: "تأیید شد · آنالیز ریسک" },
+      decided_by: { id: me.id, name: me.name },
+      decided_at: { iso: at, jalali: "" },
+    };
+  });
+  const count = (value: ReviewRisk["status"]["value"]) => risks.filter((risk) => risk.status.value === value).length;
+  return {
+    ...data,
+    risks,
+    counts: {
+      total: risks.length,
+      approved: count("converted"),
+      dismissed: count("dismissed"),
+      pending: count("pending"),
+    },
+  };
 }

@@ -36,10 +36,23 @@ class Transition:
     meeting_date: bool = False  # تصمیم کارگروه با تاریخ جلسه ثبت می‌شود (جواب س۳۳)
     asks_questions: bool = False
     checks: tuple = field(default=())
+    # وضعیت‌های دیگری که همین انتقال از آن‌ها هم شروع می‌شود (ردیف ۳ از «آنالیز ریسک» هم هست).
+    also_from: tuple = field(default=())
 
     @property
     def target_label(self):
         return S(self.target).label
+
+    @property
+    def sources(self):
+        return (self.source, *self.also_from)
+
+    @property
+    def source_label(self):
+        return " یا ".join(f"«{S(status).label}»" for status in self.sources)
+
+    def starts_from(self, status):
+        return status in self.sources
 
 
 def all_questions_answered(risk, data):
@@ -118,6 +131,7 @@ TRANSITIONS = [
         name="send_to_assessment",
         row=3,
         source=S.REGISTERED,
+        also_from=(S.ANALYSIS,),
         target=S.ASSESSMENT,
         label="ارسال جهت ارزیابی",
         description="ریسک برای ارزیابی کارگروه امنیت فرستاده می‌شود.",
@@ -207,7 +221,7 @@ def get_transition(name):
 
 
 def transitions_from(status):
-    return [transition for transition in TRANSITIONS if transition.source == status]
+    return [transition for transition in TRANSITIONS if transition.starts_from(status)]
 
 
 def can_perform(user, transition):

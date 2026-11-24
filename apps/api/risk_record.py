@@ -19,13 +19,13 @@ from . import formatting as fmt
 
 S = Risk.Status
 
-# هفت مرحله‌ی نوار بالای پرونده، به ترتیب جدول س۱۵. «ارسال‌شده» همان مرحله‌ی رجیستر است و ریسک ردشده به جای
-# «بسته‌شده» در «ردشده» تمام می‌شود.
+# هفت مرحله‌ی نوار بالای پرونده، به ترتیب جدول س۱۵. «ارسال‌شده» و «آنالیز ریسک» همان مرحله‌ی رجیستر است و ریسک
+# ردشده به جای «بسته‌شده» در «ردشده» تمام می‌شود. ریسکی که با «آنالیز ریسک» به دنیا آمده این مرحله را با همین نام می‌بیند.
 STEPS = [S.QUESTIONS, S.REGISTERED, S.ASSESSMENT, S.TREATMENT_PLAN, S.TREATMENT, S.REVIEW, S.CLOSED]
 
 
 def step_of(status):
-    return S.REGISTERED if status == S.SUBMITTED else status
+    return S.REGISTERED if status in Risk.REGISTER_STATUSES else status
 
 
 def fa(value):
@@ -34,12 +34,15 @@ def fa(value):
 
 def stepper(risk, timeline):
     """مرحله‌ها با وضعیت done، current، todo یا skipped و تاریخ آخرین ورود به هر مرحله. timeline قدیمی به جدید است."""
-    entered = {step_of(timeline[0].from_status if timeline else risk.status): risk.created_at}
+    born = timeline[0].from_status if timeline else risk.status
+    entered = {step_of(born): risk.created_at}
     for entry in timeline:
         entered[step_of(entry.to_status)] = entry.created_at
     steps = [S.REJECTED if step == S.CLOSED and risk.status == S.REJECTED else step for step in STEPS]
     current = steps.index(step_of(risk.status))
     labels = dict(S.choices)
+    if born == S.ANALYSIS:
+        labels[S.REGISTERED] = labels[S.ANALYSIS]
     rows = []
     for index, step in enumerate(steps):
         if index < current:

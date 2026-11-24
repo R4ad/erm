@@ -411,14 +411,18 @@ function CompactRisk({ risk, onSelect }: { risk: ReviewRisk; onSelect?: () => vo
   const now = useNow();
   const source = sourceText(risk, false);
   let meta: ReactNode = source;
-  if (approved && risk.risk) {
-    // کد در انتهای خط می‌آید، همان جایی که فریم 12c نشانش می‌دهد.
+  if (approved) {
+    // کد در انتهای خط می‌آید، همان جایی که فریم 12c نشانش می‌دهد؛ در ۱۰ ثانیه‌ی بازگردانی ریسک هنوز کدی ندارد.
     meta = (
       <>
         {source}
         {risk.decided_by && risk.decided_at && ` · تأیید توسط ${risk.decided_by.name}، ${ago(risk.decided_at, now)}`}
-        {" · "}
-        <bdi className="code">{risk.risk.code}</bdi>
+        {risk.risk && (
+          <>
+            {" · "}
+            <bdi className="code">{risk.risk.code}</bdi>
+          </>
+        )}
       </>
     );
   } else if (risk.status.value === "dismissed" && risk.decided_by && risk.decided_at) {

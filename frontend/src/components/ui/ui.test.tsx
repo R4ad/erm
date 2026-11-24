@@ -11,6 +11,7 @@ import { ConfirmDialog } from "./dialog";
 import { Field, Input, Select, Textarea } from "./field";
 import { LevelBadge } from "./level-badge";
 import { Pagination, pageWindow } from "./pagination";
+import { ToastProvider, useToast } from "./toast";
 
 describe("Button", () => {
   it("is a plain button by default so it never submits a form by accident", () => {
@@ -149,5 +150,71 @@ describe("ConfirmDialog", () => {
     await user.click(screen.getByRole("button", { name: "حذف کن" }));
     expect(onConfirm).toHaveBeenCalledOnce();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+});
+
+describe("Toast", () => {
+  function Harness({ onDismiss, onAction }: { onDismiss: (title: string) => void; onAction: () => void }) {
+    const toast = useToast();
+    const [close, setClose] = useState<() => void>(() => () => undefined);
+    return (
+      <>
+        {["یک", "دو", "سه", "چهار"].map((title) => (
+          <Button
+            key={title}
+            onClick={() => {
+              const handle = toast({
+                title,
+                action: { label: "بازگردانی", onClick: onAction },
+                onDismiss: () => onDismiss(title),
+              });
+              setClose(() => handle);
+            }}
+          >
+            {`پیام ${title}`}
+          </Button>
+        ))}
+        <Button onClick={() => close()}>بستن بی‌صدا</Button>
+      </>
+    );
+  }
+
+  function setup() {
+    const user = userEvent.setup();
+    const onDismiss = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ToastProvider>
+        <Harness onDismiss={onDismiss} onAction={onAction} />
+      </ToastProvider>,
+    );
+    return { user, onDismiss, onAction };
+  }
+
+  it("calls onDismiss once when closed without the action, not after the action", async () => {
+    const { user, onDismiss, onAction } = setup();
+    await user.click(screen.getByRole("button", { name: "پیام یک" }));
+    await user.click(screen.getByRole("button", { name: "بستن" }));
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledExactlyOnceWith("یک"));
+
+    await user.click(screen.getByRole("button", { name: "پیام دو" }));
+    await user.click(screen.getByRole("button", { name: "بازگردانی" }));
+    expect(onAction).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByText("دو")).not.toBeInTheDocument());
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("closes quietly with the returned handle and dismisses a message pushed out by a fourth", async () => {
+    const { user, onDismiss } = setup();
+    await user.click(screen.getByRole("button", { name: "پیام یک" }));
+    await user.click(screen.getByRole("button", { name: "بستن بی‌صدا" }));
+    await waitFor(() => expect(screen.queryByText("یک")).not.toBeInTheDocument());
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    for (const title of ["دو", "سه", "چهار", "یک"]) {
+      await user.click(screen.getByRole("button", { name: `پیام ${title}` }));
+    }
+    expect(onDismiss).toHaveBeenCalledExactlyOnceWith("دو");
+    expect(screen.getByText("چهار")).toBeInTheDocument();
   });
 });

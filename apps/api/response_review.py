@@ -14,6 +14,7 @@ from apps.questionnaires.ai.pipeline import registry, request_identification
 from apps.questionnaires.answers import FA_DIGITS, answer_values, impact_types
 from apps.questionnaires.models import AiRun, PendingRisk, Response
 from apps.questionnaires.permissions import can_manage_questionnaires, visible_responses
+from apps.questionnaires.services import TEXT_FIELDS, ai_values
 
 from . import formatting as fmt
 from .base import ApiView
@@ -145,18 +146,12 @@ def risk_route(risk):
 
 def edited(draft):
     """آیا کارشناس متنی را از پیشنهاد AI تغییر داده است؛ برای برچسب «ویرایش‌شده»."""
-    original = draft.ai_original or {}
-    if not original:
+    if not draft.ai_original:
         return False
-    paths = [item.get("text") for item in original.get("realization_paths", [])]
-    impact = original.get("impact", {})
-    return (
-        draft.title != original.get("title")
-        or draft.initiating_factor != original.get("initiating_factor")
-        or [item.get("text") for item in draft.paths] != paths
-        or draft.target_event != original.get("target_event", {}).get("text")
-        or draft.impact != impact.get("text")
-    )
+    suggested = ai_values(draft)
+    return any(getattr(draft, name) != suggested[name] for name in TEXT_FIELDS) or [
+        item["text"] for item in draft.paths
+    ] != [item["text"] for item in suggested["paths"]]
 
 
 def draft_payload(draft):
@@ -195,6 +190,7 @@ def draft_payload(draft):
             for item in draft.similar_risks
         ],
         "edited": edited(draft),
+        "suggested": ai_values(draft) if draft.ai_original else None,
         "risk": {"code": draft.risk.code, "route": risk_route(draft.risk)} if draft.risk_id else None,
         "decided_by": fmt.person(draft.decided_by),
         "decided_at": fmt.moment(draft.decided_at),
@@ -355,12 +351,34 @@ def decision_events(response):
     return events
 
 
+EDIT_FIELDS = (*TEXT_FIELDS, "paths", "category_id", "owner_unit_id", "owner_id")
+
+
+def edit_events(response):
+    """هر ذخیره‌ی فرم 12d که مقداری را عوض کرده است، از تاریخچه‌ی پیش‌نویس‌ها؛ ساخت پیش‌نویس و تغییر وضعیت ویرایش نیست."""
+    events = []
+    records = (
+        PendingRisk.history.filter(response_id=response.pk)
+        .select_related("history_user")
+        .order_by("id", "history_date", "history_id")
+    )
+    previous = None
+    for record in records:
+        same = previous is not None and previous.id == record.id
+        if same and record.history_user and record.status == previous.status == P.PENDING:
+            if any(getattr(record, name) != getattr(previous, name) for name in EDIT_FIELDS):
+                text = f"ریسک پیشنهادی «{record.title}» ویرایش شد"
+                events.append(event(text, record.history_date, record.history_user))
+        previous = record
+    return events
+
+
 class ResponseHistoryView(ApiView):
     """GET رویدادهای پاسخنامه، تازه‌ترین اول: ایجاد و ارسال، بازگرداندن، شناسایی هوشمند و تصمیم‌ها."""
 
     def get(self, request, pk):
         response = get_response(request.user, pk)
-        events = response_events(response) + run_events(response) + decision_events(response)
+        events = response_events(response) + run_events(response) + decision_events(response) + edit_events(response)
         events.sort(key=lambda item: item["at"], reverse=True)
         return ApiResponse({"events": [{**item, "at": fmt.moment(item["at"])} for item in events]})
 

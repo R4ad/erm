@@ -107,7 +107,8 @@ def test_risk_codes_carry_the_jalali_year_and_count_from_one():
     first, second = make_risk(), make_risk("ریسک دوم")
 
     assert (first.code, second.code) == (f"RK-{year}-0001", f"RK-{year}-0002")
-    assert first.status == Risk.Status.REGISTERED
+    # هر ریسک تازه در «آنالیز ریسک» به دنیا می‌آید (تصمیم ۱ برنامه‌ی شناسایی از پاسخنامه).
+    assert first.status == Risk.Status.ANALYSIS
 
 
 def test_needs_completion_follows_initiator_count_unit_and_scope():

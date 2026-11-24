@@ -58,7 +58,7 @@ def perform_transition(risk, transition, user, reason="", meeting_date=None, que
     """یک انتقال جدول س۱۵ را با چک انجام‌دهنده و شرط‌ها انجام می‌دهد و در تاریخچه‌ی انتقال ثبت می‌کند.
     برای «طرح پرسش‌های جدید»، questions فهرست متن پرسش‌هاست."""
     locked = _locked(risk)
-    if locked.status != transition.source:
+    if not transition.starts_from(locked.status):
         raise WorkflowError(["وضعیت ریسک در این فاصله عوض شده است؛ صفحه را دوباره باز کنید."])
     if not can_perform(user, transition):
         raise WorkflowError(["این انتقال با نقش شما انجام نمی‌شود."])
@@ -155,7 +155,13 @@ def decide_change(request, user, approve, note=""):
 
 
 def _split_part(source, title, user):
-    part = Risk(title=title, split_from=source, **{name: getattr(source, name) for name in SPLIT_COPIED_FIELDS})
+    # بخش تفکیک‌شده مثل قبل «ثبت‌شده در رجیستر» است، نه «آنالیز ریسک» ریسک‌های تازه.
+    part = Risk(
+        title=title,
+        split_from=source,
+        status=Risk.Status.REGISTERED,
+        **{name: getattr(source, name) for name in SPLIT_COPIED_FIELDS},
+    )
     part._history_user = user
     part.save()
     part.customers.set(source.customers.all())
