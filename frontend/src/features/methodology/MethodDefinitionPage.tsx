@@ -532,7 +532,7 @@ function Versions({ data }: { data: MethodDefinition }) {
                   <bdi className="code font-bold text-ink">{version.name}</bdi>
                   <Chip tone={STATUS_TONE[version.status.value] ?? "neutral"}>{version.status.label}</Chip>
                 </span>
-                {version.date && <span className="text-xs text-ink-3 tabular">{faText(version.date.jalali)}</span>}
+                {version.date && <span className="text-xs text-ink-2 tabular">{faText(version.date.jalali)}</span>}
               </span>
               <span className="text-xs leading-5 text-ink-2">{version.note}</span>
             </Link>
@@ -559,7 +559,7 @@ function Changes({ data }: { data: MethodDefinition }) {
             <li key={change.key} className="flex flex-col gap-1 rounded-md bg-subtle px-3 py-2.5">
               <span className="text-sm font-semibold text-ink">{change.label}</span>
               <span className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="text-ink-3">
+                <span className="text-ink-2">
                   <span className="sr-only">از </span>
                   {faText(change.before)}
                 </span>

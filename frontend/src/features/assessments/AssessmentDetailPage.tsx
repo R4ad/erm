@@ -309,7 +309,13 @@ function showCurrent(card: HTMLDivElement | null) {
 
 function StepBar({ steps }: { steps: AssessmentStep[] }) {
   return (
-    <Card ref={showCurrent} className="overflow-x-auto p-2">
+    <Card
+      ref={showCurrent}
+      className="overflow-x-auto p-2"
+      role="region"
+      tabIndex={0}
+      aria-label="گام‌های ارزیابی، پیمایش افقی"
+    >
       <ol aria-label="گام‌های ارزیابی" className="flex min-w-[54rem] gap-1">
         {steps.map((step, index) => (
           <li
@@ -366,11 +372,11 @@ function Tile({
 }) {
   return (
     <div className={cn("flex min-w-[6.25rem] flex-1 flex-col gap-0.5 rounded-lg bg-subtle px-3 py-2.5", className)}>
-      <dt className="text-xs text-ink-3">{label}</dt>
+      <dt className="text-xs text-ink-2">{label}</dt>
       <dd className={cn("text-xl leading-7 font-bold text-ink", valueClassName)}>
         <bdi>{value}</bdi>
       </dd>
-      {sub && <dd className="text-xs text-ink-3">{sub}</dd>}
+      {sub && <dd className="text-xs text-ink-2">{sub}</dd>}
     </div>
   );
 }

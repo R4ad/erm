@@ -301,7 +301,13 @@ function showCurrent(card: HTMLDivElement | null) {
 function Stepper({ steps }: { steps: RiskStep[] }) {
   const reached = (step: RiskStep | undefined) => step !== undefined && step.state !== "todo";
   return (
-    <Card ref={showCurrent} className="relative overflow-x-auto px-3 py-4">
+    <Card
+      ref={showCurrent}
+      className="relative overflow-x-auto px-3 py-4"
+      role="region"
+      tabIndex={0}
+      aria-label="مراحل گردش کار، پیمایش افقی"
+    >
       <ol aria-label="مراحل گردش کار" className="flex min-w-[42rem]">
         {steps.map((step, index) => {
           const prev = steps[index - 1];
@@ -408,7 +414,7 @@ function DeadlineBanner({ banner, active, onTab }: { banner: RiskBanner; active:
 function Metric({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-md bg-subtle px-3 py-2.5">
-      <dt className="text-xs text-ink-3">{label}</dt>
+      <dt className="text-xs text-ink-2">{label}</dt>
       <dd className="text-stat font-bold text-ink tabular">{value === null ? "نامعلوم" : fa(value)}</dd>
     </div>
   );

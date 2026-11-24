@@ -229,7 +229,7 @@ function MatrixCell({
       >
         <LevelBox level={level} />
         {level.kind === "empty" ? (
-          <span className="text-xs text-ink-3">ثبت‌نشده</span>
+          <span className="text-xs text-ink-2">ثبت‌نشده</span>
         ) : (
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className={cn("truncate text-xs", level.kind === "unknown" ? "text-gold" : "text-ink")}>
@@ -239,7 +239,8 @@ function MatrixCell({
             <span
               className={cn(
                 "flex items-center gap-1 text-xs",
-                evidence ? "text-ink-3" : level.kind === "unknown" ? "text-gold" : "text-warning",
+                // روی زمینه‌ی brand/subtle خانه‌ی انتخاب‌شده warning و ink-3 به ۴٫۵ نمی‌رسند؛ جزئیات در ویرایشگر کنار است.
+                selected || evidence ? "text-ink-2" : level.kind === "unknown" ? "text-gold" : "text-warning",
               )}
             >
               <Icon name="paperclip" size={12} />

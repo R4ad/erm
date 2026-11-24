@@ -63,7 +63,7 @@ test.describe("service catalog", () => {
       ["/app/catalog/assets", "دارایی‌ها"],
       ["/app/catalog/suppliers", "تأمین‌کنندگان"],
       ["/app/catalog/customers", "بانک‌ها"],
-      ["/app/units", "ساختار سازمانی"],
+      ["/app/units", "چارت سازمانی"],
     ] as const) {
       await page.goto(path);
       await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
@@ -74,16 +74,15 @@ test.describe("service catalog", () => {
 });
 
 test.describe("assessment method", () => {
-  test("shows the method with the L table and the decision matrix in the method's colours", async ({ page }) => {
+  test("shows the method definition with the L table, the level rules and its versions", async ({ page }) => {
     await page.goto("/app/method");
-    await expect(page.getByRole("heading", { name: "روش ارزیابی", level: 1 })).toBeVisible();
-    const matrix = page.getByRole("table", { name: /سطح تصمیم برای هر احتمال/ });
-    await expect(matrix.getByRole("row", { name: /L1/ })).toContainText("۵ · کف");
-    await expect(page.getByRole("table", { name: /L برای هر ترکیب A/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "تعریف متدولوژی", level: 1 })).toBeVisible();
+    await expect(page.getByRole("table", { name: "L برای هر ترکیب A و B" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "قواعد هر سطح ریسک" })).toContainText(/تغییر نسبت به v1/);
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
 
-    await page.getByRole("button", { name: "نسخه‌های دیگر" }).click();
-    await expect(page.getByRole("menuitem", { name: /نسخه‌ی ۲/ })).toBeVisible();
+    const versions = page.getByRole("region", { name: "نسخه‌ها" });
+    await expect(versions.getByRole("link", { name: /v2/ })).toHaveAttribute("aria-current", "page");
   });
 });

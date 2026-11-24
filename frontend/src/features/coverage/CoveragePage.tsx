@@ -389,7 +389,7 @@ function Grid({ data }: { data: CoverageData }) {
                 <span className="block text-sm font-semibold text-ink">
                   <bdi className="code">{category.code}</bdi>
                 </span>
-                <span className="mx-auto block max-w-24 truncate text-xs text-ink-3" title={category.name}>
+                <span className="mx-auto block max-w-24 truncate text-xs text-ink-2" title={category.name}>
                   {category.name}
                 </span>
               </th>

@@ -23,7 +23,9 @@ test.describe("control library", () => {
 
     await effect.getByRole("link", { name: "CA-1405-0003" }).click();
     await expect(page).toHaveURL(/\/app\/controls\/effectiveness\/3$/);
-    await expect(page.getByText("داده‌های فعلی این برگه دیگر E۳ را پشتیبانی نمی‌کنند")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "آزمون اثربخشی کنترل CT-0009", level: 1 })).toBeVisible();
+    await expect(page.getByText("اثربخشی محدود · E2")).toBeVisible();
+    await expect(page.getByText("قبلی: E3")).toBeVisible();
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
   });

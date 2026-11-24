@@ -720,7 +720,7 @@ export function RiskListPage() {
             >
               <table className="w-full min-w-[60rem] text-start text-sm">
                 <caption className="sr-only">ریسک‌های رجیستر{scope ? ` «${scope}»` : ""}</caption>
-                <thead className="bg-subtle text-xs text-ink-3">
+                <thead className="bg-subtle text-xs text-ink-2">
                   <tr className="[&>th]:h-10 [&>th]:px-3 [&>th]:text-start [&>th]:font-medium [&>th]:whitespace-nowrap">
                     <th scope="col" className="w-10">
                       <input

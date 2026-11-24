@@ -10,8 +10,8 @@ const overflows = (page: Page) => page.evaluate(() => document.documentElement.s
 test.describe("system administration", () => {
   test("lists users and holidays, and deletes a holiday after asking", async ({ page, api }) => {
     await page.goto("/app/accounts/users");
-    await expect(page.getByRole("heading", { name: "کاربران", level: 1 })).toBeVisible();
-    await expect(page.getByRole("table", { name: /کاربران/ })).toContainText("کاربر آزمون یکم");
+    await expect(page.getByRole("heading", { name: "تعریف کاربر و نقش", level: 1 })).toBeVisible();
+    await expect(page.getByRole("table", { name: "کاربران سامانه" })).toContainText("سارا محمدی");
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
 

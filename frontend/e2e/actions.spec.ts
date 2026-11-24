@@ -29,7 +29,7 @@ test.describe("treatment", () => {
 
   test("approves a plan from the risk dossier after a confirmation", async ({ page, api }) => {
     await page.goto("/app/actions/plans/1");
-    await expect(page.getByRole("heading", { name: "طرح مواجهه: کاهش", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "طرح مواجهه — ریسک آزمون شماره‌ی ۱", level: 1 })).toBeVisible();
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
 
@@ -70,18 +70,20 @@ test.describe("treatment", () => {
 
   test("signs an acceptance as senior management with the letter file", async ({ page, api }) => {
     await page.goto("/app/actions/acceptances/2");
-    await expect(page.getByRole("heading", { name: "پذیرش AC-1405-0002", level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "پذیرش ریسک باقیمانده — ریسک آزمون متوسط", level: 1 }),
+    ).toBeVisible();
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
 
-    const box = page.getByRole("region", { name: "امضای شما به‌عنوان مدیریت ارشد" });
+    const box = page.getByRole("group", { name: "امضای شما به‌عنوان مدیریت ارشد" });
     await box.getByRole("textbox", { name: "شماره‌ی نامه" }).fill("۱۲/۳۴۵");
     await box.getByLabel("فایل نامه").setInputFiles({
       name: "letter.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 test"),
     });
-    await box.getByRole("button", { name: "تأیید پذیرش" }).click();
+    await box.getByRole("button", { name: "ثبت امضا" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "تأیید پذیرش" }).click();
     await expect(page.getByText("امضای شما ثبت شد.", { exact: true })).toBeVisible();
     const [call] = api.callsTo("POST forms/");
@@ -95,9 +97,10 @@ test.describe("treatment", () => {
 
   test("shows the reassessment comparison next to the decision form", async ({ page }) => {
     await page.goto("/app/actions/plans/1/reassess");
-    await expect(page.getByRole("heading", { name: /بازسنجی طرح مواجهه/, level: 1 })).toBeVisible();
-    await expect(page.getByRole("table", { name: /مقایسه‌ی ارزیابی مبنا/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "ثبت بازسنجی" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /ارزیابی پس از اقدام/, level: 1 })).toBeVisible();
+    await expect(page.getByRole("region", { name: "جاری جدید" })).toBeVisible();
+    await expect(page.getByRole("table", { name: /مسیرهای احتمال/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "ثبت تصمیم" })).toBeVisible();
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
   });

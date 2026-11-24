@@ -64,8 +64,12 @@ test.describe("Django forms", () => {
   });
 
   test("shows a workflow step with its unmet conditions", async ({ page }) => {
+    // انتقالی که شرطش برقرار نیست در پرونده دکمه ندارد؛ دلیلش زیر دکمه‌های سربرگ می‌آید.
     await page.goto("/app/risks/1");
-    await page.getByRole("link", { name: "شروع اجرا" }).click();
+    await expect(
+      page.getByText("«شروع اجرا» هنوز فعال نیست: مالک ریسک هنوز طرح مواجهه را تأیید نکرده است."),
+    ).toBeVisible();
+    await page.goto("/app/workflow/risks/1/transition/start_treatment/");
     await expect(page.getByRole("heading", { name: "شروع اجرا", level: 1 })).toBeVisible();
     await expect(page.getByText("مالک ریسک هنوز طرح مواجهه را تأیید نکرده است.")).toBeVisible();
     await expectAccessible(page);

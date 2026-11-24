@@ -4,142 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { mockApi, reply } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
+import { methodDefinition } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
-import type { MethodDefinition, MethodParam } from "@/lib/types";
 
 import { MethodDefinitionPage } from "./MethodDefinitionPage";
-
-function param(key: string, label: string, group: string, value: string, unit: string, before: string | null = null) {
-  return { key, label, group, value, unit, text: `${value} ${unit}`, note: "بخش ۱۴ سند v5", before } as MethodParam;
-}
-
-function page(changes: Partial<MethodDefinition> = {}): MethodDefinition {
-  const level = (rank: number, name: string, min: number, max: number) => ({
-    rank,
-    name,
-    min,
-    max,
-    color: "#000",
-    text_color: "#fff",
-  });
-  return {
-    version: {
-      number: 2,
-      name: "v2",
-      title: "روش v5 · بازنگری",
-      status: { value: "draft", label: "پیش‌نویس" },
-      is_trial: false,
-      based_on: "v1",
-      saved: { iso: "2026-11-16", jalali: "1405/08/25" },
-      submitted: false,
-      editable: true,
-      reference: "/method/2/reference/",
-      change_notes: "",
-    },
-    can_submit: true,
-    can_copy: false,
-    copy_from: "v1",
-    versions: [
-      {
-        number: 2,
-        name: "v2",
-        title: "بازنگری",
-        status: { value: "draft", label: "پیش‌نویس" },
-        date: { iso: "2026-11-16", jalali: "1405/08/25" },
-        note: "۲ تغییر · در دست ویرایش",
-        current: true,
-      },
-      {
-        number: 1,
-        name: "v1",
-        title: "روش v5",
-        status: { value: "active", label: "فعال" },
-        date: { iso: "2026-05-05", jalali: "1405/02/15" },
-        note: "تصویب ۱۲/۴ · ۴۲ ارزیابی جاری به این نسخه پیوند دارند",
-        current: false,
-      },
-    ],
-    changes: [
-      {
-        key: "param:a_data_coverage",
-        group: "base",
-        label: "کمترین پوشش ثبت دامنه‌ی آغازگر",
-        before: "۹۰ درصد",
-        after: "۹۵ درصد",
-      },
-      {
-        key: "level:1:review",
-        group: "appetite",
-        label: "بازبینی دوره‌ای سطح پایین",
-        before: "سالانه",
-        after: "شش‌ماهه",
-      },
-    ],
-    groups: [
-      { key: "base", label: "پارامترهای پایه", changes: 1 },
-      { key: "likelihood", label: "احتمال", changes: 0 },
-      { key: "impact", label: "پیامد", changes: 0 },
-      { key: "levels", label: "سطح و تصمیم", changes: 0 },
-      { key: "appetite", label: "اشتها و پذیرش", changes: 1 },
-      { key: "monitoring", label: "پایش", changes: 0 },
-    ],
-    approval: [
-      { key: "draft", title: "پیش‌نویس", note: "متولی روش · ۱۴۰۵/۰۸/۲۰", state: "current" },
-      { key: "review", title: "بازبینی روش‌شناختی امنیت", note: "کارشناس ریسک", state: "locked" },
-      { key: "approval", title: "تصویب مرجع مجاز", note: "کمیته امنیت", state: "locked" },
-      { key: "publish", title: "انتشار", note: "فقط ارزیابی‌های جدید یا بازسنجی‌شده", state: "locked" },
-    ],
-    categories: [
-      { code: "T1", name: "امنیت اطلاعات و سایبری", risks: 14 },
-      { code: "T2", name: "نرم‌افزار و توسعه", risks: 9 },
-    ],
-    parameters: [
-      param("horizon", "افق پیش‌فرض ارزیابی", "base", "12", "ماه"),
-      param("input_return", "مهلت پیشنهادی جواب ورودی مبهم", "base", "5", "روز کاری"),
-      param("a_data_period", "کمترین دوره‌ی داده برای نرخ A", "base", "12", "ماه"),
-      param("a_data_coverage", "کمترین پوشش ثبت دامنه‌ی آغازگر", "base", "95", "درصد", "۹۰ درصد"),
-      param("reminder_first", "یادآوری اول پیش از انقضای پذیرش", "appetite", "30", "روز تقویمی"),
-      param("control_sample", "اندازه‌ی نمونه‌ی آزمون کنترل", "monitoring", "30", "نمونه"),
-    ],
-    likelihood: {
-      rows: [1, 2, 3, 4, 5].map((a) => ({
-        a,
-        cells: [1, 2, 3, 4, 5].map((b) => ({ b, l: Math.min(5, Math.ceil((a + b) / 2)), changed: false })),
-      })),
-      names: [
-        { value: 1, name: "بسیار کم" },
-        { value: 5, name: "بسیار زیاد" },
-      ],
-      source: "NIST SP 800-30",
-      changed: 0,
-    },
-    levels: {
-      levels: [level(1, "پایین", 1, 4), level(2, "متوسط", 5, 9), level(3, "بالا", 10, 15), level(4, "بحرانی", 16, 25)],
-      rules: [
-        { key: "floor-5", title: "کف پیامد ۵ ← حداقل «بالا»", note: "عدد خام تغییر نمی‌کند", source: "version" },
-        { key: "incident", title: "رویداد در حال وقوع ← اولویت بحرانی", note: "ارجاع به رخداد", source: "system" },
-      ],
-    },
-    appetite: [
-      {
-        rank: 1,
-        level: { name: "پایین", color: "#198754", rank: 1 },
-        authority: "مالک ریسک",
-        plan: "۳۰ روز تقویمی",
-        acceptance: "۱۲ ماه",
-        review: "شش‌ماهه",
-        reminder: "۳۰ و ۷ روز",
-        changed: ["review"],
-      },
-    ],
-    impact_scales: [
-      { code: "S", name: "خدمت و تداوم", scope: "توقف و زمان بازیابی", stakeholders: ["داتین", "مشتری"], levels: 6 },
-      { code: "F", name: "مالی", scope: "هزینه‌ی بازیابی", stakeholders: ["داتین"], levels: 6 },
-    ],
-    admin_url: null,
-    ...changes,
-  };
-}
 
 function render(path = "/method") {
   return renderPage(<MethodDefinitionPage />, { path, route: "/method/:number?" });
@@ -147,7 +15,7 @@ function render(path = "/method") {
 
 describe("MethodDefinitionPage", () => {
   it("shows versions, changes, approval flow and every method section", async () => {
-    mockApi({ "GET method/definition/": page() });
+    mockApi({ "GET method/definition/": methodDefinition() });
     const { container } = render();
 
     const changes = await screen.findByRole("region", { name: "تغییرات v2 نسبت به v1" });
@@ -170,8 +38,8 @@ describe("MethodDefinitionPage", () => {
   it("saves edited draft parameters", async () => {
     const user = userEvent.setup();
     const api = mockApi({
-      "GET method/definition/": page(),
-      "POST method/definition/2/parameters/": { changed: ["horizon"], page: page() },
+      "GET method/definition/": methodDefinition(),
+      "POST method/definition/2/parameters/": { changed: ["horizon"], page: methodDefinition() },
     });
     render();
 
@@ -190,12 +58,12 @@ describe("MethodDefinitionPage", () => {
 
   it("submits the draft with change notes", async () => {
     const user = userEvent.setup();
-    const submitted = page({
-      version: { ...page().version, submitted: true, editable: false },
+    const submitted = methodDefinition({
+      version: { ...methodDefinition().version, submitted: true, editable: false },
       can_submit: false,
     });
     const api = mockApi({
-      "GET method/definition/": page(),
+      "GET method/definition/": methodDefinition(),
       "POST method/definition/2/submit/": submitted,
     });
     render();
@@ -215,9 +83,9 @@ describe("MethodDefinitionPage", () => {
 
   it("offers a new draft when none is open, and shows errors", async () => {
     mockApi({
-      "GET method/definition/": page({
+      "GET method/definition/": methodDefinition({
         version: {
-          ...page().version,
+          ...methodDefinition().version,
           number: 1,
           name: "v1",
           status: { value: "active", label: "فعال" },

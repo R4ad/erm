@@ -299,18 +299,18 @@ function Dependents({ data }: { data: ControlTest }) {
           {(risk.b || risk.score) && (
             <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg bg-subtle px-3 py-2 text-sm">
               <div className="flex gap-1.5">
-                <dt className="text-ink-3">مقدار B جاری</dt>
+                <dt className="text-ink-2">مقدار B جاری</dt>
                 <dd className="font-semibold text-ink">
                   {risk.b ?? "—"}
                   {risk.b_change && ` · ${risk.b_change}`}
                 </dd>
               </div>
               <div className="flex gap-1.5">
-                <dt className="text-ink-3">L</dt>
+                <dt className="text-ink-2">L</dt>
                 <dd className="font-semibold text-ink">{risk.l ?? "—"}</dd>
               </div>
               <div className="flex gap-1.5">
-                <dt className="text-ink-3">امتیاز</dt>
+                <dt className="text-ink-2">امتیاز</dt>
                 <dd className="font-semibold text-ink">
                   {risk.score ?? "—"} {risk.level?.name}
                 </dd>

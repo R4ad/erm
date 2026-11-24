@@ -1,7 +1,7 @@
 import { assessmentDetail, levels } from "../src/test/fixtures";
 import { expect, expectAccessible, test } from "./fixtures";
 
-test("opens assessment workspace, starts a submitted risk, and shows risk details", async ({ page, api, isMobile }) => {
+test("opens assessment workspace, starts a submitted risk, and shows risk details", async ({ page, api }) => {
   api.on("GET assessments/", () => ({
     can_start: true,
     count: 1,
@@ -49,10 +49,8 @@ test("opens assessment workspace, starts a submitted risk, and shows risk detail
     { label: "مسیر ثبت‌شده", value: "قطع سوئیچ" },
   ];
   api.on("GET pages/", () => detail);
-  await page.goto("/app/");
-  if (isMobile) await page.getByRole("button", { name: "منو" }).click();
-  await page.getByRole("link", { name: "ارزیابی ریسک", exact: true }).click();
-  await expect(page).toHaveURL(/\/app\/assessments$/);
+  // میز ارزیابی دیگر آیتم منو ندارد و زیر «آنالیز ریسک» است؛ مستقیم باز می‌شود.
+  await page.goto("/app/assessments");
   await expect(page.getByRole("table", { name: "ارزیابی ریسک‌ها" })).toContainText("متوسط");
   await expect(page.getByRole("table", { name: "ارزیابی ریسک‌ها" })).toContainText("۶");
   await expectAccessible(page);
@@ -60,7 +58,9 @@ test("opens assessment workspace, starts a submitted risk, and shows risk detail
   await expect(page.getByRole("heading", { name: "ریسک‌های نیازمند ارزیابی" })).toBeVisible();
   await page.getByRole("button", { name: /RK-1405-0001.*قطع خدمت/ }).click();
   await expect(page).toHaveURL(/\/app\/assessments\/1$/);
+  // اطلاعات ریسک در پرونده‌ی ارزیابی جمع‌شده است و با کلیک باز می‌شود.
+  await page.getByText(/^اطلاعات ریسک/).click();
   await expect(page.getByText("سناریوی خدمت پرداخت")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "ثبت پارامترهای ارزیابی" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "زنجیره‌ی محاسبه", level: 2 })).toBeVisible();
   expect(api.callsTo("POST assessments/risks/1/start/")).toHaveLength(1);
 });

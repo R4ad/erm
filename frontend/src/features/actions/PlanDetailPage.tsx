@@ -178,12 +178,12 @@ function OptionsCard({ data }: { data: PlanDetail }) {
                   {option.selected && <span className="size-2 rounded-full bg-brand" />}
                 </span>
               </span>
-              <span className={cn("text-sm font-semibold", option.disabled ? "text-ink-3" : "text-ink")}>
+              <span className={cn("text-sm font-semibold", option.disabled ? "text-ink-2" : "text-ink")}>
                 {option.label}
                 {option.selected && <span className="sr-only"> (گزینه‌ی این طرح)</span>}
                 {option.disabled && <span className="sr-only"> (برای این سطح ممکن نیست)</span>}
               </span>
-              <span className="text-xs text-ink-3">{faText(option.hint)}</span>
+              <span className="text-xs text-ink-2">{faText(option.hint)}</span>
             </li>
           ))}
         </ul>
@@ -277,7 +277,7 @@ function ApprovalCard({ data }: { data: PlanDetail }) {
             <Avatar name={owner.name} size={36} />
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="text-sm font-semibold text-ink">{owner.name}</span>
-              <span className="text-xs text-ink-3">مالک ریسک{owner.job_title && ` · ${owner.job_title}`}</span>
+              <span className="text-xs text-ink-2">مالک ریسک{owner.job_title && ` · ${owner.job_title}`}</span>
             </div>
             <Badge tone={approval.owner_state.value === "approved" ? "success" : "warning"}>
               {faText(approval.owner_state.label)}
@@ -406,7 +406,7 @@ function TimelineTable({ actions, timeline }: { actions: PlanActionRow[]; timeli
           </th>
           <th scope="col" className={cn(head, "py-2")}>
             <span className="block text-center">زمان‌بندی {fa(timeline.label)}</span>
-            <span aria-hidden className="relative mt-1 block h-4 text-[0.6875rem] font-normal text-ink-3">
+            <span aria-hidden className="relative mt-1 block h-4 text-[0.6875rem] font-normal text-ink-2">
               {timeline.months.map((month) => (
                 <span
                   key={`${month.label}-${month.start}`}

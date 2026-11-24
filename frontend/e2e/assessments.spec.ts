@@ -32,26 +32,21 @@ test.describe("assessments", () => {
     await page.goto("/app/risks/1?tab=assessments");
     await page.getByRole("tabpanel").getByRole("link", { name: "AS-1405-0001" }).click();
     await expect(page).toHaveURL(/\/app\/assessments\/1$/);
-    await expect(page.getByRole("heading", { name: "ارزیابی جاری AS-1405-0001", level: 1 })).toBeVisible();
-    const result = page.getByRole("region", { name: "نتیجه" });
-    await expect(result.getByText("امتیاز (L × I)")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ارزیابی جاری — ریسک آزمون شماره‌ی ۱", level: 1 })).toBeVisible();
+    const chain = page.getByRole("region", { name: "زنجیره‌ی محاسبه" });
+    await expect(chain.getByRole("term").filter({ hasText: /^امتیاز$/ })).toBeVisible();
     await expectAccessible(page);
     expect(await overflows(page)).toBe(false);
 
-    // پیوند بخش‌ها همان #بخشی است که جنگو بعد از هر کار به آن برمی‌گرداند.
-    await page.getByRole("navigation", { name: "بخش‌های ارزیابی" }).getByRole("link", { name: "احتمال" }).click();
-    await expect(page).toHaveURL(/#likelihood$/);
-    await expect(page.getByRole("heading", { name: "احتمال", level: 2 })).toBeInViewport();
-
-    const review = page.getByRole("region", { name: "کنترل کیفیت" });
-    await review.getByRole("textbox", { name: /توضیح برای کنترل‌کننده/ }).fill("آماده‌ی کنترل است");
-    await review.getByRole("button", { name: "ارسال برای کنترل کیفیت" }).click();
+    const notes = page.getByRole("region", { name: "یادداشت‌های کنترل کیفیت" });
+    await notes.getByRole("textbox", { name: /توضیح برای کنترل‌کننده/ }).fill("آماده‌ی کنترل است");
+    await page.getByRole("button", { name: "ارسال برای کنترل کیفیت" }).click();
     await expect(page.getByText("ارزیابی AS-1405-0001 برای کنترل کیفیت فرستاده شد.", { exact: true })).toBeVisible();
     const [call] = api.callsTo("POST forms/");
     expect(call!.query.get("path")).toBe("/assessments/1/submit/");
     expect(call!.headers["x-csrftoken"]).toBeTruthy();
     expect(call!.body).toEqual({ values: { notes: "آماده‌ی کنترل است" } });
-    await expect(page).toHaveURL(/\/app\/assessments\/1(#likelihood)?$/);
+    await expect(page).toHaveURL(/\/app\/assessments\/1(#\w+)?$/);
   });
 
   test("asks before deleting a path, in a dialog that keeps focus", async ({ page, api }) => {
@@ -84,31 +79,29 @@ test.describe("assessments", () => {
             };
       });
       await page.goto("/app/assessments/1/impacts");
-      await expect(page.getByRole("heading", { name: /پروفایل پیامد ارزیابی جاری/, level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "پروفایل پیامد — ریسک آزمون شماره‌ی ۱", level: 1 })).toBeVisible();
       await expectAccessible(page);
       expect(await overflows(page)).toBe(false);
 
-      const bank = page.getByRole("region", { name: "بانک آزمون" });
-      await expect(bank.getByText(/پیشنهاد سامانه: سطح ۳/)).toBeVisible();
-      const financial = bank.getByRole("group", { name: "F مالی، بانک آزمون" });
-      await financial.getByRole("combobox", { name: "سطح" }).selectOption("0");
-      await financial.getByRole("combobox", { name: "اطمینان" }).selectOption("high");
-      // دکمه‌ی ذخیره در فرم بلند پایین صفحه می‌ماند.
-      const save = page.getByRole("button", { name: "ذخیره" });
-      await expect(save).toBeInViewport();
+      // ماتریس ذی‌نفع × بُعد؛ هر خانه در ویرایشگر کناری باز می‌شود.
+      const matrix = page.getByRole("region", { name: "ماتریس پیامد" });
+      await matrix.getByRole("button", { name: /^F مالی، بانک آزمون/ }).click();
+      const editor = page.getByRole("region", { name: "ویرایش خانه: F (مالی) · بانک آزمون" });
+      await expect(editor).toBeVisible();
+      // رادیوها پنهان‌اند و برچسبشان کلیک می‌خورد.
+      await editor.getByRole("group", { name: "سطح" }).getByRole("radio", { name: "۰" }).check({ force: true });
+      await editor.getByRole("group", { name: "اطمینان" }).getByRole("radio", { name: "زیاد" }).check({ force: true });
+      const save = page.getByRole("button", { name: "ذخیره‌ی پیش‌نویس" });
       await save.click();
 
-      const summary = page.getByRole("alert");
-      await expect(summary).toBeFocused();
-      await expect(summary).toContainText("بانک آزمون، F مالی، دلیل: صفر یعنی «اثر ندارد» و دلیل می‌خواهد.");
+      await expect(page.getByRole("alert")).toContainText("بعضی خانه‌ها ایراد دارند");
+      const rationale = editor.getByRole("textbox", { name: /دلیل/ });
+      await expect(rationale).toHaveAttribute("aria-invalid", "true");
+      await expect(matrix.getByRole("button", { name: /^F مالی، بانک آزمون: .*ایراد دارد$/ })).toBeVisible();
       await expectAccessible(page);
-      await summary.getByRole("link", { name: /بانک آزمون، F مالی، دلیل/ }).click();
-      const rationale = financial.getByRole("textbox", { name: "دلیل" });
-      await expect(rationale).toBeFocused();
       await rationale.fill("زیان قابل انتساب ندارد");
       await save.click();
 
-      await expect(page).toHaveURL(/\/app\/assessments\/1$/);
       await expect(page.getByText("پروفایل پیامد ارزیابی AS-1405-0001 ذخیره شد.", { exact: true })).toBeVisible();
       const last = api.callsTo("POST forms/").at(-1)!;
       expect(last.query.get("path")).toBe("/assessments/1/impacts/");

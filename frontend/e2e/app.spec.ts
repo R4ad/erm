@@ -4,7 +4,7 @@ test.describe("shell and my work", () => {
   test("opens on my work with the navigation for this user", async ({ page, isMobile }) => {
     await page.goto("/app/");
     await expect(page.getByRole("heading", { name: "کارهای من", level: 1 })).toBeVisible();
-    await expect(page.getByRole("region", { name: /اقدام‌های من/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: "صف کارها" })).toBeVisible();
     if (isMobile) {
       await expect(page.getByRole("button", { name: "منو" })).toBeVisible();
     } else {
@@ -68,23 +68,21 @@ test.describe("shell and my work", () => {
 });
 
 test.describe("risk register", () => {
-  test("filters, searches and sorts with the URL", async ({ page, api, isMobile }) => {
+  test("filters, searches and sorts with the URL", async ({ page, api }) => {
     await page.goto("/app/risks");
     await expect(page.getByRole("heading", { name: "رجیستر ریسک", level: 1 })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
     await expectAccessible(page);
 
-    if (isMobile) {
-      // در موبایل فیلترها پشت دکمه‌اند تا نتیجه‌ها زیر کادرها گم نشوند.
-      await expect(page.getByLabel("وضعیت")).toBeHidden();
-      await page.getByRole("button", { name: "فیلترها" }).click();
-    }
-    await page.getByLabel("وضعیت").selectOption("treatment_plan");
+    // نوار وضعیت‌های گردش کار فیلتر وضعیت است.
+    const pipeline = page.getByRole("navigation", { name: "وضعیت‌های گردش کار" });
+    await pipeline.getByRole("button", { name: /^برنامه‌ی درمان/ }).click();
     await expect(page).toHaveURL(/status=treatment_plan/);
+    await expect(pipeline.getByRole("button", { name: /^برنامه‌ی درمان/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "برداشتن فیلتر وضعیت: برنامه‌ی درمان" })).toBeVisible();
     await expect(page.getByRole("link", { name: /ریسک آزمون/ })).toHaveCount(1);
 
-    await page.getByRole("button", { name: "پاک کردن همه‌ی فیلترها" }).click();
+    await page.getByRole("button", { name: "پاک کردن همه", exact: true }).click();
     await expect(page).toHaveURL(/\/app\/risks$/);
 
     await page.getByRole("searchbox", { name: "جست‌وجو", exact: true }).fill("RK-1405-0004");
@@ -93,15 +91,17 @@ test.describe("risk register", () => {
     expect(api.callsTo("GET risks/").filter((call) => call.query.get("q")?.startsWith("RK"))).toHaveLength(1);
 
     await page.getByRole("searchbox", { name: "جست‌وجو", exact: true }).fill("");
-    await page.getByLabel("مرتب‌سازی").selectOption("level");
-    await expect(page).toHaveURL(/ordering=level/);
+    await expect(page).not.toHaveURL(/q=/);
+    await page.getByRole("columnheader", { name: /کد/ }).getByRole("button").click();
+    await expect(page).toHaveURL(/ordering=code/);
+    await expect(page.getByRole("columnheader", { name: /کد/ })).toHaveAttribute("aria-sort", "ascending");
     await page.goBack();
-    await expect(page).not.toHaveURL(/ordering=level/);
+    await expect(page).not.toHaveURL(/ordering=code/);
   });
 
   test("opens a dossier and keeps the tab in the URL", async ({ page }) => {
     await page.goto("/app/risks");
-    await page.getByRole("link", { name: "ریسک آزمون شماره‌ی 1", exact: true }).click();
+    await page.getByRole("link", { name: "ریسک آزمون شماره‌ی ۱", exact: true }).click();
     await expect(page.getByRole("heading", { name: "ریسک آزمون شماره‌ی ۱", level: 1 })).toBeVisible();
     await expectAccessible(page);
 

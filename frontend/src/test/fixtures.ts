@@ -76,6 +76,16 @@ import type {
   SupplierList,
   UnitList,
   UserList,
+  ControlTest,
+  DirectoryRole,
+  DirectoryUser,
+  MethodDefinition,
+  MethodParam,
+  OrgChartPage,
+  OrgNode,
+  PostAction,
+  PostActionCard,
+  UsersRolesPage,
 } from "../lib/types";
 
 export const levels = {
@@ -7198,5 +7208,556 @@ export function reviewHistory(events?: ReviewHistoryEvent[]): { events: ReviewHi
       { text: "برای بررسی ارسال شد", actor: { id: 7, name: "مریم صادقی" }, at: minutesAgo(121), tone: "info" },
       { text: "پیش‌نویس ایجاد شد", actor: { id: 7, name: "مریم صادقی" }, at: minutesAgo(60 * 26), tone: "neutral" },
     ],
+  };
+}
+
+// کاربران و نقش‌ها (UsersRolesPage)
+
+function directoryUser(id: number, name: string, extra: Partial<DirectoryUser> = {}): DirectoryUser {
+  return {
+    id,
+    name,
+    username: `u${id}`,
+    unit: "واحد ریسک",
+    job_title: "",
+    roles: [],
+    customers: null,
+    source: { value: "ad", label: "AD" },
+    last_login: { iso: "2026-11-16T09:12:00+03:30", label: "امروز ۰۹:۱۲" },
+    status: { value: "active", label: "فعال", tone: "success" },
+    edit_url: `/admin/accounts/user/${id}/change/`,
+    ...extra,
+  };
+}
+
+function directoryRole(key: string, label: string, extra: Partial<DirectoryRole> = {}): DirectoryRole {
+  return {
+    key,
+    label,
+    tone: "info",
+    description: `شرح ${label}`,
+    kind: "group",
+    kind_label: "گروه دسترسی",
+    scope: { value: "all", label: "همه‌ی واحدها" },
+    count: 1,
+    acceptance: [],
+    edit_url: `/admin/auth/group/${key}/change/`,
+    ...extra,
+  };
+}
+
+export function usersRolesPage(): UsersRolesPage {
+  const owner = { key: "owner", label: "مالک ریسک", tone: "warning" as const };
+  const analyst = { key: "analyst", label: "کارشناس ریسک", tone: "info" as const };
+  const users = [
+    directoryUser(1, "سارا محمدی", { roles: [analyst], source: { value: "local", label: "محلی" } }),
+    directoryUser(2, "علی رضایی", {
+      roles: [owner],
+      customers: ["بانک ملت"],
+      status: { value: "sod", label: "تعارض SoD", tone: "warning" },
+    }),
+    ...Array.from({ length: 8 }, (_, index) => directoryUser(10 + index, `کاربر ${index + 1}`, { roles: [owner] })),
+  ];
+  return {
+    summary: { active: 10, units: 4, ad: 9, local: 1, temporary: 0, roles: 2, conflicts: 1 },
+    users,
+    roles: [
+      directoryRole("analyst", "کارشناس ریسک"),
+      directoryRole("owner", "مالک ریسک", {
+        kind: "derived",
+        kind_label: "از روی سوابق",
+        scope: { value: "unit", label: "واحد خود و زیرواحدها" },
+        count: 9,
+        edit_url: null,
+        acceptance: [
+          { levels: ["پایین"], label: "سطح پایین", text: "پذیرش مستقل · ۱۲ ماه", tone: "success" },
+          { levels: ["بالا", "بحرانی"], label: "بالا و بحرانی", text: "فقط پیشنهاد به کمیته امنیت", tone: "warning" },
+        ],
+      }),
+    ],
+    matrix: [
+      { key: "analysis", label: "تحلیل و امتیازدهی A، B، I", stage: "آنالیز", access: { analyst: "F", owner: "L" } },
+      { key: "method", label: "ویرایش متدولوژی", stage: "پیکربندی", access: {} },
+    ],
+    sod: {
+      conflicts: [
+        {
+          key: "owner-control-2",
+          user: { id: 2, name: "علی رضایی" },
+          title: "مالک ریسک + مسئول کنترل",
+          note: "مالک RK-1 و مسئول CT-1 در همان مسیر",
+          state: "open",
+          href: "/risks/2/",
+        },
+      ],
+      rules: [{ text: "مجری اقدام نمی‌تواند تأییدکننده‌ی اثربخشی همان اقدام باشد.", where: "قید پایگاه داده" }],
+    },
+    add_user_url: "/accounts/users/new/",
+    login_report_url: "/audit/?event=login",
+    import_url: "/accounts/staff-import/",
+  };
+}
+
+// تعریف متدولوژی (MethodDefinitionPage)
+
+function methodParam(
+  key: string,
+  label: string,
+  group: string,
+  value: string,
+  unit: string,
+  before: string | null = null,
+) {
+  return { key, label, group, value, unit, text: `${value} ${unit}`, note: "بخش ۱۴ سند v5", before } as MethodParam;
+}
+
+export function methodDefinition(changes: Partial<MethodDefinition> = {}): MethodDefinition {
+  const level = (rank: number, name: string, min: number, max: number) => ({
+    rank,
+    name,
+    min,
+    max,
+    color: "#000",
+    text_color: "#fff",
+  });
+  return {
+    version: {
+      number: 2,
+      name: "v2",
+      title: "روش v5 · بازنگری",
+      status: { value: "draft", label: "پیش‌نویس" },
+      is_trial: false,
+      based_on: "v1",
+      saved: { iso: "2026-11-16", jalali: "1405/08/25" },
+      submitted: false,
+      editable: true,
+      reference: "/method/2/reference/",
+      change_notes: "",
+    },
+    can_submit: true,
+    can_copy: false,
+    copy_from: "v1",
+    versions: [
+      {
+        number: 2,
+        name: "v2",
+        title: "بازنگری",
+        status: { value: "draft", label: "پیش‌نویس" },
+        date: { iso: "2026-11-16", jalali: "1405/08/25" },
+        note: "۲ تغییر · در دست ویرایش",
+        current: true,
+      },
+      {
+        number: 1,
+        name: "v1",
+        title: "روش v5",
+        status: { value: "active", label: "فعال" },
+        date: { iso: "2026-05-05", jalali: "1405/02/15" },
+        note: "تصویب ۱۲/۴ · ۴۲ ارزیابی جاری به این نسخه پیوند دارند",
+        current: false,
+      },
+    ],
+    changes: [
+      {
+        key: "param:a_data_coverage",
+        group: "base",
+        label: "کمترین پوشش ثبت دامنه‌ی آغازگر",
+        before: "۹۰ درصد",
+        after: "۹۵ درصد",
+      },
+      {
+        key: "level:1:review",
+        group: "appetite",
+        label: "بازبینی دوره‌ای سطح پایین",
+        before: "سالانه",
+        after: "شش‌ماهه",
+      },
+    ],
+    groups: [
+      { key: "base", label: "پارامترهای پایه", changes: 1 },
+      { key: "likelihood", label: "احتمال", changes: 0 },
+      { key: "impact", label: "پیامد", changes: 0 },
+      { key: "levels", label: "سطح و تصمیم", changes: 0 },
+      { key: "appetite", label: "اشتها و پذیرش", changes: 1 },
+      { key: "monitoring", label: "پایش", changes: 0 },
+    ],
+    approval: [
+      { key: "draft", title: "پیش‌نویس", note: "متولی روش · ۱۴۰۵/۰۸/۲۰", state: "current" },
+      { key: "review", title: "بازبینی روش‌شناختی امنیت", note: "کارشناس ریسک", state: "locked" },
+      { key: "approval", title: "تصویب مرجع مجاز", note: "کمیته امنیت", state: "locked" },
+      { key: "publish", title: "انتشار", note: "فقط ارزیابی‌های جدید یا بازسنجی‌شده", state: "locked" },
+    ],
+    categories: [
+      { code: "T1", name: "امنیت اطلاعات و سایبری", risks: 14 },
+      { code: "T2", name: "نرم‌افزار و توسعه", risks: 9 },
+    ],
+    parameters: [
+      methodParam("horizon", "افق پیش‌فرض ارزیابی", "base", "12", "ماه"),
+      methodParam("input_return", "مهلت پیشنهادی جواب ورودی مبهم", "base", "5", "روز کاری"),
+      methodParam("a_data_period", "کمترین دوره‌ی داده برای نرخ A", "base", "12", "ماه"),
+      methodParam("a_data_coverage", "کمترین پوشش ثبت دامنه‌ی آغازگر", "base", "95", "درصد", "۹۰ درصد"),
+      methodParam("reminder_first", "یادآوری اول پیش از انقضای پذیرش", "appetite", "30", "روز تقویمی"),
+      methodParam("control_sample", "اندازه‌ی نمونه‌ی آزمون کنترل", "monitoring", "30", "نمونه"),
+    ],
+    likelihood: {
+      rows: [1, 2, 3, 4, 5].map((a) => ({
+        a,
+        cells: [1, 2, 3, 4, 5].map((b) => ({ b, l: Math.min(5, Math.ceil((a + b) / 2)), changed: false })),
+      })),
+      names: [
+        { value: 1, name: "بسیار کم" },
+        { value: 5, name: "بسیار زیاد" },
+      ],
+      source: "NIST SP 800-30",
+      changed: 0,
+    },
+    levels: {
+      levels: [level(1, "پایین", 1, 4), level(2, "متوسط", 5, 9), level(3, "بالا", 10, 15), level(4, "بحرانی", 16, 25)],
+      rules: [
+        { key: "floor-5", title: "کف پیامد ۵ ← حداقل «بالا»", note: "عدد خام تغییر نمی‌کند", source: "version" },
+        { key: "incident", title: "رویداد در حال وقوع ← اولویت بحرانی", note: "ارجاع به رخداد", source: "system" },
+      ],
+    },
+    appetite: [
+      {
+        rank: 1,
+        level: { name: "پایین", color: "#198754", rank: 1 },
+        authority: "مالک ریسک",
+        plan: "۳۰ روز تقویمی",
+        acceptance: "۱۲ ماه",
+        review: "شش‌ماهه",
+        reminder: "۳۰ و ۷ روز",
+        changed: ["review"],
+      },
+    ],
+    impact_scales: [
+      { code: "S", name: "خدمت و تداوم", scope: "توقف و زمان بازیابی", stakeholders: ["داتین", "مشتری"], levels: 6 },
+      { code: "F", name: "مالی", scope: "هزینه‌ی بازیابی", stakeholders: ["داتین"], levels: 6 },
+    ],
+    admin_url: null,
+    ...changes,
+  };
+}
+
+// چارت سازمانی (OrgChartPage)
+
+function orgNode(id: number, name: string, extra: Partial<OrgNode> = {}): OrgNode {
+  return {
+    id,
+    code: `U${id}`,
+    name,
+    depth: 1,
+    manager: { id: id + 100, name: `مدیر ${name}` },
+    manager_title: "",
+    risks: 0,
+    critical: 0,
+    children: [],
+    ...extra,
+  };
+}
+
+export function orgChartPage(changes: Partial<OrgChartPage> = {}): OrgChartPage {
+  return {
+    summary: { units: 4, levels: 3, users: 12 },
+    tree: [
+      orgNode(1, "داتین", {
+        depth: 0,
+        risks: 9,
+        critical: 2,
+        children: [
+          orgNode(2, "معاونت فناوری", {
+            risks: 5,
+            critical: 2,
+            children: [orgNode(4, "زیرساخت", { depth: 2, risks: 3 })],
+          }),
+          orgNode(3, "پرداخت", { risks: 4 }),
+        ],
+      }),
+    ],
+    selected: {
+      id: 2,
+      code: "U2",
+      name: "معاونت فناوری",
+      active: true,
+      ad_group: "OU=Tech",
+      parent: "داتین",
+      manager: { id: 102, name: "علی رضایی" },
+      deputy: { id: 7, name: "مهدی فرهادی" },
+      services: ["شبکه‌ی مرکزی"],
+      customers: ["بانک ملت", "بانک تجارت"],
+      acceptance: "مدیر بالادست: نرگس کاظمی",
+      levels: [
+        { rank: 4, name: "بحرانی", count: 2 },
+        { rank: 3, name: "بالا", count: 1 },
+        { rank: 2, name: "متوسط", count: 2 },
+        { rank: 1, name: "پایین", count: 0 },
+      ],
+      edit_url: "/units/2/edit/",
+      add_child_url: "/units/new/?parent=2",
+    },
+    members: [
+      {
+        id: 102,
+        name: "علی رضایی",
+        username: "ali",
+        initials: "عر",
+        job_title: "مدیر فناوری",
+        roles: [
+          { label: "مدیر واحد", tone: "info" },
+          { label: "مالک ریسک", tone: "warning" },
+        ],
+        source: { value: "ad", label: "AD" },
+        active: true,
+      },
+      {
+        id: 7,
+        name: "مهدی فرهادی",
+        username: "mehdi",
+        initials: "مف",
+        job_title: "",
+        roles: [{ label: "کارشناس", tone: "neutral" }],
+        source: { value: "local", label: "محلی" },
+        active: false,
+      },
+    ],
+    can_edit: true,
+    add_unit_url: "/units/new/",
+    ad_sync_url: "/units/ad-sync",
+    add_member_url: "/accounts/users/new/?org_unit=2",
+    ...changes,
+  };
+}
+
+// آزمون اثربخشی کنترل (ControlTestPage)
+
+const controlTestDay = (jalali: string) => ({ iso: "2026-10-10", jalali });
+
+export function controlTest(changes: Partial<ControlTest> = {}): ControlTest {
+  const rows = Array.from({ length: 12 }, (_, index) => ({
+    id: index + 1,
+    reference: `REL-${index + 1}`,
+    date: controlTestDay(`1405/07/${String(index + 10)}`),
+    path: index % 4 === 3 ? "انتشار اضطراری" : "انتشار عادی",
+    performer: index === 7 || index === 11 ? null : "علی رضایی",
+    passed: index !== 7 && index !== 11,
+    note: index === 7 ? "تأیید دوم پس از انتشار ثبت شد" : index === 11 ? "تأییدکننده‌ی دوم همان مجری بود" : null,
+  }));
+  return {
+    id: 8,
+    code: "CA-1405-0008",
+    control: {
+      id: 9,
+      code: "CT-0009",
+      title: "تأیید دوم انتشار",
+      is_key: true,
+      owner: { id: 4, name: "حسین نوری" },
+      href: "/controls/9/",
+    },
+    e: { value: 2, name: "اثربخشی محدود" },
+    previous: { e: 3, code: "CA-1405-0009", href: "/controls/effectiveness/9/" },
+    tester: { id: 7, name: "ندا احمدی" },
+    period: { from: controlTestDay("1405/07/10"), to: controlTestDay("1405/08/10") },
+    valid_until: { ...controlTestDay("1405/11/10"), days_left: 80, overdue: false },
+    evidence_age: "۹۰",
+    suspended: false,
+    cards: [
+      { key: "exists", label: "وجود", state: "met", state_label: "احراز شد", text: "کنترل اجرا می‌شود." },
+      { key: "design", label: "کفایت طراحی", state: "met", state_label: "احراز شد", text: "متوقف می‌کند." },
+      { key: "coverage", label: "پوشش اجرا", state: "partial", state_label: "ناقص", text: "۲ استثنا از ۱۲ نمونه." },
+      {
+        key: "operating",
+        label: "اثربخشی عملیاتی",
+        state: "unmet",
+        state_label: "احراز نشد",
+        text: "شکاف شناخته‌شده در دامنه‌ی مورد اتکا؛ شرط E3 برقرار نیست.",
+      },
+    ],
+    plan: {
+      kind: "نمونه‌گیری + آزمون عملی",
+      rows: [{ label: "روش آزمون", value: "بازبینی نمونه‌ای سوابق انتشار" }],
+      paths: [
+        { name: "انتشار عادی", passed: true },
+        { name: "انتشار اضطراری", passed: false },
+      ],
+    },
+    results: { summary: "۱۰ موفق · ۲ استثنا", rate: "۸۳٫۳", rows },
+    ladder: {
+      current: 2,
+      previous: 3,
+      target: 3,
+      levels: [1, 2, 3, 4, 5].map((value) => ({ value, name: `سطح ${value}`, text: `شرح ${value}`, criteria: "" })),
+      conditions: [
+        { key: "design", label: "طراحی کنترل کافی است", met: true, note: null },
+        { key: "gap", label: "شکاف شناخته‌شده وجود ندارد", met: false, note: "مسیر اضطراری باز است" },
+      ],
+      rationale: "تا رفع شکاف E2 می‌ماند.",
+    },
+    risks: [
+      {
+        id: 15,
+        code: "RK-1405-0015",
+        title: "اعمال بسته‌ی انتشار نامعتبر",
+        href: "/risks/15/",
+        assessment: { code: "AS-1405-0021", href: "/assessments/21/" },
+        approved: false,
+        paths: [
+          {
+            id: 8,
+            name: "مسیر ۲ · فرمان دستی",
+            b0: "۳",
+            bc: "۴",
+            bc_before: "۳",
+            note: "کنترل دیگری این مسیر را قطع نمی‌کند",
+          },
+        ],
+        b: "۳",
+        b_change: "بدون تغییر",
+        l: "۳",
+        score: "۹",
+        level: { rank: 2, name: "متوسط", color: "#ffc107", text_color: "#000" },
+        alert: "شکست کنترل کلیدی: اعتبار کاهش تعلیق شود.",
+      },
+    ],
+    others: [
+      { id: 9, code: "RK-1405-0009", href: "/risks/9/", scope: "پرداخت اینترنتی", state: "بازسنجی", tone: "warning" },
+    ],
+    evidence: [
+      {
+        id: 14,
+        code: "EV-1405-0014",
+        title: "تیکت‌های CAB",
+        kind: "آزمون",
+        observed_on: controlTestDay("1405/08/15"),
+        state: "current",
+        state_label: "جاری",
+        href: "/risks/evidence/14/",
+      },
+      {
+        id: 20,
+        code: "EV-1405-0020",
+        title: "آزمون سال گذشته (مبنای E3 قبلی)",
+        kind: "آزمون",
+        observed_on: controlTestDay("1404/08/10"),
+        state: "superseded",
+        state_label: "منسوخ",
+        href: "/risks/evidence/20/",
+      },
+    ],
+    rules: ["موفقیت چند نمونه برای اثبات اثربخشی در کل دامنه کافی نیست"],
+    new_test_url: "/controls/9/effectiveness/new/",
+    edit_url: "/controls/effectiveness/8/edit/",
+    ...changes,
+  };
+}
+
+// ارزیابی پس از اقدام (PostActionPage)
+
+const postHigh = { rank: 3, name: "بالا", color: "#fd7e14", text_color: "#000" };
+const postMedium = { rank: 2, name: "متوسط", color: "#ffc107", text_color: "#000" };
+
+function postActionCard(changes: Partial<PostActionCard> & Pick<PostActionCard, "key" | "title">): PostActionCard {
+  return {
+    hint: "",
+    chip: null,
+    current: false,
+    a: "۴",
+    b: "۳",
+    l: "۳",
+    i: "۳",
+    score: "۹",
+    level: postMedium,
+    ...changes,
+  };
+}
+
+export function postAction(changes: Partial<PostAction> = {}): PostAction {
+  return {
+    plan: { id: 7, label: "طرح مواجهه‌ی RK-1405-0029 (کاهش)", href: "/actions/plans/7/" },
+    risk: { code: "RK-1405-0029", title: "انتشار ساتنا", href: "/risks/29/" },
+    title: "ارزیابی پس از اقدام · انتشار ساتنا",
+    status: { label: "هدف محقق شد", tone: "success" },
+    subtitle: "ارزیابی AS-1405-0034 برای RK-1405-0029 · ارزیاب: مریم صادقی",
+    cards: [
+      postActionCard({ key: "inherent", title: "ذاتی", b: "۴", l: "۴", score: "۱۲", level: postHigh }),
+      postActionCard({ key: "before", title: "جاری قبلی" }),
+      postActionCard({
+        key: "target",
+        title: "هدف طرح",
+        b: "۲",
+        i: "۲",
+        score: "۶",
+        chip: { label: "هدف", tone: "warning" },
+      }),
+      postActionCard({
+        key: "after",
+        title: "جاری جدید",
+        i: "۲",
+        score: "۶",
+        current: true,
+        chip: { label: "محقق", tone: "success" },
+      }),
+    ],
+    compare_href: "/assessments/compare/?ids=31,32,33,34",
+    waiting: null,
+    summary: {
+      title: "ریسک هدف محقق شد",
+      text: "امتیاز جاری از ۹ به ۶ رسید و با هدف طرح برابر است",
+      reached: true,
+      rows: [
+        { label: "سطح", value: "متوسط · بدون تغییر" },
+        { label: "وضعیت ریسک", value: "پایش فعال · بسته نمی‌شود" },
+      ],
+    },
+    paths: {
+      subtitle: "B نهایی بیشینه‌ی مسیرهاست",
+      rows: [
+        {
+          id: 12,
+          name: "مسیر ۱ · انتشار عادی",
+          b0: "۴",
+          controls: [
+            { code: "CT-0011", e: 3, label: "CT-0011 · E۳", tone: "success" },
+            { code: "CT-0012", e: 2, label: "CT-0012 · E۲", tone: "warning" },
+          ],
+          bc: "۳",
+          b: "۳",
+        },
+      ],
+      total: "۳ · با A۴ رتبه‌ی L برابر ۳",
+      note: "هدف B۲ محقق نشد، چون CT-0012 در آزمون اخیر از E۳ به E۲ افت کرد.",
+    },
+    profile: {
+      subtitle: "پیامد I برابر بیشینه‌ی ابعاد است · از ۳ به ۲",
+      rows: [
+        { code: "S", name: "خدمت و تداوم", note: "بازگردانی خودکار", before: 3, after: 2, max: 5 },
+        { code: "D", name: "داده و تمامیت", note: "بدون تغییر", before: 2, after: 2, max: 5 },
+      ],
+    },
+    decision: {
+      subtitle: "تصمیم مالک ریسک · سطح متوسط",
+      can_decide: true,
+      can_ask: true,
+      owner: { id: 4, name: "حسین نوری" },
+      options: [
+        { value: "monitor", label: "پایش فعال با بازبینی سه‌ماهه", problems: [] },
+        { value: "continue", label: "ادامه‌ی اصلاح تا B۲ · رفع شکاف CT-0012", problems: [] },
+        { value: "accept", label: "پذیرش متوسط · حداکثر ۶ ماه", problems: [] },
+      ],
+      corrective: { label: "ایجاد اقدام اصلاحی برای CT-0012", count: 1 },
+      problems: [],
+      waiting: null,
+      last: null,
+    },
+    evidence: [
+      {
+        id: 29,
+        code: "EV-1405-0029",
+        title: "لاگ بازگردانی خودکار",
+        observed_on: "۱۴۰۵/۰۸/۱۰",
+        href: "/risks/evidence/29/",
+      },
+    ],
+    rules: ["ریسک پس از کاهش بسته نمی‌شود و به پایش فعال می‌رود"],
+    ...changes,
   };
 }

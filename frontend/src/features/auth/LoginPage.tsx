@@ -150,7 +150,7 @@ export function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-muted">
             ورود با همان نام کاربری و گذرواژه‌ی سامانه است.{" "}
-            <a href={classicLogin} className="text-accent-text underline-offset-4 hover:underline">
+            <a href={classicLogin} className="text-accent-text underline underline-offset-4">
               ورود با صفحه‌ی فعلی سامانه
             </a>
           </p>

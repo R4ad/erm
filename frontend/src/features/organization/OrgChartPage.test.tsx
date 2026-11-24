@@ -2,95 +2,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import type { OrgChartPage as PageData, OrgNode } from "@/lib/types";
 import { mockApi, reply } from "@/test/api";
 import { expectNoAxeViolations } from "@/test/axe";
+import { orgChartPage } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 
 import { OrgChartPage } from "./OrgChartPage";
-
-function node(id: number, name: string, extra: Partial<OrgNode> = {}): OrgNode {
-  return {
-    id,
-    code: `U${id}`,
-    name,
-    depth: 1,
-    manager: { id: id + 100, name: `مدیر ${name}` },
-    manager_title: "",
-    risks: 0,
-    critical: 0,
-    children: [],
-    ...extra,
-  };
-}
-
-function page(changes: Partial<PageData> = {}): PageData {
-  return {
-    summary: { units: 4, levels: 3, users: 12 },
-    tree: [
-      node(1, "داتین", {
-        depth: 0,
-        risks: 9,
-        critical: 2,
-        children: [
-          node(2, "معاونت فناوری", { risks: 5, critical: 2, children: [node(4, "زیرساخت", { depth: 2, risks: 3 })] }),
-          node(3, "پرداخت", { risks: 4 }),
-        ],
-      }),
-    ],
-    selected: {
-      id: 2,
-      code: "U2",
-      name: "معاونت فناوری",
-      active: true,
-      ad_group: "OU=Tech",
-      parent: "داتین",
-      manager: { id: 102, name: "علی رضایی" },
-      deputy: { id: 7, name: "مهدی فرهادی" },
-      services: ["شبکه‌ی مرکزی"],
-      customers: ["بانک ملت", "بانک تجارت"],
-      acceptance: "مدیر بالادست: نرگس کاظمی",
-      levels: [
-        { rank: 4, name: "بحرانی", count: 2 },
-        { rank: 3, name: "بالا", count: 1 },
-        { rank: 2, name: "متوسط", count: 2 },
-        { rank: 1, name: "پایین", count: 0 },
-      ],
-      edit_url: "/units/2/edit/",
-      add_child_url: "/units/new/?parent=2",
-    },
-    members: [
-      {
-        id: 102,
-        name: "علی رضایی",
-        username: "ali",
-        initials: "عر",
-        job_title: "مدیر فناوری",
-        roles: [
-          { label: "مدیر واحد", tone: "info" },
-          { label: "مالک ریسک", tone: "warning" },
-        ],
-        source: { value: "ad", label: "AD" },
-        active: true,
-      },
-      {
-        id: 7,
-        name: "مهدی فرهادی",
-        username: "mehdi",
-        initials: "مف",
-        job_title: "",
-        roles: [{ label: "کارشناس", tone: "neutral" }],
-        source: { value: "local", label: "محلی" },
-        active: false,
-      },
-    ],
-    can_edit: true,
-    add_unit_url: "/units/new/",
-    ad_sync_url: "/units/ad-sync",
-    add_member_url: "/accounts/users/new/?org_unit=2",
-    ...changes,
-  };
-}
 
 function render(path = "/units") {
   return renderPage(<OrgChartPage />, { path, route: "/units" });
@@ -98,7 +15,7 @@ function render(path = "/units") {
 
 describe("OrgChartPage", () => {
   it("draws the unit tree, the selected unit's detail and its members", async () => {
-    mockApi({ "GET org/chart/": page() });
+    mockApi({ "GET org/chart/": orgChartPage() });
     const { container } = render();
 
     const chart = await screen.findByRole("region", { name: "درخت واحدها، پیمایش افقی" });
@@ -130,7 +47,7 @@ describe("OrgChartPage", () => {
 
   it("selects another unit and dims units that do not match the search", async () => {
     const user = userEvent.setup();
-    const api = mockApi({ "GET org/chart/": page() });
+    const api = mockApi({ "GET org/chart/": orgChartPage() });
     render();
 
     const chart = await screen.findByRole("region", { name: "درخت واحدها، پیمایش افقی" });
@@ -146,12 +63,12 @@ describe("OrgChartPage", () => {
 
   it("hides editing for users who are not system admins", async () => {
     mockApi({
-      "GET org/chart/": page({
+      "GET org/chart/": orgChartPage({
         can_edit: false,
         add_unit_url: null,
         ad_sync_url: null,
         add_member_url: null,
-        selected: { ...page().selected!, edit_url: null, add_child_url: null },
+        selected: { ...orgChartPage().selected!, edit_url: null, add_child_url: null },
       }),
     });
     render();
