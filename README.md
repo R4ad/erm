@@ -277,6 +277,7 @@ pipenv run python manage.py run_ai_identification --watch --interval 2
 | `LLM_PROVIDER` | `mock` (پیش‌فرض، بی‌شبکه و برای توسعه و آزمون) یا `openai_compatible` (vLLM، Ollama یا هر سرور سازگار) |
 | `LLM_BASE_URL`، `LLM_MODEL`، `LLM_API_KEY` | نشانی پایه تا `/v1`، نام مدل و کلید؛ کلید فقط در `.env` می‌ماند |
 | `LLM_TIMEOUT_MS` | مهلت هر درخواست (پیش‌فرض ۶۰۰۰۰) |
+| `LLM_VERIFY_SSL` | بررسی گواهی HTTPS سرور LLM (پیش‌فرض `true`). `false` فقط برای سرور داخلی با گواهی خودامضا؛ هویت سرور ثابت نمی‌شود و کلید در برابر شنود میانی امن نیست. راه امن‌تر: گواهی CA داخلی در کانتینر و `SSL_CERT_FILE` |
 | `RISK_SIMILARITY_THRESHOLD` | آستانه‌ی شباهت سه‌حرفی (pg_trgm) عنوان، رویداد و پیامد با ریسک‌های رجیستر برای «ریسک‌های مشابه» (پیش‌فرض 0.3) |
 
 پرامپت‌ها نسخه‌دار در `apps/questionnaires/ai/prompts/` هستند و هر اجرا ورودی، خروجی، نسخه‌ی پرامپت، مدل و کد پیگیری

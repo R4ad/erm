@@ -189,5 +189,7 @@ LLM_BASE_URL = env("LLM_BASE_URL", default="")
 LLM_MODEL = env("LLM_MODEL", default="")
 LLM_API_KEY = env("LLM_API_KEY", default="")
 LLM_TIMEOUT_MS = env.int("LLM_TIMEOUT_MS", default=60000)
+# false فقط برای سرور LLM داخلی با گواهی خودامضا؛ بررسی گواهی خاموش می‌شود (providers._unverified_context).
+LLM_VERIFY_SSL = env.bool("LLM_VERIFY_SSL", default=True)
 # کمینه‌ی شباهت سه‌حرفی (۰ تا ۱) برای هشدار «مشابه ریسک موجود».
 RISK_SIMILARITY_THRESHOLD = env.float("RISK_SIMILARITY_THRESHOLD", default=0.3)

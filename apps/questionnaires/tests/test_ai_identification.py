@@ -2,6 +2,7 @@
 
 import io
 import json
+import ssl
 import urllib.error
 from datetime import timedelta
 from unittest import mock
@@ -354,7 +355,7 @@ def compatible(settings):
 def test_compatible_provider_asks_for_the_schema_then_falls_back_to_json_object(compatible):
     sent = []
 
-    def urlopen(request, timeout):
+    def urlopen(request, timeout, context):
         body = json.loads(request.data)
         sent.append((request.full_url, request.headers.get("Authorization"), body["response_format"]["type"]))
         if body["response_format"]["type"] == "json_schema":
@@ -367,6 +368,25 @@ def test_compatible_provider_asks_for_the_schema_then_falls_back_to_json_object(
         ("http://llm.local/v1/chat/completions", "Bearer k", "json_schema"),
         ("http://llm.local/v1/chat/completions", "Bearer k", "json_object"),
     ]
+
+
+def test_compatible_provider_verifies_the_certificate_unless_turned_off(settings):
+    settings.LLM_PROVIDER = "openai_compatible"
+    settings.LLM_BASE_URL = "https://llm.local/v1"
+    settings.LLM_MODEL = "qwen"
+    contexts = []
+
+    def urlopen(request, timeout, context):
+        contexts.append(context)
+        return Answer(json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())
+
+    with mock.patch.object(providers.urllib.request, "urlopen", urlopen):
+        providers.get_provider().complete("s", "u", {})
+        settings.LLM_VERIFY_SSL = False
+        providers.get_provider().complete("s", "u", {})
+    assert contexts[0] is None
+    assert contexts[1].verify_mode == ssl.CERT_NONE
+    assert contexts[1].check_hostname is False
 
 
 def test_compatible_provider_timeout_is_504(compatible):

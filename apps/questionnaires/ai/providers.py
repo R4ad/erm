@@ -5,9 +5,10 @@
 - openai_compatible: سرورهای داخلی سازگار با OpenAI مثل vLLM یا Ollama، با urllib کتابخانه‌ی استاندارد. اول خروجی
   ساختاریافته با JSON Schema را می‌خواهد و اگر سرور نپذیرد به json_object برمی‌گردد.
 
-تنظیمات از settings: LLM_PROVIDER، LLM_BASE_URL، LLM_MODEL، LLM_API_KEY و LLM_TIMEOUT_MS."""
+تنظیمات از settings: LLM_PROVIDER، LLM_BASE_URL، LLM_MODEL، LLM_API_KEY، LLM_TIMEOUT_MS و LLM_VERIFY_SSL."""
 
 import json
+import ssl
 import urllib.error
 import urllib.request
 
@@ -57,6 +58,15 @@ class MockProvider:
         return json.dumps({"risks": risks, "follow_up_questions": []}, ensure_ascii=False)
 
 
+def _unverified_context():
+    """LLM_VERIFY_SSL=false: گواهی سرور LLM بررسی نمی‌شود (گواهی خودامضا یا CA داخلی). ترافیک همچنان رمز می‌شود ولی
+    هویت سرور ثابت نمی‌شود، پس کلید API در برابر شنود میانی امن نیست؛ راه بهتر SSL_CERT_FILE با گواهی CA داخلی است."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
+
+
 class OpenAICompatibleProvider:
     name = "openai_compatible"
 
@@ -65,6 +75,7 @@ class OpenAICompatibleProvider:
         self.model = settings.LLM_MODEL
         self.api_key = settings.LLM_API_KEY
         self.timeout = settings.LLM_TIMEOUT_MS / 1000
+        self.context = None if settings.LLM_VERIFY_SSL else _unverified_context()
 
     def _post(self, body):
         headers = {"Content-Type": "application/json"}
@@ -77,7 +88,7 @@ class OpenAICompatibleProvider:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as answer:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as answer:
                 return json.loads(answer.read().decode())
         except urllib.error.HTTPError as error:
             raise ProviderError(f"سرور LLM خطای {error.code} داد.", status=502 if error.code < 500 else error.code)
